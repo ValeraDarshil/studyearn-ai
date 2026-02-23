@@ -1,0 +1,44 @@
+{
+  "name": "server",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "ai": "tsx src/ai-server.ts",
+    "files": "tsx src/file-server.ts",
+    "ppt": "tsx src/ppt-server.ts",
+    "auth": "tsx src/auth-server.ts",
+    "dev": "concurrently \"npm run ai\" \"npm run files\" \"npm run ppt\" \"npm run auth\""
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "axios": "^1.13.5",
+    "bcryptjs": "^3.0.3",
+    "concurrently": "^9.2.1",
+    "cors": "^2.8.6",
+    "dotenv": "^17.2.4",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
+    "lottie-react": "^2.4.1",
+    "mime-types": "^3.0.2",
+    "mongoose": "^9.2.1",
+    "multer": "^2.0.2",
+    "pdf-lib": "^1.17.1",
+    "sharp": "^0.34.5",
+    "tsx": "^4.21.0",
+    "uuid": "^13.0.0"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/mime-types": "^3.0.1",
+    "@types/multer": "^2.0.0",
+    "@types/node": "^25.2.3",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.9.3"
+  }
+}

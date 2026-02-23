@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>World War 2 - Presentation</title>
+<style>
+  *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px 20px 80px;
+  }
+
+  .slide { display: none; width: 100%; max-width: 1000px; }
+  .slide.active { display: block; animation: fadeIn 0.4s ease; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .slide-inner {
+    background: #ffffff;
+    border-radius: 24px;
+    padding: 56px 64px;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.25);
+    min-height: 480px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    position: relative;
+  }
+
+  .slide-num {
+    position: absolute;
+    top: 24px; right: 32px;
+    font-size: 13px;
+    color: #94a3b8;
+    font-weight: 600;
+    letter-spacing: 1px;
+  }
+
+  .slide-topic {
+    position: absolute;
+    bottom: 24px; left: 32px;
+    font-size: 12px;
+    color: #94a3b8;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  h1 {
+    font-size: clamp(28px, 4vw, 44px);
+    font-weight: 800;
+    color: #1a202c;
+    margin-bottom: 36px;
+    line-height: 1.2;
+    padding-bottom: 20px;
+    border-bottom: 4px solid #f5576c;
+  }
+
+  ul { list-style: none; }
+
+  li {
+    font-size: clamp(16px, 2vw, 22px);
+    color: #1a202c;
+    padding: 10px 0 10px 36px;
+    position: relative;
+    line-height: 1.5;
+    border-bottom: 1px solid rgba(0,0,0,0.06);
+  }
+  li:last-child { border-bottom: none; }
+
+  li::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 50%;
+    transform: translateY(-50%);
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: #f5576c;
+  }
+
+  /* Controls */
+  .controls {
+    position: fixed;
+    bottom: 24px; left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    background: rgba(0,0,0,0.4);
+    backdrop-filter: blur(12px);
+    padding: 10px 20px;
+    border-radius: 50px;
+    border: 1px solid rgba(255,255,255,0.15);
+  }
+
+  .controls button {
+    padding: 8px 22px;
+    font-size: 14px;
+    font-weight: 600;
+    border: none;
+    border-radius: 30px;
+    background: rgba(255,255,255,0.15);
+    color: white;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .controls button:hover:not(:disabled) {
+    background: rgba(255,255,255,0.3);
+    transform: scale(1.05);
+  }
+  .controls button:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  .controls .counter {
+    color: rgba(255,255,255,0.8);
+    font-size: 13px;
+    font-weight: 600;
+    min-width: 60px;
+    text-align: center;
+  }
+
+  @media (max-width: 600px) {
+    .slide-inner { padding: 36px 28px; min-height: 360px; }
+    h1 { font-size: 26px; }
+    li { font-size: 15px; }
+  }
+</style>
+</head>
+<body>
+
+
+    <div class="slide active">
+      <div class="slide-inner">
+        <div class="slide-num">1 / 7</div>
+        <h1>World War 2</h1>
+        <ul>
+          <li>Global Conflict</li>
+          <li>1939-1945</li>
+          <li>Historic Event</li>
+        </ul>
+        <div class="slide-topic">World War 2</div>
+      </div>
+    </div>
+
+    <div class="slide ">
+      <div class="slide-inner">
+        <div class="slide-num">2 / 7</div>
+        <h1>Introduction</h1>
+        <ul>
+          <li>War between Axis</li>
+          <li>Allied Powers</li>
+          <li>Global Involvement</li>
+        </ul>
+        <div class="slide-topic">World War 2</div>
+      </div>
+    </div>
+
+    <div class="slide ">
+      <div class="slide-inner">
+        <div class="slide-num">3 / 7</div>
+        <h1>Causes of War</h1>
+        <ul>
+          <li>Nazi Germany</li>
+          <li>Fascist Italy</li>
+          <li>Imperial Japan</li>
+        </ul>
+        <div class="slide-topic">World War 2</div>
+      </div>
+    </div>
+
+    <div class="slide ">
+      <div class="slide-inner">
+        <div class="slide-num">4 / 7</div>
+        <h1>Major Events</h1>
+        <ul>
+          <li>D-Day Invasion</li>
+          <li>Hiroshima Bombing</li>
+          <li>Battle Stalingrad</li>
+        </ul>
+        <div class="slide-topic">World War 2</div>
+      </div>
+    </div>
+
+    <div class="slide ">
+      <div class="slide-inner">
+        <div class="slide-num">5 / 7</div>
+        <h1>Key Players</h1>
+        <ul>
+          <li>Adolf Hitler</li>
+          <li>Winston Churchill</li>
+          <li>Joseph Stalin</li>
+        </ul>
+        <div class="slide-topic">World War 2</div>
+      </div>
+    </div>
+
+    <div class="slide ">
+      <div class="slide-inner">
+        <div class="slide-num">6 / 7</div>
+        <h1>Real-world Impact</h1>
+        <ul>
+          <li>United Nations Formed</li>
+          <li>European Union</li>
+          <li>Global Security</li>
+        </ul>
+        <div class="slide-topic">World War 2</div>
+      </div>
+    </div>
+
+    <div class="slide ">
+      <div class="slide-inner">
+        <div class="slide-num">7 / 7</div>
+        <h1>Summary</h1>
+        <ul>
+          <li>War Changed World</li>
+          <li>Lessons Learned</li>
+          <li>Peace Efforts</li>
+        </ul>
+        <div class="slide-topic">World War 2</div>
+      </div>
+    </div>
+
+<div class="controls">
+  <button id="prev" onclick="go(-1)">&#8592; Prev</button>
+  <span class="counter" id="counter">1 / 7</span>
+  <button id="next" onclick="go(1)">Next &#8594;</button>
+</div>
+
+<script>
+  let cur = 0;
+  const slides = document.querySelectorAll('.slide');
+  const prev = document.getElementById('prev');
+  const next = document.getElementById('next');
+  const counter = document.getElementById('counter');
+
+  function go(dir) {
+    slides[cur].classList.remove('active');
+    cur = Math.max(0, Math.min(cur + dir, slides.length - 1));
+    slides[cur].classList.add('active');
+    counter.textContent = (cur + 1) + ' / ' + slides.length;
+    prev.disabled = cur === 0;
+    next.disabled = cur === slides.length - 1;
+  }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); go(1); }
+    if (e.key === 'ArrowLeft') { e.preventDefault(); go(-1); }
+  });
+
+  prev.disabled = true;
+</script>
+</body>
+</html>
