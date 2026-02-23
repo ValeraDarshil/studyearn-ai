@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "start": "node --loader tsx src/auth-server.ts",
+    "start": "node --import tsx src/auth-server.ts",
     "ai": "tsx src/ai-server.ts",
     "files": "tsx src/file-server.ts",
     "ppt": "tsx src/ppt-server.ts",
