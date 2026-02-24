@@ -13,12 +13,12 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "@google/generative-ai": "^0.21.0",
     "axios": "^1.13.5",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
     "dotenv": "^17.2.4",
     "express": "^5.2.1",
+    "groq-sdk": "^0.8.0",
     "jsonwebtoken": "^9.0.3",
     "mime-types": "^3.0.2",
     "mongoose": "^9.2.1",

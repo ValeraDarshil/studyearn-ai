@@ -4,7 +4,7 @@ import dotenv from 'dotenv';
 import authRoutes from './auth.js';
 import userRoutes from './user-routes.js';
 import leaderboardRoutes from './leaderboard-routes.js';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import Groq from 'groq-sdk';
 import { upload } from './upload.js';
 import fs from 'fs';
 import path from 'path';
@@ -31,8 +31,10 @@ app.use(express.json({ limit: '50mb' }));
 
 const PORT = process.env.PORT || 5003;
 
-// ✅ Initialize Gemini AI
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+// ✅ Initialize GROQ (NOT Gemini!)
+const groq = new Groq({
+  apiKey: process.env.GROQ_API_KEY
+});
 
 // Storage setup
 const OUTPUT_DIR = path.join(process.cwd(), 'uploads', 'output');
@@ -41,7 +43,7 @@ app.use('/downloads', express.static(OUTPUT_DIR));
 
 // ================= HEALTH CHECK =================
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', service: 'Unified Server', port: PORT });
+  res.json({ status: 'ok', service: 'Unified Server (GROQ)', port: PORT });
 });
 
 // ================= AUTH & USER ROUTES =================
@@ -49,7 +51,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
 
-// ================= AI ROUTE =================
+// ================= AI ROUTE (GROQ) =================
 app.post('/api/ai/ask', async (req, res) => {
   try {
     const { prompt, image } = req.body;
@@ -61,33 +63,35 @@ app.post('/api/ai/ask', async (req, res) => {
       });
     }
 
-    if (!process.env.GEMINI_API_KEY) {
+    if (!process.env.GROQ_API_KEY) {
       return res.json({
         success: false,
-        answer: 'AI service not configured. Please add GEMINI_API_KEY.',
+        answer: 'AI service not configured. Please add GROQ_API_KEY.',
       });
     }
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-    let result;
-
+    // ✅ GROQ doesn't support images, so text-only
     if (image) {
-      const imageParts = [{
-        inlineData: {
-          data: image.split(',')[1],
-          mimeType: image.split(';')[0].split(':')[1]
-        }
-      }];
-
-      result = await model.generateContent([
-        prompt || 'Analyze this image and answer any questions visible in it.',
-        ...imageParts
-      ]);
-    } else {
-      result = await model.generateContent(prompt);
+      return res.json({
+        success: false,
+        answer: 'Image analysis not supported yet. Please type your question.',
+      });
     }
 
-    const answer = result.response.text();
+    // ✅ Use GROQ with llama model
+    const completion = await groq.chat.completions.create({
+      messages: [
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
+      model: 'llama-3.3-70b-versatile', // Fast and good!
+      temperature: 0.7,
+      max_tokens: 2000,
+    });
+
+    const answer = completion.choices[0]?.message?.content || 'No response from AI';
 
     res.json({
       success: true,
@@ -291,6 +295,7 @@ app.post('/api/merge-pdf', upload.array('files', 20), async (req, res) => {
 connectDB().then(() => {
   app.listen(PORT, () => {
     console.log(`🚀 Unified Server running on http://localhost:${PORT}`);
+    console.log(`✅ Using GROQ AI (llama-3.3-70b-versatile)`);
     console.log(`✅ Auth: /api/auth`);
     console.log(`✅ AI: /api/ai/ask`);
     console.log(`✅ PPT: /api/ppt/generate`);
