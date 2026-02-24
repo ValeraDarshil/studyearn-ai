@@ -1,6 +1,12 @@
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+
+// ✅ FIX __dirname for ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const UPLOAD_DIR = path.join(__dirname, "..", "uploads");
 

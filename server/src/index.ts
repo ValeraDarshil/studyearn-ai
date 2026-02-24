@@ -1,304 +1,308 @@
-// import express from 'express';
-// import cors from 'cors';
-// import dotenv from 'dotenv';
-// import authRoutes from './auth.js';
-// import userRoutes from './user-routes.js';
-// import leaderboardRoutes from './leaderboard-routes.js';
-// import Groq from 'groq-sdk';
-// import { upload } from './upload.js';
-// import fs from 'fs';
-// import path from 'path';
-// import { PDFDocument } from 'pdf-lib';
-// import sharp from 'sharp';
-// import PptxGenJS from 'pptxgenjs';
-// import { connectDB } from './db.js';
+import express from 'express';
+import cors from 'cors';
+import dotenv from 'dotenv';
+import authRoutes from './auth.js';
+import userRoutes from './user-routes.js';
+import leaderboardRoutes from './leaderboard-routes.js';
+import Groq from 'groq-sdk';
+import { upload } from './upload.js';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+import { PDFDocument } from 'pdf-lib';
+import sharp from 'sharp';
+import PptxGenJS from 'pptxgenjs';
+import { connectDB } from './db.js';
 
-// dotenv.config();
+// ✅ FIX __dirname for ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
-// const app = express();
+dotenv.config();
 
-// // ✅ CORS - Allow Vercel
-// app.use(cors({
-//   origin: [
-//     'http://localhost:5173',
-//     'https://studyearn-ai.vercel.app',
-//     'https://*.vercel.app'
-//   ],
-//   credentials: true
-// }));
+const app = express();
 
-// app.use(express.json({ limit: '50mb' }));
+// ✅ CORS - Allow Vercel
+app.use(cors({
+  origin: [
+    'http://localhost:5173',
+    'https://studyearn-ai.vercel.app',
+    'https://*.vercel.app'
+  ],
+  credentials: true
+}));
 
-// const PORT = process.env.PORT || 5003;
+app.use(express.json({ limit: '50mb' }));
 
-// // ✅ Initialize GROQ (NOT Gemini!)
-// const groq = new Groq({
-//   apiKey: process.env.GROQ_API_KEY
-// });
+const PORT = process.env.PORT || 5003;
 
-// // Storage setup
-// const OUTPUT_DIR = path.join(process.cwd(), 'uploads', 'output');
-// fs.mkdirSync(OUTPUT_DIR, { recursive: true });
-// app.use('/downloads', express.static(OUTPUT_DIR));
+// ✅ Initialize GROQ
+const groq = new Groq({
+  apiKey: process.env.GROQ_API_KEY
+});
 
-// // ================= HEALTH CHECK =================
-// app.get('/health', (req, res) => {
-//   res.json({ status: 'ok', service: 'Unified Server (GROQ)', port: PORT });
-// });
+// ✅ Storage setup - FIXED path
+const OUTPUT_DIR = path.join(__dirname, '..', 'uploads', 'output');
+fs.mkdirSync(OUTPUT_DIR, { recursive: true });
+app.use('/downloads', express.static(OUTPUT_DIR));
 
-// // ================= AUTH & USER ROUTES =================
-// app.use('/api/auth', authRoutes);
-// app.use('/api/user', userRoutes);
-// app.use('/api/leaderboard', leaderboardRoutes);
+// ================= HEALTH CHECK =================
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', service: 'Unified Server (GROQ)', port: PORT });
+});
 
-// // ================= AI ROUTE (GROQ) =================
-// app.post('/api/ai/ask', async (req, res) => {
-//   try {
-//     const { prompt, image } = req.body;
+// ================= AUTH & USER ROUTES =================
+app.use('/api/auth', authRoutes);
+app.use('/api/user', userRoutes);
+app.use('/api/leaderboard', leaderboardRoutes);
 
-//     if (!prompt && !image) {
-//       return res.json({
-//         success: false,
-//         answer: 'Please provide a question or image',
-//       });
-//     }
+// ================= AI ROUTE (GROQ) =================
+app.post('/api/ai/ask', async (req, res) => {
+  try {
+    const { prompt, image } = req.body;
 
-//     if (!process.env.GROQ_API_KEY) {
-//       return res.json({
-//         success: false,
-//         answer: 'AI service not configured. Please add GROQ_API_KEY.',
-//       });
-//     }
+    if (!prompt && !image) {
+      return res.json({
+        success: false,
+        answer: 'Please provide a question or image',
+      });
+    }
 
-//     // ✅ GROQ doesn't support images, so text-only
-//     if (image) {
-//       return res.json({
-//         success: false,
-//         answer: 'Image analysis not supported yet. Please type your question.',
-//       });
-//     }
+    if (!process.env.GROQ_API_KEY) {
+      return res.json({
+        success: false,
+        answer: 'AI service not configured. Please add GROQ_API_KEY.',
+      });
+    }
 
-//     // ✅ Use GROQ with llama model
-//     const completion = await groq.chat.completions.create({
-//       messages: [
-//         {
-//           role: 'user',
-//           content: prompt
-//         }
-//       ],
-//       model: 'llama-3.3-70b-versatile', // Fast and good!
-//       temperature: 0.7,
-//       max_tokens: 2000,
-//     });
+    // ✅ GROQ doesn't support images
+    if (image) {
+      return res.json({
+        success: false,
+        answer: 'Image analysis not supported yet. Please type your question.',
+      });
+    }
 
-//     const answer = completion.choices[0]?.message?.content || 'No response from AI';
+    // ✅ Use GROQ with llama model
+    const completion = await groq.chat.completions.create({
+      messages: [
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
+      model: 'llama-3.3-70b-versatile',
+      temperature: 0.7,
+      max_tokens: 2000,
+    });
 
-//     res.json({
-//       success: true,
-//       answer: answer,
-//     });
+    const answer = completion.choices[0]?.message?.content || 'No response from AI';
 
-//   } catch (error) {
-//     console.error('AI ERROR:', error);
-//     res.status(500).json({
-//       success: false,
-//       answer: error.message || 'AI request failed. Please try again.',
-//     });
-//   }
-// });
+    res.json({
+      success: true,
+      answer: answer,
+    });
 
-// // ================= PPT GENERATION =================
-// app.post('/api/ppt/generate', async (req, res) => {
-//   try {
-//     const { topic, slides } = req.body;
+  } catch (error: any) {
+    console.error('AI ERROR:', error);
+    res.status(500).json({
+      success: false,
+      answer: error.message || 'AI request failed. Please try again.',
+    });
+  }
+});
 
-//     if (!topic || !slides || slides.length === 0) {
-//       return res.status(400).json({
-//         success: false,
-//         message: 'Topic and slides required',
-//       });
-//     }
+// ================= PPT GENERATION =================
+app.post('/api/ppt/generate', async (req, res) => {
+  try {
+    const { topic, slides } = req.body;
 
-//     const pptx = new PptxGenJS();
-//     pptx.layout = 'LAYOUT_16x9';
-//     pptx.author = 'StudyEarn AI';
-//     pptx.title = topic;
+    if (!topic || !slides || slides.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Topic and slides required',
+      });
+    }
 
-//     // Title slide
-//     const titleSlide = pptx.addSlide();
-//     titleSlide.background = { fill: '0F172A' };
-//     titleSlide.addText(topic, {
-//       x: 0.5,
-//       y: 2.5,
-//       w: 9,
-//       h: 2,
-//       fontSize: 44,
-//       bold: true,
-//       color: 'FFFFFF',
-//       align: 'center',
-//     });
+    const pptx = new PptxGenJS();
+    pptx.layout = 'LAYOUT_16x9';
+    pptx.author = 'StudyEarn AI';
+    pptx.title = topic;
 
-//     // Content slides
-//     slides.forEach((slide) => {
-//       const contentSlide = pptx.addSlide();
-//       contentSlide.background = { fill: '1E293B' };
+    // Title slide
+    const titleSlide = pptx.addSlide();
+    titleSlide.background = { fill: '0F172A' };
+    titleSlide.addText(topic, {
+      x: 0.5,
+      y: 2.5,
+      w: 9,
+      h: 2,
+      fontSize: 44,
+      bold: true,
+      color: 'FFFFFF',
+      align: 'center',
+    });
 
-//       // Title
-//       contentSlide.addText(slide.title, {
-//         x: 0.5,
-//         y: 0.5,
-//         w: 9,
-//         h: 0.8,
-//         fontSize: 32,
-//         bold: true,
-//         color: 'FFFFFF',
-//       });
+    // Content slides
+    slides.forEach((slide: any) => {
+      const contentSlide = pptx.addSlide();
+      contentSlide.background = { fill: '1E293B' };
 
-//       // Content
-//       const bulletPoints = slide.content.split('\n').filter(line => line.trim());
-//       contentSlide.addText(bulletPoints, {
-//         x: 0.5,
-//         y: 1.5,
-//         w: 9,
-//         h: 4,
-//         fontSize: 18,
-//         color: 'E2E8F0',
-//         bullet: true,
-//         lineSpacing: 28,
-//       });
-//     });
+      contentSlide.addText(slide.title, {
+        x: 0.5,
+        y: 0.5,
+        w: 9,
+        h: 0.8,
+        fontSize: 32,
+        bold: true,
+        color: 'FFFFFF',
+      });
 
-//     const filename = `${topic.replace(/[^a-z0-9]/gi, '_')}_${Date.now()}.pptx`;
-//     const filepath = path.join(OUTPUT_DIR, filename);
+      const bulletPoints = slide.content.split('\n').filter((line: string) => line.trim());
+      contentSlide.addText(bulletPoints, {
+        x: 0.5,
+        y: 1.5,
+        w: 9,
+        h: 4,
+        fontSize: 18,
+        color: 'E2E8F0',
+        bullet: true,
+        lineSpacing: 28,
+      });
+    });
 
-//     await pptx.writeFile({ fileName: filepath });
+    const filename = `${topic.replace(/[^a-z0-9]/gi, '_')}_${Date.now()}.pptx`;
+    const filepath = path.join(OUTPUT_DIR, filename);
 
-//     const baseUrl = process.env.NODE_ENV === 'production'
-//       ? `https://${req.get('host')}`
-//       : `http://localhost:${PORT}`;
+    await pptx.writeFile({ fileName: filepath });
 
-//     res.json({
-//       success: true,
-//       url: `${baseUrl}/downloads/${filename}`,
-//       filename: filename,
-//     });
+    const baseUrl = process.env.NODE_ENV === 'production'
+      ? `https://${req.get('host')}`
+      : `http://localhost:${PORT}`;
 
-//   } catch (error) {
-//     console.error('PPT ERROR:', error);
-//     res.status(500).json({
-//       success: false,
-//       message: 'PPT generation failed',
-//     });
-//   }
-// });
+    res.json({
+      success: true,
+      url: `${baseUrl}/downloads/${filename}`,
+      filename: filename,
+    });
 
-// // ================= IMAGE/PDF CONVERSION =================
-// app.post('/api/img-to-pdf', upload.array('files', 20), async (req, res) => {
-//   try {
-//     const files = req.files;
-//     if (!files?.length) {
-//       return res.json({ success: false, message: 'No files uploaded' });
-//     }
+  } catch (error: any) {
+    console.error('PPT ERROR:', error);
+    res.status(500).json({
+      success: false,
+      message: 'PPT generation failed',
+    });
+  }
+});
 
-//     const pdfDoc = await PDFDocument.create();
+// ================= IMAGE/PDF CONVERSION =================
+app.post('/api/img-to-pdf', upload.array('files', 20), async (req, res) => {
+  try {
+    const files = req.files as Express.Multer.File[];
+    if (!files?.length) {
+      return res.json({ success: false, message: 'No files uploaded' });
+    }
 
-//     for (const file of files) {
-//       if (file.mimetype.startsWith('image/')) {
-//         const imgBuffer = await sharp(file.path)
-//           .rotate()
-//           .flatten({ background: '#ffffff' })
-//           .jpeg({ quality: 90 })
-//           .toBuffer();
+    const pdfDoc = await PDFDocument.create();
 
-//         const img = await pdfDoc.embedJpg(imgBuffer);
-//         const page = pdfDoc.addPage([img.width, img.height]);
-//         page.drawImage(img, { x: 0, y: 0, width: img.width, height: img.height });
+    for (const file of files) {
+      if (file.mimetype.startsWith('image/')) {
+        const imgBuffer = await sharp(file.path)
+          .rotate()
+          .flatten({ background: '#ffffff' })
+          .jpeg({ quality: 90 })
+          .toBuffer();
 
-//       } else if (file.mimetype === 'application/pdf') {
-//         const donorPdf = await PDFDocument.load(fs.readFileSync(file.path));
-//         const pages = await pdfDoc.copyPages(donorPdf, donorPdf.getPageIndices());
-//         pages.forEach(p => pdfDoc.addPage(p));
-//       }
+        const img = await pdfDoc.embedJpg(imgBuffer);
+        const page = pdfDoc.addPage([img.width, img.height]);
+        page.drawImage(img, { x: 0, y: 0, width: img.width, height: img.height });
 
-//       fs.unlinkSync(file.path);
-//     }
+      } else if (file.mimetype === 'application/pdf') {
+        const donorPdf = await PDFDocument.load(fs.readFileSync(file.path));
+        const pages = await pdfDoc.copyPages(donorPdf, donorPdf.getPageIndices());
+        pages.forEach(p => pdfDoc.addPage(p));
+      }
 
-//     const filename = `converted-${Date.now()}.pdf`;
-//     const outputPath = path.join(OUTPUT_DIR, filename);
-//     fs.writeFileSync(outputPath, await pdfDoc.save());
+      fs.unlinkSync(file.path);
+    }
 
-//     const baseUrl = process.env.NODE_ENV === 'production'
-//       ? `https://${req.get('host')}`
-//       : `http://localhost:${PORT}`;
+    const filename = `converted-${Date.now()}.pdf`;
+    const outputPath = path.join(OUTPUT_DIR, filename);
+    fs.writeFileSync(outputPath, await pdfDoc.save());
 
-//     res.json({
-//       success: true,
-//       url: `${baseUrl}/downloads/${filename}`,
-//     });
+    const baseUrl = process.env.NODE_ENV === 'production'
+      ? `https://${req.get('host')}`
+      : `http://localhost:${PORT}`;
 
-//   } catch (error) {
-//     console.error('IMG→PDF ERROR:', error);
-//     res.status(500).json({ success: false, message: 'Conversion failed' });
-//   }
-// });
+    res.json({
+      success: true,
+      url: `${baseUrl}/downloads/${filename}`,
+    });
 
-// // ================= MERGE PDF =================
-// app.post('/api/merge-pdf', upload.array('files', 20), async (req, res) => {
-//   try {
-//     const files = req.files;
+  } catch (error: any) {
+    console.error('IMG→PDF ERROR:', error);
+    res.status(500).json({ success: false, message: 'Conversion failed' });
+  }
+});
 
-//     if (!files || files.length < 2) {
-//       return res.status(400).json({
-//         success: false,
-//         message: 'Upload at least 2 PDFs',
-//       });
-//     }
+// ================= MERGE PDF =================
+app.post('/api/merge-pdf', upload.array('files', 20), async (req, res) => {
+  try {
+    const files = req.files as Express.Multer.File[];
 
-//     const mergedPdf = await PDFDocument.create();
+    if (!files || files.length < 2) {
+      return res.status(400).json({
+        success: false,
+        message: 'Upload at least 2 PDFs',
+      });
+    }
 
-//     for (const file of files) {
-//       if (file.mimetype !== 'application/pdf') {
-//         fs.unlinkSync(file.path);
-//         return res.status(400).json({
-//           success: false,
-//           message: `${file.originalname} is not a PDF`,
-//         });
-//       }
+    const mergedPdf = await PDFDocument.create();
 
-//       const pdf = await PDFDocument.load(fs.readFileSync(file.path));
-//       const pages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
-//       pages.forEach(p => mergedPdf.addPage(p));
+    for (const file of files) {
+      if (file.mimetype !== 'application/pdf') {
+        fs.unlinkSync(file.path);
+        return res.status(400).json({
+          success: false,
+          message: `${file.originalname} is not a PDF`,
+        });
+      }
 
-//       fs.unlinkSync(file.path);
-//     }
+      const pdf = await PDFDocument.load(fs.readFileSync(file.path));
+      const pages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
+      pages.forEach(p => mergedPdf.addPage(p));
 
-//     const filename = `merged-${Date.now()}.pdf`;
-//     const outputPath = path.join(OUTPUT_DIR, filename);
-//     fs.writeFileSync(outputPath, await mergedPdf.save());
+      fs.unlinkSync(file.path);
+    }
 
-//     const baseUrl = process.env.NODE_ENV === 'production'
-//       ? `https://${req.get('host')}`
-//       : `http://localhost:${PORT}`;
+    const filename = `merged-${Date.now()}.pdf`;
+    const outputPath = path.join(OUTPUT_DIR, filename);
+    fs.writeFileSync(outputPath, await mergedPdf.save());
 
-//     res.json({
-//       success: true,
-//       url: `${baseUrl}/downloads/${filename}`,
-//     });
+    const baseUrl = process.env.NODE_ENV === 'production'
+      ? `https://${req.get('host')}`
+      : `http://localhost:${PORT}`;
 
-//   } catch (error) {
-//     console.error('MERGE ERROR:', error);
-//     res.status(500).json({ success: false, message: 'Merge failed' });
-//   }
-// });
+    res.json({
+      success: true,
+      url: `${baseUrl}/downloads/${filename}`,
+    });
 
-// // Start server
-// connectDB().then(() => {
-//   app.listen(PORT, () => {
-//     console.log(`🚀 Unified Server running on http://localhost:${PORT}`);
-//     console.log(`✅ Using GROQ AI (llama-3.3-70b-versatile)`);
-//     console.log(`✅ Auth: /api/auth`);
-//     console.log(`✅ AI: /api/ai/ask`);
-//     console.log(`✅ PPT: /api/ppt/generate`);
-//     console.log(`✅ PDF: /api/img-to-pdf, /api/merge-pdf`);
-//   });
-// });
+  } catch (error: any) {
+    console.error('MERGE ERROR:', error);
+    res.status(500).json({ success: false, message: 'Merge failed' });
+  }
+});
+
+// Start server
+connectDB().then(() => {
+  app.listen(PORT, () => {
+    console.log(`🚀 Unified Server running on http://localhost:${PORT}`);
+    console.log(`✅ Using GROQ AI (llama-3.3-70b-versatile)`);
+    console.log(`✅ Auth: /api/auth`);
+    console.log(`✅ AI: /api/ai/ask`);
+    console.log(`✅ PPT: /api/ppt/generate`);
+    console.log(`✅ PDF: /api/img-to-pdf, /api/merge-pdf`);
+  });
+});
