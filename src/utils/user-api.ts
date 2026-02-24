@@ -1,7 +1,7 @@
 // New file: src/utils/user-api.ts
 // Database API calls for user data sync
 
-const AUTH_BASE = 'http://localhost:5003/api';
+const AUTH_BASE = 'https://studyearn-backend.onrender.com/api';
 
 // Get current user token
 function getToken(): string | null {

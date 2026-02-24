@@ -23,7 +23,7 @@ export function Leaderboard() {
 
   const loadLeaderboard = async () => {
     try {
-      const res = await fetch('http://localhost:5003/api/leaderboard/top?limit=100');
+      const res = await fetch('https://studyearn-backend.onrender.com/api/leaderboard/top?limit=100');
       const data = await res.json();
 
       if (data.success) {
@@ -50,7 +50,7 @@ export function Leaderboard() {
     if (!userId) return;
     
     try {
-      const res = await fetch(`http://localhost:5003/api/leaderboard/rank/${userId}`);
+      const res = await fetch(`https://studyearn-backend.onrender.com/api/leaderboard/rank/${userId}`);
       const data = await res.json();
       if (data.success) {
         setMyRank(data.rank);

@@ -1,41 +1,44 @@
-import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { Mail, Lock, LogIn, Loader2 } from 'lucide-react';
+import { useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
+import { Mail, Lock, LogIn, Loader2 } from "lucide-react";
 
 export function Login() {
   const navigate = useNavigate();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setError("");
     setLoading(true);
 
     try {
-      const res = await fetch('http://localhost:5003/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      });
+      const res = await fetch(
+        "https://studyearn-backend.onrender.com/api/auth/login",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password }),
+        },
+      );
 
       const data = await res.json();
 
       if (data.success) {
         // Save token and user data
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
-        
+        localStorage.setItem("token", data.token);
+        localStorage.setItem("user", JSON.stringify(data.user));
+
         // ✅ FIXED: Just navigate, no reload needed!
         // App.tsx will automatically load user data on mount
-        navigate('/app');
+        navigate("/app");
       } else {
-        setError(data.message || 'Login failed');
+        setError(data.message || "Login failed");
       }
     } catch (err) {
-      setError('Cannot connect to server. Is backend running?');
+      setError("Cannot connect to server. Is backend running?");
     } finally {
       setLoading(false);
     }
@@ -45,18 +48,19 @@ export function Login() {
     <div className="min-h-screen flex items-center justify-center p-4">
       {/* Background gradient */}
       <div className="absolute inset-0 bg-gradient-to-br from-blue-600/10 via-purple-600/10 to-pink-600/10" />
-      
+
       <div className="relative w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold gradient-text mb-2">StudyEarn AI</h1>
+          <h1 className="text-4xl font-bold gradient-text mb-2">
+            StudyEarn AI
+          </h1>
           <p className="text-slate-400 text-sm">Login to continue learning</p>
         </div>
 
         {/* Login Card */}
         <div className="glass rounded-2xl p-8 border border-white/10">
           <form onSubmit={handleLogin} className="space-y-5">
-            
             {/* Email */}
             <div>
               <label className="text-sm font-medium text-slate-300 mb-2 block">
@@ -123,7 +127,10 @@ export function Login() {
           {/* Signup Link */}
           <div className="mt-6 text-center text-sm">
             <span className="text-slate-500">Don't have an account? </span>
-            <Link to="/signup" className="text-blue-400 hover:text-blue-300 font-medium">
+            <Link
+              to="/signup"
+              className="text-blue-400 hover:text-blue-300 font-medium"
+            >
               Sign up
             </Link>
           </div>

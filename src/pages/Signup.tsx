@@ -1,18 +1,25 @@
-import { useState, useEffect } from 'react';
-import { useNavigate, Link, useSearchParams } from 'react-router-dom';
-import { Mail, Lock, User as UserIcon, LogIn, Loader2, Gift } from 'lucide-react';
+import { useState, useEffect } from "react";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
+import {
+  Mail,
+  Lock,
+  User as UserIcon,
+  LogIn,
+  Loader2,
+  Gift,
+} from "lucide-react";
 
 export function Signup() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const refCode = searchParams.get('ref'); // Get referral code from URL
-  
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [referralCode, setReferralCode] = useState(refCode || '');
+  const refCode = searchParams.get("ref"); // Get referral code from URL
+
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [referralCode, setReferralCode] = useState(refCode || "");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [showReferralBonus, setShowReferralBonus] = useState(false);
 
   useEffect(() => {
@@ -23,44 +30,47 @@ export function Signup() {
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setError("");
     setLoading(true);
 
     if (password.length < 6) {
-      setError('Password must be at least 6 characters');
+      setError("Password must be at least 6 characters");
       setLoading(false);
       return;
     }
 
     try {
-      const res = await fetch('http://localhost:5003/api/auth/signup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          name, 
-          email, 
-          password,
-          referralCode: referralCode.trim().toUpperCase() || undefined
-        }),
-      });
+      const res = await fetch(
+        "https://studyearn-backend.onrender.com/api/auth/signup",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name,
+            email,
+            password,
+            referralCode: referralCode.trim().toUpperCase() || undefined,
+          }),
+        },
+      );
 
       const data = await res.json();
 
       if (data.success) {
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
-        
+        localStorage.setItem("token", data.token);
+        localStorage.setItem("user", JSON.stringify(data.user));
+
         // Show bonus message if referred
         if (data.referralBonus) {
-          alert('🎉 Referral bonus applied! You got 200 points!');
+          alert("🎉 Referral bonus applied! You got 200 points!");
         }
-        
-        navigate('/app');
+
+        navigate("/app");
       } else {
-        setError(data.message || 'Signup failed');
+        setError(data.message || "Signup failed");
       }
     } catch (err) {
-      setError('Cannot connect to server. Is backend running?');
+      setError("Cannot connect to server. Is backend running?");
     } finally {
       setLoading(false);
     }
@@ -69,11 +79,15 @@ export function Signup() {
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-gradient-to-br from-blue-600/10 via-purple-600/10 to-pink-600/10" />
-      
+
       <div className="relative w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold gradient-text mb-2">StudyEarn AI</h1>
-          <p className="text-slate-400 text-sm">Create your account and start earning</p>
+          <h1 className="text-4xl font-bold gradient-text mb-2">
+            StudyEarn AI
+          </h1>
+          <p className="text-slate-400 text-sm">
+            Create your account and start earning
+          </p>
         </div>
 
         {/* Referral Bonus Badge */}
@@ -84,8 +98,12 @@ export function Signup() {
                 <Gift className="w-5 h-5 text-white" />
               </div>
               <div className="flex-1">
-                <div className="text-sm font-semibold text-white">🎁 Referral Bonus Active!</div>
-                <div className="text-xs text-green-400">Get 200 points instead of 100!</div>
+                <div className="text-sm font-semibold text-white">
+                  🎁 Referral Bonus Active!
+                </div>
+                <div className="text-xs text-green-400">
+                  Get 200 points instead of 100!
+                </div>
               </div>
             </div>
           </div>
@@ -93,7 +111,6 @@ export function Signup() {
 
         <div className="glass rounded-2xl p-8 border border-white/10">
           <form onSubmit={handleSignup} className="space-y-5">
-            
             {/* Name */}
             <div>
               <label className="text-sm font-medium text-slate-300 mb-2 block">
@@ -146,13 +163,15 @@ export function Signup() {
                   className="w-full bg-white/[0.03] border border-white/10 rounded-xl pl-11 pr-4 py-3 text-white placeholder-slate-600 focus:outline-none focus:border-blue-500/40"
                 />
               </div>
-              <p className="text-xs text-slate-500 mt-1">Must be at least 6 characters</p>
+              <p className="text-xs text-slate-500 mt-1">
+                Must be at least 6 characters
+              </p>
             </div>
 
             {/* ✅ REFERRAL CODE */}
             <div>
               <label className="text-sm font-medium text-slate-300 mb-2 block flex items-center gap-2">
-                Referral Code 
+                Referral Code
                 <span className="text-xs text-slate-500">(Optional)</span>
               </label>
               <div className="relative">
@@ -201,7 +220,10 @@ export function Signup() {
 
           <div className="mt-6 text-center text-sm">
             <span className="text-slate-500">Already have an account? </span>
-            <Link to="/login" className="text-blue-400 hover:text-blue-300 font-medium">
+            <Link
+              to="/login"
+              className="text-blue-400 hover:text-blue-300 font-medium"
+            >
               Login
             </Link>
           </div>
@@ -209,7 +231,10 @@ export function Signup() {
 
         {/* Welcome Bonus Badge */}
         <div className="mt-4 text-center text-xs text-slate-600">
-          <p>🎁 Get {showReferralBonus ? '200' : '100'} points welcome bonus on signup!</p>
+          <p>
+            🎁 Get {showReferralBonus ? "200" : "100"} points welcome bonus on
+            signup!
+          </p>
         </div>
       </div>
     </div>

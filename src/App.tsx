@@ -104,7 +104,13 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import { LoadingScreen } from "./components/LoadingScreen";
 import { StreakCelebration } from "./components/StreakCelebration";
 import { AppContext } from "./context/AppContext";
-import { getCurrentUser, updateUserPoints, useQuestion as useQuestionAPI, logActivity as logActivityAPI, getRecentActivity } from "./utils/user-api";
+import {
+  getCurrentUser,
+  updateUserPoints,
+  useQuestion as useQuestionAPI,
+  logActivity as logActivityAPI,
+  getRecentActivity,
+} from "./utils/user-api";
 import { ReferFriends } from "./pages/ReferFriends";
 
 // ✅ WRAPPER to check location before showing celebration
@@ -117,7 +123,7 @@ function AppContent() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userId, setUserId] = useState("");
   const [loading, setLoading] = useState(true);
-  
+
   const [showStreakCelebration, setShowStreakCelebration] = useState(false);
   const [celebrationStreak, setCelebrationStreak] = useState(0);
 
@@ -126,8 +132,8 @@ function AppContent() {
   }, []);
 
   const loadUserData = async () => {
-    const token = localStorage.getItem('token');
-    
+    const token = localStorage.getItem("token");
+
     if (!token) {
       setLoading(false);
       return;
@@ -135,31 +141,33 @@ function AppContent() {
 
     try {
       const user = await getCurrentUser();
-      
+
       if (user) {
         setIsLoggedIn(true);
         setUserId(user._id);
         setPoints(user.points);
         setQuestionsLeft(user.questionsLeft);
         setStreak(user.streak || 0);
-        
-        getRecentActivity().then(activityData => {
+
+        getRecentActivity().then((activityData) => {
           if (activityData.success) {
             setRecentActivity(activityData.activities);
           }
         });
 
         // ✅ Check streak ONLY if logged in
-        checkStreak().catch(err => console.error('Streak check failed:', err));
+        checkStreak().catch((err) =>
+          console.error("Streak check failed:", err),
+        );
       } else {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
         setIsLoggedIn(false);
       }
     } catch (error) {
-      console.error('Load user error:', error);
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
+      console.error("Load user error:", error);
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
       setIsLoggedIn(false);
     } finally {
       setTimeout(() => setLoading(false), 1000);
@@ -168,38 +176,41 @@ function AppContent() {
 
   const checkStreak = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem("token");
       if (!token) return;
 
-      const res = await fetch('http://localhost:5003/api/user/update-streak', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+      const res = await fetch(
+        "https://studyearn-backend.onrender.com/api/user/update-streak",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
         },
-      });
-      
+      );
+
       if (!res.ok) return;
 
       const data = await res.json();
       if (data.success) {
         setStreak(data.streak);
-        
+
         // ✅ ONLY show celebration if:
         // 1. Streak increased
         // 2. User is on /app route (dashboard area)
-        if (data.streakIncreased && location.pathname.startsWith('/app')) {
+        if (data.streakIncreased && location.pathname.startsWith("/app")) {
           setCelebrationStreak(data.streak);
           setTimeout(() => setShowStreakCelebration(true), 1500);
         }
       }
     } catch (err) {
-      console.error('Streak check error:', err);
+      console.error("Streak check error:", err);
     }
   };
 
   const addPoints = async (amount: number) => {
-    setPoints(prev => prev + amount);
+    setPoints((prev) => prev + amount);
     const result = await updateUserPoints(amount);
     if (result.success) {
       setPoints(result.points);
@@ -207,14 +218,18 @@ function AppContent() {
   };
 
   const useQuestion = async () => {
-    setQuestionsLeft(prev => Math.max(0, prev - 1));
+    setQuestionsLeft((prev) => Math.max(0, prev - 1));
     const result = await useQuestionAPI();
     if (result.success) {
       setQuestionsLeft(result.questionsLeft);
     }
   };
 
-  const logActivity = async (action: string, details: string, pointsEarned: number) => {
+  const logActivity = async (
+    action: string,
+    details: string,
+    pointsEarned: number,
+  ) => {
     const newActivity = {
       _id: Date.now().toString(),
       action,
@@ -222,7 +237,7 @@ function AppContent() {
       pointsEarned,
       timestamp: new Date().toISOString(),
     };
-    setRecentActivity(prev => [newActivity, ...prev].slice(0, 10));
+    setRecentActivity((prev) => [newActivity, ...prev].slice(0, 10));
     await logActivityAPI(action, details, pointsEarned);
   };
 
@@ -233,7 +248,8 @@ function AppContent() {
   };
 
   // ✅ ONLY show celebration if on dashboard routes
-  const shouldShowCelebration = showStreakCelebration && location.pathname.startsWith('/app');
+  const shouldShowCelebration =
+    showStreakCelebration && location.pathname.startsWith("/app");
 
   return (
     <>
@@ -241,7 +257,7 @@ function AppContent() {
 
       {/* ✅ Celebration ONLY in dashboard */}
       {shouldShowCelebration && (
-        <StreakCelebration 
+        <StreakCelebration
           streak={celebrationStreak}
           show={true}
           onClose={() => setShowStreakCelebration(false)}
@@ -268,12 +284,15 @@ function AppContent() {
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
-          
-          <Route path="/app" element={
-            <ProtectedRoute>
-              <DashboardLayout />
-            </ProtectedRoute>
-          }>
+
+          <Route
+            path="/app"
+            element={
+              <ProtectedRoute>
+                <DashboardLayout />
+              </ProtectedRoute>
+            }
+          >
             <Route index element={<Dashboard />} />
             <Route path="ask" element={<AskAI />} />
             <Route path="ppt" element={<PPTGenerator />} />
