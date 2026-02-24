@@ -1,162 +1,4 @@
-// import { useNavigate } from 'react-router-dom';
-// import { Brain, Presentation, FileText, Gift, TrendingUp, Flame, Zap, ArrowRight, Clock } from 'lucide-react';
-// import { useApp } from '../context/AppContext';
-// import { recentActivity, achievements } from '../data/mockData';
-
-// export function Dashboard() {
-//   const { points, streak, questionsLeft } = useApp();
-//   const navigate = useNavigate();
-
-//   const quickActions = [
-//     { icon: Brain, label: 'Ask AI', desc: 'Get instant answers', path: '/app/ask', gradient: 'from-blue-500 to-blue-600', glow: 'hover:shadow-blue-500/20' },
-//     { icon: Presentation, label: 'Generate PPT', desc: 'Create presentations', path: '/app/ppt', gradient: 'from-purple-500 to-purple-600', glow: 'hover:shadow-purple-500/20' },
-//     { icon: FileText, label: 'PDF Tools', desc: 'Convert documents', path: '/app/pdf', gradient: 'from-cyan-500 to-cyan-600', glow: 'hover:shadow-cyan-500/20' },
-//     { icon: Gift, label: 'Rewards', desc: 'View your points', path: '/app/rewards', gradient: 'from-pink-500 to-pink-600', glow: 'hover:shadow-pink-500/20' },
-//   ];
-
-//   return (
-//     <div className="space-y-6 max-w-6xl">
-//       {/* Welcome */}
-//       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-//         <div>
-//           <h1 className="text-2xl sm:text-3xl font-bold text-white">
-//             Welcome back, <span className="gradient-text">Student</span> 👋
-//           </h1>
-//           <p className="text-slate-400 text-sm mt-1">Ready to learn something new today?</p>
-//         </div>
-//         <div className="flex items-center gap-2 px-4 py-2 rounded-xl glass border border-orange-500/20">
-//           <Flame className="w-5 h-5 text-orange-400 fire-animation" />
-//           <span className="text-sm font-semibold text-orange-300">{streak} Day Streak!</span>
-//         </div>
-//       </div>
-
-//       {/* Stats Row */}
-//       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-//         {[
-//           { label: 'Total Points', value: points.toLocaleString(), icon: Gift, color: 'text-purple-400', bg: 'bg-purple-500/10' },
-//           { label: 'Questions Today', value: `${5 - questionsLeft}/5`, icon: Brain, color: 'text-blue-400', bg: 'bg-blue-500/10' },
-//           { label: 'Day Streak', value: streak.toString(), icon: Flame, color: 'text-orange-400', bg: 'bg-orange-500/10' },
-//           { label: 'Weekly XP', value: '+340', icon: TrendingUp, color: 'text-green-400', bg: 'bg-green-500/10' },
-//         ].map((stat) => (
-//           <div key={stat.label} className="glass rounded-2xl p-4 glass-hover transition-smooth">
-//             <div className="flex items-center justify-between mb-3">
-//               <span className="text-xs text-slate-500 font-medium">{stat.label}</span>
-//               <div className={`w-8 h-8 rounded-lg ${stat.bg} flex items-center justify-center`}>
-//                 <stat.icon className={`w-4 h-4 ${stat.color}`} />
-//               </div>
-//             </div>
-//             <div className="text-2xl font-bold text-white">{stat.value}</div>
-//           </div>
-//         ))}
-//       </div>
-
-//       {/* Quick Actions */}
-//       <div>
-//         <h2 className="text-lg font-semibold text-white mb-4">Quick Actions</h2>
-//         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-//           {quickActions.map((action) => (
-//             <button
-//               key={action.label}
-//               onClick={() => navigate(action.path)}
-//               className={`glass rounded-2xl p-5 text-left glass-hover transition-smooth group card-shine hover:shadow-lg ${action.glow}`}
-//             >
-//               <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${action.gradient} flex items-center justify-center text-white mb-3 group-hover:scale-110 transition-transform`}>
-//                 <action.icon className="w-5 h-5" />
-//               </div>
-//               <h3 className="font-semibold text-white text-sm">{action.label}</h3>
-//               <p className="text-xs text-slate-500 mt-1">{action.desc}</p>
-//               <ArrowRight className="w-4 h-4 text-slate-600 mt-3 group-hover:text-purple-400 group-hover:translate-x-1 transition-all" />
-//             </button>
-//           ))}
-//         </div>
-//       </div>
-
-//       <div className="grid lg:grid-cols-2 gap-6">
-//         {/* Recent Activity */}
-//         <div className="glass rounded-2xl p-5">
-//           <div className="flex items-center justify-between mb-4">
-//             <h2 className="text-lg font-semibold text-white">Recent Activity</h2>
-//             <Clock className="w-4 h-4 text-slate-500" />
-//           </div>
-//           <div className="space-y-3">
-//             {recentActivity.map((activity, i) => (
-//               <div key={i} className="flex items-start gap-3 p-3 rounded-xl hover:bg-white/[0.02] transition-colors">
-//                 <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
-//                   activity.type === 'question' ? 'bg-blue-500/10' :
-//                   activity.type === 'ppt' ? 'bg-purple-500/10' :
-//                   activity.type === 'streak' ? 'bg-orange-500/10' :
-//                   'bg-cyan-500/10'
-//                 }`}>
-//                   {activity.type === 'question' && <Brain className="w-4 h-4 text-blue-400" />}
-//                   {activity.type === 'ppt' && <Presentation className="w-4 h-4 text-purple-400" />}
-//                   {activity.type === 'pdf' && <FileText className="w-4 h-4 text-cyan-400" />}
-//                   {activity.type === 'streak' && <Flame className="w-4 h-4 text-orange-400" />}
-//                 </div>
-//                 <div className="flex-1 min-w-0">
-//                   <p className="text-sm text-slate-300 truncate">{activity.text}</p>
-//                   <p className="text-xs text-slate-600 mt-0.5">{activity.time}</p>
-//                 </div>
-//                 <div className="flex items-center gap-1 flex-shrink-0">
-//                   <Zap className="w-3 h-3 text-yellow-400" />
-//                   <span className="text-xs font-semibold text-yellow-400">+{activity.points}</span>
-//                 </div>
-//               </div>
-//             ))}
-//           </div>
-//         </div>
-
-//         {/* Achievements */}
-//         <div className="glass rounded-2xl p-5">
-//           <h2 className="text-lg font-semibold text-white mb-4">Achievements</h2>
-//           <div className="grid grid-cols-2 gap-3">
-//             {achievements.map((badge) => (
-//               <div
-//                 key={badge.id}
-//                 className={`p-4 rounded-xl border transition-smooth ${
-//                   badge.unlocked
-//                     ? 'bg-gradient-to-br from-purple-500/5 to-blue-500/5 border-purple-500/20 hover:border-purple-500/40'
-//                     : 'bg-white/[0.01] border-white/5 opacity-40'
-//                 }`}
-//               >
-//                 <div className="text-2xl mb-2">{badge.icon}</div>
-//                 <h3 className="text-sm font-semibold text-white">{badge.name}</h3>
-//                 <p className="text-xs text-slate-500 mt-0.5">{badge.description}</p>
-//                 {badge.unlocked && (
-//                   <span className="inline-flex items-center gap-1 text-[10px] font-medium text-green-400 mt-2">
-//                     ✓ Unlocked
-//                   </span>
-//                 )}
-//               </div>
-//             ))}
-//           </div>
-//         </div>
-//       </div>
-
-//       {/* XP Progress */}
-//       <div className="glass rounded-2xl p-5">
-//         <div className="flex items-center justify-between mb-3">
-//           <div>
-//             <h2 className="text-lg font-semibold text-white">Level Progress</h2>
-//             <p className="text-xs text-slate-500 mt-0.5">Level 12 → Level 13</p>
-//           </div>
-//           <span className="text-sm font-bold gradient-text">2,450 / 3,000 XP</span>
-//         </div>
-//         <div className="w-full h-3 rounded-full bg-white/5 overflow-hidden">
-//           <div
-//             className="h-full rounded-full bg-gradient-to-r from-blue-500 to-purple-500 progress-animate"
-//             style={{ width: '82%' }}
-//           />
-//         </div>
-//         <p className="text-xs text-slate-500 mt-2">550 XP until next level</p>
-//       </div>
-//     </div>
-//   );
-// }
-
-
-// ---------- calude ai ---------- //
-
-
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Brain, Presentation, FileText, Gift, TrendingUp, Zap, ArrowRight, Clock } from 'lucide-react';
 import { useApp } from '../context/AppContext';
@@ -165,8 +7,9 @@ import Lottie from 'lottie-react';
 import streakAnimation from '../assets/animations/streak-fire.json';
 
 export function Dashboard() {
-  const { points, streak, questionsLeft, recentActivity } = useApp();
+  const { points, streak, questionsLeft, recentActivity, userName } = useApp();
   const navigate = useNavigate();
+  const [showStreakCelebration, setShowStreakCelebration] = useState(false);
 
   const levelInfo = calculateLevel(points);
   const levelTier = getLevelTier(levelInfo.currentLevel);
@@ -192,8 +35,8 @@ export function Dashboard() {
   };
 
   const getActivityIcon = (action: string) => {
-    if (action.includes('ask')) return { Icon: Brain, color: 'bg-blue-500/10', iconColor: 'text-blue-400' };
-    if (action.includes('ppt')) return { Icon: Presentation, color: 'bg-purple-500/10', iconColor: 'text-purple-400' };
+    if (action.includes('ask') || action.includes('question')) return { Icon: Brain, color: 'bg-blue-500/10', iconColor: 'text-blue-400' };
+    if (action.includes('ppt') || action.includes('presentation')) return { Icon: Presentation, color: 'bg-purple-500/10', iconColor: 'text-purple-400' };
     if (action.includes('pdf')) return { Icon: FileText, color: 'bg-cyan-500/10', iconColor: 'text-cyan-400' };
     return { Icon: Zap, color: 'bg-green-500/10', iconColor: 'text-green-400' };
   };
@@ -204,7 +47,7 @@ export function Dashboard() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-white">
-            Welcome back, <span className="gradient-text">Student</span> 👋
+            Welcome back, <span className="gradient-text">{userName || 'Student'}</span> 👋
           </h1>
           <p className="text-slate-400 text-sm mt-1">Ready to learn something new today?</p>
         </div>
@@ -227,13 +70,23 @@ export function Dashboard() {
           { 
             label: 'Day Streak', 
             value: streak.toString(), 
-            icon: 'lottie', // ✅ SPECIAL MARKER FOR LOTTIE
+            icon: 'lottie',
             color: 'text-orange-400', 
-            bg: 'bg-orange-500/10' 
+            bg: 'bg-orange-500/10',
+            clickable: true
           },
           { label: 'Current Level', value: levelInfo.currentLevel.toString(), icon: TrendingUp, color: 'text-green-400', bg: 'bg-green-500/10' },
         ].map((stat) => (
-          <div key={stat.label} className="glass rounded-2xl p-4 glass-hover transition-smooth">
+          <div 
+            key={stat.label} 
+            className={`glass rounded-2xl p-4 transition-smooth ${
+              stat.clickable 
+                ? 'cursor-pointer hover:bg-white/[0.04] hover:border-orange-500/30 hover:-translate-y-1 hover:shadow-lg hover:shadow-orange-500/10' 
+                : 'glass-hover'
+            }`}
+            onClick={stat.clickable ? () => setShowStreakCelebration(true) : undefined}
+            title={stat.clickable ? '🔥 Click to celebrate your streak!' : undefined}
+          >
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs text-slate-500 font-medium">{stat.label}</span>
               <div className={`w-8 h-8 rounded-lg ${stat.bg} flex items-center justify-center`}>
@@ -242,14 +95,19 @@ export function Dashboard() {
                   <Lottie 
                     animationData={streakAnimation}
                     loop={true}
-                    style={{ width: 30, height: 30 }}
+                    style={{ width: 28, height: 28 }}
                   />
                 ) : (
                   <stat.icon className={`w-4 h-4 ${stat.color}`} />
                 )}
               </div>
             </div>
-            <div className="text-2xl font-bold text-white">{stat.value}</div>
+            <div className="text-2xl font-bold text-white flex items-center gap-2">
+              {stat.value}
+              {stat.clickable && (
+                <span className="text-[10px] text-slate-600 font-normal">(click!)</span>
+              )}
+            </div>
           </div>
         ))}
       </div>
@@ -378,6 +236,39 @@ export function Dashboard() {
           {levelInfo.requiredXP - levelInfo.currentXP} XP until next level
         </p>
       </div>
+
+      {/* ✅ STREAK CELEBRATION POPUP */}
+      {showStreakCelebration && (
+        <div 
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 animate-in fade-in duration-300"
+          onClick={() => setShowStreakCelebration(false)}
+        >
+          <div 
+            className="glass rounded-3xl p-8 max-w-md mx-4 text-center border border-orange-500/30 animate-in zoom-in duration-300"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Lottie 
+              animationData={streakAnimation}
+              loop={true}
+              style={{ width: 100, height: 100, margin: '0 auto' }}
+            />
+            <h2 className="text-3xl font-bold text-white mt-4 mb-2">
+              🔥 {streak} Day Streak!
+            </h2>
+            <p className="text-slate-400 mb-6">
+              {streak >= 7 
+                ? 'Amazing! Keep the momentum going!' 
+                : `${7 - streak} more days to unlock bonus rewards!`}
+            </p>
+            <button
+              onClick={() => setShowStreakCelebration(false)}
+              className="px-6 py-3 rounded-xl bg-gradient-to-r from-orange-500 to-red-500 text-white font-semibold hover:opacity-90 transition-opacity"
+            >
+              Keep Going! 💪
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

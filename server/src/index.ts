@@ -1,677 +1,299 @@
-// import express from "express";
-// import cors from "cors";
-// import dotenv from "dotenv";
-// import axios from "axios";
-
-// // ------ for PDF tool ------ //
-// import { upload } from "./upload";
-// import fs from "fs";
-// import path from "path";
-// import { PDFDocument } from "pdf-lib";
-// import sharp from "sharp";
-
-// // ------ for merge pdfs --------- //
-// import { upload } from "./upload";
-// import { mergePDFs } from "./pdf/mergePdf";
-// import path from "path";
-
-// dotenv.config();
-
-// const app = express();
-// app.use(cors());
-// app.use(express.json({ limit: "20mb" }));
-
-// const PORT = process.env.PORT || 5000;
-// const KEY = process.env.OPENROUTER_API_KEY;
-
-// if (!KEY) throw new Error("OPENROUTER_API_KEY missing");
-
-
-// // -------- HEADERS (ONLY ONCE) --------
-// const headers = {
-//   Authorization: `Bearer ${KEY}`,
-//   "Content-Type": "application/json",
-//   "HTTP-Referer": "http://localhost:5173",
-//   "X-Title": "AI Education Platform",
-// };
-
-
-
-// // ---------------- TEXT AI ----------------
-// async function textAI(prompt: string) {
-//   const r = await axios.post(
-//     "https://openrouter.ai/api/v1/chat/completions",
-//     {
-//       model: "openai/gpt-3.5-turbo",
-//       messages: [{ role: "user", content: prompt }],
-//     },
-//     { headers }
-//   );
-
-//   return r.data?.choices?.[0]?.message?.content;
-// }
-
-
-
-// // ---------------- IMAGE AI (VISION) ----------------
-// async function imageAI(prompt: string, image: string) {
-//   const r = await axios.post(
-//     "https://openrouter.ai/api/v1/chat/completions",
-//     {
-//       model: "google/gemma-3-12b-it:free",
-//       messages: [
-//         {
-//           role: "user",
-//           content: [
-//             { type: "text", text: prompt || "Solve this step by step" },
-//             {
-//               type: "image_url",
-//               image_url: {
-//                 url: image, // FULL base64 DATA URL yahi rahega
-//               },
-//             },
-//           ],
-//         },
-//       ],
-//       max_tokens: 700,
-//     },
-//     { headers }
-//   );
-
-//   return r.data?.choices?.[0]?.message?.content;
-// }
-
-// // ---------------- ROUTE ----------------
-// app.post("/api/ai", async (req, res) => {
-//   try {
-//     const { prompt, image } = req.body;
-
-//     let answer = "";
-
-//     if (image) {
-//       answer = await imageAI(prompt, image);
-//     } else {
-//       answer = await textAI(prompt);
-//     }
-
-//     if (!answer) throw new Error("Empty AI response");
-
-//     res.json({
-//       success: true,
-//       answer,
-//     });
-//   } catch (err: any) {
-//     console.error("AI ERROR →", err.response?.data || err.message);
-
-//     res.json({
-//       success: false,
-//       answer:
-//         err.response?.data?.error?.message ||
-//         err.message ||
-//         "AI failed to respond",
-//     });
-//   }
-// });
-
-
-
-// app.listen(PORT, () =>
-//   console.log(`🚀 Server running on http://localhost:${PORT}`)
-// );
-
-// const OUTPUT_DIR = path.join(__dirname, "..", "uploads", "output");
-// fs.mkdirSync(OUTPUT_DIR, { recursive: true });
-// app.use("/downloads", express.static(OUTPUT_DIR));
-
-// // ================= IMAGE TO PDF =================
-// app.post("/api/img-to-pdf", upload.array("files", 20), async (req, res) => {
-//   try {
-//     const files = req.files as Express.Multer.File[];
-
-//     if (!files || files.length === 0)
-//       return res.json({ success: false, message: "No images uploaded" });
-
-//     const pdfDoc = await PDFDocument.create();
-
-//     for (const file of files) {
-//       // compress + convert to jpeg buffer (important for compatibility)
-//       const imgBuffer = await sharp(file.path)
-//         .rotate()
-//         .jpeg({ quality: 90 })
-//         .toBuffer();
-
-//       const img = await pdfDoc.embedJpg(imgBuffer);
-//       const page = pdfDoc.addPage([img.width, img.height]);
-
-//       page.drawImage(img, {
-//         x: 0,
-//         y: 0,
-//         width: img.width,
-//         height: img.height,
-//       });
-
-//       fs.unlinkSync(file.path); // cleanup temp file
-//     }
-
-//     const pdfBytes = await pdfDoc.save();
-//     const filename = `converted-${Date.now()}.pdf`;
-//     const outputPath = path.join(OUTPUT_DIR, filename);
-
-//     fs.writeFileSync(outputPath, pdfBytes);
-
-//     res.json({
-//       success: true,
-//       url: `http://localhost:${PORT}/downloads/${filename}`,
-//     });
-//   } catch (err) {
-//     console.error(err);
-//     res.json({ success: false, message: "Conversion failed" });
-//   }
-// });
-
-// // PDF MERGE ROUTE
-// app.post("/api/merge-pdf", upload.array("files", 10), async (req, res) => {
-//   try {
-//     const files = req.files as Express.Multer.File[];
-
-//     if (!files || files.length < 2) {
-//       return res.status(400).json({ error: "Upload at least 2 PDFs" });
-//     }
-
-//     const result = await mergePDFs(files);
-
-//     res.json({
-//       success: true,
-//       url: result.url,
-//     });
-//   } catch (err) {
-//     console.error(err);
-//     res.status(500).json({ success: false });
-//   }
-// });
-
-
-
-// import express from "express";
-// import cors from "cors";
-// import dotenv from "dotenv";
-// import axios from "axios";
-
-// // ---- FILE TOOLS ----
-// import { upload } from "./upload";
-// import fs from "fs";
-// import path from "path";
-// import { PDFDocument } from "pdf-lib";
-// import sharp from "sharp";
-// import { mergePDFs } from "./pdf/mergePdf";
-
-// dotenv.config();
-
-// const app = express();
-// app.use(cors());
-// app.use(express.json({ limit: "20mb" }));
-
-// const PORT = process.env.PORT || 5000;
-// const KEY = process.env.OPENROUTER_API_KEY;
-
-// if (!KEY) throw new Error("OPENROUTER_API_KEY missing");
-
-
-// // ================= OPENROUTER =================
-// const headers = {
-//   Authorization: `Bearer ${KEY}`,
-//   "Content-Type": "application/json",
-//   "HTTP-Referer": "http://localhost:5173",
-//   "X-Title": "AI Education Platform",
-// };
-
-// // ---------- TEXT ----------
-// async function textAI(prompt: string) {
-//   const r = await axios.post(
-//     "https://openrouter.ai/api/v1/chat/completions",
-//     {
-//       model: "openai/gpt-3.5-turbo",
-//       messages: [{ role: "user", content: prompt }],
-//     },
-//     { headers }
-//   );
-
-//   return r.data?.choices?.[0]?.message?.content;
-// }
-
-// // ---------- IMAGE ----------
-// async function imageAI(prompt: string, image: string) {
-//   const r = await axios.post(
-//     "https://openrouter.ai/api/v1/chat/completions",
-//     {
-//       model: "google/gemma-3-12b-it:free",
-//       messages: [
-//         {
-//           role: "user",
-//           content: [
-//             { type: "text", text: prompt || "Solve step by step" },
-//             { type: "image_url", image_url: { url: image } },
-//           ],
-//         },
-//       ],
-//       max_tokens: 700,
-//     },
-//     { headers }
-//   );
-
-//   return r.data?.choices?.[0]?.message?.content;
-// }
-
-// // ---------- AI ROUTE ----------
-// app.post("/api/ai", async (req, res) => {
-//   try {
-//     const { prompt, image } = req.body;
-
-//     const answer = image
-//       ? await imageAI(prompt, image)
-//       : await textAI(prompt);
-
-//     if (!answer) throw new Error("Empty AI response");
-
-//     res.json({ success: true, answer });
-//   } catch (err: any) {
-//     console.error("AI ERROR →", err.response?.data || err.message);
-
-//     res.json({
-//       success: false,
-//       answer:
-//         err.response?.data?.error?.message ||
-//         err.message ||
-//         "AI failed to respond",
-//     });
-//   }
-// });
-
-
-// // ================= FILE STORAGE =================
-// const OUTPUT_DIR = path.join(__dirname, "..", "uploads", "output");
-// fs.mkdirSync(OUTPUT_DIR, { recursive: true });
-
-// app.use("/downloads", express.static(OUTPUT_DIR));
-
-
-// // ================= IMAGE → PDF =================
-// app.post("/api/img-to-pdf", upload.array("files", 20), async (req, res) => {
-//   try {
-//     const files = req.files as Express.Multer.File[];
-
-//     if (!files?.length)
-//       return res.json({ success: false, message: "No images uploaded" });
-
-//     const pdfDoc = await PDFDocument.create();
-
-//     for (const file of files) {
-//       const imgBuffer = await sharp(file.path)
-//         .rotate()
-//         .jpeg({ quality: 90 })
-//         .toBuffer();
-
-//       const img = await pdfDoc.embedJpg(imgBuffer);
-//       const page = pdfDoc.addPage([img.width, img.height]);
-
-//       page.drawImage(img, { x: 0, y: 0, width: img.width, height: img.height });
-
-//       fs.unlinkSync(file.path);
-//     }
-
-//     const pdfBytes = await pdfDoc.save();
-//     const filename = `converted-${Date.now()}.pdf`;
-//     const outputPath = path.join(OUTPUT_DIR, filename);
-
-//     fs.writeFileSync(outputPath, pdfBytes);
-
-//     res.json({
-//       success: true,
-//       url: `http://localhost:${PORT}/downloads/${filename}`,
-//     });
-//   } catch (err) {
-//     console.error(err);
-//     res.json({ success: false, message: "Conversion failed" });
-//   }
-// });
-
-
-// // ================= MERGE PDF =================
-// app.post("/api/merge-pdf", upload.array("files", 10), async (req, res) => {
-//   try {
-//     const files = req.files as Express.Multer.File[];
-
-//     if (!files || files.length < 2)
-//       return res.status(400).json({ error: "Upload at least 2 PDFs" });
-
-//     const mergedPdf = await PDFDocument.create();
-
-//     for (const file of files) {
-//       const pdfBytes = fs.readFileSync(file.path);
-//       const pdf = await PDFDocument.load(pdfBytes);
-
-//       const pages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
-//       pages.forEach((p) => mergedPdf.addPage(p));
-
-//       fs.unlinkSync(file.path); // cleanup temp files
-//     }
-
-//     const mergedBytes = await mergedPdf.save();
-//     const filename = `merged-${Date.now()}.pdf`;
-//     const outputPath = path.join(OUTPUT_DIR, filename);
-
-//     fs.writeFileSync(outputPath, mergedBytes);
-
-//     res.json({
-//       success: true,
-//       url: `http://localhost:${PORT}/downloads/${filename}`,
-//     });
-//   } catch (err) {
-//     console.error(err);
-//     res.status(500).json({ success: false });
-//   }
-// });
-
-
-// // ================= START SERVER =================
-// app.listen(PORT, () =>
-//   console.log(`🚀 Server running on http://localhost:${PORT}`)
-// );
-
-
-
-
-
-// import express from "express";
-// import cors from "cors";
-// import dotenv from "dotenv";
-// import { upload } from "./upload";
-// import fs from "fs";
-// import path from "path";
-// import { PDFDocument } from "pdf-lib";
-// import sharp from "sharp";
-
-// dotenv.config();
-
-// const app = express();
-// app.use(cors());
-// app.use(express.json({ limit: "20mb" }));
-
-// const PORT = process.env.PORT || 5000;
-
-// // ================= STORAGE =================
-// const OUTPUT_DIR = path.join(__dirname, "..", "uploads", "output");
-// fs.mkdirSync(OUTPUT_DIR, { recursive: true });
-// app.use("/downloads", express.static(OUTPUT_DIR));
-
-// // ================= HELPERS =================
-// const isImage = (mimetype: string) => mimetype.startsWith("image/");
-// const isPDF = (mimetype: string) => mimetype === "application/pdf";
-
-// // ================= IMAGE/PDF → PDF =================
-// app.post("/api/img-to-pdf", upload.array("files", 20), async (req, res) => {
-//   try {
-//     const files = req.files as Express.Multer.File[];
-//     if (!files?.length)
-//       return res.json({ success: false, message: "No files uploaded" });
-
-//     const pdfDoc = await PDFDocument.create();
-
-//     for (const file of files) {
-//       console.log("Processing:", file.originalname, file.mimetype);
-
-//       // IMAGE
-//       if (isImage(file.mimetype)) {
-//         const imgBuffer = await sharp(file.path)
-//           .rotate()
-//           .flatten({ background: "#ffffff" }) // fix transparent png crash
-//           .jpeg({ quality: 90 })
-//           .toBuffer();
-
-//         const img = await pdfDoc.embedJpg(imgBuffer);
-//         const page = pdfDoc.addPage([img.width, img.height]);
-
-//         page.drawImage(img, { x: 0, y: 0, width: img.width, height: img.height });
-//       }
-
-//       // PDF
-//       else if (isPDF(file.mimetype)) {
-//         const donorPdf = await PDFDocument.load(fs.readFileSync(file.path));
-//         const pages = await pdfDoc.copyPages(donorPdf, donorPdf.getPageIndices());
-//         pages.forEach(p => pdfDoc.addPage(p));
-//       }
-
-//       else {
-//         fs.unlinkSync(file.path);
-//         return res.status(400).json({ success: false, message: `Unsupported file: ${file.originalname}` });
-//       }
-
-//       fs.unlinkSync(file.path);
-//     }
-
-//     const filename = `converted-${Date.now()}.pdf`;
-//     fs.writeFileSync(path.join(OUTPUT_DIR, filename), await pdfDoc.save());
-
-//     res.json({ success: true, url: `http://localhost:${PORT}/downloads/${filename}` });
-
-//   } catch (err) {
-//     console.error("IMG→PDF ERROR:", err);
-//     res.status(500).json({ success: false, message: "Conversion failed" });
-//   }
-// });
-
-// // ================= MERGE PDF =================
-// app.post("/api/merge-pdf", upload.array("files", 20), async (req, res) => {
-//   try {
-//     const files = req.files as Express.Multer.File[];
-//     if (!files || files.length < 2)
-//       return res.status(400).json({ success: false, message: "Upload at least 2 PDFs" });
-
-//     const mergedPdf = await PDFDocument.create();
-
-//     for (const file of files) {
-//       if (!isPDF(file.mimetype)) {
-//         fs.unlinkSync(file.path);
-//         return res.status(400).json({ success: false, message: `${file.originalname} is not a PDF` });
-//       }
-
-//       const pdf = await PDFDocument.load(fs.readFileSync(file.path));
-//       const pages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
-//       pages.forEach(p => mergedPdf.addPage(p));
-//       fs.unlinkSync(file.path);
-//     }
-
-//     const filename = `merged-${Date.now()}.pdf`;
-//     fs.writeFileSync(path.join(OUTPUT_DIR, filename), await mergedPdf.save());
-
-//     res.json({ success: true, url: `http://localhost:${PORT}/downloads/${filename}` });
-
-//   } catch (err) {
-//     console.error("MERGE ERROR:", err);
-//     res.status(500).json({ success: false, message: "Merge failed" });
-//   }
-// });
-
-// app.listen(PORT, () => console.log(`🚀 Server running http://localhost:${PORT}`));
-
-
-
-
-// import express from "express";
-// import cors from "cors";
-// import dotenv from "dotenv";
-// import { upload } from "./upload";
-// import fs from "fs";
-// import path from "path";
-// import { PDFDocument } from "pdf-lib";
-// import sharp from "sharp";
-
-// dotenv.config();
-
-// const app = express();
-// app.use(cors());
-// app.use(express.json({ limit: "20mb" }));
-
-// const PORT = process.env.PORT || 5000;
-
-// // ================= STORAGE =================
-// const OUTPUT_DIR = path.join(__dirname, "..", "uploads", "output");
-// fs.mkdirSync(OUTPUT_DIR, { recursive: true });
-// app.use("/downloads", express.static(OUTPUT_DIR));
-
-// // ================= HELPERS =================
-// const isImage = (mimetype: string) => mimetype.startsWith("image/");
-// const isPDF = (mimetype: string) => mimetype === "application/pdf";
-
-// // ================= AI ROUTE =================
-// app.post("/api/ai", async (req, res) => {
-//   try {
-//     const { prompt } = req.body;
-
-//     if (!prompt) {
-//       return res.json({
-//         success: false,
-//         answer: "No prompt provided",
-//       });
-//     }
-
-//     // TEMP DEMO RESPONSE (Replace with real AI later)
-//     const fakeAnswer = `Here is a detailed explanation for:\n\n${prompt}\n\n(This is a demo AI response. You can connect OpenAI later.)`;
-
-//     res.json({
-//       success: true,
-//       answer: fakeAnswer,
-//     });
-
-//   } catch (error) {
-//     console.error("AI ERROR:", error);
-//     res.status(500).json({
-//       success: false,
-//       answer: "AI failed",
-//     });
-//   }
-// });
-
-// // ================= IMAGE/PDF → PDF =================
-// app.post("/api/img-to-pdf", upload.array("files", 20), async (req, res) => {
-//   try {
-//     const files = req.files as Express.Multer.File[];
-//     if (!files?.length)
-//       return res.json({ success: false, message: "No files uploaded" });
-
-//     const pdfDoc = await PDFDocument.create();
-
-//     for (const file of files) {
-//       if (isImage(file.mimetype)) {
-//         const imgBuffer = await sharp(file.path)
-//           .rotate()
-//           .flatten({ background: "#ffffff" })
-//           .jpeg({ quality: 90 })
-//           .toBuffer();
-
-//         const img = await pdfDoc.embedJpg(imgBuffer);
-//         const page = pdfDoc.addPage([img.width, img.height]);
-
-//         page.drawImage(img, {
-//           x: 0,
-//           y: 0,
-//           width: img.width,
-//           height: img.height,
-//         });
-//       } else if (isPDF(file.mimetype)) {
-//         const donorPdf = await PDFDocument.load(
-//           fs.readFileSync(file.path)
-//         );
-//         const pages = await pdfDoc.copyPages(
-//           donorPdf,
-//           donorPdf.getPageIndices()
-//         );
-//         pages.forEach((p) => pdfDoc.addPage(p));
-//       } else {
-//         fs.unlinkSync(file.path);
-//         return res.status(400).json({
-//           success: false,
-//           message: `Unsupported file: ${file.originalname}`,
-//         });
-//       }
-
-//       fs.unlinkSync(file.path);
-//     }
-
-//     const filename = `converted-${Date.now()}.pdf`;
-//     fs.writeFileSync(
-//       path.join(OUTPUT_DIR, filename),
-//       await pdfDoc.save()
-//     );
-
-//     res.json({
-//       success: true,
-//       url: `http://localhost:${PORT}/downloads/${filename}`,
-//     });
-
-//   } catch (err) {
-//     console.error("IMG→PDF ERROR:", err);
-//     res.status(500).json({
-//       success: false,
-//       message: "Conversion failed",
-//     });
-//   }
-// });
-
-// // ================= MERGE PDF =================
-// app.post("/api/merge-pdf", upload.array("files", 20), async (req, res) => {
-//   try {
-//     const files = req.files as Express.Multer.File[];
-
-//     if (!files || files.length < 2)
-//       return res.status(400).json({
-//         success: false,
-//         message: "Upload at least 2 PDFs",
-//       });
-
-//     const mergedPdf = await PDFDocument.create();
-
-//     for (const file of files) {
-//       if (!isPDF(file.mimetype)) {
-//         fs.unlinkSync(file.path);
-//         return res.status(400).json({
-//           success: false,
-//           message: `${file.originalname} is not a PDF`,
-//         });
-//       }
-
-//       const pdf = await PDFDocument.load(
-//         fs.readFileSync(file.path)
-//       );
-//       const pages = await mergedPdf.copyPages(
-//         pdf,
-//         pdf.getPageIndices()
-//       );
-//       pages.forEach((p) => mergedPdf.addPage(p));
-
-//       fs.unlinkSync(file.path);
-//     }
-
-//     const filename = `merged-${Date.now()}.pdf`;
-//     fs.writeFileSync(
-//       path.join(OUTPUT_DIR, filename),
-//       await mergedPdf.save()
-//     );
-
-//     res.json({
-//       success: true,
-//       url: `http://localhost:${PORT}/downloads/${filename}`,
-//     });
-
-//   } catch (err) {
-//     console.error("MERGE ERROR:", err);
-//     res.status(500).json({
-//       success: false,
-//       message: "Merge failed",
-//     });
-//   }
-// });
-
-// app.listen(PORT, () =>
-//   console.log(`🚀 Server running http://localhost:${PORT}`)
-// );
+import express from 'express';
+import cors from 'cors';
+import dotenv from 'dotenv';
+import authRoutes from './auth.js';
+import userRoutes from './user-routes.js';
+import leaderboardRoutes from './leaderboard-routes.js';
+import { GoogleGenerativeAI } from '@google/generative-ai';
+import { upload } from './upload.js';
+import fs from 'fs';
+import path from 'path';
+import { PDFDocument } from 'pdf-lib';
+import sharp from 'sharp';
+import PptxGenJS from 'pptxgenjs';
+import { connectDB } from './db.js';
+
+dotenv.config();
+
+const app = express();
+
+// ✅ CORS - Allow Vercel
+app.use(cors({
+  origin: [
+    'http://localhost:5173',
+    'https://studyearn-ai.vercel.app',
+    'https://*.vercel.app'
+  ],
+  credentials: true
+}));
+
+app.use(express.json({ limit: '50mb' }));
+
+const PORT = process.env.PORT || 5003;
+
+// ✅ Initialize Gemini AI
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+
+// Storage setup
+const OUTPUT_DIR = path.join(process.cwd(), 'uploads', 'output');
+fs.mkdirSync(OUTPUT_DIR, { recursive: true });
+app.use('/downloads', express.static(OUTPUT_DIR));
+
+// ================= HEALTH CHECK =================
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', service: 'Unified Server', port: PORT });
+});
+
+// ================= AUTH & USER ROUTES =================
+app.use('/api/auth', authRoutes);
+app.use('/api/user', userRoutes);
+app.use('/api/leaderboard', leaderboardRoutes);
+
+// ================= AI ROUTE =================
+app.post('/api/ai/ask', async (req, res) => {
+  try {
+    const { prompt, image } = req.body;
+
+    if (!prompt && !image) {
+      return res.json({
+        success: false,
+        answer: 'Please provide a question or image',
+      });
+    }
+
+    if (!process.env.GEMINI_API_KEY) {
+      return res.json({
+        success: false,
+        answer: 'AI service not configured. Please add GEMINI_API_KEY.',
+      });
+    }
+
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    let result;
+
+    if (image) {
+      const imageParts = [{
+        inlineData: {
+          data: image.split(',')[1],
+          mimeType: image.split(';')[0].split(':')[1]
+        }
+      }];
+
+      result = await model.generateContent([
+        prompt || 'Analyze this image and answer any questions visible in it.',
+        ...imageParts
+      ]);
+    } else {
+      result = await model.generateContent(prompt);
+    }
+
+    const answer = result.response.text();
+
+    res.json({
+      success: true,
+      answer: answer,
+    });
+
+  } catch (error) {
+    console.error('AI ERROR:', error);
+    res.status(500).json({
+      success: false,
+      answer: error.message || 'AI request failed. Please try again.',
+    });
+  }
+});
+
+// ================= PPT GENERATION =================
+app.post('/api/ppt/generate', async (req, res) => {
+  try {
+    const { topic, slides } = req.body;
+
+    if (!topic || !slides || slides.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Topic and slides required',
+      });
+    }
+
+    const pptx = new PptxGenJS();
+    pptx.layout = 'LAYOUT_16x9';
+    pptx.author = 'StudyEarn AI';
+    pptx.title = topic;
+
+    // Title slide
+    const titleSlide = pptx.addSlide();
+    titleSlide.background = { fill: '0F172A' };
+    titleSlide.addText(topic, {
+      x: 0.5,
+      y: 2.5,
+      w: 9,
+      h: 2,
+      fontSize: 44,
+      bold: true,
+      color: 'FFFFFF',
+      align: 'center',
+    });
+
+    // Content slides
+    slides.forEach((slide) => {
+      const contentSlide = pptx.addSlide();
+      contentSlide.background = { fill: '1E293B' };
+
+      // Title
+      contentSlide.addText(slide.title, {
+        x: 0.5,
+        y: 0.5,
+        w: 9,
+        h: 0.8,
+        fontSize: 32,
+        bold: true,
+        color: 'FFFFFF',
+      });
+
+      // Content
+      const bulletPoints = slide.content.split('\n').filter(line => line.trim());
+      contentSlide.addText(bulletPoints, {
+        x: 0.5,
+        y: 1.5,
+        w: 9,
+        h: 4,
+        fontSize: 18,
+        color: 'E2E8F0',
+        bullet: true,
+        lineSpacing: 28,
+      });
+    });
+
+    const filename = `${topic.replace(/[^a-z0-9]/gi, '_')}_${Date.now()}.pptx`;
+    const filepath = path.join(OUTPUT_DIR, filename);
+
+    await pptx.writeFile({ fileName: filepath });
+
+    const baseUrl = process.env.NODE_ENV === 'production'
+      ? `https://${req.get('host')}`
+      : `http://localhost:${PORT}`;
+
+    res.json({
+      success: true,
+      url: `${baseUrl}/downloads/${filename}`,
+      filename: filename,
+    });
+
+  } catch (error) {
+    console.error('PPT ERROR:', error);
+    res.status(500).json({
+      success: false,
+      message: 'PPT generation failed',
+    });
+  }
+});
+
+// ================= IMAGE/PDF CONVERSION =================
+app.post('/api/img-to-pdf', upload.array('files', 20), async (req, res) => {
+  try {
+    const files = req.files;
+    if (!files?.length) {
+      return res.json({ success: false, message: 'No files uploaded' });
+    }
+
+    const pdfDoc = await PDFDocument.create();
+
+    for (const file of files) {
+      if (file.mimetype.startsWith('image/')) {
+        const imgBuffer = await sharp(file.path)
+          .rotate()
+          .flatten({ background: '#ffffff' })
+          .jpeg({ quality: 90 })
+          .toBuffer();
+
+        const img = await pdfDoc.embedJpg(imgBuffer);
+        const page = pdfDoc.addPage([img.width, img.height]);
+        page.drawImage(img, { x: 0, y: 0, width: img.width, height: img.height });
+
+      } else if (file.mimetype === 'application/pdf') {
+        const donorPdf = await PDFDocument.load(fs.readFileSync(file.path));
+        const pages = await pdfDoc.copyPages(donorPdf, donorPdf.getPageIndices());
+        pages.forEach(p => pdfDoc.addPage(p));
+      }
+
+      fs.unlinkSync(file.path);
+    }
+
+    const filename = `converted-${Date.now()}.pdf`;
+    const outputPath = path.join(OUTPUT_DIR, filename);
+    fs.writeFileSync(outputPath, await pdfDoc.save());
+
+    const baseUrl = process.env.NODE_ENV === 'production'
+      ? `https://${req.get('host')}`
+      : `http://localhost:${PORT}`;
+
+    res.json({
+      success: true,
+      url: `${baseUrl}/downloads/${filename}`,
+    });
+
+  } catch (error) {
+    console.error('IMG→PDF ERROR:', error);
+    res.status(500).json({ success: false, message: 'Conversion failed' });
+  }
+});
+
+// ================= MERGE PDF =================
+app.post('/api/merge-pdf', upload.array('files', 20), async (req, res) => {
+  try {
+    const files = req.files;
+
+    if (!files || files.length < 2) {
+      return res.status(400).json({
+        success: false,
+        message: 'Upload at least 2 PDFs',
+      });
+    }
+
+    const mergedPdf = await PDFDocument.create();
+
+    for (const file of files) {
+      if (file.mimetype !== 'application/pdf') {
+        fs.unlinkSync(file.path);
+        return res.status(400).json({
+          success: false,
+          message: `${file.originalname} is not a PDF`,
+        });
+      }
+
+      const pdf = await PDFDocument.load(fs.readFileSync(file.path));
+      const pages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
+      pages.forEach(p => mergedPdf.addPage(p));
+
+      fs.unlinkSync(file.path);
+    }
+
+    const filename = `merged-${Date.now()}.pdf`;
+    const outputPath = path.join(OUTPUT_DIR, filename);
+    fs.writeFileSync(outputPath, await mergedPdf.save());
+
+    const baseUrl = process.env.NODE_ENV === 'production'
+      ? `https://${req.get('host')}`
+      : `http://localhost:${PORT}`;
+
+    res.json({
+      success: true,
+      url: `${baseUrl}/downloads/${filename}`,
+    });
+
+  } catch (error) {
+    console.error('MERGE ERROR:', error);
+    res.status(500).json({ success: false, message: 'Merge failed' });
+  }
+});
+
+// Start server
+connectDB().then(() => {
+  app.listen(PORT, () => {
+    console.log(`🚀 Unified Server running on http://localhost:${PORT}`);
+    console.log(`✅ Auth: /api/auth`);
+    console.log(`✅ AI: /api/ai/ask`);
+    console.log(`✅ PPT: /api/ppt/generate`);
+    console.log(`✅ PDF: /api/img-to-pdf, /api/merge-pdf`);
+  });
+});

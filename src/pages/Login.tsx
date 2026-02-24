@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { Mail, Lock, LogIn, Loader2 } from "lucide-react";
+import { Mail, Lock, LogIn, Loader2, AlertCircle } from "lucide-react";
+
+const API_URL = import.meta.env.VITE_API_URL || 'https://studyearn-backend.onrender.com';
 
 export function Login() {
   const navigate = useNavigate();
@@ -15,41 +17,42 @@ export function Login() {
     setLoading(true);
 
     try {
-      const res = await fetch(
-        "https://studyearn-backend.onrender.com/api/auth/login",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, password }),
-        },
-      );
+      const res = await fetch(`${API_URL}/api/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
 
       const data = await res.json();
 
       if (data.success) {
-        // Save token and user data
+        // ✅ Save session
         localStorage.setItem("token", data.token);
         localStorage.setItem("user", JSON.stringify(data.user));
-
-        // ✅ FIXED: Just navigate, no reload needed!
-        // App.tsx will automatically load user data on mount
+        
+        // ✅ Navigate to app
         navigate("/app");
+        
+        // ✅ Force reload to load user data
+        window.location.reload();
       } else {
-        setError(data.message || "Login failed");
+        setError(data.message || "Invalid email or password");
       }
     } catch (err) {
-      setError("Cannot connect to server. Is backend running?");
+      console.error('Login error:', err);
+      setError("Cannot connect to server. Backend might be starting up. Please wait 30 seconds and try again.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      {/* Background gradient */}
-      <div className="absolute inset-0 bg-gradient-to-br from-blue-600/10 via-purple-600/10 to-pink-600/10" />
+    <div className="min-h-screen flex items-center justify-center p-4 animated-bg grid-bg">
+      {/* Orbs */}
+      <div className="orb w-[500px] h-[500px] bg-blue-500 top-[-200px] left-[-100px] fixed" />
+      <div className="orb w-[400px] h-[400px] bg-purple-600 top-[30%] right-[-150px] fixed" />
 
-      <div className="relative w-full max-w-md">
+      <div className="relative w-full max-w-md z-10">
         {/* Logo */}
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold gradient-text mb-2">
@@ -61,6 +64,14 @@ export function Login() {
         {/* Login Card */}
         <div className="glass rounded-2xl p-8 border border-white/10">
           <form onSubmit={handleLogin} className="space-y-5">
+            {/* Error Alert */}
+            {error && (
+              <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-red-300">{error}</p>
+              </div>
+            )}
+
             {/* Email */}
             <div>
               <label className="text-sm font-medium text-slate-300 mb-2 block">
@@ -97,18 +108,11 @@ export function Login() {
               </div>
             </div>
 
-            {/* Error */}
-            {error && (
-              <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 text-sm text-red-400">
-                {error}
-              </div>
-            )}
-
             {/* Submit */}
             <button
               type="submit"
               disabled={loading}
-              className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold disabled:opacity-50 hover:opacity-90 transition-opacity"
+              className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white py-3 rounded-xl font-semibold text-sm hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {loading ? (
                 <>
@@ -125,16 +129,22 @@ export function Login() {
           </form>
 
           {/* Signup Link */}
-          <div className="mt-6 text-center text-sm">
-            <span className="text-slate-500">Don't have an account? </span>
-            <Link
-              to="/signup"
-              className="text-blue-400 hover:text-blue-300 font-medium"
-            >
-              Sign up
+          <p className="text-center text-sm text-slate-500 mt-6">
+            Don't have an account?{" "}
+            <Link to="/signup" className="text-blue-400 hover:text-blue-300 font-medium">
+              Sign Up
             </Link>
-          </div>
+          </p>
         </div>
+
+        {/* Backend Status Hint */}
+        {loading && (
+          <div className="mt-4 text-center">
+            <p className="text-xs text-slate-600">
+              If this is taking long, the free backend server might be waking up (takes ~30s)
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
