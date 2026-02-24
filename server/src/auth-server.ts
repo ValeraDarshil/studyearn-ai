@@ -9,7 +9,14 @@ import { connectDB } from './db';
 dotenv.config();
 
 const app = express();
-app.use(cors());
+app.use(cors({
+  origin: [
+    'http://localhost:5173',
+    'https://studyearn-ai.vercel.app',
+    'https://*.vercel.app'
+  ],
+  credentials: true
+}));
 app.use(express.json());
 
 // Health check
