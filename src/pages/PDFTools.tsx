@@ -2,15 +2,13 @@ import { useRef, useState } from "react";
 import {
   FileText,
   Upload,
-  ArrowRight,
   Image,
   File,
-  Presentation,
   CheckCircle,
   X,
 } from "lucide-react";
 import { useApp } from "../context/AppContext";
-import { convertImagesToPDF, mergePDF } from "../utils/api";
+import { convertImagesToPDF, mergePDFs } from "../utils/api";
 
 const tools = [
   {
@@ -80,7 +78,6 @@ export function PDFTools() {
   const [dragOver, setDragOver] = useState(false);
   const [downloadUrl, setDownloadUrl] = useState("");
 
-  // ===== FILE UPLOAD (APPEND MODE + REMOVE DUPLICATES) =====
   const handleFileUpload = (files: FileList | null) => {
     if (!files) return;
 
@@ -88,13 +85,10 @@ export function PDFTools() {
 
     setUploadedFiles((prev) => {
       const all = [...prev, ...newFiles];
-
-      // remove duplicates
       return Array.from(new Map(all.map((f) => [f.name + f.size, f])).values());
     });
   };
 
-  // ===== CONVERT LOGIC =====
   const handleConvert = async () => {
     if (!uploadedFiles.length) return;
 
@@ -103,7 +97,7 @@ export function PDFTools() {
     let result;
 
     if (selectedTool === "merge-pdf") {
-      result = await mergePDF(uploadedFiles);
+      result = await mergePDFs(uploadedFiles);
     } else {
       result = await convertImagesToPDF(uploadedFiles);
     }
@@ -130,8 +124,6 @@ export function PDFTools() {
     setConverted(false);
     setDownloadUrl("");
   };
-
-  const currentTool = tools.find((t) => t.id === selectedTool);
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -168,7 +160,6 @@ export function PDFTools() {
           </button>
 
           <div className="glass rounded-2xl p-6">
-            {/* ===== DROP ZONE ===== */}
             {!converted && (
               <div
                 onDragOver={(e) => {
@@ -215,7 +206,6 @@ export function PDFTools() {
               </div>
             )}
 
-            {/* ===== FILE LIST ===== */}
             {uploadedFiles.length > 0 && !converted && (
               <div className="mt-4 space-y-2">
                 {uploadedFiles.map((file, i) => (
@@ -256,7 +246,6 @@ export function PDFTools() {
               </div>
             )}
 
-            {/* ===== SUCCESS ===== */}
             {converted && (
               <div className="text-center py-6">
                 <CheckCircle className="w-10 h-10 text-green-400 mx-auto mb-4" />

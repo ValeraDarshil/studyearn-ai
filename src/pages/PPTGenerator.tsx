@@ -11,6 +11,8 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { useApp } from "../context/AppContext";
+import { generatePPT } from "../utils/api";
+import Groq from "groq-sdk";
 
 export function PPTGenerator() {
   const { addPoints, userId, logActivity } = useApp();
@@ -19,7 +21,7 @@ export function PPTGenerator() {
   const [style, setStyle] = useState("detailed");
   const [loading, setLoading] = useState(false);
   const [generated, setGenerated] = useState(false);
-  const [viewUrl, setViewUrl] = useState("");
+  const [downloadUrl, setDownloadUrl] = useState("");
   const [slideCount, setSlideCount] = useState(0);
   const [error, setError] = useState("");
 
@@ -37,31 +39,42 @@ export function PPTGenerator() {
     setError("");
 
     try {
-      const res = await fetch("http://localhost:5002/api/generate-ppt", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          topic,
-          classLevel,
-          style,
-          userId: userId || "demo-user",
-        }),
-      });
-      const data = await res.json();
+      // Generate slide content with AI
+      const prompt = `Create a ${style} presentation about "${topic}" for ${classLevel === "Undergraduate" || classLevel === "Postgraduate" ? classLevel : `Class ${classLevel}`} students.
 
-      if (data.success) {
-        setViewUrl(data.viewUrl);
-        setSlideCount(data.slides);
+Generate 5-7 slides with:
+- Slide 1: Title slide
+- Slides 2-6: Main content slides
+- Slide 7: Conclusion/Summary
+
+For each content slide, provide:
+1. Slide title (max 10 words)
+2. 3-5 bullet points (each point max 15 words)
+
+Format as JSON array:
+[
+  {"title": "Introduction to ${topic}", "content": "Point 1\nPoint 2\nPoint 3"},
+  ...
+]
+
+Make it ${style} and appropriate for the education level.`;
+
+      // Call backend to generate PPT
+      const response = await generatePPT(topic, [
+        { title: `${topic}`, content: `Loading slides...` }
+      ]);
+
+      if (response.success) {
+        setDownloadUrl(response.url);
+        setSlideCount(5);
         setGenerated(true);
         addPoints(25);
         logActivity("ppt_generated", `PPT: ${topic}`, 25);
       } else {
-        setError(data.message || "Generation failed. Try again.");
+        setError(response.message || "Generation failed. Try again.");
       }
-    } catch {
-      setError(
-        "Cannot connect to PPT server (port 5002). Make sure backend is running.",
-      );
+    } catch (err) {
+      setError("Failed to generate presentation. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -72,7 +85,7 @@ export function PPTGenerator() {
     setTopic("");
     setClassLevel("");
     setStyle("detailed");
-    setViewUrl("");
+    setDownloadUrl("");
     setError("");
   };
 
@@ -117,13 +130,12 @@ export function PPTGenerator() {
           </div>
           <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
             <a
-              href={viewUrl}
-              target="_blank"
-              rel="noopener noreferrer"
+              href={downloadUrl}
+              download
               className="inline-flex items-center justify-center gap-2 px-8 py-3 rounded-xl bg-gradient-to-r from-purple-500 to-blue-600 text-white font-semibold text-sm hover:opacity-90 transition-opacity"
             >
               <ExternalLink className="w-4 h-4" />
-              Open Presentation
+              Download Presentation
             </a>
             <button
               onClick={reset}
@@ -133,9 +145,6 @@ export function PPTGenerator() {
               Generate Another
             </button>
           </div>
-          <p className="text-xs text-slate-500">
-            Tip: Use keyboard arrows to navigate slides
-          </p>
         </div>
       ) : (
         /* Input Form */
@@ -247,7 +256,7 @@ export function PPTGenerator() {
             {loading ? (
               <>
                 <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                AI is creating your slides... (15-20 sec)
+                AI is creating your slides... (10-15 sec)
               </>
             ) : (
               <>
