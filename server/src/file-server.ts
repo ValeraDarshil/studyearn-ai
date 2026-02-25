@@ -4,7 +4,7 @@ import fs from "fs";
 import path from "path";
 import sharp from "sharp";
 import { PDFDocument } from "pdf-lib";
-import { upload } from "./upload";
+import { upload } from "./upload.js";
 
 const app = express();
 app.use(cors());

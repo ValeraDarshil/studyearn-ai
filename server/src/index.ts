@@ -12,10 +12,12 @@ import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { PDFDocument } from 'pdf-lib';
 import sharp from 'sharp';
-import PptxGenJS from 'pptxgenjs';
+import pkg from 'pptxgenjs';
 import { connectDB } from './db.js';
 
-// ✅ FIX __dirname for ES modules
+const PptxGenJS = pkg;
+
+// ✅ Fix __dirname for ESM
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
@@ -33,7 +35,7 @@ app.use(cors({
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      callback(null, true); // allow all temporarily for testing
+      callback(null, true); // allow temporarily
     }
   },
   credentials: true
@@ -48,86 +50,74 @@ const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY
 });
 
-// ✅ Storage setup - FIXED path
+// ✅ Storage setup
 const OUTPUT_DIR = path.join(__dirname, '..', 'uploads', 'output');
 fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 app.use('/downloads', express.static(OUTPUT_DIR));
 
-// ================= HEALTH CHECK =================
+/* ================= HEALTH ================= */
+
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', service: 'Unified Server (GROQ)', port: PORT });
 });
 
-// ================= AUTH & USER ROUTES =================
+/* ================= ROUTES ================= */
+
 app.use('/api/auth', authRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
 
-// ================= AI ROUTE (GROQ) =================
+/* ================= AI ROUTE ================= */
+
 app.post('/api/ai/ask', async (req, res) => {
   try {
-    const { prompt, image } = req.body;
+    const { prompt } = req.body;
 
-    if (!prompt && !image) {
+    if (!prompt) {
       return res.json({
         success: false,
-        answer: 'Please provide a question or image',
+        answer: 'Please provide a question'
       });
     }
 
     if (!process.env.GROQ_API_KEY) {
       return res.json({
         success: false,
-        answer: 'AI service not configured. Please add GROQ_API_KEY.',
+        answer: 'AI service not configured'
       });
     }
 
-    // ✅ GROQ doesn't support images
-    if (image) {
-      return res.json({
-        success: false,
-        answer: 'Image analysis not supported yet. Please type your question.',
-      });
-    }
-
-    // ✅ Use GROQ with llama model
     const completion = await groq.chat.completions.create({
-      messages: [
-        {
-          role: 'user',
-          content: prompt
-        }
-      ],
+      messages: [{ role: 'user', content: prompt }],
       model: 'llama-3.3-70b-versatile',
       temperature: 0.7,
-      max_tokens: 2000,
+      max_tokens: 2000
     });
 
-    const answer = completion.choices[0]?.message?.content || 'No response from AI';
+    const answer =
+      completion.choices?.[0]?.message?.content || 'No response from AI';
 
-    res.json({
-      success: true,
-      answer: answer,
-    });
+    res.json({ success: true, answer });
 
   } catch (error: any) {
     console.error('AI ERROR:', error);
     res.status(500).json({
       success: false,
-      answer: error.message || 'AI request failed. Please try again.',
+      answer: error.message || 'AI request failed'
     });
   }
 });
 
-// ================= PPT GENERATION =================
+/* ================= PPT GENERATION ================= */
+
 app.post('/api/ppt/generate', async (req, res) => {
   try {
     const { topic, slides } = req.body;
 
-    if (!topic || !slides || slides.length === 0) {
+    if (!topic || !slides?.length) {
       return res.status(400).json({
         success: false,
-        message: 'Topic and slides required',
+        message: 'Topic and slides required'
       });
     }
 
@@ -136,7 +126,6 @@ app.post('/api/ppt/generate', async (req, res) => {
     pptx.author = 'StudyEarn AI';
     pptx.title = topic;
 
-    // Title slide
     const titleSlide = pptx.addSlide();
     titleSlide.background = { fill: '0F172A' };
     titleSlide.addText(topic, {
@@ -147,10 +136,9 @@ app.post('/api/ppt/generate', async (req, res) => {
       fontSize: 44,
       bold: true,
       color: 'FFFFFF',
-      align: 'center',
+      align: 'center'
     });
 
-    // Content slides
     slides.forEach((slide: any) => {
       const contentSlide = pptx.addSlide();
       contentSlide.background = { fill: '1E293B' };
@@ -162,10 +150,13 @@ app.post('/api/ppt/generate', async (req, res) => {
         h: 0.8,
         fontSize: 32,
         bold: true,
-        color: 'FFFFFF',
+        color: 'FFFFFF'
       });
 
-      const bulletPoints = slide.content.split('\n').filter((line: string) => line.trim());
+      const bulletPoints = slide.content
+        .split('\n')
+        .filter((line: string) => line.trim());
+
       contentSlide.addText(bulletPoints, {
         x: 0.5,
         y: 1.5,
@@ -174,38 +165,43 @@ app.post('/api/ppt/generate', async (req, res) => {
         fontSize: 18,
         color: 'E2E8F0',
         bullet: true,
-        lineSpacing: 28,
+        lineSpacing: 28
       });
     });
 
-    const filename = `${topic.replace(/[^a-z0-9]/gi, '_')}_${Date.now()}.pptx`;
+    const filename =
+      `${topic.replace(/[^a-z0-9]/gi, '_')}_${Date.now()}.pptx`;
+
     const filepath = path.join(OUTPUT_DIR, filename);
 
     await pptx.writeFile({ fileName: filepath });
 
-    const baseUrl = process.env.NODE_ENV === 'production'
-      ? `https://${req.get('host')}`
-      : `http://localhost:${PORT}`;
+    const baseUrl =
+      process.env.NODE_ENV === 'production'
+        ? `https://${req.get('host')}`
+        : `http://localhost:${PORT}`;
 
     res.json({
       success: true,
       url: `${baseUrl}/downloads/${filename}`,
-      filename: filename,
+      filename
     });
 
   } catch (error: any) {
     console.error('PPT ERROR:', error);
     res.status(500).json({
       success: false,
-      message: 'PPT generation failed',
+      message: 'PPT generation failed'
     });
   }
 });
 
-// ================= IMAGE/PDF CONVERSION =================
+/* ================= IMAGE → PDF ================= */
+
 app.post('/api/img-to-pdf', upload.array('files', 20), async (req, res) => {
   try {
     const files = req.files as Express.Multer.File[];
+
     if (!files?.length) {
       return res.json({ success: false, message: 'No files uploaded' });
     }
@@ -222,11 +218,25 @@ app.post('/api/img-to-pdf', upload.array('files', 20), async (req, res) => {
 
         const img = await pdfDoc.embedJpg(imgBuffer);
         const page = pdfDoc.addPage([img.width, img.height]);
-        page.drawImage(img, { x: 0, y: 0, width: img.width, height: img.height });
 
-      } else if (file.mimetype === 'application/pdf') {
-        const donorPdf = await PDFDocument.load(fs.readFileSync(file.path));
-        const pages = await pdfDoc.copyPages(donorPdf, donorPdf.getPageIndices());
+        page.drawImage(img, {
+          x: 0,
+          y: 0,
+          width: img.width,
+          height: img.height
+        });
+      }
+
+      if (file.mimetype === 'application/pdf') {
+        const donorPdf = await PDFDocument.load(
+          fs.readFileSync(file.path)
+        );
+
+        const pages = await pdfDoc.copyPages(
+          donorPdf,
+          donorPdf.getPageIndices()
+        );
+
         pages.forEach(p => pdfDoc.addPage(p));
       }
 
@@ -235,24 +245,30 @@ app.post('/api/img-to-pdf', upload.array('files', 20), async (req, res) => {
 
     const filename = `converted-${Date.now()}.pdf`;
     const outputPath = path.join(OUTPUT_DIR, filename);
+
     fs.writeFileSync(outputPath, await pdfDoc.save());
 
-    const baseUrl = process.env.NODE_ENV === 'production'
-      ? `https://${req.get('host')}`
-      : `http://localhost:${PORT}`;
+    const baseUrl =
+      process.env.NODE_ENV === 'production'
+        ? `https://${req.get('host')}`
+        : `http://localhost:${PORT}`;
 
     res.json({
       success: true,
-      url: `${baseUrl}/downloads/${filename}`,
+      url: `${baseUrl}/downloads/${filename}`
     });
 
   } catch (error: any) {
     console.error('IMG→PDF ERROR:', error);
-    res.status(500).json({ success: false, message: 'Conversion failed' });
+    res.status(500).json({
+      success: false,
+      message: 'Conversion failed'
+    });
   }
 });
 
-// ================= MERGE PDF =================
+/* ================= MERGE PDF ================= */
+
 app.post('/api/merge-pdf', upload.array('files', 20), async (req, res) => {
   try {
     const files = req.files as Express.Multer.File[];
@@ -260,7 +276,7 @@ app.post('/api/merge-pdf', upload.array('files', 20), async (req, res) => {
     if (!files || files.length < 2) {
       return res.status(400).json({
         success: false,
-        message: 'Upload at least 2 PDFs',
+        message: 'Upload at least 2 PDFs'
       });
     }
 
@@ -271,12 +287,19 @@ app.post('/api/merge-pdf', upload.array('files', 20), async (req, res) => {
         fs.unlinkSync(file.path);
         return res.status(400).json({
           success: false,
-          message: `${file.originalname} is not a PDF`,
+          message: `${file.originalname} is not a PDF`
         });
       }
 
-      const pdf = await PDFDocument.load(fs.readFileSync(file.path));
-      const pages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
+      const pdf = await PDFDocument.load(
+        fs.readFileSync(file.path)
+      );
+
+      const pages = await mergedPdf.copyPages(
+        pdf,
+        pdf.getPageIndices()
+      );
+
       pages.forEach(p => mergedPdf.addPage(p));
 
       fs.unlinkSync(file.path);
@@ -284,32 +307,35 @@ app.post('/api/merge-pdf', upload.array('files', 20), async (req, res) => {
 
     const filename = `merged-${Date.now()}.pdf`;
     const outputPath = path.join(OUTPUT_DIR, filename);
+
     fs.writeFileSync(outputPath, await mergedPdf.save());
 
-    const baseUrl = process.env.NODE_ENV === 'production'
-      ? `https://${req.get('host')}`
-      : `http://localhost:${PORT}`;
+    const baseUrl =
+      process.env.NODE_ENV === 'production'
+        ? `https://${req.get('host')}`
+        : `http://localhost:${PORT}`;
 
     res.json({
       success: true,
-      url: `${baseUrl}/downloads/${filename}`,
+      url: `${baseUrl}/downloads/${filename}`
     });
 
   } catch (error: any) {
     console.error('MERGE ERROR:', error);
-    res.status(500).json({ success: false, message: 'Merge failed' });
+    res.status(500).json({
+      success: false,
+      message: 'Merge failed'
+    });
   }
 });
 
-// Start server
+/* ================= START SERVER ================= */
+
 connectDB().then(() => {
   app.listen(PORT, () => {
-    console.log(`🚀 Unified Server running on http://localhost:${PORT}`);
-    console.log(`✅ Using GROQ AI (llama-3.3-70b-versatile)`);
-    console.log(`✅ Auth: /api/auth`);
-    console.log(`✅ AI: /api/ai/ask`);
-    console.log(`✅ PPT: /api/ppt/generate`);
-    console.log(`✅ PDF: /api/img-to-pdf, /api/merge-pdf`);
+    console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`✅ AI /api/ai/ask`);
+    console.log(`✅ PPT /api/ppt/generate`);
+    console.log(`✅ PDF /api/img-to-pdf`);
   });
 });
-
