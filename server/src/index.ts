@@ -307,6 +307,11 @@
 //   });
 // });
 
+
+
+// -------- gpt ------- //
+
+
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
@@ -321,7 +326,7 @@ app.use(express.json());
 
 app.use(
   cors({
-    origin: "*", // production mein yaha apna vercel domain daal dena
+    origin: "*",
   })
 );
 
@@ -330,7 +335,7 @@ app.use(
 const PORT = process.env.PORT || 5000;
 
 /* =====================================================
-   =================== AI ROUTE ========================
+   =================== ASK AI ==========================
 ===================================================== */
 
 app.post("/api/askai", async (req, res) => {
@@ -348,6 +353,7 @@ app.post("/api/askai", async (req, res) => {
           Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
           "Content-Type": "application/json",
         },
+        timeout: 30000,
       }
     );
 
@@ -359,16 +365,17 @@ app.post("/api/askai", async (req, res) => {
 });
 
 /* =====================================================
-   =================== PDF ROUTE =======================
+   =================== PDF =============================
 ===================================================== */
 
 app.post("/api/pdf", async (req, res) => {
   try {
     const { content } = req.body;
 
-    // Simple example response (replace with your real pdf logic)
+    // For now simple response (later can upgrade to real PDF file)
     res.json({
-      message: "PDF generated successfully",
+      success: true,
+      message: "PDF request received",
       content,
     });
   } catch (error) {
@@ -377,16 +384,16 @@ app.post("/api/pdf", async (req, res) => {
 });
 
 /* =====================================================
-   =================== PPT ROUTE =======================
+   =================== PPT =============================
 ===================================================== */
 
 app.post("/api/ppt", async (req, res) => {
   try {
     const { topic } = req.body;
 
-    // Replace with your real ppt logic
     res.json({
-      message: "PPT generated successfully",
+      success: true,
+      message: "PPT request received",
       topic,
     });
   } catch (error) {
@@ -394,15 +401,13 @@ app.post("/api/ppt", async (req, res) => {
   }
 });
 
-/* =====================================================
-   =================== HEALTH CHECK ====================
-===================================================== */
+/* ================= HEALTH CHECK ================= */
 
 app.get("/", (req, res) => {
   res.send("Backend Running Successfully 🚀");
 });
 
-/* ================= START SERVER ================= */
+/* ================= START ================= */
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

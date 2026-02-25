@@ -100,65 +100,61 @@
 
 // export { API_URL };
 
-import axios from "axios";
 
-const AI_BASE = import.meta.env.VITE_API_URL;
-const FILE_BASE = "http://localhost:5001";
+// --------- gpt --------- //
 
-// ─── ASK AI ──────────────────────────────────────────────────────────────────
-export async function askAIFromServer(
-  userId: string,
-  question: string,
-  image?: string,
-) {
-  try {
-    const res = await axios.post(`${AI_BASE}/api/ai`, {
-      prompt: question,
-      image: image,
-      userId: userId,
-    });
-    return res.data;
-  } catch (error: any) {
-    console.error("askAIFromServer error:", error.message);
-    return { success: false, answer: "Server not reachable. Is backend running on port 5000?" };
+const API_BASE = import.meta.env.VITE_API_URL;
+
+/* ================= ASK AI ================= */
+
+export const askAI = async (prompt: string) => {
+  const response = await fetch(`${API_BASE}/api/askai`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ prompt }),
+  });
+
+  if (!response.ok) {
+    throw new Error("AI request failed");
   }
-}
 
-// ─── IMAGES TO PDF ───────────────────────────────────────────────────────────
-// NOTE: Do NOT set Content-Type manually - let browser set it with boundary
-export async function convertImagesToPDF(files: File[]) {
-  const formData = new FormData();
-  files.forEach((file) => formData.append("files", file));
+  return response.json();
+};
 
-  try {
-    const res = await fetch(`${FILE_BASE}/api/img-to-pdf`, {
-      method: "POST",
-      body: formData,
-      // NO headers - fetch sets multipart boundary automatically
-    });
-    const data = await res.json();
-    return data;
-  } catch (err: any) {
-    console.error("convertImagesToPDF error:", err.message);
-    return { success: false, message: "PDF conversion failed. Is backend running on port 5001?" };
+/* ================= PDF ================= */
+
+export const generatePDF = async (content: string) => {
+  const response = await fetch(`${API_BASE}/api/pdf`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ content }),
+  });
+
+  if (!response.ok) {
+    throw new Error("PDF generation failed");
   }
-}
 
-// ─── MERGE PDFs ───────────────────────────────────────────────────────────────
-export async function mergePDF(files: File[]) {
-  const formData = new FormData();
-  files.forEach((file) => formData.append("files", file));
+  return response.json();
+};
 
-  try {
-    const res = await fetch(`${FILE_BASE}/api/merge-pdf`, {
-      method: "POST",
-      body: formData,
-      // NO headers - fetch sets multipart boundary automatically
-    });
-    const data = await res.json();
-    return data;
-  } catch (err: any) {
-    console.error("mergePDF error:", err.message);
-    return { success: false, message: "PDF merge failed. Is backend running on port 5001?" };
+/* ================= PPT ================= */
+
+export const generatePPT = async (topic: string) => {
+  const response = await fetch(`${API_BASE}/api/ppt`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ topic }),
+  });
+
+  if (!response.ok) {
+    throw new Error("PPT generation failed");
   }
-}
+
+  return response.json();
+};
