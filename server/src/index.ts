@@ -12,10 +12,9 @@ import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { PDFDocument } from 'pdf-lib';
 import sharp from 'sharp';
-import pkg from 'pptxgenjs';
+import * as PptxGenJS from 'pptxgenjs';
 import { connectDB } from './db.js';
 
-const PptxGenJS = pkg;
 
 // ✅ Fix __dirname for ESM
 const __filename = fileURLToPath(import.meta.url);
@@ -121,7 +120,7 @@ app.post('/api/ppt/generate', async (req, res) => {
       });
     }
 
-    const pptx = new PptxGenJS();
+    const pptx = new (PptxGenJS as any)();
     pptx.layout = 'LAYOUT_16x9';
     pptx.author = 'StudyEarn AI';
     pptx.title = topic;
