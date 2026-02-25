@@ -2,6 +2,7 @@ import { PDFDocument } from "pdf-lib";
 import fs from "fs";
 import path from "path";
 import { v4 as uuid } from "uuid";
+import { Express } from "express";
 
 export async function mergePDFs(files: Express.Multer.File[]) {
   const mergedPdf = await PDFDocument.create();
