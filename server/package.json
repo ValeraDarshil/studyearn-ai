@@ -4,8 +4,8 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "start": "node --import tsx src/index.ts",
-    "dev": "tsx watch src/index.ts"
+    "build": "echo 'No build needed for TypeScript with tsx'",
+    "start": "node --import tsx src/index.ts"
   },
   "keywords": [],
   "author": "",
