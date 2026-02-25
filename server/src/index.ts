@@ -23,13 +23,19 @@ dotenv.config();
 
 const app = express();
 
-// ✅ CORS - Allow Vercel
 app.use(cors({
-  origin: [
-    'http://localhost:5173',
-    'https://studyearn-ai.vercel.app',
-    'https://*.vercel.app'
-  ],
+  origin: function (origin, callback) {
+    const allowedOrigins = [
+      'http://localhost:5173',
+      'https://studyearn-ai.vercel.app'
+    ];
+
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(null, true); // allow all temporarily for testing
+    }
+  },
   credentials: true
 }));
 
