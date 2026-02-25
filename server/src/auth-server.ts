@@ -1,10 +1,10 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import authRoutes from './auth';
-import userRoutes from './user-routes';
-import leaderboardRoutes from './leaderboard-routes';
-import { connectDB } from './db';
+import authRoutes from './auth.js';
+import userRoutes from './user-routes.js';
+import leaderboardRoutes from './leaderboard-routes.js';
+import { connectDB } from './db.js';
 
 dotenv.config();
 
