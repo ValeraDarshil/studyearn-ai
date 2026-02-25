@@ -3,12 +3,9 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "start": "node --import tsx src/auth-server.ts",
-    "ai": "tsx src/ai-server.ts",
-    "files": "tsx src/file-server.ts",
-    "ppt": "tsx src/ppt-server.ts",
-    "auth": "tsx src/auth-server.ts",
-    "dev": "concurrently \"npm run ai\" \"npm run files\" \"npm run ppt\" \"npm run auth\""
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts",
+    "build": "tsc"
   },
   "keywords": [],
   "author": "",

@@ -102,7 +102,7 @@
 
 import axios from "axios";
 
-const AI_BASE = "http://localhost:5000";
+const AI_BASE = import.meta.env.VITE_API_URL;
 const FILE_BASE = "http://localhost:5001";
 
 // ─── ASK AI ──────────────────────────────────────────────────────────────────

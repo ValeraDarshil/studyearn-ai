@@ -306,3 +306,104 @@
 //     console.log(`✅ PDF: /api/img-to-pdf, /api/merge-pdf`);
 //   });
 // });
+
+import express from "express";
+import cors from "cors";
+import dotenv from "dotenv";
+import axios from "axios";
+
+dotenv.config();
+
+const app = express();
+app.use(express.json());
+
+/* ================= CORS ================= */
+
+app.use(
+  cors({
+    origin: "*", // production mein yaha apna vercel domain daal dena
+  })
+);
+
+/* ================= PORT ================= */
+
+const PORT = process.env.PORT || 5000;
+
+/* =====================================================
+   =================== AI ROUTE ========================
+===================================================== */
+
+app.post("/api/askai", async (req, res) => {
+  try {
+    const { prompt } = req.body;
+
+    const response = await axios.post(
+      "https://api.groq.com/openai/v1/chat/completions",
+      {
+        model: "llama3-8b-8192",
+        messages: [{ role: "user", content: prompt }],
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    res.json(response.data);
+  } catch (error: any) {
+    console.error(error.response?.data || error.message);
+    res.status(500).json({ error: "AI request failed" });
+  }
+});
+
+/* =====================================================
+   =================== PDF ROUTE =======================
+===================================================== */
+
+app.post("/api/pdf", async (req, res) => {
+  try {
+    const { content } = req.body;
+
+    // Simple example response (replace with your real pdf logic)
+    res.json({
+      message: "PDF generated successfully",
+      content,
+    });
+  } catch (error) {
+    res.status(500).json({ error: "PDF generation failed" });
+  }
+});
+
+/* =====================================================
+   =================== PPT ROUTE =======================
+===================================================== */
+
+app.post("/api/ppt", async (req, res) => {
+  try {
+    const { topic } = req.body;
+
+    // Replace with your real ppt logic
+    res.json({
+      message: "PPT generated successfully",
+      topic,
+    });
+  } catch (error) {
+    res.status(500).json({ error: "PPT generation failed" });
+  }
+});
+
+/* =====================================================
+   =================== HEALTH CHECK ====================
+===================================================== */
+
+app.get("/", (req, res) => {
+  res.send("Backend Running Successfully 🚀");
+});
+
+/* ================= START SERVER ================= */
+
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
