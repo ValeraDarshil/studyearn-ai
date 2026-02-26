@@ -1,4 +1,4 @@
-// src/utils/api.ts - Production Safe Version
+// src/utils/api.ts - FINAL PRODUCTION VERSION
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -52,7 +52,15 @@ export async function generatePPT(topic: string, slides: any[]) {
       throw new Error(`Server Error: ${response.status}`);
     }
 
-    return await response.json();
+    // 🔥 IMPORTANT CHANGE — receive file as blob
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+
+    return {
+      success: true,
+      url,
+    };
+
   } catch (error) {
     console.error("PPT API Error:", error);
     return {

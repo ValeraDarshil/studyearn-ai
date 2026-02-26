@@ -95,41 +95,29 @@ app.post("/api/ppt/generate", async (req, res) => {
   try {
     const { topic, slides } = req.body;
 
-    if (!topic || !slides?.length) {
+    if (!topic || !slides || !Array.isArray(slides)) {
       return res.status(400).json({
         success: false,
-        message: "Topic and slides required",
+        message: "Invalid topic or slides",
       });
     }
 
-    // 🔥 Render-safe constructor
     const pptx = new (PptxGenJS as any)();
 
     pptx.layout = "LAYOUT_16x9";
     pptx.author = "StudyEarn AI";
     pptx.title = topic;
 
-    const titleSlide = pptx.addSlide();
-    titleSlide.background = { fill: "0F172A" };
-
-    titleSlide.addText(topic, {
-      x: 0.5,
-      y: 2.5,
-      w: 9,
-      h: 2,
-      fontSize: 40,
-      bold: true,
-      color: "FFFFFF",
-      align: "center",
-    });
-
     slides.forEach((slide: any) => {
       const s = pptx.addSlide();
-      s.background = { fill: "1E293B" };
 
-      s.addText(slide.title, {
+      // Background
+      s.background = { fill: "0F172A" };
+
+      // Title
+      s.addText(slide.title || "Slide", {
         x: 0.5,
-        y: 0.5,
+        y: 0.4,
         w: 9,
         h: 0.8,
         fontSize: 28,
@@ -137,41 +125,41 @@ app.post("/api/ppt/generate", async (req, res) => {
         color: "FFFFFF",
       });
 
-      const bulletPoints = slide.content
+      // Convert content safely into bullet objects
+      const bulletPoints = (slide.content || "")
         .split("\n")
-        .filter((line: string) => line.trim());
+        .filter((line: string) => line.trim() !== "")
+        .map((line: string) => ({
+          text: line.trim(),
+          options: { bullet: true },
+        }));
 
       s.addText(bulletPoints, {
-        x: 0.5,
+        x: 0.7,
         y: 1.5,
-        w: 9,
-        h: 4,
+        w: 8.5,
+        h: 4.5,
         fontSize: 18,
         color: "E2E8F0",
-        bullet: true,
         lineSpacing: 28,
       });
     });
 
-    const filename = `${topic.replace(
-      /[^a-z0-9]/gi,
-      "_"
-    )}_${Date.now()}.pptx`;
+    // 🔥 Render-safe: generate buffer
+    const buffer = await pptx.write("nodebuffer");
 
-    const filepath = path.join(OUTPUT_DIR, filename);
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename=${topic.replace(/\s+/g, "_")}.pptx`
+    );
 
-    await pptx.writeFile({ fileName: filepath });
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+    );
 
-    const baseUrl =
-      process.env.NODE_ENV === "production"
-        ? `https://${req.get("host")}`
-        : `http://localhost:${PORT}`;
+    res.send(buffer);
 
-    res.json({
-      success: true,
-      url: `${baseUrl}/downloads/${filename}`,
-      filename,
-    });
   } catch (error: any) {
     console.error("PPT ERROR:", error);
     res.status(500).json({
