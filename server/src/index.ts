@@ -1,19 +1,19 @@
-import express from 'express';
-import cors from 'cors';
-import dotenv from 'dotenv';
-import authRoutes from './auth.js';
-import userRoutes from './user-routes.js';
-import leaderboardRoutes from './leaderboard-routes.js';
-import Groq from 'groq-sdk';
-import { upload } from './upload.js';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
-import { PDFDocument } from 'pdf-lib';
-import sharp from 'sharp';
-import PptxGenJS from 'pptxgenjs/dist/pptxgen.cjs'; // ✅ FIXED IMPORT
-import { connectDB } from './db.js';
+import express from "express";
+import cors from "cors";
+import dotenv from "dotenv";
+import authRoutes from "./auth.js";
+import userRoutes from "./user-routes.js";
+import leaderboardRoutes from "./leaderboard-routes.js";
+import Groq from "groq-sdk";
+import { upload } from "./upload.js";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+import { dirname } from "path";
+import { PDFDocument } from "pdf-lib";
+import sharp from "sharp";
+import PptxGenJS from "pptxgenjs";
+import { connectDB } from "./db.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -22,165 +22,161 @@ dotenv.config();
 
 const app = express();
 
-app.use(cors({
-  origin: function (origin, callback) {
-    const allowedOrigins = [
-      'http://localhost:5173',
-      'https://studyearn-ai.vercel.app'
-    ];
+app.use(
+  cors({
+    origin: [
+      "http://localhost:5173",
+      "https://studyearn-ai.vercel.app",
+    ],
+    credentials: true,
+  })
+);
 
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(null, true);
-    }
-  },
-  credentials: true
-}));
-
-app.use(express.json({ limit: '50mb' }));
+app.use(express.json({ limit: "50mb" }));
 
 const PORT = process.env.PORT || 5003;
 
 const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY
+  apiKey: process.env.GROQ_API_KEY,
 });
 
-const OUTPUT_DIR = path.join(__dirname, '..', 'uploads', 'output');
+const OUTPUT_DIR = path.join(__dirname, "..", "uploads", "output");
 fs.mkdirSync(OUTPUT_DIR, { recursive: true });
-app.use('/downloads', express.static(OUTPUT_DIR));
+app.use("/downloads", express.static(OUTPUT_DIR));
 
 /* ================= HEALTH ================= */
 
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', service: 'Unified Server (GROQ)', port: PORT });
+app.get("/health", (req, res) => {
+  res.json({ status: "ok", port: PORT });
 });
 
 /* ================= ROUTES ================= */
 
-app.use('/api/auth', authRoutes);
-app.use('/api/user', userRoutes);
-app.use('/api/leaderboard', leaderboardRoutes);
+app.use("/api/auth", authRoutes);
+app.use("/api/user", userRoutes);
+app.use("/api/leaderboard", leaderboardRoutes);
 
 /* ================= AI ROUTE ================= */
 
-app.post('/api/ai/ask', async (req, res) => {
+app.post("/api/ai/ask", async (req, res) => {
   try {
     const { prompt } = req.body;
 
     if (!prompt) {
-      return res.json({ success: false, answer: 'Please provide a question' });
-    }
-
-    if (!process.env.GROQ_API_KEY) {
-      return res.json({ success: false, answer: 'AI service not configured' });
+      return res.json({
+        success: false,
+        answer: "Please provide a question",
+      });
     }
 
     const completion = await groq.chat.completions.create({
-      messages: [{ role: 'user', content: prompt }],
-      model: 'llama-3.3-70b-versatile',
+      messages: [{ role: "user", content: prompt }],
+      model: "llama-3.3-70b-versatile",
       temperature: 0.7,
-      max_tokens: 2000
+      max_tokens: 2000,
     });
 
     const answer =
-      completion.choices?.[0]?.message?.content || 'No response from AI';
+      completion.choices?.[0]?.message?.content || "No response";
 
     res.json({ success: true, answer });
-
   } catch (error: any) {
-    console.error('AI ERROR:', error);
+    console.error("AI ERROR:", error);
     res.status(500).json({
       success: false,
-      answer: error.message || 'AI request failed'
+      answer: error.message || "AI failed",
     });
   }
 });
 
 /* ================= PPT GENERATION ================= */
 
-app.post('/api/ppt/generate', async (req, res) => {
+app.post("/api/ppt/generate", async (req, res) => {
   try {
     const { topic, slides } = req.body;
 
     if (!topic || !slides?.length) {
       return res.status(400).json({
         success: false,
-        message: 'Topic and slides required'
+        message: "Topic and slides required",
       });
     }
 
-    const pptx = new PptxGenJS(); // ✅ NOW WORKS
-    pptx.layout = 'LAYOUT_16x9';
-    pptx.author = 'StudyEarn AI';
+    // 🔥 Render-safe constructor
+    const pptx = new (PptxGenJS as any)();
+
+    pptx.layout = "LAYOUT_16x9";
+    pptx.author = "StudyEarn AI";
     pptx.title = topic;
 
     const titleSlide = pptx.addSlide();
-    titleSlide.background = { fill: '0F172A' };
+    titleSlide.background = { fill: "0F172A" };
+
     titleSlide.addText(topic, {
       x: 0.5,
       y: 2.5,
       w: 9,
       h: 2,
-      fontSize: 44,
+      fontSize: 40,
       bold: true,
-      color: 'FFFFFF',
-      align: 'center'
+      color: "FFFFFF",
+      align: "center",
     });
 
     slides.forEach((slide: any) => {
-      const contentSlide = pptx.addSlide();
-      contentSlide.background = { fill: '1E293B' };
+      const s = pptx.addSlide();
+      s.background = { fill: "1E293B" };
 
-      contentSlide.addText(slide.title, {
+      s.addText(slide.title, {
         x: 0.5,
         y: 0.5,
         w: 9,
         h: 0.8,
-        fontSize: 32,
+        fontSize: 28,
         bold: true,
-        color: 'FFFFFF'
+        color: "FFFFFF",
       });
 
       const bulletPoints = slide.content
-        .split('\n')
+        .split("\n")
         .filter((line: string) => line.trim());
 
-      contentSlide.addText(bulletPoints, {
+      s.addText(bulletPoints, {
         x: 0.5,
         y: 1.5,
         w: 9,
         h: 4,
         fontSize: 18,
-        color: 'E2E8F0',
+        color: "E2E8F0",
         bullet: true,
-        lineSpacing: 28
+        lineSpacing: 28,
       });
     });
 
-    const filename =
-      `${topic.replace(/[^a-z0-9]/gi, '_')}_${Date.now()}.pptx`;
+    const filename = `${topic.replace(
+      /[^a-z0-9]/gi,
+      "_"
+    )}_${Date.now()}.pptx`;
 
     const filepath = path.join(OUTPUT_DIR, filename);
 
     await pptx.writeFile({ fileName: filepath });
 
     const baseUrl =
-      process.env.NODE_ENV === 'production'
-        ? `https://${req.get('host')}`
+      process.env.NODE_ENV === "production"
+        ? `https://${req.get("host")}`
         : `http://localhost:${PORT}`;
 
     res.json({
       success: true,
       url: `${baseUrl}/downloads/${filename}`,
-      filename
+      filename,
     });
-
   } catch (error: any) {
-    console.error('PPT ERROR:', error);
+    console.error("PPT ERROR:", error);
     res.status(500).json({
       success: false,
-      message: 'PPT generation failed'
+      message: error.message || "PPT generation failed",
     });
   }
 });
@@ -190,7 +186,7 @@ app.post('/api/ppt/generate', async (req, res) => {
 connectDB().then(() => {
   app.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
-    console.log(`✅ AI /api/ai/ask`);
-    console.log(`✅ PPT /api/ppt/generate`);
+    console.log(`✅ AI route ready`);
+    console.log(`✅ PPT route ready`);
   });
 });
