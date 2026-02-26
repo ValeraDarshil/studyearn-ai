@@ -5,22 +5,16 @@ import authRoutes from "./auth.js";
 import userRoutes from "./user-routes.js";
 import leaderboardRoutes from "./leaderboard-routes.js";
 import Groq from "groq-sdk";
-import { upload } from "./upload.js";
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
-import { dirname } from "path";
+import multer from "multer";
 import { PDFDocument } from "pdf-lib";
 import sharp from "sharp";
 import PptxGenJS from "pptxgenjs";
 import { connectDB } from "./db.js";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
 dotenv.config();
 
 const app = express();
+const PORT = process.env.PORT || 5003;
 
 app.use(
   cors({
@@ -34,15 +28,15 @@ app.use(
 
 app.use(express.json({ limit: "50mb" }));
 
-const PORT = process.env.PORT || 5003;
-
 const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY,
 });
 
-const OUTPUT_DIR = path.join(__dirname, "..", "uploads", "output");
-fs.mkdirSync(OUTPUT_DIR, { recursive: true });
-app.use("/downloads", express.static(OUTPUT_DIR));
+// 🔥 MEMORY STORAGE (Render Safe)
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 20 * 1024 * 1024 },
+});
 
 /* ================= HEALTH ================= */
 
@@ -61,13 +55,6 @@ app.use("/api/leaderboard", leaderboardRoutes);
 app.post("/api/ai/ask", async (req, res) => {
   try {
     const { prompt } = req.body;
-
-    if (!prompt) {
-      return res.json({
-        success: false,
-        answer: "Please provide a question",
-      });
-    }
 
     const completion = await groq.chat.completions.create({
       messages: [{ role: "user", content: prompt }],
@@ -89,92 +76,166 @@ app.post("/api/ai/ask", async (req, res) => {
   }
 });
 
-/* ================= PPT GENERATION ================= */
+/* ================= PPT ROUTE ================= */
 
 app.post("/api/ppt/generate", async (req, res) => {
   try {
     const { topic, slides } = req.body;
 
-    if (!topic || !slides || !Array.isArray(slides)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid topic or slides",
-      });
-    }
-
     const pptx = new (PptxGenJS as any)();
-
     pptx.layout = "LAYOUT_16x9";
-    pptx.author = "StudyEarn AI";
-    pptx.title = topic;
 
     slides.forEach((slide: any) => {
       const s = pptx.addSlide();
 
-      // Background
-      s.background = { fill: "0F172A" };
-
-      // Title
       s.addText(slide.title || "Slide", {
         x: 0.5,
-        y: 0.4,
-        w: 9,
-        h: 0.8,
+        y: 0.5,
         fontSize: 28,
         bold: true,
-        color: "FFFFFF",
       });
 
-      // Convert content safely into bullet objects
-      const bulletPoints = (slide.content || "")
+      const bullets = (slide.content || "")
         .split("\n")
-        .filter((line: string) => line.trim() !== "")
+        .filter((line: string) => line.trim())
         .map((line: string) => ({
-          text: line.trim(),
+          text: line,
           options: { bullet: true },
         }));
 
-      s.addText(bulletPoints, {
-        x: 0.7,
+      s.addText(bullets, {
+        x: 0.5,
         y: 1.5,
-        w: 8.5,
-        h: 4.5,
         fontSize: 18,
-        color: "E2E8F0",
-        lineSpacing: 28,
       });
     });
 
-    // 🔥 Render-safe: generate buffer
     const buffer = await pptx.write("nodebuffer");
-
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename=${topic.replace(/\s+/g, "_")}.pptx`
-    );
 
     res.setHeader(
       "Content-Type",
       "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+    );
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename=${topic}.pptx`
     );
 
     res.send(buffer);
 
   } catch (error: any) {
     console.error("PPT ERROR:", error);
-    res.status(500).json({
-      success: false,
-      message: error.message || "PPT generation failed",
-    });
+    res.status(500).json({ success: false, message: "PPT failed" });
   }
 });
+
+/* ================= IMAGE → PDF ================= */
+
+app.post(
+  "/api/img-to-pdf",
+  upload.array("files"),
+  async (req: any, res) => {
+    try {
+      const files = req.files;
+
+      if (!files || files.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: "No files uploaded",
+        });
+      }
+
+      const pdfDoc = await PDFDocument.create();
+
+      for (const file of files) {
+        const imageBuffer = await sharp(file.buffer)
+          .png()
+          .toBuffer();
+
+        const image = await pdfDoc.embedPng(imageBuffer);
+        const page = pdfDoc.addPage([image.width, image.height]);
+        page.drawImage(image, {
+          x: 0,
+          y: 0,
+          width: image.width,
+          height: image.height,
+        });
+      }
+
+      const pdfBytes = await pdfDoc.save();
+
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader(
+        "Content-Disposition",
+        "attachment; filename=converted.pdf"
+      );
+
+      res.send(Buffer.from(pdfBytes));
+
+    } catch (error: any) {
+      console.error("IMG→PDF ERROR:", error);
+      res.status(500).json({
+        success: false,
+        message: "Image to PDF failed",
+      });
+    }
+  }
+);
+
+/* ================= MERGE PDF ================= */
+
+app.post(
+  "/api/merge-pdf",
+  upload.array("files"),
+  async (req: any, res) => {
+    try {
+      const files = req.files;
+
+      if (!files || files.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: "No files uploaded",
+        });
+      }
+
+      const mergedPdf = await PDFDocument.create();
+
+      for (const file of files) {
+        const pdf = await PDFDocument.load(file.buffer);
+        const copiedPages = await mergedPdf.copyPages(
+          pdf,
+          pdf.getPageIndices()
+        );
+        copiedPages.forEach((page) => mergedPdf.addPage(page));
+      }
+
+      const pdfBytes = await mergedPdf.save();
+
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader(
+        "Content-Disposition",
+        "attachment; filename=merged.pdf"
+      );
+
+      res.send(Buffer.from(pdfBytes));
+
+    } catch (error: any) {
+      console.error("MERGE PDF ERROR:", error);
+      res.status(500).json({
+        success: false,
+        message: "Merge failed",
+      });
+    }
+  }
+);
 
 /* ================= START SERVER ================= */
 
 connectDB().then(() => {
   app.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
-    console.log(`✅ AI route ready`);
-    console.log(`✅ PPT route ready`);
+    console.log(`✅ AI ready`);
+    console.log(`✅ PPT ready`);
+    console.log(`✅ PDF tools ready`);
   });
 });
