@@ -61,7 +61,7 @@ Make it ${style} and appropriate for the education level.`;
 
       // Call backend to generate PPT
       const response = await generatePPT(topic, [
-        { title: `${topic}`, content: `Loading slides...` }
+        { title: `${topic}`, content: `Loading slides...` },
       ]);
 
       if (response.success) {
@@ -276,4 +276,3 @@ Make it ${style} and appropriate for the education level.`;
     </div>
   );
 }
-
