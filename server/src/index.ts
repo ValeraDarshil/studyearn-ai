@@ -56,32 +56,58 @@ app.post("/api/ai/ask", async (req, res) => {
   try {
     const { prompt, image } = req.body;
 
+    if (!prompt && !image) {
+      return res.status(400).json({
+        success: false,
+        answer: "No question or image provided",
+      });
+    }
+
     let messages: any[] = [];
 
-    if (image) {
+    // ✅ If Image Exists
+    if (image && image.startsWith("data:image")) {
       messages = [
         {
           role: "user",
           content: [
-            { type: "text", text: prompt || "Solve this question" },
+            {
+              type: "text",
+              text:
+                prompt ||
+                "Solve all questions in this image step by step with proper explanation.",
+            },
             {
               type: "image_url",
-              image_url: { url: image },
+              image_url: {
+                url: image,
+              },
             },
           ],
         },
       ];
     } else {
-      messages = [{ role: "user", content: prompt }];
+      // ✅ Text Only
+      messages = [
+        {
+          role: "system",
+          content:
+            "You are a highly intelligent academic AI tutor. Always solve questions step by step with clear explanations.",
+        },
+        {
+          role: "user",
+          content: prompt,
+        },
+      ];
     }
 
     const completion = await groq.chat.completions.create({
-      model: image
+      model: image && image.startsWith("data:image")
         ? "llama-3.2-90b-vision-preview"
         : "llama-3.3-70b-versatile",
       messages,
-      temperature: 0.7,
-      max_tokens: 3000,
+      temperature: 0.4,
+      max_tokens: 4096,
     });
 
     const answer =
