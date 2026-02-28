@@ -596,7 +596,7 @@ import { useState, useRef, useEffect } from "react";
 import {
   Presentation, ExternalLink, Sparkles, Palette,
   GraduationCap, FileText, ChevronDown, CheckCircle,
-  RotateCcw, Check, Layers, BookOpen, Wand2,
+  RotateCcw, Check,
 } from "lucide-react";
 import { useApp } from "../context/AppContext";
 import { API_URL } from "../utils/api";
@@ -612,35 +612,188 @@ const CLASS_LEVELS = [
   { value: "Postgraduate",  label: "Postgraduate",  emoji: "🏛️" },
 ];
 
+// ── Premium SVG Icons ─────────────────────────────────────────────────────────
+
+const SimpleIcon = ({ active }: { active: boolean }) => (
+  <svg width="52" height="52" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="simpleGrad" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stopColor="#60A5FA"/>
+        <stop offset="100%" stopColor="#06B6D4"/>
+      </linearGradient>
+      <filter id="simpleGlow">
+        <feGaussianBlur stdDeviation="2.5" result="blur"/>
+        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+    </defs>
+    {/* Outer hexagon ring */}
+    <path
+      d="M26 4 L44 15 L44 37 L26 48 L8 37 L8 15 Z"
+      stroke={active ? "url(#simpleGrad)" : "#334155"}
+      strokeWidth="1.5" fill="none"
+      style={{ transition: "all 0.3s" }}
+    />
+    {/* Inner clean slides stack */}
+    <rect x="15" y="17" width="22" height="3" rx="1.5"
+      fill={active ? "url(#simpleGrad)" : "#475569"}
+      filter={active ? "url(#simpleGlow)" : undefined}
+      style={{ transition: "all 0.3s" }}
+    />
+    <rect x="15" y="23" width="16" height="3" rx="1.5"
+      fill={active ? "#60A5FA" : "#374151"}
+      opacity={active ? 0.8 : 0.5}
+      style={{ transition: "all 0.3s" }}
+    />
+    <rect x="15" y="29" width="19" height="3" rx="1.5"
+      fill={active ? "#06B6D4" : "#374151"}
+      opacity={active ? 0.6 : 0.4}
+      style={{ transition: "all 0.3s" }}
+    />
+    {/* Corner accent dot */}
+    <circle cx="40" cy="12" r="3"
+      fill={active ? "#60A5FA" : "#1E3A5F"}
+      style={{ transition: "all 0.3s" }}
+    />
+  </svg>
+);
+
+const DetailedIcon = ({ active }: { active: boolean }) => (
+  <svg width="52" height="52" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="detailGrad" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stopColor="#A78BFA"/>
+        <stop offset="100%" stopColor="#7C3AED"/>
+      </linearGradient>
+      <linearGradient id="detailGrad2" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stopColor="#C4B5FD"/>
+        <stop offset="100%" stopColor="#8B5CF6"/>
+      </linearGradient>
+      <filter id="detailGlow">
+        <feGaussianBlur stdDeviation="3" result="blur"/>
+        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+    </defs>
+    {/* Document frame */}
+    <rect x="10" y="6" width="32" height="40" rx="4"
+      stroke={active ? "url(#detailGrad)" : "#334155"}
+      strokeWidth="1.5" fill={active ? "rgba(124,58,237,0.08)" : "none"}
+      style={{ transition: "all 0.3s" }}
+    />
+    {/* Top accent bar */}
+    <rect x="10" y="6" width="32" height="5" rx="2"
+      fill={active ? "url(#detailGrad)" : "#1E293B"}
+      style={{ transition: "all 0.3s" }}
+    />
+    {/* Content lines — varied widths like real data */}
+    {[14, 18, 22, 27, 31, 35].map((y, i) => (
+      <rect key={i} x="16" y={y} width={i % 3 === 0 ? 22 : i % 3 === 1 ? 16 : 19} height="2.2" rx="1.1"
+        fill={active ? (i === 0 ? "#C4B5FD" : i < 3 ? "#A78BFA" : "#7C3AED") : "#2D3748"}
+        opacity={active ? (1 - i * 0.08) : 0.5}
+        filter={active && i === 0 ? "url(#detailGlow)" : undefined}
+        style={{ transition: "all 0.3s" }}
+      />
+    ))}
+    {/* Bookmark ribbon */}
+    <path d="M35 6 L35 15 L31.5 12 L28 15 L28 6 Z"
+      fill={active ? "url(#detailGrad2)" : "#374151"}
+      style={{ transition: "all 0.3s" }}
+    />
+  </svg>
+);
+
+const CreativeIcon = ({ active }: { active: boolean }) => (
+  <svg width="52" height="52" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="creativeGrad" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stopColor="#F97316"/>
+        <stop offset="100%" stopColor="#EC4899"/>
+      </linearGradient>
+      <linearGradient id="creativeGrad2" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stopColor="#F97316"/>
+        <stop offset="50%" stopColor="#A855F7"/>
+        <stop offset="100%" stopColor="#06B6D4"/>
+      </linearGradient>
+      <filter id="creativeGlow">
+        <feGaussianBlur stdDeviation="3.5" result="blur"/>
+        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+    </defs>
+    {/* Outer circle ring */}
+    <circle cx="26" cy="26" r="21"
+      stroke={active ? "url(#creativeGrad2)" : "#334155"}
+      strokeWidth="1.5" strokeDasharray="4 3" fill="none"
+      style={{ transition: "all 0.3s" }}
+    />
+    {/* Magic wand body */}
+    <line x1="14" y1="38" x2="30" y2="22"
+      stroke={active ? "url(#creativeGrad)" : "#475569"}
+      strokeWidth="3" strokeLinecap="round"
+      filter={active ? "url(#creativeGlow)" : undefined}
+      style={{ transition: "all 0.3s" }}
+    />
+    {/* Wand tip star */}
+    <path d="M30 22 L32 18 L34 22 L38 24 L34 26 L32 30 L30 26 L26 24 Z"
+      fill={active ? "url(#creativeGrad)" : "#374151"}
+      filter={active ? "url(#creativeGlow)" : undefined}
+      style={{ transition: "all 0.3s" }}
+    />
+    {/* Sparkle dots */}
+    <circle cx="18" cy="16" r="2.5"
+      fill={active ? "#F97316" : "#2D3748"}
+      opacity={active ? 0.9 : 0.4}
+      filter={active ? "url(#creativeGlow)" : undefined}
+      style={{ transition: "all 0.3s" }}
+    />
+    <circle cx="38" cy="36" r="1.8"
+      fill={active ? "#A855F7" : "#2D3748"}
+      opacity={active ? 0.8 : 0.3}
+      style={{ transition: "all 0.3s" }}
+    />
+    <circle cx="14" cy="28" r="1.4"
+      fill={active ? "#06B6D4" : "#2D3748"}
+      opacity={active ? 0.7 : 0.3}
+      style={{ transition: "all 0.3s" }}
+    />
+    <circle cx="36" cy="14" r="1.2"
+      fill={active ? "#EC4899" : "#2D3748"}
+      opacity={active ? 0.6 : 0.3}
+      style={{ transition: "all 0.3s" }}
+    />
+  </svg>
+);
+
 const PPT_STYLES = [
   {
     id: "simple",
     label: "Simple",
     desc: "Clean & minimal — easy to read",
-    icon: <Layers className="w-5 h-5" />,
     color: "from-blue-500/20 to-cyan-500/10",
     border: "border-blue-500/40",
     accent: "text-blue-300",
+    ring: "ring-blue-500/30",
+    glow: "shadow-blue-500/20",
     slides: "6 slides",
   },
   {
     id: "detailed",
     label: "Detailed",
     desc: "Deep content — every concept covered",
-    icon: <BookOpen className="w-5 h-5" />,
     color: "from-purple-500/20 to-indigo-500/10",
     border: "border-purple-500/40",
     accent: "text-purple-300",
+    ring: "ring-purple-500/30",
+    glow: "shadow-purple-500/20",
     slides: "10 slides",
   },
   {
     id: "creative",
     label: "Creative",
     desc: "Visual & engaging — with emojis & design",
-    icon: <Wand2 className="w-5 h-5" />,
-    color: "from-pink-500/20 to-orange-500/10",
-    border: "border-pink-500/40",
-    accent: "text-pink-300",
+    color: "from-orange-500/20 to-pink-500/10",
+    border: "border-orange-500/40",
+    accent: "text-orange-300",
+    ring: "ring-orange-500/30",
+    glow: "shadow-orange-500/20",
     slides: "10 slides",
   },
 ];
@@ -977,27 +1130,33 @@ Output the JSON array now:`;
               <Palette className="w-4 h-4 text-purple-400" /> Presentation Style
             </label>
             <div className="grid grid-cols-3 gap-3">
-              {PPT_STYLES.map(s => (
+              {PPT_STYLES.map(s => {
+                const active = style === s.id;
+                return (
                 <button key={s.id} onClick={() => setStyle(s.id)}
-                  className={`relative p-4 rounded-xl border text-center transition-all duration-200 overflow-hidden group
-                    ${style === s.id
-                      ? `bg-gradient-to-br ${s.color} ${s.border} ring-1 ${s.border.replace("border-","ring-")}`
+                  className={`relative p-4 rounded-xl border text-center transition-all duration-300 overflow-hidden group
+                    ${active
+                      ? `bg-gradient-to-br ${s.color} ${s.border} ring-1 ${s.ring} shadow-lg ${s.glow}`
                       : "bg-white/[0.02] border-white/5 hover:border-white/15 hover:bg-white/[0.04]"
                     }`}
                 >
-                  {style === s.id && (
-                    <div className="absolute inset-0 bg-gradient-to-br from-transparent via-white/[0.02] to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700 pointer-events-none" />
+                  {active && (
+                    <div className="absolute inset-0 bg-gradient-to-br from-transparent via-white/[0.03] to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700 pointer-events-none" />
                   )}
-                  <div className={`flex justify-center mb-2 transition-colors ${style === s.id ? s.accent : "text-slate-500"}`}>
-                    {s.icon}
+                  {/* Premium icon */}
+                  <div className={`flex justify-center mb-3 transition-all duration-300 ${active ? "scale-110 drop-shadow-lg" : "scale-100 opacity-50 grayscale"}`}>
+                    {s.id === "simple"   && <SimpleIcon   active={active} />}
+                    {s.id === "detailed" && <DetailedIcon active={active} />}
+                    {s.id === "creative" && <CreativeIcon active={active} />}
                   </div>
                   <div className="text-sm font-bold text-white">{s.label}</div>
                   <div className="text-[10px] text-slate-500 mt-0.5">{s.desc}</div>
-                  <div className={`text-[10px] mt-1.5 font-semibold ${style === s.id ? s.accent : "text-slate-600"}`}>
+                  <div className={`text-[10px] mt-1.5 font-semibold ${active ? s.accent : "text-slate-600"}`}>
                     {s.slides}
                   </div>
                 </button>
-              ))}
+                );
+              })}
             </div>
           </div>
 
