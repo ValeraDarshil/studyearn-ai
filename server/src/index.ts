@@ -732,57 +732,493 @@ app.post("/api/ai/solve-pdf", upload.single("file"), async (req, res) => {
 
 /* ================= PPT GENERATOR ================= */
 
+// ─────────────────────────────────────────────────────────────────────────────
+// THEME DEFINITIONS
+// Each theme has a full design system: colors, fonts, layouts
+// ─────────────────────────────────────────────────────────────────────────────
+
+const THEMES = {
+
+  // ── SIMPLE: Midnight Executive — clean, minimal, white on deep navy ────────
+  simple: {
+    bg:          "0F1B35",   // deep navy
+    bgLight:     "162040",   // slightly lighter navy for alt slides
+    accent:      "4A90E2",   // clean blue accent
+    accentLight: "7BB3F0",   // lighter blue
+    textPrimary: "FFFFFF",
+    textSecondary: "B8C8E0",
+    textMuted:   "6B8AB0",
+    cardBg:      "1C2A48",
+    cardBorder:  "2D3F60",
+    titleFont:   "Calibri",
+    bodyFont:    "Calibri",
+  },
+
+  // ── DETAILED: Charcoal Professional — dark with purple-blue gradient feel ──
+  detailed: {
+    bg:          "1A1A2E",   // dark navy-purple
+    bgLight:     "16213E",
+    accent:      "7C3AED",   // vivid purple
+    accentLight: "A78BFA",   // lavender
+    accentAlt:   "3B82F6",   // blue
+    textPrimary: "FFFFFF",
+    textSecondary: "C4B5FD",
+    textMuted:   "7B7FA8",
+    cardBg:      "252545",
+    cardBorder:  "3D3D6B",
+    titleFont:   "Cambria",
+    bodyFont:    "Calibri",
+  },
+
+  // ── CREATIVE: Coral Energy — vibrant, engaging, orange-coral with dark bg ──
+  creative: {
+    bg:          "1C1C2E",   // very dark navy
+    bgLight:     "252538",
+    accent:      "F97316",   // vibrant orange
+    accentLight: "FB923C",
+    accentAlt:   "8B5CF6",   // purple complement
+    accentAlt2:  "06B6D4",   // cyan complement
+    textPrimary: "FFFFFF",
+    textSecondary: "FED7AA",  // warm cream
+    textMuted:   "94A3B8",
+    cardBg:      "2D2B42",
+    cardBorder:  "4C4870",
+    titleFont:   "Trebuchet MS",
+    bodyFont:    "Calibri",
+  },
+};
+
+type ThemeKey = keyof typeof THEMES;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HELPER FUNCTIONS
+// ─────────────────────────────────────────────────────────────────────────────
+
+function makeShadow() {
+  return { type: "outer" as const, blur: 8, offset: 3, angle: 135, color: "000000", opacity: 0.25 };
+}
+
+function parseLines(content: string): string[] {
+  return content.split("\n")
+    .map((l: string) => l.replace(/^[-•*▸→]\s*/, "").trim())
+    .filter((l: string) => l.length > 0);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SLIDE BUILDERS
+// ─────────────────────────────────────────────────────────────────────────────
+
+// TITLE SLIDE — full-screen dramatic hero
+function addTitleSlide(pptx: any, slide: any, theme: any, topic: string, classLevel: string, themeKey: ThemeKey) {
+  const s = pptx.addSlide();
+  s.background = { color: theme.bg };
+
+  // Large decorative shape — top-left corner block
+  s.addShape(pptx.shapes.RECTANGLE, {
+    x: 0, y: 0, w: 4.5, h: 5.625,
+    fill: { color: theme.accent, transparency: 85 },
+    line: { color: theme.accent, transparency: 85 },
+  });
+
+  // Bottom accent bar
+  s.addShape(pptx.shapes.RECTANGLE, {
+    x: 0, y: 5.1, w: 10, h: 0.525,
+    fill: { color: theme.accent, transparency: 60 },
+    line: { color: theme.accent, transparency: 60 },
+  });
+
+  // Accent left bar
+  s.addShape(pptx.shapes.RECTANGLE, {
+    x: 0.6, y: 1.4, w: 0.12, h: 2.8,
+    fill: { color: theme.accent },
+    line: { color: theme.accent },
+  });
+
+  // Topic / Main Title
+  s.addText(slide.title || topic, {
+    x: 0.9, y: 1.5, w: 8.3, h: 1.8,
+    fontSize: 44, bold: true, color: theme.textPrimary,
+    fontFace: theme.titleFont, align: "left", valign: "middle",
+    margin: 0,
+  });
+
+  // Subtitle
+  const subtitle = slide.subtitle || `A Comprehensive ${themeKey === "simple" ? "Overview" : "Presentation"}`;
+  s.addText(subtitle, {
+    x: 0.9, y: 3.35, w: 8.0, h: 0.6,
+    fontSize: 18, color: theme.accentLight || theme.accent,
+    fontFace: theme.bodyFont, align: "left", margin: 0,
+  });
+
+  // Class level badge
+  s.addShape(pptx.shapes.RECTANGLE, {
+    x: 0.9, y: 4.2, w: 2.2, h: 0.45,
+    fill: { color: theme.cardBg },
+    line: { color: theme.cardBorder },
+    shadow: makeShadow(),
+  });
+  s.addText(classLevel, {
+    x: 0.9, y: 4.2, w: 2.2, h: 0.45,
+    fontSize: 13, color: theme.textSecondary,
+    fontFace: theme.bodyFont, align: "center", valign: "middle", margin: 0,
+  });
+}
+
+// CONTENT SLIDE — standard layout with left accent bar
+function addContentSlide(pptx: any, slideData: any, theme: any, slideNum: number) {
+  const s = pptx.addSlide();
+  s.background = { color: slideNum % 2 === 0 ? theme.bg : theme.bgLight };
+
+  // Top header bar
+  s.addShape(pptx.shapes.RECTANGLE, {
+    x: 0, y: 0, w: 10, h: 1.0,
+    fill: { color: theme.accent, transparency: 88 },
+    line: { color: theme.accent, transparency: 88 },
+  });
+
+  // Slide number dot
+  s.addShape(pptx.shapes.OVAL, {
+    x: 9.1, y: 0.2, w: 0.6, h: 0.6,
+    fill: { color: theme.accent },
+    line: { color: theme.accent },
+  });
+  s.addText(String(slideNum), {
+    x: 9.1, y: 0.2, w: 0.6, h: 0.6,
+    fontSize: 11, bold: true, color: "FFFFFF",
+    fontFace: theme.bodyFont, align: "center", valign: "middle", margin: 0,
+  });
+
+  // Title
+  s.addText(slideData.title, {
+    x: 0.5, y: 0.1, w: 8.4, h: 0.8,
+    fontSize: 26, bold: true, color: theme.textPrimary,
+    fontFace: theme.titleFont, align: "left", valign: "middle", margin: 0,
+  });
+
+  // Left accent bar
+  s.addShape(pptx.shapes.RECTANGLE, {
+    x: 0.4, y: 1.2, w: 0.08, h: 4.1,
+    fill: { color: theme.accent },
+    line: { color: theme.accent },
+  });
+
+  // Content area
+  const lines = parseLines(slideData.content || "");
+  const bullets = lines.map((text: string, i: number) => ({
+    text,
+    options: {
+      bullet: true,
+      breakLine: i < lines.length - 1,
+      fontSize: 15,
+      color: i === 0 ? theme.textPrimary : theme.textSecondary,
+      bold: i === 0,
+      paraSpaceAfter: 8,
+    },
+  }));
+
+  s.addText(bullets.length > 0 ? bullets : [{ text: slideData.content || "", options: { fontSize: 15, color: theme.textSecondary } }], {
+    x: 0.65, y: 1.2, w: 8.9, h: 4.1, valign: "top",
+  });
+}
+
+// TWO-COLUMN SLIDE — for detailed style variety
+function addTwoColumnSlide(pptx: any, slideData: any, theme: any, slideNum: number) {
+  const s = pptx.addSlide();
+  s.background = { color: slideNum % 2 === 0 ? theme.bg : theme.bgLight };
+
+  // Header
+  s.addShape(pptx.shapes.RECTANGLE, {
+    x: 0, y: 0, w: 10, h: 1.0,
+    fill: { color: theme.accent, transparency: 88 },
+    line: { color: theme.accent, transparency: 88 },
+  });
+  s.addText(slideData.title, {
+    x: 0.5, y: 0.1, w: 9.0, h: 0.8,
+    fontSize: 26, bold: true, color: theme.textPrimary,
+    fontFace: theme.titleFont, align: "left", valign: "middle", margin: 0,
+  });
+
+  const lines = parseLines(slideData.content || "");
+  const mid = Math.ceil(lines.length / 2);
+  const leftLines = lines.slice(0, mid);
+  const rightLines = lines.slice(mid);
+
+  // Left column card
+  s.addShape(pptx.shapes.RECTANGLE, {
+    x: 0.4, y: 1.15, w: 4.3, h: 4.1,
+    fill: { color: theme.cardBg },
+    line: { color: theme.cardBorder },
+    shadow: makeShadow(),
+  });
+  // Left accent top
+  s.addShape(pptx.shapes.RECTANGLE, {
+    x: 0.4, y: 1.15, w: 4.3, h: 0.08,
+    fill: { color: theme.accent },
+    line: { color: theme.accent },
+  });
+
+  const leftBullets = leftLines.map((text: string, i: number) => ({
+    text, options: { bullet: true, breakLine: i < leftLines.length - 1, fontSize: 13, color: theme.textSecondary, paraSpaceAfter: 6 },
+  }));
+  s.addText(leftBullets.length > 0 ? leftBullets : [{ text: "", options: { fontSize: 13 } }], {
+    x: 0.6, y: 1.35, w: 3.9, h: 3.75, valign: "top",
+  });
+
+  // Right column card
+  s.addShape(pptx.shapes.RECTANGLE, {
+    x: 5.3, y: 1.15, w: 4.3, h: 4.1,
+    fill: { color: theme.cardBg },
+    line: { color: theme.cardBorder },
+    shadow: makeShadow(),
+  });
+  s.addShape(pptx.shapes.RECTANGLE, {
+    x: 5.3, y: 1.15, w: 4.3, h: 0.08,
+    fill: { color: (theme as any).accentAlt || theme.accent },
+    line: { color: (theme as any).accentAlt || theme.accent },
+  });
+
+  const rightBullets = rightLines.map((text: string, i: number) => ({
+    text, options: { bullet: true, breakLine: i < rightLines.length - 1, fontSize: 13, color: theme.textSecondary, paraSpaceAfter: 6 },
+  }));
+  s.addText(rightBullets.length > 0 ? rightBullets : [{ text: "", options: { fontSize: 13 } }], {
+    x: 5.5, y: 1.35, w: 3.9, h: 3.75, valign: "top",
+  });
+}
+
+// STAT / HIGHLIGHT SLIDE — big callout numbers, for creative/detailed
+function addHighlightSlide(pptx: any, slideData: any, theme: any) {
+  const s = pptx.addSlide();
+  s.background = { color: theme.bg };
+
+  // Bold full-width accent strip at top
+  s.addShape(pptx.shapes.RECTANGLE, {
+    x: 0, y: 0, w: 10, h: 1.3,
+    fill: { color: theme.accent },
+    line: { color: theme.accent },
+  });
+  s.addText(slideData.title, {
+    x: 0.5, y: 0.05, w: 9.0, h: 1.2,
+    fontSize: 30, bold: true, color: "FFFFFF",
+    fontFace: theme.titleFont, align: "left", valign: "middle", margin: 0,
+  });
+
+  // 3-card grid for key points
+  const lines = parseLines(slideData.content || "");
+  const cards = lines.slice(0, 6);
+  const cols = Math.min(3, cards.length);
+  const cardW = cols === 3 ? 2.9 : cols === 2 ? 4.0 : 8.0;
+  const startX = cols === 3 ? 0.4 : cols === 2 ? 1.0 : 1.0;
+  const gapX = cols === 3 ? 0.45 : 1.0;
+
+  cards.forEach((text: string, i: number) => {
+    const row = Math.floor(i / cols);
+    const col = i % cols;
+    const x = startX + col * (cardW + gapX);
+    const y = 1.6 + row * 1.9;
+
+    s.addShape(pptx.shapes.RECTANGLE, {
+      x, y, w: cardW, h: 1.65,
+      fill: { color: theme.cardBg },
+      line: { color: theme.cardBorder },
+      shadow: makeShadow(),
+    });
+    // Left accent
+    const accentColors = [theme.accent, (theme as any).accentAlt || theme.accent, (theme as any).accentAlt2 || theme.accent];
+    s.addShape(pptx.shapes.RECTANGLE, {
+      x, y, w: 0.1, h: 1.65,
+      fill: { color: accentColors[i % 3] },
+      line: { color: accentColors[i % 3] },
+    });
+    s.addText(text, {
+      x: x + 0.2, y, w: cardW - 0.2, h: 1.65,
+      fontSize: 12, color: theme.textSecondary, fontFace: theme.bodyFont,
+      align: "left", valign: "middle", wrap: true, margin: 8,
+    });
+  });
+}
+
+// CONCLUSION SLIDE — strong closing with summary
+function addConclusionSlide(pptx: any, slideData: any, theme: any, topic: string) {
+  const s = pptx.addSlide();
+  s.background = { color: theme.bg };
+
+  // Full decorative right-side panel
+  s.addShape(pptx.shapes.RECTANGLE, {
+    x: 6.5, y: 0, w: 3.5, h: 5.625,
+    fill: { color: theme.accent, transparency: 80 },
+    line: { color: theme.accent, transparency: 80 },
+  });
+
+  // Top label
+  s.addText("SUMMARY", {
+    x: 0.5, y: 0.4, w: 5.5, h: 0.4,
+    fontSize: 11, bold: true, color: theme.accentLight || theme.accent,
+    fontFace: theme.bodyFont, charSpacing: 6, margin: 0,
+  });
+
+  // Topic name as heading
+  s.addText(topic, {
+    x: 0.5, y: 0.85, w: 5.5, h: 0.9,
+    fontSize: 32, bold: true, color: theme.textPrimary,
+    fontFace: theme.titleFont, align: "left", margin: 0,
+  });
+
+  // Divider
+  s.addShape(pptx.shapes.RECTANGLE, {
+    x: 0.5, y: 1.8, w: 3.5, h: 0.05,
+    fill: { color: theme.accent },
+    line: { color: theme.accent },
+  });
+
+  // Summary bullets
+  const lines = parseLines(slideData.content || "");
+  const bullets = lines.map((text: string, i: number) => ({
+    text,
+    options: { bullet: true, breakLine: i < lines.length - 1, fontSize: 14, color: theme.textSecondary, paraSpaceAfter: 8 },
+  }));
+  s.addText(bullets.length > 0 ? bullets : [{ text: slideData.content || "", options: { fontSize: 14, color: theme.textSecondary } }], {
+    x: 0.5, y: 2.0, w: 5.7, h: 3.3, valign: "top",
+  });
+
+  // Right panel: "Thank You" text
+  s.addText("Thank\nYou", {
+    x: 6.6, y: 1.8, w: 3.0, h: 2.5,
+    fontSize: 42, bold: true, color: "FFFFFF",
+    fontFace: theme.titleFont, align: "center", valign: "middle",
+    margin: 0,
+  });
+  s.addText("Keep Learning! 🚀", {
+    x: 6.6, y: 4.3, w: 3.0, h: 0.6,
+    fontSize: 13, color: theme.textSecondary,
+    fontFace: theme.bodyFont, align: "center", margin: 0,
+  });
+}
+
+// TABLE OF CONTENTS slide (for detailed style)
+function addTOCSlide(pptx: any, slides: any[], theme: any) {
+  const s = pptx.addSlide();
+  s.background = { color: theme.bgLight };
+
+  s.addShape(pptx.shapes.RECTANGLE, {
+    x: 0, y: 0, w: 10, h: 1.1,
+    fill: { color: theme.accent },
+    line: { color: theme.accent },
+  });
+  s.addText("Table of Contents", {
+    x: 0.5, y: 0.05, w: 9, h: 1.0,
+    fontSize: 30, bold: true, color: "FFFFFF",
+    fontFace: theme.titleFont, align: "left", valign: "middle", margin: 0,
+  });
+
+  // List slides as TOC entries (skip title and toc itself)
+  const entries = slides.slice(2, slides.length - 1); // skip title, toc, conclusion
+  const cols = 2;
+  entries.forEach((sl: any, i: number) => {
+    const row = Math.floor(i / cols);
+    const col = i % cols;
+    const x = 0.5 + col * 4.75;
+    const y = 1.35 + row * 0.75;
+
+    s.addShape(pptx.shapes.RECTANGLE, {
+      x, y, w: 4.5, h: 0.62,
+      fill: { color: theme.cardBg },
+      line: { color: theme.cardBorder },
+      shadow: { type: "outer" as const, blur: 4, offset: 2, angle: 135, color: "000000", opacity: 0.2 },
+    });
+    s.addShape(pptx.shapes.RECTANGLE, {
+      x, y, w: 0.45, h: 0.62,
+      fill: { color: theme.accent },
+      line: { color: theme.accent },
+    });
+    s.addText(String(i + 1), {
+      x, y, w: 0.45, h: 0.62,
+      fontSize: 14, bold: true, color: "FFFFFF",
+      fontFace: theme.bodyFont, align: "center", valign: "middle", margin: 0,
+    });
+    s.addText(sl.title || `Section ${i + 1}`, {
+      x: x + 0.55, y, w: 3.85, h: 0.62,
+      fontSize: 13, color: theme.textSecondary, fontFace: theme.bodyFont,
+      align: "left", valign: "middle", margin: 0,
+    });
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MAIN PPT BUILDER
+// ─────────────────────────────────────────────────────────────────────────────
+function buildPPTX(pptx: any, slides: any[], style: ThemeKey, topic: string, classLevel: string) {
+  const theme = THEMES[style] || THEMES.simple;
+  const T = theme as any;
+
+  if (style === "simple") {
+    // SIMPLE: clean 6-slide deck — title, 4 content, conclusion
+    addTitleSlide(pptx, slides[0], T, topic, classLevel, "simple");
+    slides.slice(1, slides.length - 1).forEach((sl, i) => {
+      addContentSlide(pptx, sl, T, i + 2);
+    });
+    addConclusionSlide(pptx, slides[slides.length - 1], T, topic);
+
+  } else if (style === "detailed") {
+    // DETAILED: 10-slide — title, toc, content mix (two-col + regular), conclusion
+    addTitleSlide(pptx, slides[0], T, topic, classLevel, "detailed");
+    addTOCSlide(pptx, slides, T);
+    slides.slice(2, slides.length - 1).forEach((sl, i) => {
+      // Alternate layouts for variety
+      if (i % 3 === 1 && parseLines(sl.content || "").length >= 6) {
+        addTwoColumnSlide(pptx, sl, T, i + 3);
+      } else if (i % 3 === 2) {
+        addHighlightSlide(pptx, sl, T);
+      } else {
+        addContentSlide(pptx, sl, T, i + 3);
+      }
+    });
+    addConclusionSlide(pptx, slides[slides.length - 1], T, topic);
+
+  } else {
+    // CREATIVE: 10-slide — title, highlight cards, mixed layouts, conclusion
+    addTitleSlide(pptx, slides[0], T, topic, classLevel, "creative");
+    slides.slice(1, slides.length - 1).forEach((sl, i) => {
+      if (i % 3 === 0) {
+        addHighlightSlide(pptx, sl, T);
+      } else if (i % 3 === 1) {
+        addTwoColumnSlide(pptx, sl, T, i + 2);
+      } else {
+        addContentSlide(pptx, sl, T, i + 2);
+      }
+    });
+    addConclusionSlide(pptx, slides[slides.length - 1], T, topic);
+  }
+}
+
 app.post("/api/ppt/generate", async (req, res) => {
   try {
-    const { topic, slides } = req.body;
+    const { topic, slides, style = "simple", classLevel = "Student" } = req.body;
+
+    if (!slides || slides.length === 0) {
+      return res.status(400).json({ success: false, message: "No slides provided" });
+    }
 
     const pptx = new (PptxGenJS as any)();
-    pptx.layout = "LAYOUT_16x9";
+    pptx.layout  = "LAYOUT_16x9";
+    pptx.author  = "StudyEarn AI";
+    pptx.title   = topic || "Presentation";
+    pptx.subject = `${style} presentation for ${classLevel}`;
 
-    slides.forEach((slide: any) => {
-      const s = pptx.addSlide();
-
-      s.addText(slide.title || "Slide", {
-        x: 0.5,
-        y: 0.5,
-        fontSize: 28,
-        bold: true,
-      });
-
-      const bullets = (slide.content || "")
-        .split("\n")
-        .filter((l: string) => l.trim())
-        .map((l: string) => ({
-          text: l,
-          options: { bullet: true },
-        }));
-
-      s.addText(bullets, {
-        x: 0.5,
-        y: 1.5,
-        fontSize: 18,
-      });
-    });
+    buildPPTX(pptx, slides, style as ThemeKey, topic || "Topic", classLevel);
 
     const buffer = await pptx.write("nodebuffer");
 
-    res.setHeader(
-      "Content-Type",
-      "application/vnd.openxmlformats-officedocument.presentationml.presentation"
-    );
-
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename=${topic}.pptx`
-    );
-
+    const safeFilename = (topic || "presentation").replace(/[^a-zA-Z0-9\s-]/g, "").trim().replace(/\s+/g, "_");
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.presentationml.presentation");
+    res.setHeader("Content-Disposition", `attachment; filename="${safeFilename}_${style}.pptx"`);
     res.send(buffer);
 
-  } catch (error) {
+  } catch (error: any) {
     console.error("PPT ERROR:", error);
-    res.status(500).json({ success: false });
+    res.status(500).json({ success: false, message: error.message });
   }
 });
+
 
 /* ================= IMAGE → PDF ================= */
 
