@@ -136,6 +136,7 @@ import { Brain, Presentation, FileText, Gift, Trophy, User, LogOut, Sparkles, Za
 import { useApp } from '../context/AppContext';
 import Lottie from 'lottie-react';
 import streakAnimation from '../assets/animations/streak-fire.json';
+import profileIconAnimation from '../assets/animations/profile-icon.json';
 
 export function DashboardLayout() {
   const navigate = useNavigate();
@@ -271,6 +272,16 @@ export function DashboardLayout() {
               <Gift className="w-3.5 h-3.5 text-purple-400" />
               <span className="text-xs font-medium text-purple-300">{points} pts</span>
             </div>
+            {/* Animated Profile Icon */}
+            <NavLink to="/app/profile" title="Profile">
+              <div className="w-10 h-10 rounded-full glass border border-white/10 hover:border-purple-500/40 transition-colors overflow-hidden cursor-pointer flex items-center justify-center">
+                <Lottie
+                  animationData={profileIconAnimation}
+                  loop={true}
+                  style={{ width: 36, height: 36 }}
+                />
+              </div>
+            </NavLink>
           </div>
         </div>
 
