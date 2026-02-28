@@ -142,6 +142,7 @@ export function DashboardLayout() {
   const navigate = useNavigate();
   const { points, questionsLeft, streak, userName } = useApp();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [profileHovered, setProfileHovered] = useState(false);
 
   const navItems = [
     { icon: Sparkles, label: 'Dashboard', path: '/app' },
@@ -163,7 +164,6 @@ export function DashboardLayout() {
     { icon: User, label: 'Profile', path: '/app/profile' },
   ];
 
-  // ✅ PROPER LOGOUT - Clears EVERYTHING
   const handleLogout = () => {
     localStorage.clear();
     navigate('/login');
@@ -176,6 +176,37 @@ export function DashboardLayout() {
       <div className="orb w-[400px] h-[400px] bg-blue-500 top-[-200px] left-[-100px] fixed" />
       <div className="orb w-[300px] h-[300px] bg-purple-600 top-[40%] right-[-150px] fixed" />
 
+      {/* Inline styles for premium profile icon animations */}
+      <style>{`
+        @keyframes spin-slow {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        @keyframes pulse-glow {
+          0%, 100% { opacity: 0.5; transform: scale(1); }
+          50% { opacity: 1; transform: scale(1.08); }
+        }
+        @keyframes float-up {
+          0% { opacity: 0; transform: translateY(6px) translateX(-50%); }
+          100% { opacity: 1; transform: translateY(0px) translateX(-50%); }
+        }
+        .profile-spin-ring {
+          animation: spin-slow 3s linear infinite;
+        }
+        .profile-glow-pulse {
+          animation: pulse-glow 2s ease-in-out infinite;
+        }
+        .profile-tooltip {
+          animation: float-up 0.2s ease-out forwards;
+        }
+        .profile-icon-wrapper {
+          transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .profile-icon-wrapper:hover {
+          transform: scale(1.15);
+        }
+      `}</style>
+
       {/* Mobile Overlay */}
       {sidebarOpen && (
         <div
@@ -184,7 +215,7 @@ export function DashboardLayout() {
         />
       )}
 
-      {/* Sidebar - Desktop always visible, Mobile slide-in */}
+      {/* Sidebar */}
       <aside className={`fixed left-0 top-0 h-screen w-64 glass border-r border-white/5 p-6 flex flex-col z-40 transition-transform duration-300
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}>
         {/* Logo + Close btn on mobile */}
@@ -262,24 +293,103 @@ export function DashboardLayout() {
               <p className="text-sm font-semibold text-white">{userName || 'Student'}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+
+          <div className="flex items-center gap-3">
+            {/* Questions left badge */}
             <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg glass border border-blue-500/20">
               <Zap className="w-3.5 h-3.5 text-blue-400" />
               <span className="text-xs font-medium text-blue-300 hidden sm:inline">{questionsLeft} left</span>
               <span className="text-xs font-medium text-blue-300 sm:hidden">{questionsLeft}</span>
             </div>
+
+            {/* Points badge */}
             <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg glass border border-purple-500/20">
               <Gift className="w-3.5 h-3.5 text-purple-400" />
               <span className="text-xs font-medium text-purple-300">{points} pts</span>
             </div>
-            {/* Animated Profile Icon */}
-            <NavLink to="/app/profile" title="Profile">
-              <div className="w-10 h-10 rounded-full glass border border-white/10 hover:border-purple-500/40 transition-colors overflow-hidden cursor-pointer flex items-center justify-center">
-                <Lottie
-                  animationData={profileIconAnimation}
-                  loop={true}
-                  style={{ width: 36, height: 36 }}
-                />
+
+            {/* ✨ PREMIUM Animated Profile Icon */}
+            <NavLink to="/app/profile">
+              <div
+                className="relative cursor-pointer profile-icon-wrapper"
+                onMouseEnter={() => setProfileHovered(true)}
+                onMouseLeave={() => setProfileHovered(false)}
+              >
+                {/* Spinning gradient ring — only on hover */}
+                {profileHovered && (
+                  <div
+                    className="profile-spin-ring absolute inset-0 rounded-full"
+                    style={{
+                      background: 'conic-gradient(from 0deg, #8b5cf6, #3b82f6, #06b6d4, #8b5cf6)',
+                      padding: '2px',
+                      borderRadius: '9999px',
+                      zIndex: 0,
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        borderRadius: '9999px',
+                        background: '#030712',
+                      }}
+                    />
+                  </div>
+                )}
+
+                {/* Soft glow behind icon on hover */}
+                {profileHovered && (
+                  <div
+                    className="profile-glow-pulse absolute inset-0 rounded-full"
+                    style={{
+                      background: 'radial-gradient(circle, rgba(139,92,246,0.35) 0%, transparent 70%)',
+                      filter: 'blur(6px)',
+                      zIndex: 0,
+                    }}
+                  />
+                )}
+
+                {/* Lottie icon — NO background, no border, clean */}
+                <div
+                  style={{
+                    position: 'relative',
+                    zIndex: 1,
+                    width: 42,
+                    height: 42,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Lottie
+                    animationData={profileIconAnimation}
+                    loop={true}
+                    style={{ width: 42, height: 42 }}
+                  />
+                </div>
+
+                {/* Tooltip */}
+                {profileHovered && (
+                  <div
+                    className="profile-tooltip absolute pointer-events-none"
+                    style={{
+                      bottom: '-32px',
+                      left: '50%',
+                      whiteSpace: 'nowrap',
+                      background: 'rgba(15,10,30,0.92)',
+                      border: '1px solid rgba(139,92,246,0.35)',
+                      borderRadius: '8px',
+                      padding: '3px 10px',
+                      fontSize: '11px',
+                      fontWeight: 500,
+                      color: '#c4b5fd',
+                      backdropFilter: 'blur(8px)',
+                      zIndex: 50,
+                    }}
+                  >
+                    My Profile
+                  </div>
+                )}
               </div>
             </NavLink>
           </div>
