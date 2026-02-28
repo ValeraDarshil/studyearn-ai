@@ -23,9 +23,8 @@
     "pptxgenjs": "^3.12.0",
     "sharp": "^0.34.5",
     "typescript": "^5.9.3",
-    "uuid": "^13.0.0"
-  },
-  "devDependencies": {
+    "uuid": "^13.0.0",
+
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",
