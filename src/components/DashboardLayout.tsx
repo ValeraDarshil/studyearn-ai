@@ -129,7 +129,6 @@
 
 // ------- calude ai ------- //
 
-
 import { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { Brain, Presentation, FileText, Gift, Trophy, User, LogOut, Sparkles, Zap, Menu, X } from 'lucide-react';
@@ -288,18 +287,14 @@ export function DashboardLayout() {
             >
               <Menu className="w-5 h-5" />
             </button>
-            <div>
-              <p className="text-xs text-slate-500 hidden sm:block">Logged in as</p>
-              <p className="text-sm font-semibold text-white">{userName || 'Student'}</p>
-            </div>
+
           </div>
 
           <div className="flex items-center gap-3">
             {/* Questions left badge */}
             <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg glass border border-blue-500/20">
               <Zap className="w-3.5 h-3.5 text-blue-400" />
-              <span className="text-xs font-medium text-blue-300 hidden sm:inline">{questionsLeft} left</span>
-              <span className="text-xs font-medium text-blue-300 sm:hidden">{questionsLeft}</span>
+              <span className="text-xs font-medium text-blue-300">{questionsLeft} questions left today</span>
             </div>
 
             {/* Points badge */}
