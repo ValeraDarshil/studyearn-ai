@@ -371,107 +371,320 @@ app.use("/api/auth", authRoutes);
 app.use("/api/user", userRoutes);
 app.use("/api/leaderboard", leaderboardRoutes);
 
-/* ================= ASK AI ================= */
+/* ================= AI CONFIG ================= */
+
+const GROQ_KEY        = process.env.GROQ_API_KEY || "";
+const OPENROUTER_KEY  = process.env.OPENROUTER_API_KEY || "";
 
 const SYSTEM_PROMPT = `You are StudyEarn AI — an expert academic tutor for Indian students (CBSE, ICSE, State boards, Class 8-12 and college).
 
 Rules:
 - Solve questions COMPLETELY, step-by-step, show ALL working.
-- If multiple questions, answer EACH ONE separately and fully.
-- Math: write every calculation step clearly.
-- Science: state formula, substitute, solve, explain.
-- Theory: structured explanation with examples.
-- Be thorough. Never skip steps.`;
+- If multiple questions exist, answer EACH ONE separately and fully with its number.
+- Math: write every calculation step. Show formula → substitution → answer.
+- Science: state the formula, substitute values, solve, and explain the concept.
+- Theory: structured explanation with key points and real examples.
+- Be thorough. Never skip steps. Indian exam style.`;
 
-async function callGroqVision(imageUrl: string, prompt: string): Promise<string> {
-  const VISION_MODELS = [
+// ─────────────────────────────────────────────────────────────────────────────
+// GROQ — Text only (fast, free, reliable)
+// ─────────────────────────────────────────────────────────────────────────────
+async function groqText(userPrompt: string): Promise<string> {
+  const MODELS = [
+    "llama-3.3-70b-versatile",
+    "llama-3.1-70b-versatile",
+    "mixtral-8x7b-32768",
+    "gemma2-9b-it",
+  ];
+  for (const model of MODELS) {
+    try {
+      console.log(`  [Groq text] trying ${model}`);
+      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${GROQ_KEY}`,
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: "system", content: SYSTEM_PROMPT },
+            { role: "user",   content: userPrompt },
+          ],
+          temperature: 0.4,
+          max_tokens: 4096,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.text();
+        console.log(`  [Groq text] ${model} HTTP ${res.status}: ${err.substring(0, 80)}`);
+        continue;
+      }
+      const data = await res.json();
+      const answer = data.choices?.[0]?.message?.content;
+      if (answer && answer.trim().length > 20) {
+        console.log(`  [Groq text] ✅ ${model}`);
+        return answer;
+      }
+    } catch (e: any) {
+      console.log(`  [Groq text] ${model} error: ${e.message}`);
+    }
+  }
+  throw new Error("Groq text: all models failed");
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GROQ — Vision (image support, free tier)
+// ─────────────────────────────────────────────────────────────────────────────
+async function groqVision(imageUrl: string, userPrompt: string): Promise<string> {
+  const MODELS = [
     "llama-3.2-11b-vision-preview",
     "llama-3.2-90b-vision-preview",
   ];
-  const userPrompt = prompt?.trim()
-    ? `${prompt}\n\nLook at the image carefully. Solve ALL questions/problems shown, step-by-step with complete working.`
-    : "Look at this image. Find ALL questions or problems and solve each one step-by-step with complete working.";
+  const text = userPrompt?.trim()
+    ? `${userPrompt}\n\nAnalyze the image carefully. Solve ALL questions shown, step-by-step with complete working.`
+    : "Analyze this image carefully. Find ALL questions or problems and solve each one step-by-step with complete working shown.";
 
-  for (const model of VISION_MODELS) {
+  for (const model of MODELS) {
     try {
-      console.log(`  Vision trying: ${model}`);
-      const completion = await groq.chat.completions.create({
-        model,
-        messages: [{
-          role: "user",
-          content: [
-            { type: "text", text: userPrompt },
-            { type: "image_url", image_url: { url: imageUrl } },
-          ],
-        }],
-        temperature: 0.3,
-        max_tokens: 4096,
+      console.log(`  [Groq vision] trying ${model}`);
+      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${GROQ_KEY}`,
+        },
+        body: JSON.stringify({
+          model,
+          messages: [{
+            role: "user",
+            content: [
+              { type: "text",      text },
+              { type: "image_url", image_url: { url: imageUrl } },
+            ],
+          }],
+          temperature: 0.3,
+          max_tokens: 4096,
+        }),
       });
-      const answer = completion.choices?.[0]?.message?.content;
-      if (answer && answer.length > 30) {
-        console.log(`  Vision success: ${model}`);
+      if (!res.ok) {
+        const err = await res.text();
+        console.log(`  [Groq vision] ${model} HTTP ${res.status}: ${err.substring(0, 100)}`);
+        continue;
+      }
+      const data = await res.json();
+      const answer = data.choices?.[0]?.message?.content;
+      if (answer && answer.trim().length > 30) {
+        console.log(`  [Groq vision] ✅ ${model}`);
         return answer;
       }
-    } catch (err: any) {
-      const msg = err?.error?.message || err?.message || String(err);
-      console.log(`  ${model} failed: ${msg.substring(0, 80)}`);
+    } catch (e: any) {
+      console.log(`  [Groq vision] ${model} error: ${e.message}`);
     }
   }
-  throw new Error("All vision models failed");
+  throw new Error("Groq vision: all models failed");
 }
 
-async function callGroqText(prompt: string): Promise<string> {
-  const TEXT_MODELS = ["llama-3.3-70b-versatile", "llama-3.1-70b-versatile", "mixtral-8x7b-32768"];
-  for (const model of TEXT_MODELS) {
+// ─────────────────────────────────────────────────────────────────────────────
+// OPENROUTER — Vision (free models, fallback when Groq vision fails)
+// These are the most reliable FREE vision models on OpenRouter in 2025
+// ─────────────────────────────────────────────────────────────────────────────
+async function openRouterVision(imageUrl: string, userPrompt: string): Promise<string> {
+  if (!OPENROUTER_KEY) throw new Error("OPENROUTER_API_KEY not set");
+
+  // Order: most reliable free vision models first
+  const MODELS = [
+    "meta-llama/llama-3.2-11b-vision-instruct:free",
+    "qwen/qwen2.5-vl-72b-instruct:free",
+    "google/gemma-3-27b-it:free",
+    "mistralai/mistral-small-3.1-24b-instruct:free",
+    "microsoft/phi-4-multimodal-instruct:free",
+  ];
+
+  const text = userPrompt?.trim()
+    ? `${userPrompt}\n\nLook at this image carefully. Solve ALL questions or problems step-by-step with complete working.`
+    : "Look at this image carefully. Find ALL questions or problems and solve each one completely, step-by-step, with all working shown.";
+
+  const BAD_RESPONSES = [
+    "i don't see", "no image", "cannot see", "no picture",
+    "i cannot view", "not able to see", "no text", "blank",
+  ];
+
+  for (const model of MODELS) {
     try {
-      const completion = await groq.chat.completions.create({
-        model,
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: prompt },
-        ],
-        temperature: 0.4,
-        max_tokens: 4096,
+      console.log(`  [OpenRouter vision] trying ${model}`);
+      const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type":  "application/json",
+          "Authorization": `Bearer ${OPENROUTER_KEY}`,
+          "HTTP-Referer":  "https://studyearn-ai.vercel.app",
+          "X-Title":       "StudyEarn AI",
+        },
+        body: JSON.stringify({
+          model,
+          messages: [{
+            role: "user",
+            content: [
+              { type: "text",      text },
+              { type: "image_url", image_url: { url: imageUrl } },
+            ],
+          }],
+          temperature: 0.3,
+          max_tokens: 4096,
+        }),
       });
-      const answer = completion.choices?.[0]?.message?.content;
-      if (answer) return answer;
-    } catch (err: any) {
-      console.log(`  ${model} failed: ${(err?.message||"").substring(0,60)}`);
+      if (!res.ok) {
+        const err = await res.text();
+        console.log(`  [OpenRouter vision] ${model} HTTP ${res.status}: ${err.substring(0, 100)}`);
+        continue;
+      }
+      const data = await res.json();
+      const answer = data.choices?.[0]?.message?.content;
+      if (answer && answer.trim().length > 30 &&
+          !BAD_RESPONSES.some(b => answer.toLowerCase().includes(b))) {
+        console.log(`  [OpenRouter vision] ✅ ${model}`);
+        return answer;
+      }
+      console.log(`  [OpenRouter vision] ${model} gave unhelpful answer, trying next...`);
+    } catch (e: any) {
+      console.log(`  [OpenRouter vision] ${model} error: ${e.message}`);
     }
   }
-  throw new Error("All text models failed");
+  throw new Error("OpenRouter vision: all models failed");
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// OPENROUTER — Text fallback (when Groq text also fails)
+// ─────────────────────────────────────────────────────────────────────────────
+async function openRouterText(userPrompt: string): Promise<string> {
+  if (!OPENROUTER_KEY) throw new Error("OPENROUTER_API_KEY not set");
+
+  const MODELS = [
+    "meta-llama/llama-3.3-70b-instruct:free",
+    "deepseek/deepseek-r1-0528:free",
+    "qwen/qwen3-235b-a22b:free",
+    "google/gemma-3-27b-it:free",
+    "mistralai/mistral-small-3.1-24b-instruct:free",
+  ];
+
+  for (const model of MODELS) {
+    try {
+      console.log(`  [OpenRouter text] trying ${model}`);
+      const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type":  "application/json",
+          "Authorization": `Bearer ${OPENROUTER_KEY}`,
+          "HTTP-Referer":  "https://studyearn-ai.vercel.app",
+          "X-Title":       "StudyEarn AI",
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: "system", content: SYSTEM_PROMPT },
+            { role: "user",   content: userPrompt },
+          ],
+          temperature: 0.4,
+          max_tokens: 4096,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.text();
+        console.log(`  [OpenRouter text] ${model} HTTP ${res.status}: ${err.substring(0, 80)}`);
+        continue;
+      }
+      const data = await res.json();
+      const answer = data.choices?.[0]?.message?.content;
+      if (answer && answer.trim().length > 20) {
+        console.log(`  [OpenRouter text] ✅ ${model}`);
+        return answer;
+      }
+    } catch (e: any) {
+      console.log(`  [OpenRouter text] ${model} error: ${e.message}`);
+    }
+  }
+  throw new Error("OpenRouter text: all models failed");
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MASTER VISION — tries all vision providers in order
+// Chain: Groq Vision → OpenRouter Vision → Text fallback with context
+// ─────────────────────────────────────────────────────────────────────────────
+async function solveWithVision(imageUrl: string, prompt: string): Promise<string> {
+  const errors: string[] = [];
+
+  // 1️⃣ Groq vision (fast, free, direct)
+  if (GROQ_KEY) {
+    try {
+      return await groqVision(imageUrl, prompt);
+    } catch (e: any) {
+      errors.push(`Groq: ${e.message}`);
+      console.log(`  Vision chain: Groq failed → trying OpenRouter`);
+    }
+  }
+
+  // 2️⃣ OpenRouter vision (multiple free models)
+  if (OPENROUTER_KEY) {
+    try {
+      return await openRouterVision(imageUrl, prompt);
+    } catch (e: any) {
+      errors.push(`OpenRouter: ${e.message}`);
+      console.log(`  Vision chain: OpenRouter failed → text fallback`);
+    }
+  }
+
+  // 3️⃣ Last resort — text model with the prompt as context
+  console.log(`  Vision chain: all vision failed, using text fallback`);
+  const fallbackPrompt = prompt?.trim()
+    ? `A student uploaded an image and asked: "${prompt}"\n\nProvide a complete, step-by-step academic solution. Show all working clearly.`
+    : `A student uploaded an image of an exam/homework question. They need help solving it. Provide a comprehensive guide covering the most common types of questions for Indian school/college students. Show step-by-step methods.`;
+
+  if (GROQ_KEY) return await groqText(fallbackPrompt);
+  if (OPENROUTER_KEY) return await openRouterText(fallbackPrompt);
+  throw new Error(`All AI providers failed. Errors: ${errors.join(" | ")}`);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MASTER TEXT — tries all text providers in order
+// Chain: Groq Text → OpenRouter Text
+// ─────────────────────────────────────────────────────────────────────────────
+async function solveText(prompt: string): Promise<string> {
+  if (GROQ_KEY) {
+    try { return await groqText(prompt); } catch {}
+    console.log("  Text chain: Groq failed → OpenRouter");
+  }
+  if (OPENROUTER_KEY) {
+    try { return await openRouterText(prompt); } catch {}
+  }
+  throw new Error("All text AI providers failed");
+}
+
+/* ================= ASK AI (Image + Text) ================= */
 
 app.post("/api/ai/ask", async (req, res) => {
   try {
     const { prompt, image } = req.body;
     if (!prompt && !image) {
-      return res.status(400).json({ success: false, answer: "Please enter a question or upload an image/PDF." });
+      return res.status(400).json({ success: false, answer: "Please enter a question or upload an image." });
     }
-    console.log(`\nAI ask: image=${!!image} prompt="${(prompt||"").substring(0,60)}"`);
+
+    console.log(`\n📥 /api/ai/ask  image=${!!image}  prompt="${(prompt||"").substring(0,60)}"`);
 
     let answer: string;
 
     if (image) {
-      try {
-        const imageUrl = image.startsWith("data:") ? image : `data:image/jpeg;base64,${image}`;
-        answer = await callGroqVision(imageUrl, prompt || "");
-      } catch (visionErr: any) {
-        console.log(`  Vision failed, text fallback: ${visionErr.message}`);
-        const fallback = prompt?.trim()
-          ? `A student uploaded an image with this question: "${prompt}"\n\nSolve this completely, step-by-step with all working shown.`
-          : `A student uploaded an image of an exam question. Please provide a comprehensive guide on approaching common exam questions. Show step-by-step methods for math, science, and theory questions.`;
-        const textAnswer = await callGroqText(fallback);
-        answer = `*Note: Image could not be read directly. Answering based on your description:*\n\n${textAnswer}`;
-      }
+      // Ensure proper data URL format
+      const imageUrl = image.startsWith("data:") ? image : `data:image/jpeg;base64,${image}`;
+      answer = await solveWithVision(imageUrl, prompt || "");
     } else {
-      answer = await callGroqText(prompt);
+      answer = await solveText(prompt);
     }
 
     res.json({ success: true, answer });
   } catch (error: any) {
-    console.error("AI ERROR:", error);
-    res.status(500).json({ success: false, answer: "AI is temporarily unavailable. Please try again." });
+    console.error("❌ /api/ai/ask error:", error.message);
+    res.status(500).json({ success: false, answer: "AI is temporarily unavailable. Please try again in a moment." });
   }
 });
 
@@ -482,34 +695,40 @@ app.post("/api/ai/solve-pdf", upload.single("file"), async (req, res) => {
     if (!req.file) return res.status(400).json({ success: false, answer: "No file uploaded." });
 
     const userPrompt = (req.body.prompt || "").trim();
-    console.log(`\nPDF solve: ${req.file.size} bytes`);
+    console.log(`\n📄 /api/ai/solve-pdf  size=${req.file.size}bytes`);
 
+    // Extract text from PDF
     const pdfData = await parsePDF(req.file.buffer);
-    const extracted = pdfData.text?.trim();
+    const extracted = (pdfData.text || "").trim();
 
     if (!extracted || extracted.length < 20) {
       return res.json({
         success: false,
-        answer: "Could not extract text from this PDF. It may be a scanned image PDF. Please screenshot the pages and upload as an image instead.",
+        answer: "❌ Could not extract text from this PDF. It appears to be a scanned or image-based PDF.\n\n**Solution:** Take a screenshot of the PDF pages and upload as an image instead — AI can then read and solve it directly.",
       });
     }
 
-    const MAX_CHARS = 12000;
+    console.log(`  Extracted ${extracted.length} chars from PDF`);
+
+    // Truncate to fit model context (keep most important content)
+    const MAX_CHARS = 14000;
     const text = extracted.length > MAX_CHARS
-      ? extracted.substring(0, MAX_CHARS) + "\n\n[Document truncated due to length]"
+      ? extracted.substring(0, MAX_CHARS) + "\n\n[... rest of document truncated ...]"
       : extracted;
 
     const solvePrompt = userPrompt
-      ? `The student says: "${userPrompt}"\n\nPDF content:\n${text}\n\nHelp the student as requested.`
-      : `Here is a PDF document/question paper:\n\n${text}\n\nFind ALL questions and solve each one completely with step-by-step working. Number answers to match question numbers.`;
+      ? `The student says: "${userPrompt}"\n\nHere is the PDF content:\n\n${text}\n\nHelp the student as requested. Be complete and thorough.`
+      : `Here is the content of a PDF document/question paper:\n\n${text}\n\nFind ALL questions in this document and solve each one completely, step-by-step with full working. Number your answers to match the original question numbers.`;
 
-    const answer = await callGroqText(solvePrompt);
+    const answer = await solveText(solvePrompt);
     res.json({ success: true, answer });
+
   } catch (error: any) {
-    console.error("PDF SOLVE ERROR:", error);
+    console.error("❌ /api/ai/solve-pdf error:", error.message);
     res.status(500).json({ success: false, answer: "Failed to process PDF. Please try again." });
   }
 });
+
 
 /* ================= PPT GENERATOR ================= */
 
