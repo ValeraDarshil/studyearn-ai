@@ -730,6 +730,248 @@ app.post("/api/ai/solve-pdf", upload.single("file"), async (req, res) => {
 });
 
 
+/* ================= PPT CONTENT GENERATOR ================= */
+// Dedicated endpoint for generating slide content JSON
+// Uses tighter prompts + aggressive JSON extraction + multi-provider fallback
+
+function buildPPTPrompt(topic: string, classLevel: string, style: string): { system: string; user: string } {
+  const levelMap: Record<string, string> = {
+    "8":             "Class 8 (age 13-14, simple language, basic concepts)",
+    "9":             "Class 9 (age 14-15, clear explanations, standard terms)",
+    "10":            "Class 10 (CBSE/ICSE board level, exam-focused)",
+    "11":            "Class 11 (advanced concepts, technical terms, board level)",
+    "12":            "Class 12 (full board level, technical definitions, formulas)",
+    "Undergraduate": "Undergraduate (university depth, academic language)",
+    "Postgraduate":  "Postgraduate (advanced theories, research level)",
+  };
+  const level = levelMap[classLevel] || classLevel;
+
+  const system = `You output ONLY valid JSON arrays. No explanation. No markdown. No text before or after. Start with [ and end with ].`;
+
+  let slideList = "";
+  let rules = "";
+  let count = 6;
+
+  if (style === "simple") {
+    count = 6;
+    slideList = `Slide 1: Title slide
+Slide 2: Introduction
+Slide 3: Key Concept 1
+Slide 4: Key Concept 2
+Slide 5: Key Takeaways
+Slide 6: Conclusion`;
+    rules = `Each slide: max 4 bullet points, max 12 words each. Simple language.`;
+  } else if (style === "detailed") {
+    count = 10;
+    slideList = `Slide 1: Title
+Slide 2: Overview & Background
+Slide 3: Core Concept A
+Slide 4: Core Concept B
+Slide 5: Core Concept C
+Slide 6: Key Definitions
+Slide 7: Real-World Applications
+Slide 8: Important Facts
+Slide 9: Case Study / Example
+Slide 10: Summary & Conclusion`;
+    rules = `Each slide: 5-6 bullet points, 15-20 words each. Technical depth for ${level}.`;
+  } else {
+    count = 10;
+    slideList = `Slide 1: Title (exciting hook)
+Slide 2: Did You Know? (surprising facts)
+Slide 3: The Big Picture
+Slide 4: Deep Dive Part 1
+Slide 5: Deep Dive Part 2
+Slide 6: Deep Dive Part 3
+Slide 7: Visual Concept
+Slide 8: Real World Impact
+Slide 9: Fun Facts & Myths vs Reality
+Slide 10: Key Takeaways`;
+    rules = `Start each bullet with a relevant emoji. Use vivid engaging language. 4-5 bullets per slide.`;
+  }
+
+  const user = `Create a ${count}-slide PowerPoint about "${topic}" for ${level}.
+
+Slides:
+${slideList}
+
+Rules: ${rules}
+
+Output this exact JSON structure (${count} objects):
+[{"title":"...","content":"bullet1\nbullet2\nbullet3"}]`;
+
+  return { system, user };
+}
+
+// Extract JSON array from any messy AI response
+function extractJSONArray(text: string): any[] | null {
+  if (!text) return null;
+
+  // Strategy 1: clean and direct parse
+  try {
+    const clean = text.replace(/```json/gi, "").replace(/```/g, "").trim();
+    const parsed = JSON.parse(clean);
+    if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+  } catch {}
+
+  // Strategy 2: find first [ to last ]
+  try {
+    const start = text.indexOf("[");
+    const end   = text.lastIndexOf("]");
+    if (start !== -1 && end > start) {
+      const parsed = JSON.parse(text.slice(start, end + 1));
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch {}
+
+  // Strategy 3: fix common JSON issues and retry
+  try {
+    let fixed = text
+      .replace(/```json/gi, "").replace(/```/g, "")
+      .replace(/,\s*]/g, "]")           // trailing commas
+      .replace(/,\s*}/g, "}")           // trailing commas in objects
+      .replace(/[“”]/g, '"')  // smart quotes
+      .replace(/[‘’]/g, "'")
+      .trim();
+    const start = fixed.indexOf("[");
+    const end   = fixed.lastIndexOf("]");
+    if (start !== -1 && end > start) {
+      const parsed = JSON.parse(fixed.slice(start, end + 1));
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch {}
+
+  // Strategy 4: extract individual slide objects with regex
+  try {
+    const objects: any[] = [];
+    const objRegex = /\{[^{}]*"title"[^{}]*"content"[^{}]*\}/gs;
+    const matches  = text.matchAll(objRegex);
+    for (const m of matches) {
+      try {
+        const obj = JSON.parse(m[0]);
+        if (obj.title && obj.content) objects.push(obj);
+      } catch {}
+    }
+    if (objects.length >= 3) return objects;
+  } catch {}
+
+  return null;
+}
+
+async function callGroqForPPT(system: string, user: string): Promise<string> {
+  // Use smaller, faster models for JSON tasks — they're more reliable for structured output
+  const MODELS = ["llama-3.3-70b-versatile", "llama-3.1-70b-versatile", "gemma2-9b-it"];
+  for (const model of MODELS) {
+    try {
+      console.log(`  [PPT Groq] ${model}`);
+      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_KEY}` },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: "system", content: system },
+            { role: "user",   content: user   },
+          ],
+          temperature: 0.3,
+          max_tokens:  3000,
+        }),
+      });
+      if (!res.ok) { console.log(`  [PPT Groq] ${model} HTTP ${res.status}`); continue; }
+      const data = await res.json();
+      const ans  = data.choices?.[0]?.message?.content;
+      if (ans && ans.length > 50) { console.log(`  [PPT Groq] ✅ ${model}`); return ans; }
+    } catch(e: any) { console.log(`  [PPT Groq] ${model} err: ${e.message}`); }
+  }
+  throw new Error("Groq PPT: all models failed");
+}
+
+async function callOpenRouterForPPT(system: string, user: string): Promise<string> {
+  if (!OPENROUTER_KEY) throw new Error("No OpenRouter key");
+  const MODELS = [
+    "meta-llama/llama-3.3-70b-instruct:free",
+    "deepseek/deepseek-r1-0528:free",
+    "qwen/qwen3-235b-a22b:free",
+    "google/gemma-3-27b-it:free",
+  ];
+  for (const model of MODELS) {
+    try {
+      console.log(`  [PPT OR] ${model}`);
+      const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${OPENROUTER_KEY}`,
+          "HTTP-Referer": "https://studyearn-ai.vercel.app",
+          "X-Title": "StudyEarn AI",
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: "system", content: system },
+            { role: "user",   content: user   },
+          ],
+          temperature: 0.3,
+          max_tokens:  3000,
+        }),
+      });
+      if (!res.ok) { console.log(`  [PPT OR] ${model} HTTP ${res.status}`); continue; }
+      const data = await res.json();
+      const ans  = data.choices?.[0]?.message?.content;
+      if (ans && ans.length > 50) { console.log(`  [PPT OR] ✅ ${model}`); return ans; }
+    } catch(e: any) { console.log(`  [PPT OR] ${model} err: ${e.message}`); }
+  }
+  throw new Error("OpenRouter PPT: all models failed");
+}
+
+app.post("/api/ppt/content", async (req, res) => {
+  try {
+    const { topic, style = "simple", classLevel = "10" } = req.body;
+    if (!topic?.trim()) return res.status(400).json({ success: false, message: "Topic required" });
+
+    console.log(`\n📊 PPT content: "${topic}" | style=${style} | level=${classLevel}`);
+
+    const { system, user } = buildPPTPrompt(topic.trim(), classLevel, style);
+    let rawText = "";
+    let slides: any[] | null = null;
+
+    // Try Groq first, then OpenRouter
+    const providers = [
+      () => callGroqForPPT(system, user),
+      () => callOpenRouterForPPT(system, user),
+    ];
+
+    for (const callFn of providers) {
+      try {
+        rawText = await callFn();
+        slides  = extractJSONArray(rawText);
+        if (slides && slides.length >= 3) break;
+        console.log("  Parsed 0 valid slides, trying next provider...");
+      } catch(e: any) {
+        console.log(`  Provider failed: ${e.message}`);
+      }
+    }
+
+    if (!slides || slides.length < 3) {
+      console.error("PPT: all providers failed. Raw:", rawText?.substring(0, 300));
+      return res.status(500).json({ success: false, message: "Could not generate slide content. Please try again." });
+    }
+
+    // Normalize slide objects
+    const normalized = slides.map((sl: any, i: number) => ({
+      title:   String(sl.title || sl.Title || `Slide ${i + 1}`).trim(),
+      content: String(sl.content || sl.Content || sl.body || sl.Body || "").trim(),
+      subtitle: sl.subtitle || sl.Subtitle || "",
+    })).filter((sl: any) => sl.title.length > 0);
+
+    console.log(`  ✅ Generated ${normalized.length} slides`);
+    res.json({ success: true, slides: normalized });
+
+  } catch(err: any) {
+    console.error("PPT CONTENT ERROR:", err);
+    res.status(500).json({ success: false, message: "Failed to generate content. Please try again." });
+  }
+});
+
 /* ================= PPT GENERATOR ================= */
 
 // ─────────────────────────────────────────────────────────────────────────────
