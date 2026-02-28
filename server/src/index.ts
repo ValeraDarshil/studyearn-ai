@@ -7,7 +7,6 @@ import leaderboardRoutes from "./leaderboard-routes.js";
 import Groq from "groq-sdk";
 import multer from "multer";
 import { PDFDocument } from "pdf-lib";
-import pdfParse from "pdf-parse";
 import sharp from "sharp";
 import PptxGenJS from "pptxgenjs";
 import { connectDB } from "./db.js";
@@ -16,6 +15,8 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5003;
+
+/* ================= CORS ================= */
 
 app.use(
   cors({
@@ -29,28 +30,39 @@ app.use(
 
 app.use(express.json({ limit: "50mb" }));
 
+/* ================= GROQ ================= */
+
 const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY,
 });
+
+/* ================= MULTER ================= */
 
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 25 * 1024 * 1024 },
 });
 
+/* ================= PDF PARSER ================= */
+
+async function parsePDF(buffer: Buffer) {
+  const pdfParse: any = await import("pdf-parse");
+  return pdfParse(buffer);
+}
+
 /* ================= HEALTH ================= */
 
-app.get("/health", (req, res) => {
+app.get("/health", (_, res) => {
   res.json({ status: "ok", port: PORT });
 });
 
-/* ================= BASIC ROUTES ================= */
+/* ================= ROUTES ================= */
 
 app.use("/api/auth", authRoutes);
 app.use("/api/user", userRoutes);
 app.use("/api/leaderboard", leaderboardRoutes);
 
-/* ================= AI TEXT + IMAGE ================= */
+/* ================= ASK AI ================= */
 
 app.post("/api/ai/ask", async (req, res) => {
   try {
@@ -59,13 +71,12 @@ app.post("/api/ai/ask", async (req, res) => {
     if (!prompt && !image) {
       return res.status(400).json({
         success: false,
-        answer: "No question or image provided",
+        answer: "No question provided",
       });
     }
 
-    let messages: any[] = [];
+    let messages: any[];
 
-    // ✅ If Image Exists
     if (image && image.startsWith("data:image")) {
       messages = [
         {
@@ -75,24 +86,21 @@ app.post("/api/ai/ask", async (req, res) => {
               type: "text",
               text:
                 prompt ||
-                "Solve all questions in this image step by step with proper explanation.",
+                "Solve all questions step by step from this image.",
             },
             {
               type: "image_url",
-              image_url: {
-                url: image,
-              },
+              image_url: { url: image },
             },
           ],
         },
       ];
     } else {
-      // ✅ Text Only
       messages = [
         {
           role: "system",
           content:
-            "You are a highly intelligent academic AI tutor. Always solve questions step by step with clear explanations.",
+            "You are an intelligent academic tutor. Solve step by step.",
         },
         {
           role: "user",
@@ -102,7 +110,7 @@ app.post("/api/ai/ask", async (req, res) => {
     }
 
     const completion = await groq.chat.completions.create({
-      model: image && image.startsWith("data:image")
+      model: image
         ? "llama-3.2-90b-vision-preview"
         : "llama-3.3-70b-versatile",
       messages,
@@ -119,7 +127,7 @@ app.post("/api/ai/ask", async (req, res) => {
     console.error("AI ERROR:", error);
     res.status(500).json({
       success: false,
-      answer: error.message || "AI failed",
+      answer: error.message,
     });
   }
 });
@@ -129,20 +137,25 @@ app.post("/api/ai/ask", async (req, res) => {
 app.post(
   "/api/ai/solve-pdf",
   upload.single("file"),
-  async (req: any, res) => {
+  async (req, res) => {
     try {
-      const pdfData = await pdfParse(req.file.buffer);
+      if (!req.file) {
+        return res.status(400).json({ success: false });
+      }
+
+      const pdfData = await parsePDF(req.file.buffer);
 
       const completion = await groq.chat.completions.create({
         model: "llama-3.3-70b-versatile",
         messages: [
           {
             role: "user",
-            content: `Solve the following question paper step by step:\n\n${pdfData.text}`,
+            content:
+              "Solve this question paper step by step:\n\n" +
+              pdfData.text,
           },
         ],
-        temperature: 0.7,
-        max_tokens: 3000,
+        max_tokens: 4096,
       });
 
       const answer =
@@ -150,12 +163,9 @@ app.post(
 
       res.json({ success: true, answer });
 
-    } catch (error: any) {
+    } catch (error) {
       console.error("PDF SOLVE ERROR:", error);
-      res.status(500).json({
-        success: false,
-        message: "PDF solve failed",
-      });
+      res.status(500).json({ success: false });
     }
   }
 );
@@ -181,9 +191,9 @@ app.post("/api/ppt/generate", async (req, res) => {
 
       const bullets = (slide.content || "")
         .split("\n")
-        .filter((line: string) => line.trim())
-        .map((line: string) => ({
-          text: line,
+        .filter((l: string) => l.trim())
+        .map((l: string) => ({
+          text: l,
           options: { bullet: true },
         }));
 
@@ -200,6 +210,7 @@ app.post("/api/ppt/generate", async (req, res) => {
       "Content-Type",
       "application/vnd.openxmlformats-officedocument.presentationml.presentation"
     );
+
     res.setHeader(
       "Content-Disposition",
       `attachment; filename=${topic}.pptx`
@@ -207,7 +218,7 @@ app.post("/api/ppt/generate", async (req, res) => {
 
     res.send(buffer);
 
-  } catch (error: any) {
+  } catch (error) {
     console.error("PPT ERROR:", error);
     res.status(500).json({ success: false });
   }
@@ -223,9 +234,14 @@ app.post(
       const pdfDoc = await PDFDocument.create();
 
       for (const file of req.files) {
-        const imageBuffer = await sharp(file.buffer).png().toBuffer();
-        const image = await pdfDoc.embedPng(imageBuffer);
-        const page = pdfDoc.addPage([image.width, image.height]);
+        const img = await sharp(file.buffer).png().toBuffer();
+        const image = await pdfDoc.embedPng(img);
+
+        const page = pdfDoc.addPage([
+          image.width,
+          image.height,
+        ]);
+
         page.drawImage(image, {
           x: 0,
           y: 0,
@@ -237,14 +253,9 @@ app.post(
       const pdfBytes = await pdfDoc.save();
 
       res.setHeader("Content-Type", "application/pdf");
-      res.setHeader(
-        "Content-Disposition",
-        "attachment; filename=converted.pdf"
-      );
-
       res.send(Buffer.from(pdfBytes));
 
-    } catch (error: any) {
+    } catch (error) {
       console.error("IMG→PDF ERROR:", error);
       res.status(500).json({ success: false });
     }
@@ -258,41 +269,36 @@ app.post(
   upload.array("files"),
   async (req: any, res) => {
     try {
-      const mergedPdf = await PDFDocument.create();
+      const merged = await PDFDocument.create();
 
       for (const file of req.files) {
         const pdf = await PDFDocument.load(file.buffer);
-        const copiedPages = await mergedPdf.copyPages(
+        const pages = await merged.copyPages(
           pdf,
           pdf.getPageIndices()
         );
-        copiedPages.forEach((page) => mergedPdf.addPage(page));
+        pages.forEach((p) => merged.addPage(p));
       }
 
-      const pdfBytes = await mergedPdf.save();
+      const pdfBytes = await merged.save();
 
       res.setHeader("Content-Type", "application/pdf");
-      res.setHeader(
-        "Content-Disposition",
-        "attachment; filename=merged.pdf"
-      );
-
       res.send(Buffer.from(pdfBytes));
 
-    } catch (error: any) {
+    } catch (error) {
       console.error("MERGE PDF ERROR:", error);
       res.status(500).json({ success: false });
     }
   }
 );
 
-/* ================= START ================= */
+/* ================= START SERVER ================= */
 
 connectDB().then(() => {
   app.listen(PORT, () => {
-    console.log(`🚀 Server running on port ${PORT}`);
-    console.log(`✅ AI ready (Vision + Text)`);
-    console.log(`✅ PPT ready`);
-    console.log(`✅ PDF tools ready`);
+    console.log(`🚀 Server running on ${PORT}`);
+    console.log("✅ AI Ready");
+    console.log("✅ PPT Ready");
+    console.log("✅ PDF Tools Ready");
   });
 });

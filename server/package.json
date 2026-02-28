@@ -9,11 +9,10 @@
   },
   "dependencies": {
     "@types/express": "^5.0.6",
-    "@types/multer": "^2.0.0",
     "axios": "^1.13.5",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
-    "dotenv": "^17.2.4",
+    "dotenv": "^17.3.1",
     "express": "^5.2.1",
     "groq-sdk": "^0.8.0",
     "jsonwebtoken": "^9.0.3",
@@ -28,6 +27,9 @@
     "uuid": "^13.0.0"
   },
   "devDependencies": {
-    "@types/node": "^25.3.1"
+    "@types/cors": "^2.8.19",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/multer": "^2.0.0",
+    "@types/node": "^25.3.2"
   }
 }
