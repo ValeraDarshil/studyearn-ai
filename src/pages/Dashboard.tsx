@@ -276,11 +276,13 @@
 
 // claude aii //
 
+
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Brain, Presentation, FileText, Gift, TrendingUp, Zap, ArrowRight, Clock, Lock } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { ACHIEVEMENTS, RARITY_STYLES } from '../data/achievements';
+import { AnimatedNumber } from '../components/AnimatedNumber';
 import { calculateLevel, getLevelTier, getLevelColor } from '../utils/level-utils';
 import Lottie from 'lottie-react';
 import streakAnimation from '../assets/animations/streak-fire.json';
@@ -343,53 +345,66 @@ export function Dashboard() {
       </div>
 
       {/* Stats Row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { label: 'Total Points', value: points.toLocaleString(), icon: Gift, color: 'text-purple-400', bg: 'bg-purple-500/10' },
-          { label: 'Questions Today', value: `${5 - questionsLeft}/5`, icon: Brain, color: 'text-blue-400', bg: 'bg-blue-500/10' },
-          { 
-            label: 'Day Streak', 
-            value: streak.toString(), 
-            icon: 'lottie',
-            color: 'text-orange-400', 
-            bg: 'bg-orange-500/10',
-            clickable: true
-          },
-          { label: 'Current Level', value: levelInfo.currentLevel.toString(), icon: TrendingUp, color: 'text-green-400', bg: 'bg-green-500/10' },
-        ].map((stat) => (
-          <div 
-            key={stat.label} 
-            className={`glass rounded-2xl p-4 transition-smooth ${
-              stat.clickable 
-                ? 'cursor-pointer hover:bg-white/[0.04] hover:border-orange-500/30 hover:-translate-y-1 hover:shadow-lg hover:shadow-orange-500/10' 
-                : 'glass-hover'
-            }`}
-            onClick={stat.clickable ? () => setShowStreakCelebration(true) : undefined}
-            title={stat.clickable ? '🔥 Click to celebrate your streak!' : undefined}
-          >
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs text-slate-500 font-medium">{stat.label}</span>
-              <div className={`w-8 h-8 rounded-lg ${stat.bg} flex items-center justify-center`}>
-                {/* ✅ ANIMATED ICON FOR STREAK */}
-                {stat.icon === 'lottie' ? (
-                  <Lottie 
-                    animationData={streakAnimation}
-                    loop={true}
-                    style={{ width: 28, height: 28 }}
-                  />
-                ) : (
-                  <stat.icon className={`w-4 h-4 ${stat.color}`} />
-                )}
-              </div>
-            </div>
-            <div className="text-2xl font-bold text-white flex items-center gap-2">
-              {stat.value}
-              {stat.clickable && (
-                <span className="text-[10px] text-slate-600 font-normal">(click!)</span>
-              )}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 stagger-children">
+        {/* Points */}
+        <div className="glass glass-hover card-shine rounded-2xl p-4 animate-slide-up border border-purple-500/10 hover:border-purple-500/25 hover:-translate-y-1 transition-all duration-300 group">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs text-slate-500 font-medium">Total Points</span>
+            <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <Gift className="w-4 h-4 text-purple-400" />
             </div>
           </div>
-        ))}
+          <div className="text-2xl font-bold text-white">
+            <AnimatedNumber value={points} className="count-animate" />
+          </div>
+          <div className="w-full h-0.5 mt-3 rounded-full bg-gradient-to-r from-purple-500/40 to-transparent" />
+        </div>
+
+        {/* Questions */}
+        <div className="glass glass-hover card-shine rounded-2xl p-4 animate-slide-up border border-blue-500/10 hover:border-blue-500/25 hover:-translate-y-1 transition-all duration-300 group">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs text-slate-500 font-medium">Questions Today</span>
+            <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <Brain className="w-4 h-4 text-blue-400" />
+            </div>
+          </div>
+          <div className="text-2xl font-bold text-white">
+            <AnimatedNumber value={5 - questionsLeft} suffix={'/5'} />
+          </div>
+          <div className="w-full h-0.5 mt-3 rounded-full bg-gradient-to-r from-blue-500/40 to-transparent" />
+        </div>
+
+        {/* Streak — clickable */}
+        <div
+          className="glass card-shine rounded-2xl p-4 animate-slide-up border border-orange-500/10 hover:border-orange-500/30 hover:-translate-y-1 hover:shadow-lg hover:shadow-orange-500/10 transition-all duration-300 cursor-pointer group"
+          onClick={() => setShowStreakCelebration(true)}
+          title="🔥 Click to celebrate!"
+        >
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs text-slate-500 font-medium">Day Streak</span>
+            <div className="w-8 h-8 rounded-lg bg-orange-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <Lottie animationData={streakAnimation} loop style={{ width: 28, height: 28 }} />
+            </div>
+          </div>
+          <div className="text-2xl font-bold text-white">
+            <AnimatedNumber value={streak} />
+          </div>
+          <div className="w-full h-0.5 mt-3 rounded-full bg-gradient-to-r from-orange-500/40 to-transparent" />
+        </div>
+
+        {/* Level */}
+        <div className="glass glass-hover card-shine rounded-2xl p-4 animate-slide-up border border-green-500/10 hover:border-green-500/25 hover:-translate-y-1 transition-all duration-300 group">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs text-slate-500 font-medium">Current Level</span>
+            <div className="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <TrendingUp className="w-4 h-4 text-green-400" />
+            </div>
+          </div>
+          <div className="text-2xl font-bold text-white">
+            <AnimatedNumber value={levelInfo.currentLevel} />
+          </div>
+          <div className="w-full h-0.5 mt-3 rounded-full bg-gradient-to-r from-green-500/40 to-transparent" />
+        </div>
       </div>
 
       {/* Quick Actions */}
@@ -397,19 +412,21 @@ export function Dashboard() {
         <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
           Quick Actions
         </h2>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 stagger-children">
           {quickActions.map((action) => (
             <button
               key={action.label}
               onClick={() => navigate(action.path)}
-              className={`glass rounded-2xl p-5 group cursor-pointer ${action.glow} hover:scale-[1.02] transition-all`}
+              className={`relative glass card-shine rounded-2xl p-5 group cursor-pointer border border-white/5 hover:border-white/15 hover:-translate-y-1.5 hover:shadow-xl ${action.glow} transition-all duration-300 overflow-hidden animate-slide-up`}
             >
-              <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${action.gradient} flex items-center justify-center mb-3 group-hover:scale-110 transition-transform`}>
+              {/* gradient bg on hover */}
+              <div className={`absolute inset-0 bg-gradient-to-br ${action.gradient} opacity-0 group-hover:opacity-5 transition-opacity duration-300`} />
+              <div className={`relative w-12 h-12 rounded-xl bg-gradient-to-br ${action.gradient} flex items-center justify-center mb-4 group-hover:scale-110 group-hover:shadow-lg transition-all duration-300`}>
                 <action.icon className="w-6 h-6 text-white" />
               </div>
-              <h3 className="text-base font-semibold text-white mb-1">{action.label}</h3>
-              <p className="text-xs text-slate-500">{action.desc}</p>
-              <div className="flex items-center gap-1 text-xs text-purple-400 mt-3 opacity-0 group-hover:opacity-100 transition-opacity">
+              <h3 className="relative text-base font-semibold text-white mb-1 group-hover:gradient-text transition-all">{action.label}</h3>
+              <p className="relative text-xs text-slate-500 mb-3">{action.desc}</p>
+              <div className="relative flex items-center gap-1 text-xs text-purple-400 opacity-0 group-hover:opacity-100 translate-x-[-4px] group-hover:translate-x-0 transition-all duration-300">
                 Start now <ArrowRight className="w-3 h-3" />
               </div>
             </button>

@@ -260,6 +260,7 @@ import {
 } from "./utils/user-api";
 import { ReferFriends } from "./pages/ReferFriends";
 import { ACHIEVEMENTS } from "./data/achievements";
+import { CursorSpotlight } from "./components/CursorSpotlight";
 
 // ── Achievement Toast Notification ──────────────────────────────────────────
 function AchievementToast({ achievement, onClose }: { achievement: any; onClose: () => void }) {
@@ -477,6 +478,7 @@ function AppContent() {
 
   return (
     <>
+      <CursorSpotlight />
       <LoadingScreen show={loading} />
 
       {shouldShowCelebration && (
