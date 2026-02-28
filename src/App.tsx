@@ -351,15 +351,29 @@ function AppContent() {
         getRecentActivity().then((d) => { if (d.success) setRecentActivity(d.activities); });
         checkStreak().catch(console.error);
 
-        // Load achievements from server
+        // Load achievements from server, then immediately check for any newly eligible ones
         getAchievements().then((d) => {
           if (d.success) {
-            setUnlockedAchievements(d.unlockedAchievements || []);
-            setUserStats({
+            const unlocked = d.unlockedAchievements || [];
+            const stats = {
               totalQuestionsAsked: d.totalQuestionsAsked || 0,
-              totalPPTsGenerated: d.totalPPTsGenerated || 0,
-              totalPDFsConverted: d.totalPDFsConverted || 0,
-            });
+              totalPPTsGenerated:  d.totalPPTsGenerated  || 0,
+              totalPDFsConverted:  d.totalPDFsConverted  || 0,
+            };
+            setUnlockedAchievements(unlocked);
+            unlockedRef.current = unlocked;
+            setUserStats(stats);
+            userStatsRef.current = stats;
+
+            // 🔑 KEY FIX: check right now with fresh server data + current points
+            // Use a small delay so pointsRef is populated first
+            setTimeout(() => {
+              checkAndUnlockAchievements({
+                ...stats,
+                points: user.points,
+                streak: user.streak || 0,
+              });
+            }, 500);
           }
         });
       } else {
@@ -377,42 +391,58 @@ function AppContent() {
     }
   };
 
-  // ✅ Check & unlock achievements based on current stats
+  // ✅ Check & unlock achievements — bulletproof, checks ALL eligible at once
   const checkAndUnlockAchievements = useCallback(async (
     override?: Partial<UserStats & { points: number; streak: number }>
   ) => {
     const currentPoints = override?.points ?? pointsRef.current;
     const currentStreak = override?.streak ?? streakRef.current;
-    const currentStats = { ...userStatsRef.current, ...override };
-    const currentUnlocked = unlockedRef.current;
+    const currentStats  = { ...userStatsRef.current, ...override };
+    const currentUnlocked = [...unlockedRef.current];
 
     const statMap: Record<string, number> = {
-      totalQuestionsAsked: currentStats.totalQuestionsAsked,
-      totalPPTsGenerated: currentStats.totalPPTsGenerated,
-      totalPDFsConverted: currentStats.totalPDFsConverted,
-      streak: currentStreak,
-      points: currentPoints,
+      totalQuestionsAsked: currentStats.totalQuestionsAsked || 0,
+      totalPPTsGenerated:  currentStats.totalPPTsGenerated  || 0,
+      totalPDFsConverted:  currentStats.totalPDFsConverted  || 0,
+      streak: currentStreak || 0,
+      points: currentPoints || 0,
     };
 
-    for (const ach of ACHIEVEMENTS) {
-      if (currentUnlocked.includes(ach.id)) continue;
+    // Collect all newly eligible achievements (not yet unlocked)
+    const toUnlock = ACHIEVEMENTS.filter(ach => {
+      if (currentUnlocked.includes(ach.id)) return false;
       const val = statMap[ach.stat] ?? 0;
-      if (val >= ach.threshold) {
-        // Unlock it!
+      return val >= ach.threshold;
+    });
+
+    if (toUnlock.length === 0) return;
+
+    // Unlock all of them sequentially
+    let lastToast = null;
+    let bonusPoints = 0;
+
+    for (const ach of toUnlock) {
+      try {
         const result = await unlockAchievement(ach.id);
         if (result.success) {
-          setUnlockedAchievements(result.unlockedAchievements);
+          // Update ref immediately so next iteration sees it
           unlockedRef.current = result.unlockedAchievements;
-          // Show toast
-          setToastAchievement(ach);
-          // Give bonus points if any
-          if (ach.reward > 0) {
-            setPoints((prev) => prev + ach.reward);
-            updateUserPoints(ach.reward);
-          }
+          setUnlockedAchievements(result.unlockedAchievements);
+          lastToast = ach;
+          if (ach.reward > 0) bonusPoints += ach.reward;
         }
-        break; // Show one toast at a time
+      } catch (e) {
+        console.error("unlock error", ach.id, e);
       }
+    }
+
+    // Show toast for the last (most impressive) unlocked achievement
+    if (lastToast) setToastAchievement(lastToast);
+
+    // Award all bonus points in one shot
+    if (bonusPoints > 0) {
+      setPoints(prev => prev + bonusPoints);
+      updateUserPoints(bonusPoints);
     }
   }, []);
 
