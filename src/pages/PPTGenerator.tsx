@@ -596,7 +596,7 @@ import { useState, useRef, useEffect } from "react";
 import {
   Presentation, ExternalLink, Sparkles, Palette,
   GraduationCap, FileText, ChevronDown, CheckCircle,
-  RotateCcw, Check, Layers, BookOpen, Wand2,
+  RotateCcw, Check,
 } from "lucide-react";
 import { useApp } from "../context/AppContext";
 import { API_URL } from "../utils/api";
@@ -612,155 +612,192 @@ const CLASS_LEVELS = [
   { value: "Postgraduate",  label: "Postgraduate",  emoji: "🏛️" },
 ];
 
+// ── Premium SVG Icons ─────────────────────────────────────────────────────────
+
+const SimpleIcon = ({ active }: { active: boolean }) => (
+  <svg width="52" height="52" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="simpleGrad" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stopColor="#60A5FA"/>
+        <stop offset="100%" stopColor="#06B6D4"/>
+      </linearGradient>
+      <filter id="simpleGlow">
+        <feGaussianBlur stdDeviation="2.5" result="blur"/>
+        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+    </defs>
+    {/* Outer hexagon ring */}
+    <path
+      d="M26 4 L44 15 L44 37 L26 48 L8 37 L8 15 Z"
+      stroke={active ? "url(#simpleGrad)" : "#334155"}
+      strokeWidth="1.5" fill="none"
+      style={{ transition: "all 0.3s" }}
+    />
+    {/* Inner clean slides stack */}
+    <rect x="15" y="17" width="22" height="3" rx="1.5"
+      fill={active ? "url(#simpleGrad)" : "#475569"}
+      filter={active ? "url(#simpleGlow)" : undefined}
+      style={{ transition: "all 0.3s" }}
+    />
+    <rect x="15" y="23" width="16" height="3" rx="1.5"
+      fill={active ? "#60A5FA" : "#374151"}
+      opacity={active ? 0.8 : 0.5}
+      style={{ transition: "all 0.3s" }}
+    />
+    <rect x="15" y="29" width="19" height="3" rx="1.5"
+      fill={active ? "#06B6D4" : "#374151"}
+      opacity={active ? 0.6 : 0.4}
+      style={{ transition: "all 0.3s" }}
+    />
+    {/* Corner accent dot */}
+    <circle cx="40" cy="12" r="3"
+      fill={active ? "#60A5FA" : "#1E3A5F"}
+      style={{ transition: "all 0.3s" }}
+    />
+  </svg>
+);
+
+const DetailedIcon = ({ active }: { active: boolean }) => (
+  <svg width="52" height="52" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="detailGrad" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stopColor="#A78BFA"/>
+        <stop offset="100%" stopColor="#7C3AED"/>
+      </linearGradient>
+      <linearGradient id="detailGrad2" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stopColor="#C4B5FD"/>
+        <stop offset="100%" stopColor="#8B5CF6"/>
+      </linearGradient>
+      <filter id="detailGlow">
+        <feGaussianBlur stdDeviation="3" result="blur"/>
+        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+    </defs>
+    {/* Document frame */}
+    <rect x="10" y="6" width="32" height="40" rx="4"
+      stroke={active ? "url(#detailGrad)" : "#334155"}
+      strokeWidth="1.5" fill={active ? "rgba(124,58,237,0.08)" : "none"}
+      style={{ transition: "all 0.3s" }}
+    />
+    {/* Top accent bar */}
+    <rect x="10" y="6" width="32" height="5" rx="2"
+      fill={active ? "url(#detailGrad)" : "#1E293B"}
+      style={{ transition: "all 0.3s" }}
+    />
+    {/* Content lines — varied widths like real data */}
+    {[14, 18, 22, 27, 31, 35].map((y, i) => (
+      <rect key={i} x="16" y={y} width={i % 3 === 0 ? 22 : i % 3 === 1 ? 16 : 19} height="2.2" rx="1.1"
+        fill={active ? (i === 0 ? "#C4B5FD" : i < 3 ? "#A78BFA" : "#7C3AED") : "#2D3748"}
+        opacity={active ? (1 - i * 0.08) : 0.5}
+        filter={active && i === 0 ? "url(#detailGlow)" : undefined}
+        style={{ transition: "all 0.3s" }}
+      />
+    ))}
+    {/* Bookmark ribbon */}
+    <path d="M35 6 L35 15 L31.5 12 L28 15 L28 6 Z"
+      fill={active ? "url(#detailGrad2)" : "#374151"}
+      style={{ transition: "all 0.3s" }}
+    />
+  </svg>
+);
+
+const CreativeIcon = ({ active }: { active: boolean }) => (
+  <svg width="52" height="52" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="creativeGrad" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stopColor="#F97316"/>
+        <stop offset="100%" stopColor="#EC4899"/>
+      </linearGradient>
+      <linearGradient id="creativeGrad2" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stopColor="#F97316"/>
+        <stop offset="50%" stopColor="#A855F7"/>
+        <stop offset="100%" stopColor="#06B6D4"/>
+      </linearGradient>
+      <filter id="creativeGlow">
+        <feGaussianBlur stdDeviation="3.5" result="blur"/>
+        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+    </defs>
+    {/* Outer circle ring */}
+    <circle cx="26" cy="26" r="21"
+      stroke={active ? "url(#creativeGrad2)" : "#334155"}
+      strokeWidth="1.5" strokeDasharray="4 3" fill="none"
+      style={{ transition: "all 0.3s" }}
+    />
+    {/* Magic wand body */}
+    <line x1="14" y1="38" x2="30" y2="22"
+      stroke={active ? "url(#creativeGrad)" : "#475569"}
+      strokeWidth="3" strokeLinecap="round"
+      filter={active ? "url(#creativeGlow)" : undefined}
+      style={{ transition: "all 0.3s" }}
+    />
+    {/* Wand tip star */}
+    <path d="M30 22 L32 18 L34 22 L38 24 L34 26 L32 30 L30 26 L26 24 Z"
+      fill={active ? "url(#creativeGrad)" : "#374151"}
+      filter={active ? "url(#creativeGlow)" : undefined}
+      style={{ transition: "all 0.3s" }}
+    />
+    {/* Sparkle dots */}
+    <circle cx="18" cy="16" r="2.5"
+      fill={active ? "#F97316" : "#2D3748"}
+      opacity={active ? 0.9 : 0.4}
+      filter={active ? "url(#creativeGlow)" : undefined}
+      style={{ transition: "all 0.3s" }}
+    />
+    <circle cx="38" cy="36" r="1.8"
+      fill={active ? "#A855F7" : "#2D3748"}
+      opacity={active ? 0.8 : 0.3}
+      style={{ transition: "all 0.3s" }}
+    />
+    <circle cx="14" cy="28" r="1.4"
+      fill={active ? "#06B6D4" : "#2D3748"}
+      opacity={active ? 0.7 : 0.3}
+      style={{ transition: "all 0.3s" }}
+    />
+    <circle cx="36" cy="14" r="1.2"
+      fill={active ? "#EC4899" : "#2D3748"}
+      opacity={active ? 0.6 : 0.3}
+      style={{ transition: "all 0.3s" }}
+    />
+  </svg>
+);
+
 const PPT_STYLES = [
   {
     id: "simple",
     label: "Simple",
     desc: "Clean & minimal — easy to read",
-    icon: <Layers className="w-5 h-5" />,
     color: "from-blue-500/20 to-cyan-500/10",
     border: "border-blue-500/40",
     accent: "text-blue-300",
+    ring: "ring-blue-500/30",
+    glow: "shadow-blue-500/20",
     slides: "6 slides",
   },
   {
     id: "detailed",
     label: "Detailed",
     desc: "Deep content — every concept covered",
-    icon: <BookOpen className="w-5 h-5" />,
     color: "from-purple-500/20 to-indigo-500/10",
     border: "border-purple-500/40",
     accent: "text-purple-300",
+    ring: "ring-purple-500/30",
+    glow: "shadow-purple-500/20",
     slides: "10 slides",
   },
   {
     id: "creative",
     label: "Creative",
     desc: "Visual & engaging — with emojis & design",
-    icon: <Wand2 className="w-5 h-5" />,
-    color: "from-pink-500/20 to-orange-500/10",
-    border: "border-pink-500/40",
-    accent: "text-pink-300",
+    color: "from-orange-500/20 to-pink-500/10",
+    border: "border-orange-500/40",
+    accent: "text-orange-300",
+    ring: "ring-orange-500/30",
+    glow: "shadow-orange-500/20",
     slides: "10 slides",
   },
 ];
 
-// Build a style-specific AI prompt
-function buildPrompt(topic: string, classLevel: string, style: string): string {
-  const levelContext: Record<string, string> = {
-    "8":             "Class 8 students (age 13-14). Use simple language, relatable examples, basic concepts only.",
-    "9":             "Class 9 students (age 14-15). Use clear explanations, introduce standard terms, basic to intermediate.",
-    "10":            "Class 10 students (age 15-16). CBSE/ICSE board level, exam-focused, standard terminology.",
-    "11":            "Class 11 students (age 16-17). Introduce advanced concepts, technical terms, board exam relevant.",
-    "12":            "Class 12 students (age 17-18). Full board exam level, in-depth, use technical definitions and formulas.",
-    "Undergraduate": "undergraduate college students. Use university-level depth, academic language, real-world applications.",
-    "Postgraduate":  "postgraduate/research students. Use advanced technical depth, cite key theories, professional academic tone.",
-  };
-
-  const context = levelContext[classLevel] || "students";
-
-  if (style === "simple") {
-    return `You are creating a PowerPoint presentation for ${context}
-
-Topic: "${topic}"
-
-Return ONLY a valid JSON array. No markdown, no explanation, no extra text.
-
-Create exactly 6 slides:
-1. Title slide — catchy subtitle
-2. Overview/Introduction — what this topic is
-3. Core Concept 1 — most important idea
-4. Core Concept 2 — second key idea  
-5. Key Takeaways — 3-4 bullet summary
-6. Conclusion — closing thought
-
-Rules for SIMPLE style:
-- Each slide: max 4 bullet points
-- Each bullet: max 12 words
-- Language: simple, clear, no jargon
-- Focus on clarity over depth
-
-JSON format:
-[
-  {
-    "title": "slide title here",
-    "content": "bullet point one\nbullet point two\nbullet point three",
-    "subtitle": "optional subtitle for title slide only"
-  }
-]`;
-  }
-
-  if (style === "detailed") {
-    return `You are creating a comprehensive PowerPoint presentation for ${context}
-
-Topic: "${topic}"
-
-Return ONLY a valid JSON array. No markdown, no explanation, no extra text.
-
-Create exactly 10 slides:
-1. Title slide — professional subtitle
-2. Table of Contents — list all main sections
-3. Introduction & Background — context and history
-4. Core Concept A — detailed explanation with definition
-5. Core Concept B — detailed explanation with examples
-6. Core Concept C — detailed explanation with applications
-7. Key Formulas / Definitions — (if applicable to topic)
-8. Real-World Applications — how this topic is used
-9. Important Facts & Statistics — data points, numbers
-10. Summary & Conclusion — key takeaways + closing
-
-Rules for DETAILED style:
-- Each slide: 5-7 bullet points
-- Each bullet: can be 15-20 words
-- Use proper academic/technical terminology appropriate for level
-- Include specific facts, numbers, definitions
-- Content must match exactly the academic level
-
-JSON format:
-[
-  {
-    "title": "slide title here",
-    "content": "detailed point one with explanation\ndetailed point two with example\ndetailed point three\ndetailed point four\ndetailed point five"
-  }
-]`;
-  }
-
-  // creative
-  return `You are creating a visually engaging, creative PowerPoint presentation for ${context}
-
-Topic: "${topic}"
-
-Return ONLY a valid JSON array. No markdown, no explanation, no extra text.
-
-Create exactly 10 slides:
-1. Title slide — exciting hook subtitle
-2. "Did You Know?" — 3 surprising facts about the topic
-3. The Big Picture — overview with vivid description
-4. Deep Dive: Part 1 — first major concept, explained engagingly
-5. Deep Dive: Part 2 — second major concept with real examples
-6. Deep Dive: Part 3 — third major concept with analogies
-7. Visualize It — describe a diagram/concept visually in text
-8. Real World Impact — how this changes/affects everyday life
-9. Fun Facts & Myths vs Reality
-10. Key Takeaways + Call to Action
-
-Rules for CREATIVE style:
-- Start bullets with relevant emojis (🔬 ⚡ 🌍 💡 🎯 etc.)
-- Use vivid, energetic language
-- Include analogies and storytelling
-- Each slide: 4-6 engaging bullet points
-- Make it fun to read while being accurate
-- Include a "visual_idea" field describing what image would suit each slide
-
-JSON format:
-[
-  {
-    "title": "🎯 Exciting Slide Title",
-    "content": "🌟 Engaging point one with analogy\n💡 Interesting fact with context\n⚡ Surprising connection to real life\n🔬 Technical concept made fun",
-    "visual_idea": "A diagram showing..."
-  }
-]`;
-}
 
 export function PPTGenerator() {
   const { addPoints, userId, logActivity, checkAndUnlockAchievements, userStats, setUserStats } = useApp();
@@ -789,6 +826,120 @@ export function PPTGenerator() {
   const selectedLabel = CLASS_LEVELS.find(c => c.value === classLevel) || null;
   const selectedStyle = PPT_STYLES.find(s => s.id === style)!;
 
+  // ── Robust JSON extractor — 4 fallback strategies ──────────────────────────
+  const extractSlides = (raw: string): any[] | null => {
+    const attempts = [
+      // 1. Direct parse after cleaning markdown fences
+      () => {
+        const clean = raw.replace(/```json/gi, "").replace(/```/g, "").trim();
+        const parsed = JSON.parse(clean);
+        return Array.isArray(parsed) ? parsed : null;
+      },
+      // 2. Find first [ to last ]
+      () => {
+        const s = raw.indexOf("["), e = raw.lastIndexOf("]");
+        if (s === -1 || e <= s) return null;
+        const parsed = JSON.parse(raw.slice(s, e + 1));
+        return Array.isArray(parsed) ? parsed : null;
+      },
+      // 3. Fix common issues: trailing commas, smart quotes, then extract array
+      () => {
+        const fixed = raw
+          .replace(/```json/gi, "").replace(/```/g, "")
+          .replace(/,\s*]/g, "]").replace(/,\s*}/g, "}")
+          .replace(/[\u201C\u201D]/g, '"').replace(/[\u2018\u2019]/g, "'");
+        const s = fixed.indexOf("["), e = fixed.lastIndexOf("]");
+        if (s === -1 || e <= s) return null;
+        const parsed = JSON.parse(fixed.slice(s, e + 1));
+        return Array.isArray(parsed) ? parsed : null;
+      },
+      // 4. Regex: extract individual {title, content} objects
+      () => {
+        const objs: any[] = [];
+        const re = /\{\s*"title"\s*:\s*"[^"]*"[^}]*"content"\s*:\s*"[^"]*"[^}]*\}/g;
+        let m;
+        while ((m = re.exec(raw)) !== null) {
+          try { objs.push(JSON.parse(m[0])); } catch {}
+        }
+        return objs.length >= 3 ? objs : null;
+      },
+    ];
+    for (const fn of attempts) {
+      try { const r = fn(); if (r && r.length >= 3) return r; } catch {}
+    }
+    return null;
+  };
+
+  // ── Build a tight AI prompt for each style ─────────────────────────────────
+  const buildPPTPrompt = (t: string, level: string, s: string): string => {
+    const lvl: Record<string, string> = {
+      "8": "Class 8 (simple language, basic concepts)",
+      "9": "Class 9 (clear explanations, standard terms)",
+      "10": "Class 10 (CBSE/ICSE board level)",
+      "11": "Class 11 (advanced concepts, technical terms)",
+      "12": "Class 12 (full board level, formulas)",
+      "Undergraduate": "Undergraduate (university depth)",
+      "Postgraduate": "Postgraduate (research level)",
+    };
+    const ctx = lvl[level] || level;
+
+    if (s === "simple") return `Output only a JSON array. No explanation. No markdown. Just JSON.
+
+Create 6 PowerPoint slides about "${t}" for ${ctx}.
+
+[
+{"title":"Introduction","content":"point1\\npoint2\\npoint3"},
+{"title":"Overview","content":"point1\\npoint2\\npoint3"},
+{"title":"Key Concept 1","content":"point1\\npoint2\\npoint3"},
+{"title":"Key Concept 2","content":"point1\\npoint2\\npoint3"},
+{"title":"Key Takeaways","content":"point1\\npoint2\\npoint3"},
+{"title":"Conclusion","content":"point1\\npoint2\\npoint3"}
+]
+
+Rules: max 4 bullets per slide, max 12 words each, simple clear language for ${ctx}.
+Output the JSON array now:`;
+
+    if (s === "detailed") return `Output only a JSON array. No explanation. No markdown. Just JSON.
+
+Create 10 PowerPoint slides about "${t}" for ${ctx}.
+
+[
+{"title":"Title","content":"subtitle text here"},
+{"title":"Overview & Background","content":"point1\\npoint2\\npoint3\\npoint4\\npoint5"},
+{"title":"Core Concept A","content":"point1\\npoint2\\npoint3\\npoint4\\npoint5"},
+{"title":"Core Concept B","content":"point1\\npoint2\\npoint3\\npoint4\\npoint5"},
+{"title":"Core Concept C","content":"point1\\npoint2\\npoint3\\npoint4\\npoint5"},
+{"title":"Key Definitions","content":"point1\\npoint2\\npoint3\\npoint4"},
+{"title":"Real-World Applications","content":"point1\\npoint2\\npoint3\\npoint4"},
+{"title":"Important Facts & Data","content":"point1\\npoint2\\npoint3\\npoint4"},
+{"title":"Case Study / Example","content":"point1\\npoint2\\npoint3\\npoint4"},
+{"title":"Summary & Conclusion","content":"point1\\npoint2\\npoint3\\npoint4"}
+]
+
+Rules: 5-6 bullets per slide, technical depth for ${ctx}, real facts and definitions.
+Output the JSON array now:`;
+
+    return `Output only a JSON array. No explanation. No markdown. Just JSON.
+
+Create 10 creative PowerPoint slides about "${t}" for ${ctx}.
+
+[
+{"title":"🚀 Title Slide","content":"hook subtitle"},
+{"title":"💡 Did You Know?","content":"🌟 fact1\\n⚡ fact2\\n🔥 fact3"},
+{"title":"🌍 The Big Picture","content":"🎯 point1\\n💫 point2\\n🔬 point3\\n✨ point4"},
+{"title":"🔍 Deep Dive Part 1","content":"💡 point1\\n⚡ point2\\n🌟 point3\\n🎯 point4"},
+{"title":"⚡ Deep Dive Part 2","content":"🔥 point1\\n💫 point2\\n🌍 point3\\n✅ point4"},
+{"title":"🎯 Deep Dive Part 3","content":"🚀 point1\\n🔬 point2\\n💡 point3\\n⚡ point4"},
+{"title":"🖼️ Visualize It","content":"📊 point1\\n🎨 point2\\n📐 point3\\n🔭 point4"},
+{"title":"🌟 Real World Impact","content":"🏙️ point1\\n💼 point2\\n🌱 point3\\n🚀 point4"},
+{"title":"🤔 Myths vs Reality","content":"❌ myth1 → ✅ truth1\\n❌ myth2 → ✅ truth2\\n💡 fact1\\n⚡ fact2"},
+{"title":"✅ Key Takeaways","content":"🌟 takeaway1\\n💡 takeaway2\\n🎯 takeaway3\\n🚀 takeaway4"}
+]
+
+Rules: use emojis, vivid engaging language, analogies for ${ctx}. 4-5 bullets per slide.
+Output the JSON array now:`;
+  };
+
   const handleGenerate = async () => {
     if (!topic.trim()) { setError("Please enter a topic"); return; }
     if (!classLevel)   { setError("Please select a class level"); return; }
@@ -796,56 +947,50 @@ export function PPTGenerator() {
     setLoading(true); setError("");
 
     try {
-      // Step 1: Generate slide content with AI
-      setLoadingStep("AI is building your slides…");
       const token = localStorage.getItem("token");
-      const aiRes = await fetch(`${API_URL}/api/ai/ask`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token || ""}`,
-        },
-        body: JSON.stringify({
-          prompt: buildPrompt(topic, classLevel, style),
-          userId,
-        }),
-      });
-      const aiData = await aiRes.json();
+      const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token || ""}` };
+      const prompt = buildPPTPrompt(topic.trim(), classLevel, style);
 
-      if (!aiData.success) {
-        setError("AI failed to generate content. Please try again.");
+      // ── Step 1: Get slide content from AI (retry up to 3 times) ────────────
+      setLoadingStep("AI is building your slides…");
+      let slides: any[] | null = null;
+
+      for (let attempt = 1; attempt <= 3 && !slides; attempt++) {
+        try {
+          if (attempt > 1) setLoadingStep(`Retrying… (attempt ${attempt}/3)`);
+          const aiRes = await fetch(`${API_URL}/api/ai/ask`, {
+            method: "POST", headers,
+            body: JSON.stringify({ prompt, userId }),
+          });
+          if (!aiRes.ok) continue;
+          const aiData = await aiRes.json();
+          if (aiData.success && aiData.answer) {
+            slides = extractSlides(aiData.answer);
+          }
+        } catch {}
+      }
+
+      if (!slides || slides.length < 3) {
+        setError("AI could not generate slides. Please try again.");
         setLoading(false); return;
       }
 
-      // Parse JSON from AI response
-      let slides: any[];
-      try {
-        const clean = aiData.answer
-          .replace(/```json/gi, "").replace(/```/g, "").trim();
-        // Find the JSON array in the response
-        const match = clean.match(/\[[\s\S]*\]/);
-        if (!match) throw new Error("No JSON array found");
-        slides = JSON.parse(match[0]);
-        if (!Array.isArray(slides) || slides.length === 0) throw new Error("Empty array");
-      } catch (parseErr) {
-        console.error("Parse error:", aiData.answer.substring(0, 200));
-        setError("AI returned unexpected format. Please try again.");
-        setLoading(false); return;
-      }
+      // Normalize slides
+      const normalized = slides.map((sl: any, i: number) => ({
+        title:   String(sl.title   || sl.Title   || `Slide ${i + 1}`).trim(),
+        content: String(sl.content || sl.Content || sl.body || "").trim(),
+        subtitle: String(sl.subtitle || "").trim(),
+      })).filter((sl: any) => sl.title.length > 0);
 
-      // Step 2: Generate the actual PPTX file
-      setLoadingStep("Creating your presentation file…");
+      // ── Step 2: Build PPTX file ─────────────────────────────────────────────
+      setLoadingStep(`Designing ${style} presentation…`);
       const pptRes = await fetch(`${API_URL}/api/ppt/generate`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token || ""}`,
-        },
-        body: JSON.stringify({ topic, slides, style, classLevel }),
+        method: "POST", headers,
+        body: JSON.stringify({ topic, slides: normalized, style, classLevel }),
       });
 
       if (!pptRes.ok) {
-        setError("Failed to create presentation file.");
+        setError("Failed to create presentation file. Please try again.");
         setLoading(false); return;
       }
 
@@ -853,7 +998,7 @@ export function PPTGenerator() {
       const url  = window.URL.createObjectURL(blob);
 
       setDownloadUrl(url);
-      setSlideCount(slides.length);
+      setSlideCount(normalized.length);
       setGenerated(true);
       addPoints(25);
       logActivity("ppt_generated", `PPT: ${topic}`, 25);
@@ -985,27 +1130,33 @@ export function PPTGenerator() {
               <Palette className="w-4 h-4 text-purple-400" /> Presentation Style
             </label>
             <div className="grid grid-cols-3 gap-3">
-              {PPT_STYLES.map(s => (
+              {PPT_STYLES.map(s => {
+                const active = style === s.id;
+                return (
                 <button key={s.id} onClick={() => setStyle(s.id)}
-                  className={`relative p-4 rounded-xl border text-center transition-all duration-200 overflow-hidden group
-                    ${style === s.id
-                      ? `bg-gradient-to-br ${s.color} ${s.border} ring-1 ${s.border.replace("border-","ring-")}`
+                  className={`relative p-4 rounded-xl border text-center transition-all duration-300 overflow-hidden group
+                    ${active
+                      ? `bg-gradient-to-br ${s.color} ${s.border} ring-1 ${s.ring} shadow-lg ${s.glow}`
                       : "bg-white/[0.02] border-white/5 hover:border-white/15 hover:bg-white/[0.04]"
                     }`}
                 >
-                  {style === s.id && (
-                    <div className="absolute inset-0 bg-gradient-to-br from-transparent via-white/[0.02] to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700 pointer-events-none" />
+                  {active && (
+                    <div className="absolute inset-0 bg-gradient-to-br from-transparent via-white/[0.03] to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700 pointer-events-none" />
                   )}
-                  <div className={`flex justify-center mb-2 transition-colors ${style === s.id ? s.accent : "text-slate-500"}`}>
-                    {s.icon}
+                  {/* Premium icon */}
+                  <div className={`flex justify-center mb-3 transition-all duration-300 ${active ? "scale-110 drop-shadow-lg" : "scale-100 opacity-50 grayscale"}`}>
+                    {s.id === "simple"   && <SimpleIcon   active={active} />}
+                    {s.id === "detailed" && <DetailedIcon active={active} />}
+                    {s.id === "creative" && <CreativeIcon active={active} />}
                   </div>
                   <div className="text-sm font-bold text-white">{s.label}</div>
                   <div className="text-[10px] text-slate-500 mt-0.5">{s.desc}</div>
-                  <div className={`text-[10px] mt-1.5 font-semibold ${style === s.id ? s.accent : "text-slate-600"}`}>
+                  <div className={`text-[10px] mt-1.5 font-semibold ${active ? s.accent : "text-slate-600"}`}>
                     {s.slides}
                   </div>
                 </button>
-              ))}
+                );
+              })}
             </div>
           </div>
 
