@@ -861,7 +861,7 @@ router.get('/activity', authenticate, async (req: any, res) => {
 router.post('/update-profile', authenticate, async (req: any, res) => {
   try {
     await connectDB();
-    const { name, email } = req.body;
+    const { name, email, avatar } = req.body;
 
     if (!name || !email) {
       return res.status(400).json({ success: false, message: 'Name and email required' });
@@ -881,6 +881,7 @@ router.post('/update-profile', authenticate, async (req: any, res) => {
 
     user.name = name;
     user.email = email;
+    if (avatar !== undefined) (user as any).avatar = avatar;
     await user.save();
 
     res.json({ 
@@ -888,6 +889,7 @@ router.post('/update-profile', authenticate, async (req: any, res) => {
       user: {
         name: user.name,
         email: user.email,
+        avatar: (user as any).avatar ?? null,
       }
     });
 

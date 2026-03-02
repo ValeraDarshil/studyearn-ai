@@ -110,6 +110,11 @@ const userSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
+  // ✅ AVATAR - selected avatar ID
+  avatar: {
+    type: String,
+    default: null,
+  },
   // ✅ ACHIEVEMENTS - array of unlocked achievement IDs
   unlockedAchievements: {
     type: [String],

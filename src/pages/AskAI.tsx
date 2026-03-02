@@ -437,7 +437,7 @@ function formatAnswer(text: string) {
 }
 
 // ── Compress image to keep it small for API ───────────────────────────────────
-async function compressImage(base64: string, maxPx = 1400): Promise<string> {
+async function compressImage(base64: string, maxPx = 1024): Promise<string> {
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {
@@ -534,7 +534,7 @@ export function AskAI() {
         let imageData: string | undefined;
 
         if (fileType === "image" && previewSrc) {
-          imageData = await compressImage(previewSrc, 1400);
+          imageData = await compressImage(previewSrc, 1024);
           setLoadingStep("AI is analyzing image…");
         } else {
           setLoadingStep("AI is thinking…");
