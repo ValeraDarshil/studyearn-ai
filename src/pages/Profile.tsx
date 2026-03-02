@@ -274,10 +274,12 @@ export function AvatarCircle({
   avatarId, initials, size = "md", ring = true,
 }: { avatarId?: string | null; initials: string; size?: "sm"|"md"|"lg"; ring?: boolean }) {
   const av = getAvatar(avatarId);
-  const sz = size === "sm" ? "w-8 h-8 text-base" : size === "lg" ? "w-28 h-28 text-4xl" : "w-24 h-24 text-3xl";
+  const dims = size === "sm" ? "w-8 h-8" : size === "lg" ? "w-28 h-28" : "w-24 h-24";
+  const emojiSize = size === "lg" ? "text-4xl" : size === "sm" ? "text-base" : "text-3xl";
+  const textSize  = size === "lg" ? "text-3xl"  : size === "sm" ? "text-xs"   : "text-2xl";
 
   return (
-    <div className={`relative flex-shrink-0 ${size === "lg" ? "w-28 h-28" : size === "sm" ? "w-8 h-8" : "w-24 h-24"}`}>
+    <div className={`relative flex-shrink-0 ${dims}`}>
       {ring && (
         <>
           <div className="absolute inset-[-4px] rounded-full" style={{
@@ -287,12 +289,17 @@ export function AvatarCircle({
           <div className="absolute inset-[-2px] rounded-full bg-gray-950" />
         </>
       )}
-      <div className={`relative ${sz} rounded-full flex items-center justify-center z-10 overflow-hidden bg-gradient-to-br ${av ? av.bg : "from-blue-500 via-purple-600 to-pink-500"}`}>
-        {av
-          ? <span className={size === "lg" ? "text-4xl" : size === "sm" ? "text-base" : "text-3xl"} style={{ filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.5))" }}>{av.emoji}</span>
-          : <span className={`font-black text-white ${size === "lg" ? "text-3xl" : size === "sm" ? "text-xs" : "text-2xl"}`}>{initials}</span>
+
+      {/* Avatar circle */}
+      <div className={`relative ${dims} rounded-full flex items-center justify-center z-10 overflow-hidden bg-gradient-to-br ${av ? av.bg : "from-blue-500 via-purple-600 to-pink-500"}`}>
+        {av?.imageUrl
+          ? <img src={av.imageUrl} alt={av.label} className="w-full h-full object-cover rounded-full" />
+          : av
+            ? <span className={emojiSize} style={{ filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.5))" }}>{av.emoji}</span>
+            : <span className={`font-black text-white ${textSize}`}>{initials}</span>
         }
       </div>
+
       {ring && av && (
         <div className="absolute inset-0 rounded-full animate-pulse" style={{ boxShadow: `0 0 20px ${av.glow}40` }} />
       )}
@@ -305,7 +312,7 @@ export function AvatarCircle({
 function AvatarPickerModal({
   current, initials, onSelect, onClose,
 }: { current: string | null; initials: string; onSelect: (id: string) => void; onClose: () => void }) {
-  const [activeCategory, setActiveCategory] = useState<string>("cosmic");
+  const [activeCategory, setActiveCategory] = useState<string>("characters");
   const [hovered, setHovered] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(current);
 
@@ -403,7 +410,10 @@ function AvatarPickerModal({
                     {(isSelected || isHovered) && (
                       <div className="absolute inset-0 rounded-2xl" style={{ background: `radial-gradient(circle at center, ${av.glow}30, transparent 70%)` }} />
                     )}
-                    <span className="relative text-2xl" style={{ filter: "drop-shadow(0 2px 6px rgba(0,0,0,0.6))" }}>{av.emoji}</span>
+                    {av.imageUrl
+                      ? <img src={av.imageUrl} alt={av.label} className="w-full h-full object-cover" />
+                      : <span className="relative text-2xl" style={{ filter: "drop-shadow(0 2px 6px rgba(0,0,0,0.6))" }}>{av.emoji}</span>
+                    }
 
                     {/* Selected checkmark */}
                     {isSelected && (
