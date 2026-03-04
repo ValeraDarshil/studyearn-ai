@@ -346,7 +346,7 @@ export function Dashboard() {
       </div>
 
       {/* Stats Row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 stagger-children">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 stagger-children">
         {/* Points */}
         <div className="glass glass-hover card-shine rounded-2xl p-4 animate-slide-up border border-purple-500/10 hover:border-purple-500/25 hover:-translate-y-1 transition-all duration-300 group">
           <div className="flex items-center justify-between mb-3">
@@ -410,26 +410,22 @@ export function Dashboard() {
 
       {/* Quick Actions */}
       <div>
-        <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+        <h2 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
           Quick Actions
         </h2>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 stagger-children">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 stagger-children">
           {quickActions.map((action) => (
             <button
               key={action.label}
               onClick={() => navigate(action.path)}
-              className={`relative glass card-shine rounded-2xl p-5 group cursor-pointer border border-white/5 hover:border-white/15 hover:-translate-y-1.5 hover:shadow-xl ${action.glow} transition-all duration-300 overflow-hidden animate-slide-up`}
+              className={`relative glass card-shine rounded-2xl p-4 group cursor-pointer border border-white/5 hover:border-white/15 hover:-translate-y-1 hover:shadow-xl ${action.glow} transition-all duration-300 overflow-hidden animate-slide-up text-left`}
             >
-              {/* gradient bg on hover */}
               <div className={`absolute inset-0 bg-gradient-to-br ${action.gradient} opacity-0 group-hover:opacity-5 transition-opacity duration-300`} />
-              <div className={`relative w-12 h-12 rounded-xl bg-gradient-to-br ${action.gradient} flex items-center justify-center mb-4 group-hover:scale-110 group-hover:shadow-lg transition-all duration-300`}>
-                <action.icon className="w-6 h-6 text-white" />
+              <div className={`relative w-10 h-10 md:w-12 md:h-12 rounded-xl bg-gradient-to-br ${action.gradient} flex items-center justify-center mb-3 group-hover:scale-110 group-hover:shadow-lg transition-all duration-300`}>
+                <action.icon className="w-5 h-5 md:w-6 md:h-6 text-white" />
               </div>
-              <h3 className="relative text-base font-semibold text-white mb-1 group-hover:gradient-text transition-all">{action.label}</h3>
-              <p className="relative text-xs text-slate-500 mb-3">{action.desc}</p>
-              <div className="relative flex items-center gap-1 text-xs text-purple-400 opacity-0 group-hover:opacity-100 translate-x-[-4px] group-hover:translate-x-0 transition-all duration-300">
-                Start now <ArrowRight className="w-3 h-3" />
-              </div>
+              <h3 className="relative text-sm md:text-base font-semibold text-white mb-0.5">{action.label}</h3>
+              <p className="relative text-[11px] md:text-xs text-slate-500">{action.desc}</p>
             </button>
           ))}
         </div>
