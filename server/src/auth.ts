@@ -4,6 +4,8 @@ import jwt from 'jsonwebtoken';
 import { User } from './models/User.model.js';
 import { Activity } from './models/Activity.model.js';
 import { connectDB } from './db.js';
+import { authLimiter } from './middleware/rateLimiter.js';
+import { validateSignup, validateLogin } from './middleware/validate.js';
 
 const router = express.Router();
 
@@ -36,7 +38,7 @@ async function getDefaultReferrer() {
 }
 
 // ── SIGNUP ───────────────────────────────────────────────────────────────────
-router.post('/signup', async (req, res) => {
+router.post('/signup', authLimiter, validateSignup, async (req, res) => {
   try {
     await connectDB();
     
@@ -169,7 +171,7 @@ router.post('/signup', async (req, res) => {
 });
 
 // ── LOGIN ────────────────────────────────────────────────────────────────────
-router.post('/login', async (req, res) => {
+router.post('/login', authLimiter, validateLogin, async (req, res) => {
   try {
     await connectDB();
     

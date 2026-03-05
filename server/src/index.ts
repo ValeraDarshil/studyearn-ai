@@ -10,25 +10,77 @@ import { PDFDocument } from "pdf-lib";
 import sharp from "sharp";
 import PptxGenJS from "pptxgenjs";
 import { connectDB } from "./db.js";
+import {
+  globalLimiter,
+  aiAskLimiter,
+  pdfSolveLimiter,
+  pptLimiter,
+  fileToolsLimiter,
+} from "./middleware/rateLimiter.js";
+import {
+  validateAskAI,
+  validatePPTContent,
+  validatePPTGenerate,
+} from "./middleware/validate.js";
 
 dotenv.config();
 
+/* ================= STARTUP ENV CHECK ================= */
+const REQUIRED_ENV = ["MONGODB_URI", "JWT_SECRET", "GROQ_API_KEY"];
+const missing = REQUIRED_ENV.filter((key) => !process.env[key]);
+if (missing.length > 0) {
+  console.error(`❌ Missing required environment variables: ${missing.join(", ")}`);
+  console.error("   Please copy server/.env.example to server/.env and fill in all values.");
+  process.exit(1);
+}
+
 const app = express();
-const PORT = process.env.PORT || 5003;
+const PORT = process.env.PORT || 5000;
+
+/* ================= GLOBAL ERROR HANDLERS ================= */
+
+// Catch unhandled promise rejections (prevents server crash)
+process.on("unhandledRejection", (reason: any) => {
+  console.error("❌ Unhandled Promise Rejection:", reason?.message || reason);
+  // Don't exit — just log it
+});
+
+// Catch uncaught exceptions (prevents server crash)
+process.on("uncaughtException", (err: Error) => {
+  console.error("❌ Uncaught Exception:", err.message);
+  console.error(err.stack);
+  // Give time to finish pending requests before exit
+  setTimeout(() => process.exit(1), 1000);
+});
 
 /* ================= CORS ================= */
 
+const ALLOWED_ORIGINS = [
+  "http://localhost:5173",
+  "http://localhost:5174",
+  "https://studyearn-ai.vercel.app",
+  process.env.FRONTEND_URL,
+].filter(Boolean) as string[];
+
 app.use(
   cors({
-    origin: [
-      "http://localhost:5173",
-      "https://studyearn-ai.vercel.app",
-    ],
+    origin: (origin, callback) => {
+      // Allow requests with no origin (mobile apps, curl, Postman)
+      if (!origin) return callback(null, true);
+      if (ALLOWED_ORIGINS.includes(origin)) {
+        return callback(null, true);
+      }
+      callback(new Error(`CORS: Origin ${origin} not allowed`));
+    },
     credentials: true,
   })
 );
 
-app.use(express.json({ limit: "50mb" }));
+// Apply global rate limiter to ALL routes (safety net)
+app.use(globalLimiter);
+
+// Reduce JSON body limit from 50mb → 10mb (50mb was dangerously large)
+app.use(express.json({ limit: "10mb" }));
 
 /* ================= GROQ ================= */
 
@@ -58,6 +110,7 @@ app.get("/health", (_, res) => {
 
 /* ================= ROUTES ================= */
 
+// Auth routes get brute-force protection (applied inside auth.ts per route)
 app.use("/api/auth", authRoutes);
 app.use("/api/user", userRoutes);
 app.use("/api/leaderboard", leaderboardRoutes);
@@ -387,7 +440,7 @@ async function solveText(prompt: string): Promise<string> {
 
 /* ================= ASK AI (Image + Text) ================= */
 
-app.post("/api/ai/ask", async (req, res) => {
+app.post("/api/ai/ask", aiAskLimiter, validateAskAI, async (req, res) => {
   try {
     const { prompt, image } = req.body;
     if (!prompt && !image) {
@@ -431,7 +484,7 @@ app.post("/api/ai/ask", async (req, res) => {
 
 /* ================= PDF QUESTION SOLVER ================= */
 
-app.post("/api/ai/solve-pdf", upload.single("file"), async (req, res) => {
+app.post("/api/ai/solve-pdf", pdfSolveLimiter, upload.single("file"), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ success: false, answer: "No file uploaded." });
 
@@ -664,7 +717,7 @@ async function callOpenRouterForPPT(system: string, user: string): Promise<strin
   throw new Error("OpenRouter PPT: all models failed");
 }
 
-app.post("/api/ppt/content", async (req, res) => {
+app.post("/api/ppt/content", pptLimiter, validatePPTContent, async (req, res) => {
   try {
     const { topic, style = "simple", classLevel = "10" } = req.body;
     if (!topic?.trim()) return res.status(400).json({ success: false, message: "Topic required" });
@@ -1173,7 +1226,7 @@ function buildPPTX(pptx: any, slides: any[], style: ThemeKey, topic: string, cla
   }
 }
 
-app.post("/api/ppt/generate", async (req, res) => {
+app.post("/api/ppt/generate", pptLimiter, validatePPTGenerate, async (req, res) => {
   try {
     const { topic, slides, style = "simple", classLevel = "Student" } = req.body;
 
@@ -1207,6 +1260,7 @@ app.post("/api/ppt/generate", async (req, res) => {
 
 app.post(
   "/api/img-to-pdf",
+  fileToolsLimiter,
   upload.array("files"),
   async (req: any, res) => {
     try {
@@ -1245,6 +1299,7 @@ app.post(
 
 app.post(
   "/api/merge-pdf",
+  fileToolsLimiter,
   upload.array("files"),
   async (req: any, res) => {
     try {
@@ -1270,6 +1325,29 @@ app.post(
     }
   }
 );
+
+/* ================= GLOBAL EXPRESS ERROR HANDLER ================= */
+// This catches ANY error thrown inside route handlers (last middleware)
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error("❌ Express error:", err.message);
+  console.error(err.stack);
+
+  // CORS error
+  if (err.message?.startsWith("CORS:")) {
+    return res.status(403).json({ success: false, message: "Not allowed by CORS policy." });
+  }
+
+  // Rate limit error (already handled by rateLimiter, but just in case)
+  if (err.status === 429) {
+    return res.status(429).json({ success: false, message: "Too many requests. Please slow down." });
+  }
+
+  // Default: 500 internal server error
+  res.status(500).json({
+    success: false,
+    message: "An internal server error occurred. Please try again.",
+  });
+});
 
 /* ================= START SERVER ================= */
 

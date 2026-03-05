@@ -1,0 +1,27 @@
+# ── CRITICAL: Never commit these ─────────────────────────────
+.env
+.env.local
+.env.production
+.env.staging
+
+# ── Build output ──────────────────────────────────────────────
+dist/
+
+# ── Dependencies ──────────────────────────────────────────────
+node_modules/
+
+# ── User uploaded files (can be large + sensitive) ────────────
+uploads/output/
+uploads/tmp/
+# Keep the uploads folder structure but not the files:
+!uploads/.gitkeep
+!uploads/output/.gitkeep
+!uploads/tmp/.gitkeep
+
+# ── Logs ──────────────────────────────────────────────────────
+*.log
+logs/
+
+# ── OS ────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
