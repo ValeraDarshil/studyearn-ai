@@ -622,20 +622,16 @@ function AppContent() {
   };
 
   const addPoints = async (amount: number) => {
+    // Update UI immediately
     const newPoints = pointsRef.current + amount;
     setPoints(newPoints);
-    const result = await updateUserPoints(amount);
-    if (result.success) {
-      setPoints(result.points);
-      // Check point-based achievements
-      checkAndUnlockAchievements({ points: result.points });
-    }
+    // Server handles actual DB update in /api/ai/ask — no double call needed
+    checkAndUnlockAchievements({ points: newPoints });
   };
 
-  const useQuestion = async () => {
+  const useQuestion = () => {
+    // Only update UI — server handles actual deduction in /api/ai/ask
     setQuestionsLeft((prev) => Math.max(0, prev - 1));
-    const result = await useQuestionAPI();
-    if (result.success) setQuestionsLeft(result.questionsLeft);
   };
 
   const logActivity = async (action: string, details: string, pointsEarned: number) => {
