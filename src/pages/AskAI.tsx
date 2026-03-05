@@ -465,8 +465,7 @@ export function AskAI() {
     questionsLeft, useQuestion, addPoints, userId, logActivity,
     checkAndUnlockAchievements, userStats, setUserStats,
   } = useApp();
-  // Local state to sync server questionsLeft
-  const [localQuestionsLeft, setLocalQuestionsLeft] = useState<number | null>(null);
+
 
 
 
@@ -561,17 +560,13 @@ export function AskAI() {
       setAnswer(result.answer || "No answer received. Please try again.");
 
       if (result.success) {
-        // Server already handled points + question deduction — just sync UI
-        const pts = result.pointsAwarded ?? 15;
-        if (result.questionsLeft !== undefined) {
-          setLocalQuestionsLeft(result.questionsLeft);
-        }
-        addPoints(pts);
-        logActivity("ask_question", question.substring(0, 50) || `${fileType} question`, pts);
+        addPoints(10);       // +10 pts shown in UI
+        useQuestion();       // decrement questionsLeft in UI
+        logActivity("ask_question", question.substring(0, 50) || `${fileType} question`, 10);
         const newTotal = (userStats.totalQuestionsAsked || 0) + 1;
         setUserStats({ ...userStats, totalQuestionsAsked: newTotal });
+        incrementAction("question");
         checkAndUnlockAchievements({ totalQuestionsAsked: newTotal });
-      } else {
       }
       setShowAnswer(true);
 
@@ -591,7 +586,7 @@ export function AskAI() {
     "Explain supply and demand with a simple example",
   ];
 
-  const canAsk = (!!question.trim() || !!uploadedFile) && (localQuestionsLeft ?? questionsLeft) > 0 && !loading;
+  const canAsk = (!!question.trim() || !!uploadedFile) && questionsLeft > 0 && !loading;
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -771,7 +766,7 @@ export function AskAI() {
               )}
             </div>
             <span className="text-xs font-medium text-green-400 bg-green-400/10 px-2 py-1 rounded-lg">
-              +15 pts ✓
+              +10 pts ✓
             </span>
           </div>
 
