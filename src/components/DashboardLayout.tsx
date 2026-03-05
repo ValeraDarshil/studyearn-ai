@@ -265,23 +265,26 @@ export function DashboardLayout() {
   const [profileHovered, setProfileHovered] = useState(false);
 
   const navItems = [
-    { icon: Sparkles, label: 'Dashboard', path: '/app' },
-    { icon: Brain, label: 'Ask AI', path: '/app/ask' },
-    { icon: Presentation, label: 'PPT', path: '/app/ppt' },
-    { icon: FileText, label: 'PDF', path: '/app/pdf' },
-    { icon: Gift, label: 'Points', path: '/app/rewards' },
-    { icon: Trophy, label: 'Ranks', path: '/app/leaderboard' },
-    { icon: User, label: 'Profile', path: '/app/profile' },
+    { icon: Sparkles,    label: 'Home',      path: '/app' },
+    { icon: Brain,       label: 'Ask AI',    path: '/app/ask' },
+    { icon: HelpCircle,  label: 'Quiz',      path: '/app/quiz' },
+    { icon: FlameIcon,   label: 'Challenge', path: '/app/challenge' },
+    { icon: BookOpen,    label: 'Planner',   path: '/app/planner' },
+    { icon: Gift,        label: 'Points',    path: '/app/rewards' },
+    { icon: User,        label: 'Profile',   path: '/app/profile' },
   ];
 
   const navItemsFull = [
-    { icon: Sparkles, label: 'Dashboard', path: '/app' },
-    { icon: Brain, label: 'Ask AI', path: '/app/ask' },
-    { icon: Presentation, label: 'PPT Generator', path: '/app/ppt' },
-    { icon: FileText, label: 'PDF Tools', path: '/app/pdf' },
-    { icon: Gift, label: 'My Points', path: '/app/rewards' },
-    { icon: Trophy, label: 'Leaderboard', path: '/app/leaderboard' },
-    { icon: User, label: 'Profile', path: '/app/profile' },
+    { icon: Sparkles,    label: 'Dashboard',      path: '/app' },
+    { icon: Brain,       label: 'Ask AI',          path: '/app/ask' },
+    { icon: HelpCircle,  label: 'AI Quiz',         path: '/app/quiz' },
+    { icon: FlameIcon,   label: 'Daily Challenge', path: '/app/challenge' },
+    { icon: BookOpen,    label: 'Study Planner',   path: '/app/planner' },
+    { icon: Presentation,label: 'PPT Generator',   path: '/app/ppt' },
+    { icon: FileText,    label: 'PDF Tools',        path: '/app/pdf' },
+    { icon: Gift,        label: 'My Points',        path: '/app/rewards' },
+    { icon: Trophy,      label: 'Leaderboard',      path: '/app/leaderboard' },
+    { icon: User,        label: 'Profile',           path: '/app/profile' },
   ];
 
   const handleLogout = () => {
