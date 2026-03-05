@@ -1,3 +1,5 @@
+// // claude aii //
+
 // import { useState } from 'react';
 // import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 // import { Brain, Presentation, FileText, Gift, Trophy, User, LogOut, Sparkles, Zap, Menu, X } from 'lucide-react';
@@ -121,15 +123,22 @@
 //               end={item.path === '/app'}
 //               onClick={() => setSidebarOpen(false)}
 //               className={({ isActive }) =>
-//                 `flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+//                 `relative flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group/nav ${
 //                   isActive
-//                     ? 'bg-gradient-to-r from-blue-500/10 to-purple-500/10 text-white border border-blue-500/20'
-//                     : 'text-slate-400 hover:text-white hover:bg-white/[0.02]'
+//                     ? 'bg-gradient-to-r from-blue-500/10 to-purple-500/10 text-white border border-blue-500/20 shadow-lg shadow-blue-500/5'
+//                     : 'text-slate-400 hover:text-white hover:bg-white/[0.03] border border-transparent'
 //                 }`
 //               }
 //             >
-//               <item.icon className="w-4 h-4" />
-//               {item.label}
+//               {({ isActive }) => (
+//                 <>
+//                   {isActive && (
+//                     <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-r-full bg-gradient-to-b from-blue-400 to-purple-500" />
+//                   )}
+//                   <item.icon className={`w-4 h-4 transition-all duration-200 ${isActive ? 'text-blue-400' : 'group-hover/nav:text-white group-hover/nav:scale-110'}`} />
+//                   {item.label}
+//                 </>
+//               )}
 //             </NavLink>
 //           ))}
 //         </nav>
@@ -147,110 +156,53 @@
 //       {/* Main Content */}
 //       <main className="md:ml-64 min-h-screen pb-20 md:pb-0">
 //         {/* Top Bar */}
-//         <div className="sticky top-0 z-30 glass border-b border-white/5 px-4 md:px-8 py-3 md:py-4 flex items-center justify-between">
-//           <div className="flex items-center gap-3">
+//         <div className="sticky top-0 z-30 glass border-b border-white/5 px-3 md:px-8 py-2.5 md:py-4 flex items-center justify-between gap-2">
+//           <div className="flex items-center gap-2">
 //             {/* Hamburger - mobile only */}
 //             <button
-//               className="md:hidden text-slate-400 hover:text-white p-1"
+//               className="md:hidden text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-white/5"
 //               onClick={() => setSidebarOpen(true)}
 //             >
 //               <Menu className="w-5 h-5" />
 //             </button>
-
 //           </div>
 
-//           <div className="flex items-center gap-3">
+//           <div className="flex items-center gap-1.5 md:gap-3 ml-auto">
 //             {/* Questions left badge */}
-//             <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg glass border border-blue-500/20">
-//               <Zap className="w-3.5 h-3.5 text-blue-400" />
-//               <span className="text-xs font-medium text-blue-300">{questionsLeft} questions left today</span>
+//             <div className="flex items-center gap-1 md:gap-1.5 px-2 md:px-2.5 py-1.5 rounded-lg glass border border-blue-500/20">
+//               <Zap className="w-3 h-3 md:w-3.5 md:h-3.5 text-blue-400 flex-shrink-0" />
+//               <span className="text-[10px] md:text-xs font-medium text-blue-300 whitespace-nowrap">
+//                 <span className="hidden sm:inline">{questionsLeft} questions left today</span>
+//                 <span className="sm:hidden">{questionsLeft} left</span>
+//               </span>
 //             </div>
 
 //             {/* Points badge */}
-//             <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg glass border border-purple-500/20">
-//               <Gift className="w-3.5 h-3.5 text-purple-400" />
-//               <span className="text-xs font-medium text-purple-300">{points} pts</span>
+//             <div className="flex items-center gap-1 md:gap-1.5 px-2 md:px-2.5 py-1.5 rounded-lg glass border border-purple-500/20">
+//               <Gift className="w-3 h-3 md:w-3.5 md:h-3.5 text-purple-400 flex-shrink-0" />
+//               <span className="text-[10px] md:text-xs font-medium text-purple-300 whitespace-nowrap">{points} pts</span>
 //             </div>
 
-//             {/* ✨ PREMIUM Animated Profile Icon */}
+//             {/* Profile Icon */}
 //             <NavLink to="/app/profile">
 //               <div
 //                 className="relative cursor-pointer profile-icon-wrapper"
 //                 onMouseEnter={() => setProfileHovered(true)}
 //                 onMouseLeave={() => setProfileHovered(false)}
 //               >
-//                 {/* Spinning gradient ring — only on hover */}
 //                 {profileHovered && (
-//                   <div
-//                     className="profile-spin-ring absolute inset-0 rounded-full"
-//                     style={{
-//                       background: 'conic-gradient(from 0deg, #8b5cf6, #3b82f6, #06b6d4, #8b5cf6)',
-//                       padding: '2px',
-//                       borderRadius: '9999px',
-//                       zIndex: 0,
-//                     }}
-//                   >
-//                     <div
-//                       style={{
-//                         width: '100%',
-//                         height: '100%',
-//                         borderRadius: '9999px',
-//                         background: '#030712',
-//                       }}
-//                     />
+//                   <div className="profile-spin-ring absolute inset-0 rounded-full" style={{ background: 'conic-gradient(from 0deg, #8b5cf6, #3b82f6, #06b6d4, #8b5cf6)', padding: '2px', borderRadius: '9999px', zIndex: 0 }}>
+//                     <div style={{ width: '100%', height: '100%', borderRadius: '9999px', background: '#030712' }} />
 //                   </div>
 //                 )}
-
-//                 {/* Soft glow behind icon on hover */}
 //                 {profileHovered && (
-//                   <div
-//                     className="profile-glow-pulse absolute inset-0 rounded-full"
-//                     style={{
-//                       background: 'radial-gradient(circle, rgba(139,92,246,0.35) 0%, transparent 70%)',
-//                       filter: 'blur(6px)',
-//                       zIndex: 0,
-//                     }}
-//                   />
+//                   <div className="profile-glow-pulse absolute inset-0 rounded-full" style={{ background: 'radial-gradient(circle, rgba(139,92,246,0.35) 0%, transparent 70%)', filter: 'blur(6px)', zIndex: 0 }} />
 //                 )}
-
-//                 {/* Lottie icon — NO background, no border, clean */}
-//                 <div
-//                   style={{
-//                     position: 'relative',
-//                     zIndex: 1,
-//                     width: 42,
-//                     height: 42,
-//                     display: 'flex',
-//                     alignItems: 'center',
-//                     justifyContent: 'center',
-//                   }}
-//                 >
-//                   <Lottie
-//                     animationData={profileIconAnimation}
-//                     loop={true}
-//                     style={{ width: 42, height: 42 }}
-//                   />
+//                 <div style={{ position: 'relative', zIndex: 1, width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+//                   <Lottie animationData={profileIconAnimation} loop={true} style={{ width: 36, height: 36 }} />
 //                 </div>
-
-//                 {/* Tooltip */}
 //                 {profileHovered && (
-//                   <div
-//                     className="profile-tooltip absolute pointer-events-none"
-//                     style={{
-//                       bottom: '-32px',
-//                       left: '50%',
-//                       whiteSpace: 'nowrap',
-//                       background: 'rgba(15,10,30,0.92)',
-//                       border: '1px solid rgba(139,92,246,0.35)',
-//                       borderRadius: '8px',
-//                       padding: '3px 10px',
-//                       fontSize: '11px',
-//                       fontWeight: 500,
-//                       color: '#c4b5fd',
-//                       backdropFilter: 'blur(8px)',
-//                       zIndex: 50,
-//                     }}
-//                   >
+//                   <div className="profile-tooltip absolute pointer-events-none" style={{ bottom: '-32px', left: '50%', whiteSpace: 'nowrap', background: 'rgba(15,10,30,0.92)', border: '1px solid rgba(139,92,246,0.35)', borderRadius: '8px', padding: '3px 10px', fontSize: '11px', fontWeight: 500, color: '#c4b5fd', backdropFilter: 'blur(8px)', zIndex: 50 }}>
 //                     My Profile
 //                   </div>
 //                 )}
@@ -266,18 +218,16 @@
 //       </main>
 
 //       {/* Mobile Bottom Navigation Bar */}
-//       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 glass border-t border-white/5">
-//         <div className="flex items-center justify-around px-2 py-2">
+//       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 glass border-t border-white/5" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+//         <div className="flex items-center justify-around px-1 py-1.5">
 //           {navItems.map((item) => (
 //             <NavLink
 //               key={item.path}
 //               to={item.path}
 //               end={item.path === '/app'}
 //               className={({ isActive }) =>
-//                 `flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-xl transition-colors min-w-[44px] ${
-//                   isActive
-//                     ? 'text-white'
-//                     : 'text-slate-500 hover:text-slate-300'
+//                 `flex flex-col items-center gap-0.5 px-1.5 py-1.5 rounded-xl transition-colors min-w-[40px] ${
+//                   isActive ? 'text-white' : 'text-slate-500'
 //                 }`
 //               }
 //             >
@@ -297,7 +247,8 @@
 //   );
 // }
 
-// claude aii //
+// Clear Version //
+
 
 import { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
