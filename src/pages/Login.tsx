@@ -181,8 +181,22 @@ export function Login() {
       if (data.success) {
         // ✅ Save session
         localStorage.setItem("token", data.token);
-        localStorage.setItem("user", JSON.stringify(data.user));
-        
+        // Save user with updated points/streak from server response
+        localStorage.setItem("user", JSON.stringify({
+          ...data.user,
+          // Server already updated points with daily bonus — use fresh value
+          points: data.user.points,
+          streak: data.streakInfo?.currentStreak ?? data.user.streak,
+        }));
+
+        // Save streakInfo for App.tsx to show celebration on load
+        if (data.streakInfo?.streakIncreased) {
+          sessionStorage.setItem("streakCelebration", JSON.stringify(data.streakInfo));
+        }
+        if (data.streakInfo?.bonusPoints > 0) {
+          sessionStorage.setItem("loginBonus", String(data.streakInfo.bonusPoints));
+        }
+
         // ✅ Navigate to app
         navigate("/app");
         

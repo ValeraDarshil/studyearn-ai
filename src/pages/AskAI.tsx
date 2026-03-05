@@ -379,6 +379,7 @@
 
 // calude aii //
 
+
 import { useState, useRef, useCallback } from "react";
 import {
   Brain, Send, Zap, Lightbulb, X, ImagePlus, FileText, AlertCircle,
@@ -555,12 +556,16 @@ export function AskAI() {
       setAnswer(result.answer || "No answer received. Please try again.");
 
       if (result.success) {
-        addPoints(10);
-        useQuestion();
-        logActivity("ask_question", question.substring(0, 50) || `${fileType} question`, 10);
+        // Server already handled points + question deduction — just sync UI
+        const pts = result.pointsAwarded ?? 10;
+        if (result.questionsLeft !== undefined) {
+          // Use server value (source of truth)
+          setQuestionsLeft(result.questionsLeft);
+        }
+        addPoints(pts);
+        logActivity("ask_question", question.substring(0, 50) || `${fileType} question`, pts);
         const newTotal = (userStats.totalQuestionsAsked || 0) + 1;
         setUserStats({ ...userStats, totalQuestionsAsked: newTotal });
-        incrementAction("question");
         checkAndUnlockAchievements({ totalQuestionsAsked: newTotal });
       }
       setShowAnswer(true);

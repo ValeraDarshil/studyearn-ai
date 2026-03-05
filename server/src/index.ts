@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import jwt from "jsonwebtoken";
 import authRoutes from "./auth.js";
 import userRoutes from "./user-routes.js";
 import leaderboardRoutes from "./leaderboard-routes.js";
@@ -10,6 +11,8 @@ import { PDFDocument } from "pdf-lib";
 import sharp from "sharp";
 import PptxGenJS from "pptxgenjs";
 import { connectDB } from "./db.js";
+import { User } from "./models/User.model.js";
+import { Activity } from "./models/Activity.model.js";
 import {
   globalLimiter,
   aiAskLimiter,
@@ -114,6 +117,90 @@ app.get("/health", (_, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/user", userRoutes);
 app.use("/api/leaderboard", leaderboardRoutes);
+
+/* ================= SERVER-SIDE USER ACTIONS ================= */
+// Points & question tracking are awarded/deducted by SERVER ONLY — no client trust needed.
+
+const JWT_SECRET = process.env.JWT_SECRET!;
+
+/** Extract userId from Bearer token. Returns null if missing/invalid. */
+function getUserIdFromToken(req: any): string | null {
+  try {
+    const token = req.headers.authorization?.replace("Bearer ", "");
+    if (!token) return null;
+    const decoded = (jwt as any).verify(token, JWT_SECRET) as { userId: string };
+    return decoded.userId;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Deduct 1 question from daily quota + award points.
+ * Called after every successful AI response.
+ */
+async function handleQuestionUsed(req: any, pointsToAward = 15): Promise<{ questionsLeft: number; pointsAwarded: number } | null> {
+  const userId = getUserIdFromToken(req);
+  if (!userId) return null;
+  try {
+    const user = await User.findById(userId);
+    if (!user) return null;
+
+    const today = new Date().toISOString().split("T")[0];
+    if (user.questionsDate !== today) {
+      user.questionsLeft = 5;
+      user.questionsDate = today;
+    }
+    if (user.questionsLeft > 0) user.questionsLeft -= 1;
+
+    user.points += pointsToAward;
+    (user as any).totalQuestionsAsked = ((user as any).totalQuestionsAsked || 0) + 1;
+    await user.save();
+
+    await Activity.create({ userId, action: "ask_question", details: "Asked AI a question", pointsEarned: pointsToAward });
+    console.log(`✅ Question used: ${user.email} | left=${user.questionsLeft} | +${pointsToAward}pts`);
+    return { questionsLeft: user.questionsLeft, pointsAwarded: pointsToAward };
+  } catch (err: any) {
+    console.error("handleQuestionUsed error:", err.message);
+    return null;
+  }
+}
+
+/** Award points for generating a PPT. Called after successful PPTX creation. */
+async function handlePPTGenerated(req: any): Promise<void> {
+  const userId = getUserIdFromToken(req);
+  if (!userId) return;
+  try {
+    const user = await User.findById(userId);
+    if (!user) return;
+    const pts = 20;
+    user.points += pts;
+    (user as any).totalPPTsGenerated = ((user as any).totalPPTsGenerated || 0) + 1;
+    await user.save();
+    await Activity.create({ userId, action: "generate_ppt", details: "Generated a PPT presentation", pointsEarned: pts });
+    console.log(`✅ PPT generated: ${user.email} | +${pts}pts`);
+  } catch (err: any) {
+    console.error("handlePPTGenerated error:", err.message);
+  }
+}
+
+/** Award points for PDF tools. Called after successful PDF action. */
+async function handlePDFAction(req: any, action: "img-to-pdf" | "merge-pdf"): Promise<void> {
+  const userId = getUserIdFromToken(req);
+  if (!userId) return;
+  try {
+    const user = await User.findById(userId);
+    if (!user) return;
+    const pts = 10;
+    user.points += pts;
+    (user as any).totalPDFsConverted = ((user as any).totalPDFsConverted || 0) + 1;
+    await user.save();
+    await Activity.create({ userId, action: "convert_pdf", details: action === "img-to-pdf" ? "Converted images to PDF" : "Merged PDF files", pointsEarned: pts });
+    console.log(`✅ PDF action (${action}): ${user.email} | +${pts}pts`);
+  } catch (err: any) {
+    console.error("handlePDFAction error:", err.message);
+  }
+}
 
 /* ================= AI CONFIG ================= */
 
@@ -475,7 +562,15 @@ app.post("/api/ai/ask", aiAskLimiter, validateAskAI, async (req, res) => {
       answer = await solveText(prompt);
     }
 
-    res.json({ success: true, answer });
+    // ── Server-side: deduct question + award points (fire-and-forget) ──
+    const userAction = await handleQuestionUsed(req, 15);
+
+    res.json({
+      success: true,
+      answer,
+      // Return updated values so frontend stays in sync without extra API call
+      ...(userAction ? { questionsLeft: userAction.questionsLeft, pointsAwarded: userAction.pointsAwarded } : {}),
+    });
   } catch (error: any) {
     console.error("❌ /api/ai/ask error:", error.message);
     res.status(500).json({ success: false, answer: "AI is temporarily unavailable. Please try again in a moment." });
@@ -515,7 +610,15 @@ app.post("/api/ai/solve-pdf", pdfSolveLimiter, upload.single("file"), async (req
       : `Here is the content of a PDF document/question paper:\n\n${text}\n\nFind ALL questions in this document and solve each one completely, step-by-step with full working. Number your answers to match the original question numbers.`;
 
     const answer = await solveText(solvePrompt);
-    res.json({ success: true, answer });
+
+    // ── Server-side: deduct question + award points ──────────
+    const userAction = await handleQuestionUsed(req, 15);
+
+    res.json({
+      success: true,
+      answer,
+      ...(userAction ? { questionsLeft: userAction.questionsLeft, pointsAwarded: userAction.pointsAwarded } : {}),
+    });
 
   } catch (error: any) {
     console.error("❌ /api/ai/solve-pdf error:", error.message);
@@ -1249,6 +1352,9 @@ app.post("/api/ppt/generate", pptLimiter, validatePPTGenerate, async (req, res) 
     res.setHeader("Content-Disposition", `attachment; filename="${safeFilename}_${style}.pptx"`);
     res.send(buffer);
 
+    // ── Server-side: award PPT points (after response sent) ──
+    handlePPTGenerated(req).catch(console.error);
+
   } catch (error: any) {
     console.error("PPT ERROR:", error);
     res.status(500).json({ success: false, message: error.message });
@@ -1288,6 +1394,9 @@ app.post(
       res.setHeader("Content-Type", "application/pdf");
       res.send(Buffer.from(pdfBytes));
 
+      // ── Server-side: award PDF points ──
+      handlePDFAction(req, "img-to-pdf").catch(console.error);
+
     } catch (error) {
       console.error("IMG→PDF ERROR:", error);
       res.status(500).json({ success: false });
@@ -1318,6 +1427,9 @@ app.post(
 
       res.setHeader("Content-Type", "application/pdf");
       res.send(Buffer.from(pdfBytes));
+
+      // ── Server-side: award PDF points ──
+      handlePDFAction(req, "merge-pdf").catch(console.error);
 
     } catch (error) {
       console.error("MERGE PDF ERROR:", error);

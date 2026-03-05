@@ -283,6 +283,50 @@ const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET!;
 const JWT_EXPIRES = '7d';
 
+// ─────────────────────────────────────────────────────────────
+// HELPER — Auto update streak + award daily login bonus
+// Called on every successful login automatically
+// ─────────────────────────────────────────────────────────────
+async function updateStreakOnLogin(user: any): Promise<{ streak: number; streakIncreased: boolean; bonusPoints: number }> {
+  const today     = new Date().toISOString().split('T')[0];
+  const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+  const lastDate  = user.lastActive ? new Date(user.lastActive).toISOString().split('T')[0] : null;
+
+  // Already logged in today — skip
+  if (lastDate === today) {
+    return { streak: user.streak, streakIncreased: false, bonusPoints: 0 };
+  }
+
+  let streakIncreased = false;
+  let bonusPoints     = 10; // Base daily login bonus (every day)
+
+  if (lastDate === yesterday) {
+    user.streak    += 1;
+    streakIncreased = true;
+    // Milestone bonuses
+    if (user.streak === 7)                        bonusPoints = 50;  // 🔥 1 week
+    else if (user.streak === 14)                  bonusPoints = 100; // 💪 2 weeks
+    else if (user.streak === 30)                  bonusPoints = 250; // 🏆 1 month
+    else if (user.streak > 30 && user.streak % 7 === 0) bonusPoints = 75;  // every week after
+  } else {
+    user.streak = 1; // Broken — reset to 1 (never 0)
+  }
+
+  user.points    += bonusPoints;
+  user.lastActive = new Date();
+  await user.save();
+
+  await Activity.create({
+    userId:       user._id,
+    action:       'daily_login',
+    details:      streakIncreased ? `Day ${user.streak} streak! 🔥` : 'Daily login bonus',
+    pointsEarned: bonusPoints,
+  });
+
+  console.log(`✅ Streak: ${user.email} → ${user.streak} days (+${bonusPoints} pts)`);
+  return { streak: user.streak, streakIncreased, bonusPoints };
+}
+
 // ── GENERATE REFERRAL CODE ──────────────────────────────────────────────────
 function generateReferralCode(name: string, userId: string): string {
   const namePart = name.substring(0, 3).toUpperCase();
@@ -472,18 +516,20 @@ router.post('/login', authLimiter, validateLogin, async (req, res) => {
       await user.save();
     }
 
-    // Log login
+    // ── Auto-update streak + award daily login bonus ──────────
+    const { streak, streakIncreased, bonusPoints } = await updateStreakOnLogin(user);
+
+    // Log login activity
     await Activity.create({
-      userId: user._id,
-      action: 'login',
-      details: 'Logged in',
+      userId:       user._id,
+      action:       'login',
+      details:      'Logged in',
       pointsEarned: 0,
     });
 
     // Generate token
     const token = jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: JWT_EXPIRES });
 
-    // NO CACHE HEADERS
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
@@ -492,16 +538,22 @@ router.post('/login', authLimiter, validateLogin, async (req, res) => {
       success: true,
       token,
       user: {
-        _id: user._id,
-        name: user.name,
-        email: user.email,
-        points: user.points,
+        _id:           user._id,
+        name:          user.name,
+        email:         user.email,
+        points:        user.points,      // Already updated with bonus
         questionsLeft: user.questionsLeft,
-        streak: user.streak,
+        streak,
+      },
+      // Frontend can use these to show a celebration toast
+      streakInfo: {
+        streakIncreased,
+        bonusPoints,
+        currentStreak: streak,
       },
     });
 
-    console.log(`✅ Login: ${email} (ID: ${user._id})`);
+    console.log(`✅ Login: ${user.email} | streak=${streak} | bonus=+${bonusPoints}pts`);
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ success: false, message: 'Server error' });
