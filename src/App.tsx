@@ -218,7 +218,9 @@ import { DailyChallenge } from "./pages/DailyChallenge";
 //             <Route path="leaderboard" element={<Leaderboard />} />
 //             <Route path="profile" element={<Profile />} />
 //             <Route path="refer" element={<ReferFriends />} />
-            
+            <Route path="quiz" element={<QuizGenerator />} />
+            <Route path="planner" element={<StudyPlanner />} />
+            <Route path="challenge" element={<DailyChallenge />} />
 //           </Route>
 //         </Routes>
 //       </AppContext.Provider>
@@ -264,9 +266,6 @@ import {
 import { ReferFriends } from "./pages/ReferFriends";
 import { ACHIEVEMENTS } from "./data/achievements";
 import { CursorSpotlight } from "./components/CursorSpotlight";
-import { QuizGenerator } from "./pages/QuizGenerator";
-import { StudyPlanner } from "./pages/StudyPlanner";
-import { DailyChallenge } from "./pages/DailyChallenge";
 
 // ── Achievement Toast Notification ──────────────────────────────────────────
 function AchievementToast({ achievement, onClose }: { achievement: any; onClose: () => void }) {
@@ -589,9 +588,6 @@ function AppContent() {
             <Route path="leaderboard" element={<Leaderboard />} />
             <Route path="profile" element={<Profile />} />
             <Route path="refer" element={<ReferFriends />} />
-            <Route path="quiz" element={<QuizGenerator />} />
-            <Route path="planner" element={<StudyPlanner />} />
-            <Route path="challenge" element={<DailyChallenge />} />
           </Route>
         </Routes>
       </AppContext.Provider>
