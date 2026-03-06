@@ -23,9 +23,6 @@
 //   getRecentActivity,
 // } from "./utils/user-api";
 // import { ReferFriends } from "./pages/ReferFriends";
-import { QuizGenerator } from "./pages/QuizGenerator";
-import { StudyPlanner } from "./pages/StudyPlanner";
-import { DailyChallenge } from "./pages/DailyChallenge";
 
 // // ✅ WRAPPER to check location before showing celebration
 // function AppContent() {
@@ -218,9 +215,6 @@ import { DailyChallenge } from "./pages/DailyChallenge";
 //             <Route path="leaderboard" element={<Leaderboard />} />
 //             <Route path="profile" element={<Profile />} />
 //             <Route path="refer" element={<ReferFriends />} />
-            <Route path="quiz" element={<QuizGenerator />} />
-            <Route path="planner" element={<StudyPlanner />} />
-            <Route path="challenge" element={<DailyChallenge />} />
 //           </Route>
 //         </Routes>
 //       </AppContext.Provider>
@@ -264,6 +258,9 @@ import {
   unlockAchievement,
 } from "./utils/user-api";
 import { ReferFriends } from "./pages/ReferFriends";
+import { QuizGenerator } from "./pages/QuizGenerator";
+import { StudyPlanner } from "./pages/StudyPlanner";
+import { DailyChallenge } from "./pages/DailyChallenge";
 import { ACHIEVEMENTS } from "./data/achievements";
 import { CursorSpotlight } from "./components/CursorSpotlight";
 
@@ -588,6 +585,9 @@ function AppContent() {
             <Route path="leaderboard" element={<Leaderboard />} />
             <Route path="profile" element={<Profile />} />
             <Route path="refer" element={<ReferFriends />} />
+            <Route path="quiz" element={<QuizGenerator />} />
+            <Route path="planner" element={<StudyPlanner />} />
+            <Route path="challenge" element={<DailyChallenge />} />
           </Route>
         </Routes>
       </AppContext.Provider>
