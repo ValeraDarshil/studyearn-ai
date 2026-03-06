@@ -252,7 +252,7 @@
 
 import { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { Brain, Presentation, FileText, Gift, Trophy, User, LogOut, Sparkles, Zap, Menu, X } from 'lucide-react';
+import { Brain, Presentation, FileText, Gift, Trophy, User, LogOut, Sparkles, Zap, Menu, X, Flame as FlameIcon, BookOpen, HelpCircle } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import Lottie from 'lottie-react';
 import streakAnimation from '../assets/animations/streak-fire.json';
