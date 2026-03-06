@@ -50,31 +50,41 @@ interface ChallengeResult {
   ptsEarned: number;
 }
 
-// Parse MCQ from AI response
+// Parse MCQ from AI response — bulletproof v2
 function parseMCQ(text: string): { question: string; options: string[]; answer: number; explanation: string } | null {
   try {
     const lines = text.split("\n").map(l => l.trim()).filter(Boolean);
 
-    // Question = first non-empty line (remove Q1. prefix)
-    const qLine = lines[0]?.replace(/^Q?\d+[\.\)]\s*/i, "").trim() || "";
-    if (!qLine) return null;
+    // Question = first non-empty line, remove any prefix
+    const qLine = lines[0]?.replace(/^\*{0,2}Q?\s*\d*[\.)\s]*\*{0,2}\s*/i, "").replace(/\*+/g, "").trim() || "";
+    if (!qLine || qLine.length < 5) return null;
 
-    // Options
-    const opts: string[] = [];
+    // Options — match A) B) C) D) in order
+    const optLines: { letter: string; text: string }[] = [];
+    lines.forEach(line => {
+      const m = line.replace(/\*+/g, "").match(/^\(?([A-D])[\.)\-\s]\s*(.+)/i);
+      if (m) optLines.push({ letter: m[1].toUpperCase(), text: m[2].trim() });
+    });
+    if (optLines.length < 4) return null;
+    optLines.sort((a, b) => "ABCD".indexOf(a.letter) - "ABCD".indexOf(b.letter));
+    const opts = optLines.map(o => o.text);
+
+    // Answer — find line starting with "Answer:" then take FIRST letter after colon
+    let answer = 0;
     for (const line of lines) {
-      const m = line.match(/^[A-D][\.\)]\s*(.+)/i);
-      if (m) opts.push(m[1].trim());
+      if (!/^\*{0,2}(correct\s+)?answer\s*[:\-]/i.test(line.replace(/\*+/g, ""))) continue;
+      const afterColon = line.replace(/^.*?[:\-]\s*/i, "").trim();
+      const lm = afterColon.match(/^([A-D])/i);
+      if (lm) { answer = "ABCD".indexOf(lm[1].toUpperCase()); break; }
     }
-    if (opts.length < 4) return null;
-
-    // Answer
-    const answerLine = lines.find(l => /answer[:\s]/i.test(l)) || "";
-    const am = answerLine.match(/[A-D]/i);
-    const answer = am ? "ABCD".indexOf(am[0].toUpperCase()) : 0;
 
     // Explanation
-    const explLine = lines.find(l => /explanation[:\s]/i.test(l)) || "";
-    const explanation = explLine.replace(/^explanation[:\s]*/i, "").trim() || "Check your textbook.";
+    let explanation = "Check your textbook.";
+    for (const line of lines) {
+      if (!/^\*{0,2}explanation\s*[:\-]/i.test(line.replace(/\*+/g, ""))) continue;
+      const text = line.replace(/^.*?[:\-]\s*/i, "").trim();
+      if (text.length > 5) { explanation = text; break; }
+    }
 
     return { question: qLine, options: opts, answer, explanation };
   } catch { return null; }

@@ -40,41 +40,74 @@ const DIFFICULTIES = [
 ];
 
 // ─────────────────────────────────────────────────────────────
-// PARSE AI response → Question[]
+// PARSE AI response → Question[]  (bulletproof v2)
 // ─────────────────────────────────────────────────────────────
 function parseQuestions(text: string): Question[] {
   const questions: Question[] = [];
-  // Split on Q1. Q2. etc or numbered lines
-  const blocks = text.split(/\n(?=Q?\d+[\.\)]\s)/i).filter(b => b.trim());
+
+  // Split into blocks on Q1. / Q2. / **1. / 1) patterns
+  const blocks = text.split(/\n(?=\*{0,2}Q?\s*\d+[\.)\s])/i).filter(b => b.trim());
 
   for (const block of blocks) {
     try {
       const lines = block.trim().split("\n").map(l => l.trim()).filter(Boolean);
       if (lines.length < 5) continue;
 
-      // Question line (remove Q1. prefix)
-      const qLine = lines[0].replace(/^Q?\d+[\.\)]\s*/i, "").trim();
+      // ── Question text ──────────────────────────────────────
+      // Remove leading Q1. / 1. / **1. prefixes
+      const qLine = lines[0]
+        .replace(/^\*{0,2}Q?\s*\d+[\.)\s]+\*{0,2}\s*/i, "")
+        .replace(/\*+/g, "")
+        .trim();
+      if (!qLine) continue;
 
-      // Options: A) B) C) D)
+      // ── Options A B C D ────────────────────────────────────
       const opts: string[] = [];
+      const optLines: { letter: string; idx: number; text: string }[] = [];
+
+      lines.forEach((line, idx) => {
+        // Match: A) / A. / (A) / A - / **A)
+        const m = line.replace(/\*+/g, "").match(/^\(?([A-D])[\.)\-\s]\s*(.+)/i);
+        if (m) {
+          optLines.push({ letter: m[1].toUpperCase(), idx, text: m[2].trim() });
+        }
+      });
+
+      if (optLines.length < 4) continue;
+      // Sort by A B C D order
+      optLines.sort((a, b) => "ABCD".indexOf(a.letter) - "ABCD".indexOf(b.letter));
+      optLines.forEach(o => opts.push(o.text));
+
+      // ── Answer — look for "Answer: B" or "Correct Answer: B" ──
+      // Find the EXACT answer line, then extract ONLY the letter right after colon
+      let answerIdx = 0;
       for (const line of lines) {
-        const m = line.match(/^[A-D][\.\)]\s*(.+)/i);
-        if (m) opts.push(m[1].trim());
+        // Must start with "answer" or "correct answer"
+        const isAnswerLine = /^\*{0,2}(correct\s+)?answer\s*[:\-]/i.test(line.replace(/\*+/g, ""));
+        if (!isAnswerLine) continue;
+
+        // Extract letter immediately after the colon/dash
+        const afterColon = line.replace(/^.*?[:\-]\s*/i, "").trim();
+        const letterMatch = afterColon.match(/^([A-D])/i);
+        if (letterMatch) {
+          answerIdx = "ABCD".indexOf(letterMatch[1].toUpperCase());
+          break;
+        }
       }
-      if (opts.length < 4) continue;
 
-      // Answer line
-      const answerLine = lines.find(l => /answer[:\s]/i.test(l)) || "";
-      const answerMatch = answerLine.match(/[A-D]/i);
-      const answerIdx = answerMatch ? "ABCD".indexOf(answerMatch[0].toUpperCase()) : 0;
-
-      // Explanation
-      const explLine = lines.find(l => /explanation[:\s]/i.test(l)) || "";
-      const explanation = explLine.replace(/^explanation[:\s]*/i, "").trim() || "See your textbook for details.";
+      // ── Explanation ─────────────────────────────────────────
+      let explanation = "See your textbook for details.";
+      for (const line of lines) {
+        const isExplLine = /^\*{0,2}explanation\s*[:\-]/i.test(line.replace(/\*+/g, ""));
+        if (!isExplLine) continue;
+        const text = line.replace(/^.*?[:\-]\s*/i, "").trim();
+        if (text.length > 5) { explanation = text; break; }
+      }
 
       questions.push({ q: qLine, options: opts, answer: answerIdx, explanation });
     } catch { continue; }
   }
+
   return questions.slice(0, 10);
 }
 
@@ -107,19 +140,32 @@ export function QuizGenerator() {
     const token = localStorage.getItem("token");
     const prompt = `Generate exactly 10 multiple choice questions about "${finalTopic}" at ${difficulty} difficulty level for Indian students (CBSE/ICSE).
 
-Format STRICTLY as:
-Q1. [question text]
-A) [option]
-B) [option]
-C) [option]
-D) [option]
-Answer: [A/B/C/D]
-Explanation: [one sentence explanation]
+STRICT FORMAT — follow this EXACTLY for every question, no deviation:
 
-Q2. [question text]
-...and so on till Q10.
+Q1. [question text here]
+A) [option 1]
+B) [option 2]
+C) [option 3]
+D) [option 4]
+Answer: [ONLY the letter A or B or C or D — nothing else on this line]
+Explanation: [one clear sentence explaining why the answer is correct]
 
-Make questions clear, accurate, and exam-focused.`;
+Q2. [question text here]
+A) [option 1]
+B) [option 2]
+C) [option 3]
+D) [option 4]
+Answer: [ONLY the letter A or B or C or D]
+Explanation: [one clear sentence]
+
+Continue this EXACT format for Q3 through Q10.
+
+CRITICAL RULES:
+- The Answer line must contain ONLY the letter (A, B, C, or D) after "Answer: "
+- Make sure the correct answer actually matches the right option
+- Questions must be factually accurate — double-check before writing
+- All 4 options must be plausible but only one correct
+- Do NOT add any text before Q1 or after Q10`;
 
     try {
       const res = await fetch(`${API_URL}/api/ai/ask`, {
