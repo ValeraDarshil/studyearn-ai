@@ -135,7 +135,7 @@ export function DashboardLayout() {
         </div>
 
         {/* Nav — scrollable, logout always visible */}
-        <nav className="flex-1 overflow-y-auto px-3 pb-6 space-y-0.5" style={{ overscrollBehavior: 'contain' }}>
+        <nav className="flex-1 overflow-y-auto px-3 pb-2 space-y-0.5" style={{ overscrollBehavior: 'contain' }}>
           {navItemsFull.map((item) => (
             <NavLink
               key={item.path}
@@ -161,20 +161,18 @@ export function DashboardLayout() {
               )}
             </NavLink>
           ))}
-
-          {/* Sign Out — inside scroll area so it's reachable */}
-          <div className="pt-2 mt-2 border-t border-white/8">
-            <button
-              onClick={handleLogout}
-              className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-semibold text-slate-300 hover:text-red-400 hover:bg-red-500/10 active:bg-red-500/20 transition-colors"
-            >
-              <LogOut className="w-5 h-5 flex-shrink-0 text-red-400" />
-              Sign Out
-            </button>
-          </div>
         </nav>
 
-
+        {/* Logout — always visible at bottom */}
+        <div className="flex-shrink-0 px-3 pb-6 pt-3 border-t border-white/8">
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-semibold text-slate-300 hover:text-red-400 hover:bg-red-500/10 active:bg-red-500/20 transition-colors border border-white/5"
+          >
+            <LogOut className="w-4 h-4 flex-shrink-0 text-red-400" />
+            Sign Out
+          </button>
+        </div>
       </aside>
 
       {/* Main Content */}
