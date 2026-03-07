@@ -2,6 +2,9 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import jwt from "jsonwebtoken";
+import fs from "fs";
+import path from "path";
+import os from "os";
 import authRoutes from "./auth.js";
 import userRoutes from "./user-routes.js";
 import leaderboardRoutes from "./leaderboard-routes.js";
@@ -1464,6 +1467,271 @@ app.post(
     }
   }
 );
+
+/* ================= SPLIT PDF ================= */
+app.post("/api/split-pdf", fileToolsLimiter, upload.single("file"), async (req: any, res) => {
+  const startTime = Date.now();
+  try {
+    if (!req.file) return res.status(400).json({ success: false, message: "No file uploaded" });
+
+    const { pages } = req.body; // e.g. "1,3,5-7" or "all"
+    const srcDoc = await PDFDocument.load(req.file.buffer, { ignoreEncryption: true });
+    const total  = srcDoc.getPageCount();
+
+    // Parse page selection
+    let pageIndices: number[] = [];
+    if (!pages || pages === "all") {
+      pageIndices = Array.from({ length: total }, (_, i) => i);
+    } else {
+      for (const part of pages.split(",")) {
+        const trimmed = part.trim();
+        if (trimmed.includes("-")) {
+          const [s, e] = trimmed.split("-").map((n: string) => parseInt(n.trim()) - 1);
+          for (let i = s; i <= Math.min(e, total - 1); i++) pageIndices.push(i);
+        } else {
+          const idx = parseInt(trimmed) - 1;
+          if (idx >= 0 && idx < total) pageIndices.push(idx);
+        }
+      }
+    }
+    if (!pageIndices.length) return res.status(400).json({ success: false, message: "No valid pages selected" });
+
+    const newDoc = await PDFDocument.create();
+    const copied = await newDoc.copyPages(srcDoc, pageIndices);
+    copied.forEach(p => newDoc.addPage(p));
+
+    const pdfBytes = await newDoc.save({ objectsPerTick: 50 });
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", "attachment; filename=split.pdf");
+    res.send(Buffer.from(pdfBytes));
+    console.log(`✅ SPLIT-PDF: ${pageIndices.length}/${total} pages in ${Date.now() - startTime}ms`);
+    handlePDFAction(req, "img-to-pdf").catch(console.error);
+  } catch (err: any) {
+    console.error("SPLIT PDF ERROR:", err.message);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/* ================= COMPRESS PDF ================= */
+app.post("/api/compress-pdf", fileToolsLimiter, upload.single("file"), async (req: any, res) => {
+  const startTime = Date.now();
+  try {
+    if (!req.file) return res.status(400).json({ success: false, message: "No file uploaded" });
+
+    const srcDoc = await PDFDocument.load(req.file.buffer, { ignoreEncryption: true });
+    // Re-save with compression — pdf-lib removes duplicates and compresses streams
+    const pdfBytes = await srcDoc.save({ useObjectStreams: true, objectsPerTick: 50 });
+
+    const originalKB  = Math.round(req.file.buffer.length / 1024);
+    const compressedKB = Math.round(pdfBytes.length / 1024);
+    const savings = Math.max(0, Math.round((1 - compressedKB / originalKB) * 100));
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", "attachment; filename=compressed.pdf");
+    res.setHeader("X-Original-Size", originalKB.toString());
+    res.setHeader("X-Compressed-Size", compressedKB.toString());
+    res.setHeader("X-Savings-Percent", savings.toString());
+    res.send(Buffer.from(pdfBytes));
+    console.log(`✅ COMPRESS-PDF: ${originalKB}KB → ${compressedKB}KB (${savings}% saved) in ${Date.now() - startTime}ms`);
+    handlePDFAction(req, "img-to-pdf").catch(console.error);
+  } catch (err: any) {
+    console.error("COMPRESS PDF ERROR:", err.message);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/* ================= ROTATE PDF ================= */
+app.post("/api/rotate-pdf", fileToolsLimiter, upload.single("file"), async (req: any, res) => {
+  const startTime = Date.now();
+  try {
+    if (!req.file) return res.status(400).json({ success: false, message: "No file uploaded" });
+
+    const degrees = parseInt(req.body.degrees || "90"); // 90, 180, 270
+    if (![90, 180, 270].includes(degrees))
+      return res.status(400).json({ success: false, message: "Degrees must be 90, 180, or 270" });
+
+    const srcDoc = await PDFDocument.load(req.file.buffer, { ignoreEncryption: true });
+    const pages  = srcDoc.getPages();
+    pages.forEach(page => {
+      const current = page.getRotation().angle;
+      page.setRotation({ type: 0, angle: (current + degrees) % 360 } as any);
+    });
+
+    const pdfBytes = await srcDoc.save({ objectsPerTick: 50 });
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", "attachment; filename=rotated.pdf");
+    res.send(Buffer.from(pdfBytes));
+    console.log(`✅ ROTATE-PDF: ${degrees}° in ${Date.now() - startTime}ms`);
+    handlePDFAction(req, "img-to-pdf").catch(console.error);
+  } catch (err: any) {
+    console.error("ROTATE PDF ERROR:", err.message);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/* ================= ADD PAGE NUMBERS ================= */
+app.post("/api/pdf-page-numbers", fileToolsLimiter, upload.single("file"), async (req: any, res) => {
+  const startTime = Date.now();
+  try {
+    if (!req.file) return res.status(400).json({ success: false, message: "No file uploaded" });
+
+    const { StandardFonts, rgb, degrees } = await import("pdf-lib");
+    const srcDoc  = await PDFDocument.load(req.file.buffer, { ignoreEncryption: true });
+    const font    = await srcDoc.embedFont(StandardFonts.Helvetica);
+    const pages   = srcDoc.getPages();
+    const total   = pages.length;
+    const position = req.body.position || "bottom-center"; // bottom-center, bottom-right
+
+    pages.forEach((page, i) => {
+      const { width, height } = page.getSize();
+      const text = `${i + 1} / ${total}`;
+      const fontSize = 10;
+      const textWidth = font.widthOfTextAtSize(text, fontSize);
+
+      let x = (width - textWidth) / 2; // center
+      if (position === "bottom-right") x = width - textWidth - 30;
+
+      page.drawText(text, {
+        x, y: 20,
+        size: fontSize,
+        font,
+        color: rgb(0.4, 0.4, 0.4),
+        opacity: 0.8,
+      });
+    });
+
+    const pdfBytes = await srcDoc.save({ objectsPerTick: 50 });
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", "attachment; filename=numbered.pdf");
+    res.send(Buffer.from(pdfBytes));
+    console.log(`✅ PAGE-NUMBERS: ${total} pages in ${Date.now() - startTime}ms`);
+    handlePDFAction(req, "img-to-pdf").catch(console.error);
+  } catch (err: any) {
+    console.error("PAGE NUMBERS ERROR:", err.message);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/* ================= WATERMARK PDF ================= */
+app.post("/api/pdf-watermark", fileToolsLimiter, upload.single("file"), async (req: any, res) => {
+  const startTime = Date.now();
+  try {
+    if (!req.file) return res.status(400).json({ success: false, message: "No file uploaded" });
+
+    const { StandardFonts, rgb, degrees } = await import("pdf-lib");
+    const text    = (req.body.text || "CONFIDENTIAL").toUpperCase().slice(0, 30);
+    const srcDoc  = await PDFDocument.load(req.file.buffer, { ignoreEncryption: true });
+    const font    = await srcDoc.embedFont(StandardFonts.HelveticaBold);
+    const pages   = srcDoc.getPages();
+
+    pages.forEach(page => {
+      const { width, height } = page.getSize();
+      const fontSize   = Math.min(width / text.length * 1.5, 60);
+      const textWidth  = font.widthOfTextAtSize(text, fontSize);
+      const x = (width - textWidth) / 2;
+      const y = (height - fontSize) / 2;
+
+      page.drawText(text, {
+        x, y,
+        size: fontSize,
+        font,
+        color: rgb(0.75, 0.75, 0.75),
+        opacity: 0.25,
+        rotate: degrees(45),
+      });
+    });
+
+    const pdfBytes = await srcDoc.save({ objectsPerTick: 50 });
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", "attachment; filename=watermarked.pdf");
+    res.send(Buffer.from(pdfBytes));
+    console.log(`✅ WATERMARK: "${text}" on ${pages.length} pages in ${Date.now() - startTime}ms`);
+    handlePDFAction(req, "img-to-pdf").catch(console.error);
+  } catch (err: any) {
+    console.error("WATERMARK ERROR:", err.message);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/* ================= WORD/PPT/EXCEL → PDF (LibreOffice) ================= */
+import { exec } from "child_process";
+import { promisify } from "util";
+const execAsync = promisify(exec);
+
+async function convertWithLibreOffice(inputBuffer: Buffer, originalName: string): Promise<Buffer> {
+  const tmpDir   = fs.mkdtempSync(path.join(os.tmpdir(), "lo-"));
+  const inputPath = path.join(tmpDir, originalName);
+  const outName   = originalName.replace(/\.[^.]+$/, ".pdf");
+  const outPath   = path.join(tmpDir, outName);
+
+  try {
+    fs.writeFileSync(inputPath, inputBuffer);
+    await execAsync(
+      `libreoffice --headless --convert-to pdf --outdir "${tmpDir}" "${inputPath}"`,
+      { timeout: 30000 }
+    );
+    if (!fs.existsSync(outPath)) throw new Error("LibreOffice conversion failed — output not found");
+    return fs.readFileSync(outPath);
+  } finally {
+    // Cleanup temp files
+    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
+  }
+}
+
+// Word → PDF
+app.post("/api/word-to-pdf", fileToolsLimiter, upload.single("file"), async (req: any, res) => {
+  const startTime = Date.now();
+  try {
+    if (!req.file) return res.status(400).json({ success: false, message: "No file uploaded" });
+    const allowed = ["application/vnd.openxmlformats-officedocument.wordprocessingml.document","application/msword","application/vnd.oasis.opendocument.text"];
+    if (!allowed.some(t => req.file.mimetype.includes(t) || req.file.originalname.match(/\.(docx|doc|odt)$/i)))
+      return res.status(400).json({ success: false, message: "Please upload a Word (.docx, .doc) file" });
+
+    const pdfBuffer = await convertWithLibreOffice(req.file.buffer, req.file.originalname);
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", "attachment; filename=converted.pdf");
+    res.send(pdfBuffer);
+    console.log(`✅ WORD→PDF: ${req.file.originalname} in ${Date.now() - startTime}ms`);
+    handlePDFAction(req, "img-to-pdf").catch(console.error);
+  } catch (err: any) {
+    console.error("WORD→PDF ERROR:", err.message);
+    res.status(500).json({ success: false, message: "Conversion failed: " + err.message });
+  }
+});
+
+// PPT → PDF
+app.post("/api/ppt-to-pdf", fileToolsLimiter, upload.single("file"), async (req: any, res) => {
+  const startTime = Date.now();
+  try {
+    if (!req.file) return res.status(400).json({ success: false, message: "No file uploaded" });
+    const pdfBuffer = await convertWithLibreOffice(req.file.buffer, req.file.originalname);
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", "attachment; filename=converted.pdf");
+    res.send(pdfBuffer);
+    console.log(`✅ PPT→PDF: ${req.file.originalname} in ${Date.now() - startTime}ms`);
+    handlePDFAction(req, "img-to-pdf").catch(console.error);
+  } catch (err: any) {
+    console.error("PPT→PDF ERROR:", err.message);
+    res.status(500).json({ success: false, message: "Conversion failed: " + err.message });
+  }
+});
+
+// Excel → PDF
+app.post("/api/excel-to-pdf", fileToolsLimiter, upload.single("file"), async (req: any, res) => {
+  const startTime = Date.now();
+  try {
+    if (!req.file) return res.status(400).json({ success: false, message: "No file uploaded" });
+    const pdfBuffer = await convertWithLibreOffice(req.file.buffer, req.file.originalname);
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", "attachment; filename=converted.pdf");
+    res.send(pdfBuffer);
+    console.log(`✅ EXCEL→PDF: ${req.file.originalname} in ${Date.now() - startTime}ms`);
+    handlePDFAction(req, "img-to-pdf").catch(console.error);
+  } catch (err: any) {
+    console.error("EXCEL→PDF ERROR:", err.message);
+    res.status(500).json({ success: false, message: "Conversion failed: " + err.message });
+  }
+});
 
 /* ================= GLOBAL EXPRESS ERROR HANDLER ================= */
 // This catches ANY error thrown inside route handlers (last middleware)

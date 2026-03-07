@@ -142,4 +142,108 @@ export async function mergePDFs(files: File[]) {
   }
 }
 
+
+// ================= SPLIT PDF =================
+export async function splitPDF(file: File, pages: string) {
+  try {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("pages", pages);
+    const res = await fetch(`${API_URL}/api/split-pdf`, { method: "POST", headers: { ...getAuthHeader() }, body: formData });
+    if (!res.ok) throw new Error(`Server Error: ${res.status}`);
+    const blob = await res.blob();
+    return { success: true, url: URL.createObjectURL(blob) };
+  } catch (e: any) { return { success: false, message: e.message }; }
+}
+
+// ================= COMPRESS PDF =================
+export async function compressPDF(file: File) {
+  try {
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await fetch(`${API_URL}/api/compress-pdf`, { method: "POST", headers: { ...getAuthHeader() }, body: formData });
+    if (!res.ok) throw new Error(`Server Error: ${res.status}`);
+    const blob = await res.blob();
+    const savings = res.headers.get("X-Savings-Percent") || "0";
+    const origKB  = res.headers.get("X-Original-Size") || "0";
+    const compKB  = res.headers.get("X-Compressed-Size") || "0";
+    return { success: true, url: URL.createObjectURL(blob), savings, origKB, compKB };
+  } catch (e: any) { return { success: false, message: e.message }; }
+}
+
+// ================= ROTATE PDF =================
+export async function rotatePDF(file: File, degrees: number) {
+  try {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("degrees", String(degrees));
+    const res = await fetch(`${API_URL}/api/rotate-pdf`, { method: "POST", headers: { ...getAuthHeader() }, body: formData });
+    if (!res.ok) throw new Error(`Server Error: ${res.status}`);
+    const blob = await res.blob();
+    return { success: true, url: URL.createObjectURL(blob) };
+  } catch (e: any) { return { success: false, message: e.message }; }
+}
+
+// ================= ADD PAGE NUMBERS =================
+export async function addPageNumbers(file: File, position: string) {
+  try {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("position", position);
+    const res = await fetch(`${API_URL}/api/pdf-page-numbers`, { method: "POST", headers: { ...getAuthHeader() }, body: formData });
+    if (!res.ok) throw new Error(`Server Error: ${res.status}`);
+    const blob = await res.blob();
+    return { success: true, url: URL.createObjectURL(blob) };
+  } catch (e: any) { return { success: false, message: e.message }; }
+}
+
+// ================= WATERMARK PDF =================
+export async function watermarkPDF(file: File, text: string) {
+  try {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("text", text);
+    const res = await fetch(`${API_URL}/api/pdf-watermark`, { method: "POST", headers: { ...getAuthHeader() }, body: formData });
+    if (!res.ok) throw new Error(`Server Error: ${res.status}`);
+    const blob = await res.blob();
+    return { success: true, url: URL.createObjectURL(blob) };
+  } catch (e: any) { return { success: false, message: e.message }; }
+}
+
+// ================= WORD → PDF =================
+export async function wordToPDF(file: File) {
+  try {
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await fetch(`${API_URL}/api/word-to-pdf`, { method: "POST", headers: { ...getAuthHeader() }, body: formData });
+    if (!res.ok) throw new Error(`Server Error: ${res.status}`);
+    const blob = await res.blob();
+    return { success: true, url: URL.createObjectURL(blob) };
+  } catch (e: any) { return { success: false, message: e.message }; }
+}
+
+// ================= PPT → PDF =================
+export async function pptToPDF(file: File) {
+  try {
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await fetch(`${API_URL}/api/ppt-to-pdf`, { method: "POST", headers: { ...getAuthHeader() }, body: formData });
+    if (!res.ok) throw new Error(`Server Error: ${res.status}`);
+    const blob = await res.blob();
+    return { success: true, url: URL.createObjectURL(blob) };
+  } catch (e: any) { return { success: false, message: e.message }; }
+}
+
+// ================= EXCEL → PDF =================
+export async function excelToPDF(file: File) {
+  try {
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await fetch(`${API_URL}/api/excel-to-pdf`, { method: "POST", headers: { ...getAuthHeader() }, body: formData });
+    if (!res.ok) throw new Error(`Server Error: ${res.status}`);
+    const blob = await res.blob();
+    return { success: true, url: URL.createObjectURL(blob) };
+  } catch (e: any) { return { success: false, message: e.message }; }
+}
+
 export { API_URL };
