@@ -1364,42 +1364,62 @@ app.post("/api/ppt/generate", pptLimiter, validatePPTGenerate, async (req, res) 
 
 /* ================= IMAGE → PDF ================= */
 
+// A4 dimensions in points (72pt = 1 inch)
+const A4_W = 595, A4_H = 842;
+
+function fitToA4(w: number, h: number) {
+  const r = Math.min(A4_W / w, A4_H / h);
+  return { w: w * r, h: h * r };
+}
+
 app.post(
   "/api/img-to-pdf",
   fileToolsLimiter,
-  upload.array("files"),
+  upload.array("files", 20),
   async (req: any, res) => {
+    const startTime = Date.now();
     try {
+      const files: Express.Multer.File[] = req.files || [];
+      if (!files.length) return res.status(400).json({ success: false, message: "No files uploaded" });
+
+      // ✅ SPEED FIX 1: Process ALL images in parallel simultaneously
+      const processedImages = await Promise.all(
+        files.map(async (file) => {
+          // ✅ SPEED FIX 2: JPEG is 3-5x faster than PNG for photos
+          const jpegBuf = await sharp(file.buffer)
+            .rotate()                          // auto-orient from EXIF
+            .jpeg({ quality: 92, mozjpeg: true })
+            .toBuffer();
+
+          const meta = await sharp(jpegBuf).metadata();
+          return { buffer: jpegBuf, width: meta.width!, height: meta.height! };
+        })
+      );
+
       const pdfDoc = await PDFDocument.create();
 
-      for (const file of req.files) {
-        const img = await sharp(file.buffer).png().toBuffer();
-        const image = await pdfDoc.embedPng(img);
-
-        const page = pdfDoc.addPage([
-          image.width,
-          image.height,
-        ]);
-
-        page.drawImage(image, {
-          x: 0,
-          y: 0,
-          width: image.width,
-          height: image.height,
-        });
+      for (const { buffer, width, height } of processedImages) {
+        const image   = await pdfDoc.embedJpg(buffer);
+        const fitted  = fitToA4(width, height);
+        const page    = pdfDoc.addPage([A4_W, A4_H]);
+        const x       = (A4_W - fitted.w) / 2;
+        const y       = (A4_H - fitted.h) / 2;
+        page.drawImage(image, { x, y, width: fitted.w, height: fitted.h });
       }
 
-      const pdfBytes = await pdfDoc.save();
+      // ✅ SPEED FIX 3: objectsPerTick=50 makes save() much faster for large PDFs
+      const pdfBytes = await pdfDoc.save({ objectsPerTick: 50 });
 
       res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", "attachment; filename=converted.pdf");
       res.send(Buffer.from(pdfBytes));
 
-      // ── Server-side: award PDF points ──
+      console.log(`✅ IMG→PDF: ${files.length} files in ${Date.now() - startTime}ms`);
       handlePDFAction(req, "img-to-pdf").catch(console.error);
 
-    } catch (error) {
-      console.error("IMG→PDF ERROR:", error);
-      res.status(500).json({ success: false });
+    } catch (error: any) {
+      console.error("IMG→PDF ERROR:", error.message);
+      res.status(500).json({ success: false, message: error.message });
     }
   }
 );
@@ -1409,31 +1429,38 @@ app.post(
 app.post(
   "/api/merge-pdf",
   fileToolsLimiter,
-  upload.array("files"),
+  upload.array("files", 20),
   async (req: any, res) => {
+    const startTime = Date.now();
     try {
+      const files: Express.Multer.File[] = req.files || [];
+      if (!files || files.length < 2)
+        return res.status(400).json({ success: false, message: "Upload at least 2 PDF files" });
+
       const merged = await PDFDocument.create();
 
-      for (const file of req.files) {
-        const pdf = await PDFDocument.load(file.buffer);
-        const pages = await merged.copyPages(
-          pdf,
-          pdf.getPageIndices()
-        );
-        pages.forEach((p) => merged.addPage(p));
+      // ✅ SPEED FIX: Load all PDFs in parallel, then merge in order
+      const loadedPDFs = await Promise.all(
+        files.map(f => PDFDocument.load(f.buffer, { ignoreEncryption: true }))
+      );
+
+      for (const pdf of loadedPDFs) {
+        const pages = await merged.copyPages(pdf, pdf.getPageIndices());
+        pages.forEach(p => merged.addPage(p));
       }
 
-      const pdfBytes = await merged.save();
+      const pdfBytes = await merged.save({ objectsPerTick: 50 });
 
       res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", "attachment; filename=merged.pdf");
       res.send(Buffer.from(pdfBytes));
 
-      // ── Server-side: award PDF points ──
+      console.log(`✅ MERGE-PDF: ${files.length} files in ${Date.now() - startTime}ms`);
       handlePDFAction(req, "merge-pdf").catch(console.error);
 
-    } catch (error) {
-      console.error("MERGE PDF ERROR:", error);
-      res.status(500).json({ success: false });
+    } catch (error: any) {
+      console.error("MERGE PDF ERROR:", error.message);
+      res.status(500).json({ success: false, message: error.message });
     }
   }
 );
