@@ -105,6 +105,13 @@ const userSchema = new mongoose.Schema({
   points: {
     type: Number, default: 100,
   },
+
+  // ── XP (never decreases — used for level calculation) ─────
+  // points = spendable wallet (goes up/down)
+  // totalXP = lifetime earned XP (only ever increases)
+  totalXP: {
+    type: Number, default: 100,
+  },
   streak: {
     type: Number, default: 1, // Always starts at 1, never 0
   },

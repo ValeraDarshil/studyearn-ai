@@ -472,6 +472,7 @@ router.post('/signup', authLimiter, validateSignup, async (req, res) => {
         name: user.name,
         email: user.email,
         points: user.points,
+        totalXP: (user as any).totalXP || user.points,
         questionsLeft: user.questionsLeft,
         streak: user.streak, // Will be 1
       },
@@ -542,8 +543,11 @@ router.post('/login', authLimiter, validateLogin, async (req, res) => {
         name:          user.name,
         email:         user.email,
         points:        user.points,      // Already updated with bonus
+        totalXP:       (user as any).totalXP || user.points,
         questionsLeft: user.questionsLeft,
         streak,
+        isPremium:        (user as any).isPremium || false,
+        premiumExpiresAt: (user as any).premiumExpiresAt || null,
       },
       // Frontend can use these to show a celebration toast
       streakInfo: {

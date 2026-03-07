@@ -231,8 +231,6 @@
 // }
 
 
-
-
 import { Login } from "./pages/Login";
 import { Signup } from "./pages/Signup";
 import { HashRouter, Routes, Route, useLocation } from "react-router-dom";
@@ -310,6 +308,7 @@ function AppContent() {
   const [questionsLeft, setQuestionsLeft] = useState(5);
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
   const [streak, setStreak] = useState(0);
+  const [totalXP, setTotalXP] = useState(0);  // Never decreases — used for level
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userId, setUserId] = useState("");
   const [userName, setUserName] = useState("");
@@ -351,6 +350,7 @@ function AppContent() {
         setUserId(user._id);
         setUserName(user.name || "");
         setPoints(user.points);
+        setTotalXP((user as any).totalXP || user.points); // Level always uses XP, not wallet
         setQuestionsLeft(user.questionsLeft);
         setStreak(user.streak || 0);
 
@@ -548,6 +548,7 @@ function AppContent() {
       <AppContext.Provider
         value={{
           points,
+          totalXP,
           streak,
           questionsLeft,
           setQuestionsLeft,

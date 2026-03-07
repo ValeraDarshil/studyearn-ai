@@ -9,13 +9,13 @@ import Lottie from 'lottie-react';
 import streakAnimation from '../assets/animations/streak-fire.json';
 
 export function Dashboard() {
-  const { points, streak, questionsLeft, recentActivity, userName, unlockedAchievements, userStats } = useApp();
+  const { points, totalXP, streak, questionsLeft, recentActivity, userName, unlockedAchievements, userStats } = useApp();
   const firstName = userName ? userName.trim().split(" ")[0] : "Student";
   const navigate = useNavigate();
   const [showStreakCelebration, setShowStreakCelebration] = useState(false);
   const [showAchievementsModal, setShowAchievementsModal] = useState(false);
 
-  const levelInfo = calculateLevel(points);
+  const levelInfo = calculateLevel(totalXP);
   const levelTier = getLevelTier(levelInfo.currentLevel);
   const levelColor = getLevelColor(levelInfo.currentLevel);
 

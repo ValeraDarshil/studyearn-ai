@@ -199,7 +199,7 @@ function AvatarPickerModal({
 }
 
 export function Profile() {
-  const { points, streak, questionsLeft, unlockedAchievements } = useApp();
+  const { points, totalXP, streak, questionsLeft, unlockedAchievements } = useApp();
   const [loading, setLoading]     = useState(true);
   const [saving, setSaving]       = useState(false);
   const [error, setError]         = useState("");
@@ -212,7 +212,7 @@ export function Profile() {
   const [joinedDate, setJoinedDate] = useState("");
   const [avatarId, setAvatarId]   = useState<string | null>(null);
 
-  const levelInfo  = calculateLevel(points);
+  const levelInfo  = calculateLevel(totalXP);
   const levelColor = getLevelColor(levelInfo.currentLevel);
 
   const initials = name.trim().split(" ").map(w => w[0]).slice(0, 2).join("").toUpperCase() || "?";

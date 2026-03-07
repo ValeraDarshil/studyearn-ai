@@ -160,7 +160,7 @@ function StatCard({ icon: Icon, label, value, sub, trend, color }: {
 // MAIN COMPONENT
 // ─────────────────────────────────────────────────────────────
 export function Analytics() {
-  const { points, streak, userStats, unlockedAchievements, userName } = useApp();
+  const { points, totalXP, streak, userStats, unlockedAchievements, userName } = useApp();
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading]       = useState(true);
   const [activeTab, setActiveTab]   = useState<"overview" | "subjects" | "activity">("overview");
@@ -173,7 +173,7 @@ export function Analytics() {
   }, []);
 
   // ── Derived stats ────────────────────────────────────────
-  const levelInfo  = calculateLevel(points);
+  const levelInfo  = calculateLevel(totalXP);
   const levelTier  = getLevelTier(levelInfo.currentLevel);
   const levelColor = getLevelColor(levelInfo.currentLevel);
 
