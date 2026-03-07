@@ -495,6 +495,7 @@ function AppContent() {
     // Update UI immediately
     const newPoints = pointsRef.current + amount;
     setPoints(newPoints);
+    setTotalXP(prev => prev + amount); // XP also increases — never decreases
     // Server handles actual DB update in /api/ai/ask — no double call needed
     checkAndUnlockAchievements({ points: newPoints });
   };
