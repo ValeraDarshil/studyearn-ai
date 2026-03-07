@@ -231,6 +231,8 @@
 // }
 
 
+
+
 import { Login } from "./pages/Login";
 import { Signup } from "./pages/Signup";
 import { HashRouter, Routes, Route, useLocation } from "react-router-dom";
@@ -262,6 +264,7 @@ import { QuizGenerator } from "./pages/QuizGenerator";
 import { StudyPlanner } from "./pages/StudyPlanner";
 import { DailyChallenge } from "./pages/DailyChallenge";
 import { Analytics } from "./pages/Analytics";
+import { FormulaSheet } from "./pages/FormulaSheet";
 import { ACHIEVEMENTS } from "./data/achievements";
 import { CursorSpotlight } from "./components/CursorSpotlight";
 
@@ -590,6 +593,7 @@ function AppContent() {
             <Route path="planner" element={<StudyPlanner />} />
             <Route path="challenge" element={<DailyChallenge />} />
             <Route path="analytics" element={<Analytics />} />
+            <Route path="formulas" element={<FormulaSheet />} />
           </Route>
         </Routes>
       </AppContext.Provider>
