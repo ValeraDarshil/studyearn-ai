@@ -230,7 +230,6 @@
 //   );
 // }
 
-
 import { Login } from "./pages/Login";
 import { Signup } from "./pages/Signup";
 import { HashRouter, Routes, Route, useLocation } from "react-router-dom";
@@ -267,7 +266,13 @@ import { ACHIEVEMENTS } from "./data/achievements";
 import { CursorSpotlight } from "./components/CursorSpotlight";
 
 // ── Achievement Toast Notification ──────────────────────────────────────────
-function AchievementToast({ achievement, onClose }: { achievement: any; onClose: () => void }) {
+function AchievementToast({
+  achievement,
+  onClose,
+}: {
+  achievement: any;
+  onClose: () => void;
+}) {
   useEffect(() => {
     const t = setTimeout(onClose, 4000);
     return () => clearTimeout(t);
@@ -277,7 +282,8 @@ function AchievementToast({ achievement, onClose }: { achievement: any; onClose:
     <div
       className="fixed top-20 right-4 z-[100] flex items-center gap-3 px-4 py-3 rounded-2xl border border-yellow-500/40 max-w-xs"
       style={{
-        background: "linear-gradient(135deg, rgba(10,17,40,0.97) 0%, rgba(20,10,40,0.97) 100%)",
+        background:
+          "linear-gradient(135deg, rgba(10,17,40,0.97) 0%, rgba(20,10,40,0.97) 100%)",
         boxShadow: "0 20px 60px rgba(0,0,0,0.6), 0 0 30px rgba(234,179,8,0.15)",
         backdropFilter: "blur(20px)",
         animation: "slideInRight 0.4s cubic-bezier(0.34,1.56,0.64,1)",
@@ -291,11 +297,19 @@ function AchievementToast({ achievement, onClose }: { achievement: any; onClose:
       `}</style>
       <div className="text-3xl">{achievement.icon}</div>
       <div className="flex-1 min-w-0">
-        <p className="text-[11px] font-semibold text-yellow-400 uppercase tracking-widest mb-0.5">🏆 Achievement Unlocked!</p>
-        <p className="text-sm font-bold text-white truncate">{achievement.name}</p>
-        <p className="text-[11px] text-slate-400 truncate">{achievement.desc}</p>
+        <p className="text-[11px] font-semibold text-yellow-400 uppercase tracking-widest mb-0.5">
+          🏆 Achievement Unlocked!
+        </p>
+        <p className="text-sm font-bold text-white truncate">
+          {achievement.name}
+        </p>
+        <p className="text-[11px] text-slate-400 truncate">
+          {achievement.desc}
+        </p>
         {achievement.reward > 0 && (
-          <p className="text-[11px] text-green-400 font-semibold mt-0.5">+{achievement.reward} bonus pts</p>
+          <p className="text-[11px] text-green-400 font-semibold mt-0.5">
+            +{achievement.reward} bonus pts
+          </p>
         )}
       </div>
     </div>
@@ -308,7 +322,7 @@ function AppContent() {
   const [questionsLeft, setQuestionsLeft] = useState(5);
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
   const [streak, setStreak] = useState(0);
-  const [totalXP, setTotalXP] = useState(0);  // Never decreases — used for level
+  const [totalXP, setTotalXP] = useState(0); // Never decreases — used for level
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userId, setUserId] = useState("");
   const [userName, setUserName] = useState("");
@@ -318,7 +332,9 @@ function AppContent() {
   const [celebrationStreak, setCelebrationStreak] = useState(0);
 
   // ✅ Achievements state
-  const [unlockedAchievements, setUnlockedAchievements] = useState<string[]>([]);
+  const [unlockedAchievements, setUnlockedAchievements] = useState<string[]>(
+    [],
+  );
   const [userStats, setUserStats] = useState<UserStats>({
     totalQuestionsAsked: 0,
     totalPPTsGenerated: 0,
@@ -332,16 +348,29 @@ function AppContent() {
   const userStatsRef = useRef(userStats);
   const unlockedRef = useRef(unlockedAchievements);
 
-  useEffect(() => { pointsRef.current = points; }, [points]);
-  useEffect(() => { streakRef.current = streak; }, [streak]);
-  useEffect(() => { userStatsRef.current = userStats; }, [userStats]);
-  useEffect(() => { unlockedRef.current = unlockedAchievements; }, [unlockedAchievements]);
+  useEffect(() => {
+    pointsRef.current = points;
+  }, [points]);
+  useEffect(() => {
+    streakRef.current = streak;
+  }, [streak]);
+  useEffect(() => {
+    userStatsRef.current = userStats;
+  }, [userStats]);
+  useEffect(() => {
+    unlockedRef.current = unlockedAchievements;
+  }, [unlockedAchievements]);
 
-  useEffect(() => { loadUserData(); }, []);
+  useEffect(() => {
+    loadUserData();
+  }, []);
 
   const loadUserData = async () => {
     const token = localStorage.getItem("token");
-    if (!token) { setLoading(false); return; }
+    if (!token) {
+      setLoading(false);
+      return;
+    }
 
     try {
       const user = await getCurrentUser();
@@ -354,7 +383,9 @@ function AppContent() {
         setQuestionsLeft(user.questionsLeft);
         setStreak(user.streak || 0);
 
-        getRecentActivity().then((d) => { if (d.success) setRecentActivity(d.activities); });
+        getRecentActivity().then((d) => {
+          if (d.success) setRecentActivity(d.activities);
+        });
 
         // ── Show streak celebration if login returned streakInfo ──
         const streakCelebration = sessionStorage.getItem("streakCelebration");
@@ -378,8 +409,8 @@ function AppContent() {
             const unlocked = d.unlockedAchievements || [];
             const stats = {
               totalQuestionsAsked: d.totalQuestionsAsked || 0,
-              totalPPTsGenerated:  d.totalPPTsGenerated  || 0,
-              totalPDFsConverted:  d.totalPDFsConverted  || 0,
+              totalPPTsGenerated: d.totalPPTsGenerated || 0,
+              totalPDFsConverted: d.totalPDFsConverted || 0,
             };
             setUnlockedAchievements(unlocked);
             unlockedRef.current = unlocked;
@@ -413,59 +444,62 @@ function AppContent() {
   };
 
   // ✅ Check & unlock achievements — bulletproof, checks ALL eligible at once
-  const checkAndUnlockAchievements = useCallback(async (
-    override?: Partial<UserStats & { points: number; streak: number }>
-  ) => {
-    const currentPoints = override?.points ?? pointsRef.current;
-    const currentStreak = override?.streak ?? streakRef.current;
-    const currentStats  = { ...userStatsRef.current, ...override };
-    const currentUnlocked = [...unlockedRef.current];
+  const checkAndUnlockAchievements = useCallback(
+    async (
+      override?: Partial<UserStats & { points: number; streak: number }>,
+    ) => {
+      const currentPoints = override?.points ?? pointsRef.current;
+      const currentStreak = override?.streak ?? streakRef.current;
+      const currentStats = { ...userStatsRef.current, ...override };
+      const currentUnlocked = [...unlockedRef.current];
 
-    const statMap: Record<string, number> = {
-      totalQuestionsAsked: currentStats.totalQuestionsAsked || 0,
-      totalPPTsGenerated:  currentStats.totalPPTsGenerated  || 0,
-      totalPDFsConverted:  currentStats.totalPDFsConverted  || 0,
-      streak: currentStreak || 0,
-      points: currentPoints || 0,
-    };
+      const statMap: Record<string, number> = {
+        totalQuestionsAsked: currentStats.totalQuestionsAsked || 0,
+        totalPPTsGenerated: currentStats.totalPPTsGenerated || 0,
+        totalPDFsConverted: currentStats.totalPDFsConverted || 0,
+        streak: currentStreak || 0,
+        points: currentPoints || 0,
+      };
 
-    // Collect all newly eligible achievements (not yet unlocked)
-    const toUnlock = ACHIEVEMENTS.filter(ach => {
-      if (currentUnlocked.includes(ach.id)) return false;
-      const val = statMap[ach.stat] ?? 0;
-      return val >= ach.threshold;
-    });
+      // Collect all newly eligible achievements (not yet unlocked)
+      const toUnlock = ACHIEVEMENTS.filter((ach) => {
+        if (currentUnlocked.includes(ach.id)) return false;
+        const val = statMap[ach.stat] ?? 0;
+        return val >= ach.threshold;
+      });
 
-    if (toUnlock.length === 0) return;
+      if (toUnlock.length === 0) return;
 
-    // Unlock all of them sequentially
-    let lastToast = null;
-    let bonusPoints = 0;
+      // Unlock all of them sequentially
+      let lastToast = null;
+      let bonusPoints = 0;
 
-    for (const ach of toUnlock) {
-      try {
-        const result = await unlockAchievement(ach.id);
-        if (result.success) {
-          // Update ref immediately so next iteration sees it
-          unlockedRef.current = result.unlockedAchievements;
-          setUnlockedAchievements(result.unlockedAchievements);
-          lastToast = ach;
-          if (ach.reward > 0) bonusPoints += ach.reward;
+      for (const ach of toUnlock) {
+        try {
+          const result = await unlockAchievement(ach.id);
+          if (result.success) {
+            // Update ref immediately so next iteration sees it
+            unlockedRef.current = result.unlockedAchievements;
+            setUnlockedAchievements(result.unlockedAchievements);
+            lastToast = ach;
+            if (ach.reward > 0) bonusPoints += ach.reward;
+          }
+        } catch (e) {
+          console.error("unlock error", ach.id, e);
         }
-      } catch (e) {
-        console.error("unlock error", ach.id, e);
       }
-    }
 
-    // Show toast for the last (most impressive) unlocked achievement
-    if (lastToast) setToastAchievement(lastToast);
+      // Show toast for the last (most impressive) unlocked achievement
+      if (lastToast) setToastAchievement(lastToast);
 
-    // Award all bonus points in one shot
-    if (bonusPoints > 0) {
-      setPoints(prev => prev + bonusPoints);
-      updateUserPoints(bonusPoints);
-    }
-  }, []);
+      // Award all bonus points in one shot
+      if (bonusPoints > 0) {
+        setPoints((prev) => prev + bonusPoints);
+        updateUserPoints(bonusPoints);
+      }
+    },
+    [],
+  );
 
   const checkStreak = async () => {
     try {
@@ -475,7 +509,10 @@ function AppContent() {
       const API_URL = import.meta.env.VITE_API_URL;
       const res = await fetch(`${API_URL}/api/user/update-streak`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
       });
       if (!res.ok) return;
       const data = await res.json();
@@ -495,7 +532,7 @@ function AppContent() {
     // Update UI immediately
     const newPoints = pointsRef.current + amount;
     setPoints(newPoints);
-    setTotalXP(prev => prev + amount); // XP also increases — never decreases
+    setTotalXP((prev) => prev + amount); // XP also increases — never decreases
     // Server handles actual DB update in /api/ai/ask — no double call needed
     checkAndUnlockAchievements({ points: newPoints });
   };
@@ -505,7 +542,11 @@ function AppContent() {
     setQuestionsLeft((prev) => Math.max(0, prev - 1));
   };
 
-  const logActivity = async (action: string, details: string, pointsEarned: number) => {
+  const logActivity = async (
+    action: string,
+    details: string,
+    pointsEarned: number,
+  ) => {
     const newActivity = {
       _id: Date.now().toString(),
       action,
@@ -523,7 +564,8 @@ function AppContent() {
     setRecentActivity([]);
   };
 
-  const shouldShowCelebration = showStreakCelebration && location.pathname.startsWith("/app");
+  const shouldShowCelebration =
+    showStreakCelebration && location.pathname.startsWith("/app");
 
   return (
     <>
