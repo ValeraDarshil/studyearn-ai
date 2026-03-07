@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import {
   Mail,
@@ -41,7 +41,7 @@ export function Signup() {
 
     try {
       const res = await fetch(
-        "https://studyearn-backend.onrender.com/api/auth/signup",
+        `${import.meta.env.VITE_API_URL}/api/auth/signup`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },

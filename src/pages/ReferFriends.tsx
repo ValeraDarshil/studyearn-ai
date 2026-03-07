@@ -30,7 +30,7 @@ export function ReferFriends() {
     try {
       const token = localStorage.getItem("token");
       const res = await fetch(
-        "https://studyearn-backend.onrender.com/api/user/referral-data",
+        `${import.meta.env.VITE_API_URL}/api/user/referral-data`,
         {
           headers: { Authorization: `Bearer ${token}` },
         },
