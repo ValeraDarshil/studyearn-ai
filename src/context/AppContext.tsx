@@ -9,6 +9,8 @@ export interface UserStats {
 export interface AppContextType {
   points: number;
   totalXP: number;   // lifetime XP — used for level, never decreases
+  isPremium: boolean;
+  premiumExpiresAt: string | null;
   streak: number;
   questionsLeft: number;
   isLoggedIn: boolean;
@@ -33,6 +35,8 @@ export interface AppContextType {
 export const AppContext = createContext<AppContextType>({
   points: 0,
   totalXP: 0,
+  isPremium: false,
+  premiumExpiresAt: null,
   streak: 0,
   questionsLeft: 5,
   isLoggedIn: false,

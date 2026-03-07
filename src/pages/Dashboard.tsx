@@ -9,7 +9,7 @@ import Lottie from 'lottie-react';
 import streakAnimation from '../assets/animations/streak-fire.json';
 
 export function Dashboard() {
-  const { points, totalXP, streak, questionsLeft, recentActivity, userName, unlockedAchievements, userStats } = useApp();
+  const { points, totalXP, streak, questionsLeft, recentActivity, userName, unlockedAchievements, userStats, isPremium, premiumExpiresAt } = useApp();
   const firstName = userName ? userName.trim().split(" ")[0] : "Student";
   const navigate = useNavigate();
   const [showStreakCelebration, setShowStreakCelebration] = useState(false);
@@ -65,6 +65,26 @@ export function Dashboard() {
           <span className="text-sm font-semibold text-orange-300">{streak} Day Streak!</span>
         </div>
       </div>
+
+      {/* Premium Active Banner */}
+      {isPremium && (
+        <div className="flex items-center justify-between px-4 py-3 rounded-2xl border border-yellow-500/30 animate-slide-up"
+          style={{ background: 'linear-gradient(135deg, rgba(234,179,8,0.08), rgba(251,146,60,0.06))' }}>
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
+              style={{ background: 'rgba(234,179,8,0.15)' }}>⚡</div>
+            <div>
+              <p className="text-sm font-bold text-yellow-300">Premium Active — 2× Points on Everything!</p>
+              <p className="text-xs text-yellow-400/70 mt-0.5">
+                All AI, PPT, PDF actions earn double points
+                {premiumExpiresAt && ` • Expires ${new Date(premiumExpiresAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}`}
+              </p>
+            </div>
+          </div>
+          <span className="text-yellow-400 text-xs font-bold px-2 py-1 rounded-lg border border-yellow-500/30 hidden sm:block"
+            style={{ background: 'rgba(234,179,8,0.1)' }}>2× XP</span>
+        </div>
+      )}
 
       {/* Stats Row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 stagger-children">

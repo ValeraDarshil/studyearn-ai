@@ -78,7 +78,7 @@ async function compressImage(base64: string, maxPx = 1024): Promise<string> {
 
 export function AskAI() {
   const {
-    questionsLeft, useQuestion, addPoints, userId, logActivity,
+    questionsLeft, useQuestion, addPoints, userId, logActivity, isPremium,
     checkAndUnlockAchievements, userStats, setUserStats,
   } = useApp();
 
@@ -216,6 +216,11 @@ export function AskAI() {
           <span className={`text-sm font-medium ${questionsLeft > 0 ? "text-blue-300" : "text-red-300"}`}>
             {questionsLeft} questions remaining
           </span>
+          {isPremium && (
+            <span className="text-xs font-bold text-yellow-300 px-2 py-0.5 rounded-full border border-yellow-500/30 ml-1" style={{ background: 'rgba(234,179,8,0.1)' }}>
+              ⚡ 2× pts
+            </span>
+          )}
         </div>
       </div>
 

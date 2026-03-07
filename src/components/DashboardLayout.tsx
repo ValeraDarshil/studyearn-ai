@@ -8,7 +8,7 @@ import profileIconAnimation from '../assets/animations/profile-icon.json';
 
 export function DashboardLayout() {
   const navigate = useNavigate();
-  const { points, questionsLeft, streak, userName } = useApp();
+  const { points, questionsLeft, streak, userName, isPremium, premiumExpiresAt } = useApp();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profileHovered, setProfileHovered] = useState(false);
 
@@ -132,10 +132,16 @@ export function DashboardLayout() {
             <Lottie animationData={streakAnimation} loop style={{ width: 20, height: 20 }} />
             <span>{streak} day streak</span>
           </div>
+          {isPremium && (
+            <div className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-yellow-300 px-2 py-1 rounded-lg" style={{ background: 'rgba(234,179,8,0.12)', border: '1px solid rgba(234,179,8,0.25)' }}>
+              <span>⚡</span>
+              <span>Premium Active — 2× Points</span>
+            </div>
+          )}
         </div>
 
         {/* Nav — scrollable, logout always visible */}
-        <nav className="flex-1 overflow-y-auto px-3 pb-2 space-y-0.5" style={{ overscrollBehavior: 'contain' }}>
+        <nav className="flex-1 overflow-y-auto px-3 pb-6 space-y-0.5" style={{ overscrollBehavior: 'contain' }}>
           {navItemsFull.map((item) => (
             <NavLink
               key={item.path}
@@ -161,18 +167,20 @@ export function DashboardLayout() {
               )}
             </NavLink>
           ))}
+
+          {/* Sign Out — inside scroll area so it's reachable */}
+          <div className="pt-2 mt-2 border-t border-white/8">
+            <button
+              onClick={handleLogout}
+              className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-semibold text-slate-300 hover:text-red-400 hover:bg-red-500/10 active:bg-red-500/20 transition-colors"
+            >
+              <LogOut className="w-5 h-5 flex-shrink-0 text-red-400" />
+              Sign Out
+            </button>
+          </div>
         </nav>
 
-        {/* Logout — always visible at bottom */}
-        <div className="flex-shrink-0 px-3 pb-6 pt-3 border-t border-white/8">
-          <button
-            onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-semibold text-slate-300 hover:text-red-400 hover:bg-red-500/10 active:bg-red-500/20 transition-colors border border-white/5"
-          >
-            <LogOut className="w-4 h-4 flex-shrink-0 text-red-400" />
-            Sign Out
-          </button>
-        </div>
+
       </aside>
 
       {/* Main Content */}
@@ -211,6 +219,14 @@ export function DashboardLayout() {
               <Gift className="w-3.5 h-3.5 text-purple-400 flex-shrink-0" />
               <span className="text-[11px] font-semibold text-purple-300 whitespace-nowrap">{points} pts</span>
             </div>
+
+            {/* Premium Badge — only if active */}
+            {isPremium && (
+              <div className="flex items-center gap-1 px-2 py-1.5 rounded-lg border border-yellow-500/40" style={{ background: 'rgba(234,179,8,0.1)' }}>
+                <span className="text-yellow-400 text-[11px]">⚡</span>
+                <span className="text-[11px] font-semibold text-yellow-300 whitespace-nowrap hidden sm:inline">Premium</span>
+              </div>
+            )}
 
             {/* Profile */}
             <NavLink to="/app/profile">
