@@ -586,6 +586,13 @@ router.get('/me', async (req, res) => {
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
 
+    // ── Auto-migrate: seed totalXP for existing users ──
+    if (!(user as any).totalXP && user.points > 0) {
+      (user as any).totalXP = user.points;
+      await user.save();
+      console.log(`✅ XP migrated for ${user.email}: totalXP = ${user.points}`);
+    }
+
     res.json({ success: true, user });
   } catch (error) {
     res.status(401).json({ success: false, message: 'Invalid token' });
