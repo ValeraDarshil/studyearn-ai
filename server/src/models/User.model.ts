@@ -152,6 +152,17 @@ const userSchema = new mongoose.Schema({
   createdAt: {
     type: Date, default: Date.now,
   },
+
+  // ── Premium Plan ──────────────────────────────────────────
+  isPremium: {
+    type: Boolean, default: false,
+  },
+  premiumExpiresAt: {
+    type: Date, default: null,
+  },
+  premiumActivatedAt: {
+    type: Date, default: null,
+  },
 });
 
 // Indexes for fast queries

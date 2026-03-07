@@ -151,12 +151,27 @@ async function handleQuestionUsed(req: any, pointsToAward = 15): Promise<{ quest
     if (!user) return null;
 
     const today = new Date().toISOString().split("T")[0];
+
+    // ── Auto-expire premium if past expiry ──────────────────
+    if ((user as any).isPremium && (user as any).premiumExpiresAt) {
+      if (new Date((user as any).premiumExpiresAt) < new Date()) {
+        (user as any).isPremium        = false;
+        (user as any).premiumExpiresAt = null;
+        console.log(`⏰ Premium auto-expired for ${user.email}`);
+      }
+    }
+    const isPremiumActive = (user as any).isPremium === true;
+
+    // Premium = 15 questions/day, Free = 5 questions/day
+    const dailyLimit = isPremiumActive ? 15 : 5;
     if (user.questionsDate !== today) {
-      user.questionsLeft = 5;
+      user.questionsLeft = dailyLimit;
       user.questionsDate = today;
     }
     if (user.questionsLeft > 0) user.questionsLeft -= 1;
 
+    // Premium users earn 2x points on all actions
+    if (isPremiumActive) pointsToAward = pointsToAward * 2;
     user.points += pointsToAward;
     (user as any).totalQuestionsAsked = ((user as any).totalQuestionsAsked || 0) + 1;
     await user.save();
@@ -177,7 +192,16 @@ async function handlePPTGenerated(req: any): Promise<void> {
   try {
     const user = await User.findById(userId);
     if (!user) return;
-    const pts = 20;
+
+    // Auto-expire premium check
+    if ((user as any).isPremium && (user as any).premiumExpiresAt) {
+      if (new Date((user as any).premiumExpiresAt) < new Date()) {
+        (user as any).isPremium        = false;
+        (user as any).premiumExpiresAt = null;
+      }
+    }
+    const isPremiumActive = (user as any).isPremium === true;
+    const pts = isPremiumActive ? 40 : 20; // 2x for premium
     user.points += pts;
     (user as any).totalPPTsGenerated = ((user as any).totalPPTsGenerated || 0) + 1;
     await user.save();
@@ -195,7 +219,16 @@ async function handlePDFAction(req: any, action: "img-to-pdf" | "merge-pdf"): Pr
   try {
     const user = await User.findById(userId);
     if (!user) return;
-    const pts = 10;
+
+    // Auto-expire premium check
+    if ((user as any).isPremium && (user as any).premiumExpiresAt) {
+      if (new Date((user as any).premiumExpiresAt) < new Date()) {
+        (user as any).isPremium        = false;
+        (user as any).premiumExpiresAt = null;
+      }
+    }
+    const isPremiumActive = (user as any).isPremium === true;
+    const pts = isPremiumActive ? 20 : 10; // 2x for premium
     user.points += pts;
     (user as any).totalPDFsConverted = ((user as any).totalPDFsConverted || 0) + 1;
     await user.save();
@@ -1734,22 +1767,110 @@ app.post("/api/excel-to-pdf", fileToolsLimiter, upload.single("file"), async (re
   }
 });
 
+/* ================= PREMIUM FRAUD CHECK ================= */
+/**
+ * Verifies a user earned points legitimately before activating premium.
+ * Called automatically 30 mins after premium redemption.
+ */
+async function checkPremiumEligibility(userId: string): Promise<{ ok: boolean; reason?: string }> {
+  try {
+    const user = await User.findById(userId);
+    if (!user) return { ok: false, reason: "User not found" };
+
+    const activities = await Activity.find({ userId })
+      .sort({ createdAt: -1 })
+      .limit(200)
+      .lean();
+
+    // Rule 1: Must have at least 5 real study activities
+    const realActions = ["ask_question", "generate_ppt", "convert_pdf", "daily_challenge", "quiz_completed", "study_plan_created"];
+    const realCount = activities.filter((a: any) => realActions.includes(a.action)).length;
+    if (realCount < 5)
+      return { ok: false, reason: "Not enough genuine activity. Keep using the app and try again." };
+
+    // Rule 2: No rapid farming — max 300 pts in any 10-minute window
+    const sorted = [...activities].sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    for (let i = 0; i < sorted.length; i++) {
+      const windowStart = new Date((sorted[i] as any).createdAt).getTime();
+      const windowEnd   = windowStart + 10 * 60 * 1000;
+      const windowPts   = sorted
+        .filter((a: any) => {
+          const t = new Date(a.createdAt).getTime();
+          return t >= windowStart && t <= windowEnd;
+        })
+        .reduce((sum: number, a: any) => sum + (a.pointsEarned || 0), 0);
+      if (windowPts > 300)
+        return { ok: false, reason: "Suspicious rapid point activity detected. Please use the app naturally." };
+    }
+
+    // Rule 3: Account must be at least 2 hours old
+    const ageMs = Date.now() - new Date((user as any).createdAt).getTime();
+    if (ageMs < 2 * 60 * 60 * 1000)
+      return { ok: false, reason: "Account too new. Please use the app for at least 2 hours before redeeming." };
+
+    // Rule 4: At least 2 different action types (not just one feature spammed)
+    const uniqueActions = new Set(activities.map((a: any) => a.action));
+    if (uniqueActions.size < 2)
+      return { ok: false, reason: "Points earned from too few features. Use more of the app." };
+
+    return { ok: true };
+  } catch (err: any) {
+    console.error("Fraud check error:", err.message);
+    return { ok: false, reason: "Verification failed. Please try again." };
+  }
+}
+
 /* ================= REWARDS — TIERS & REDEMPTION ================= */
 
 const REWARD_TIERS = [
-  { id: "tier_1000",  title: "7-Day Premium",     desc: "Extra 10 AI questions/day for 7 days", pointsCost: 1000,  type: "premium",  icon: "⚡" },
-  { id: "tier_2500",  title: "₹10 Paytm Voucher", desc: "UPI/Paytm cash voucher",               pointsCost: 2500,  type: "voucher",  icon: "💳" },
-  { id: "tier_5000",  title: "₹25 Amazon GC",      desc: "Amazon India gift card",               pointsCost: 5000,  type: "giftcard", icon: "🎁" },
-  { id: "tier_10000", title: "₹50 Amazon GC",      desc: "Amazon India gift card",               pointsCost: 10000, type: "giftcard", icon: "🎁" },
-  { id: "tier_25000", title: "₹150 Amazon GC",     desc: "Amazon India gift card",               pointsCost: 25000, type: "giftcard", icon: "💎" },
+  {
+    id: "tier_1000",
+    title: "7-Day Premium",
+    desc: "15 AI questions/day • 2× points on all actions • Premium badge",
+    pointsCost: 1000,
+    type: "premium",
+    icon: "⚡",
+  },
+  { id: "tier_2500",  title: "₹10 Paytm Voucher", desc: "UPI/Paytm cash voucher",  pointsCost: 2500,  type: "voucher",  icon: "💳" },
+  { id: "tier_5000",  title: "₹25 Amazon GC",      desc: "Amazon India gift card",  pointsCost: 5000,  type: "giftcard", icon: "🎁" },
+  { id: "tier_10000", title: "₹50 Amazon GC",       desc: "Amazon India gift card",  pointsCost: 10000, type: "giftcard", icon: "🎁" },
+  { id: "tier_25000", title: "₹150 Amazon GC",      desc: "Amazon India gift card",  pointsCost: 25000, type: "giftcard", icon: "💎" },
 ];
 
-// GET /api/rewards/tiers — list all reward tiers
+// GET /api/rewards/tiers
 app.get("/api/rewards/tiers", (_req, res) => {
   res.json({ success: true, tiers: REWARD_TIERS });
 });
 
-// POST /api/rewards/redeem — submit a redemption request
+// GET /api/rewards/status — current premium status for logged-in user
+app.get("/api/rewards/status", async (req: any, res) => {
+  try {
+    const userId = getUserIdFromToken(req);
+    if (!userId) return res.status(401).json({ success: false, message: "Login required" });
+
+    const user = await User.findById(userId).lean();
+    if (!user) return res.status(404).json({ success: false });
+
+    // Check if premium is still valid
+    const expiresAt    = (user as any).premiumExpiresAt;
+    const isPremium    = (user as any).isPremium === true && expiresAt && new Date(expiresAt) > new Date();
+    const daysLeft     = isPremium ? Math.ceil((new Date(expiresAt).getTime() - Date.now()) / 86400000) : 0;
+    const pending      = await Redemption.findOne({ userId, status: { $in: ["pending", "processing"] } }).lean();
+
+    res.json({
+      success: true,
+      isPremium,
+      premiumExpiresAt:    expiresAt || null,
+      daysLeft,
+      hasPendingRedemption: !!pending,
+      pendingRedemption:   pending || null,
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// POST /api/rewards/redeem
 app.post("/api/rewards/redeem", async (req: any, res) => {
   try {
     const userId = getUserIdFromToken(req);
@@ -1764,13 +1885,24 @@ app.post("/api/rewards/redeem", async (req: any, res) => {
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ success: false, message: "User not found" });
 
+    // Not enough points
     if (user.points < tier.pointsCost)
       return res.status(400).json({
         success: false,
-        message: `Not enough points. Need ${tier.pointsCost}, you have ${user.points}`,
+        message: `Not enough points. Need ${tier.pointsCost}, you have ${user.points}.`,
       });
 
-    // Only one pending/processing redemption at a time
+    // Already active premium
+    if (tier.type === "premium" && (user as any).isPremium === true) {
+      const exp = new Date((user as any).premiumExpiresAt);
+      if (exp > new Date())
+        return res.status(400).json({
+          success: false,
+          message: `You already have an active Premium plan (expires ${exp.toLocaleDateString("en-IN")}).`,
+        });
+    }
+
+    // Already have a pending redemption
     const existing = await Redemption.findOne({ userId, status: { $in: ["pending", "processing"] } });
     if (existing)
       return res.status(400).json({
@@ -1778,11 +1910,10 @@ app.post("/api/rewards/redeem", async (req: any, res) => {
         message: "You already have a pending redemption. Please wait for it to be processed.",
       });
 
-    // Deduct points
+    // Deduct points immediately
     user.points -= tier.pointsCost;
     await user.save();
 
-    // Create redemption record
     const redemption = await Redemption.create({
       userId,
       userName:     user.name,
@@ -1794,20 +1925,73 @@ app.post("/api/rewards/redeem", async (req: any, res) => {
       status:       "pending",
     });
 
-    // Log activity
     await Activity.create({
       userId,
       action:       "referral",
-      details:      `Redeemed ${tier.title} for ${tier.pointsCost} pts`,
+      details:      `Redeemed: ${tier.title} (${tier.pointsCost} pts)`,
       pointsEarned: 0,
     });
 
-    console.log(`✅ REDEEM: ${user.email} → ${tier.title} (${tier.pointsCost} pts)`);
+    console.log(`✅ REDEEM submitted: ${user.email} → ${tier.title}`);
+
+    // ── PREMIUM: fraud check + auto-activate after 30 mins ──────────────
+    if (tier.type === "premium") {
+      const redemptionId = (redemption._id as any).toString();
+
+      setTimeout(async () => {
+        try {
+          console.log(`🔍 Running 30-min fraud check for ${user.email}...`);
+
+          const rec = await Redemption.findById(redemptionId);
+          if (!rec || rec.status !== "pending") {
+            console.log(`⚠️ Redemption ${redemptionId} already handled, skipping.`);
+            return;
+          }
+
+          const check = await checkPremiumEligibility(userId);
+
+          if (!check.ok) {
+            // REJECT — refund points
+            rec.status    = "rejected";
+            rec.adminNote = `Auto-rejected: ${check.reason}`;
+            await rec.save();
+
+            const u = await User.findById(userId);
+            if (u) {
+              u.points += tier.pointsCost; // full refund
+              await u.save();
+            }
+            console.log(`❌ Premium REJECTED for ${user.email}: ${check.reason}`);
+
+          } else {
+            // APPROVE — activate 7-day premium
+            rec.status = "fulfilled";
+            await rec.save();
+
+            const u = await User.findById(userId);
+            if (u) {
+              const now    = new Date();
+              const expiry = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); // exactly 7 days
+              (u as any).isPremium          = true;
+              (u as any).premiumExpiresAt   = expiry;
+              (u as any).premiumActivatedAt = now;
+              await u.save();
+              console.log(`🌟 Premium ACTIVATED for ${u.email} — expires ${expiry.toISOString()}`);
+            }
+          }
+        } catch (err: any) {
+          console.error("❌ Premium activation error:", err.message);
+        }
+      }, 30 * 60 * 1000); // 30 minutes
+    }
+
     res.json({
-      success:          true,
-      message:          `Successfully redeemed ${tier.title}! We'll process it within 2–3 business days.`,
-      redemptionId:     redemption._id,
-      pointsRemaining:  user.points,
+      success:         true,
+      message:         tier.type === "premium"
+        ? "Premium plan requested! We're verifying your account activity. Your plan will activate automatically in ~30 minutes. ✅"
+        : `Successfully redeemed ${tier.title}! We'll process it within 2–3 business days.`,
+      redemptionId:    (redemption._id as any).toString(),
+      pointsRemaining: user.points,
     });
 
   } catch (err: any) {
@@ -1816,7 +2000,7 @@ app.post("/api/rewards/redeem", async (req: any, res) => {
   }
 });
 
-// GET /api/rewards/history — user's redemption history
+// GET /api/rewards/history
 app.get("/api/rewards/history", async (req: any, res) => {
   try {
     const userId = getUserIdFromToken(req);
