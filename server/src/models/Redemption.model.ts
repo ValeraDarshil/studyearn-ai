@@ -31,11 +31,16 @@ const redemptionSchema = new mongoose.Schema({
   // Admin notes (optional)
   adminNote: { type: String, default: '' },
 
+  // When this premium redemption becomes eligible for fraud check processing
+  // Set at redeem time: now + 30 mins. Polling job checks this field.
+  eligibleAt: { type: Date, default: null },
+
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
 });
 
 redemptionSchema.index({ userId: 1, createdAt: -1 });
 redemptionSchema.index({ status: 1 });
+redemptionSchema.index({ status: 1, eligibleAt: 1 }); // For polling query
 
 export const Redemption = mongoose.model('Redemption', redemptionSchema);

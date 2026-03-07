@@ -1864,35 +1864,11 @@ app.post("/api/rewards/redeem", async (req: any, res) => {
     console.log(`✅ REDEEM submitted: ${user.email} → ${tier.title}`);
 
     if (tier.type === "premium") {
-      const redemptionId = (redemption._id as any).toString();
-      setTimeout(async () => {
-        try {
-          console.log(`🔍 30-min fraud check for ${user.email}...`);
-          const rec = await Redemption.findById(redemptionId);
-          if (!rec || rec.status !== "pending") return;
-          const check = await checkPremiumEligibility(userId);
-          if (!check.ok) {
-            rec.status = "rejected";
-            rec.adminNote = `Auto-rejected: ${check.reason}`;
-            await rec.save();
-            const u = await User.findById(userId);
-            if (u) { u.points += tier.pointsCost; await u.save(); }
-            console.log(`❌ Premium REJECTED for ${user.email}: ${check.reason}`);
-          } else {
-            rec.status = "fulfilled";
-            await rec.save();
-            const u = await User.findById(userId);
-            if (u) {
-              const expiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-              (u as any).isPremium          = true;
-              (u as any).premiumExpiresAt   = expiry;
-              (u as any).premiumActivatedAt = new Date();
-              await u.save();
-              console.log(`🌟 Premium ACTIVATED for ${u.email} — expires ${expiry.toISOString()}`);
-            }
-          }
-        } catch (err: any) { console.error("Premium activation error:", err.message); }
-      }, 30 * 60 * 1000);
+      // Store eligibleAt timestamp in DB — polling job will process it (server-restart safe)
+      const eligibleAt = new Date(Date.now() + 30 * 60 * 1000);
+      (redemption as any).eligibleAt = eligibleAt;
+      await redemption.save();
+      console.log(`⏳ Premium queued for ${user.email} — eligible at ${eligibleAt.toISOString()}`);
     }
 
     res.json({
@@ -1917,6 +1893,86 @@ app.get("/api/rewards/history", async (req: any, res) => {
     res.json({ success: true, history });
   } catch (err: any) { res.status(500).json({ success: false, message: err.message }); }
 });
+
+/* ================= PREMIUM POLLING JOB (replaces setTimeout — restart-safe) ================= */
+
+async function processPendingPremiums(): Promise<void> {
+  try {
+    await connectDB();
+    const now = new Date();
+    // Find all pending premium redemptions where eligibleAt has passed
+    const pending = await Redemption.find({
+      rewardId: "tier_1000",
+      status: "pending",
+      eligibleAt: { $lte: now },
+    }).lean();
+
+    if (pending.length === 0) return;
+    console.log(`🔄 Premium polling: ${pending.length} redemption(s) to process`);
+
+    for (const red of pending) {
+      try {
+        const rec = await Redemption.findById((red as any)._id);
+        if (!rec || rec.status !== "pending") continue;
+
+        const check = await checkPremiumEligibility((red as any).userId.toString());
+        if (!check.ok) {
+          rec.status = "rejected";
+          rec.adminNote = `Auto-rejected: ${check.reason}`;
+          await rec.save();
+          const u = await User.findById((red as any).userId);
+          if (u) {
+            u.points += (red as any).pointsCost;
+            await u.save();
+          }
+          console.log(`❌ Premium REJECTED for ${(red as any).userEmail}: ${check.reason}`);
+        } else {
+          rec.status = "fulfilled";
+          await rec.save();
+          const u = await User.findById((red as any).userId);
+          if (u) {
+            const expiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+            (u as any).isPremium          = true;
+            (u as any).premiumExpiresAt   = expiry;
+            (u as any).premiumActivatedAt = new Date();
+            await u.save();
+            console.log(`🌟 Premium ACTIVATED for ${u.email} — expires ${expiry.toISOString()}`);
+          }
+        }
+      } catch (err: any) {
+        console.error(`Premium processing error for ${(red as any).userEmail}:`, err.message);
+      }
+    }
+  } catch (err: any) {
+    console.error("Premium polling error:", err.message);
+  }
+}
+
+// Run immediately on server start (catches any missed during downtime)
+// First fix any stuck redemptions from before polling system, then process
+// ── On startup: fix any stuck pending redemptions with no eligibleAt ──
+// This fixes redemptions created before the polling system was added
+async function fixStuckRedemptions(): Promise<void> {
+  try {
+    await connectDB();
+    const stuck = await Redemption.find({ status: "pending", rewardId: "tier_1000", eligibleAt: null });
+    if (stuck.length === 0) return;
+    const pastTime = new Date(Date.now() - 1000); // 1 second ago — eligible immediately
+    for (const r of stuck) {
+      (r as any).eligibleAt = pastTime;
+      await r.save();
+    }
+    console.log(`🔧 Fixed ${stuck.length} stuck pending premium redemption(s) — will process in next poll`);
+  } catch (err: any) {
+    console.error("fixStuckRedemptions error:", err.message);
+  }
+}
+
+// Run fix first, then polling
+fixStuckRedemptions().then(() => processPendingPremiums());
+// (processPendingPremiums is now called inside fixStuckRedemptions chain)
+// Then poll every 5 minutes
+setInterval(processPendingPremiums, 5 * 60 * 1000);
 
 /* ================= GLOBAL EXPRESS ERROR HANDLER ================= */
 // This catches ANY error thrown inside route handlers (last middleware)
