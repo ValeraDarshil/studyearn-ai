@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { Brain, Presentation, FileText, Gift, Trophy, User, LogOut, Sparkles, Zap, Menu, X, Flame as FlameIcon, BookOpen, HelpCircle } from 'lucide-react';
+import { Brain, Presentation, FileText, Gift, Trophy, User, LogOut, Sparkles, Zap, Menu, X, Flame as FlameIcon, BookOpen, HelpCircle, BarChart2 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import Lottie from 'lottie-react';
 import streakAnimation from '../assets/animations/streak-fire.json';
@@ -18,6 +18,7 @@ export function DashboardLayout() {
     { icon: HelpCircle,  label: 'Quiz',      path: '/app/quiz' },
     { icon: FlameIcon,   label: 'Challenge', path: '/app/challenge' },
     { icon: BookOpen,    label: 'Planner',   path: '/app/planner' },
+    { icon: BarChart2,   label: 'Stats',     path: '/app/analytics' },
     { icon: Gift,        label: 'Points',    path: '/app/rewards' },
     { icon: User,        label: 'Profile',   path: '/app/profile' },
   ];
@@ -28,6 +29,7 @@ export function DashboardLayout() {
     { icon: HelpCircle,  label: 'AI Quiz',         path: '/app/quiz' },
     { icon: FlameIcon,   label: 'Daily Challenge', path: '/app/challenge' },
     { icon: BookOpen,    label: 'Study Planner',   path: '/app/planner' },
+    { icon: BarChart2,   label: 'Analytics',        path: '/app/analytics' },
     { icon: Presentation,label: 'PPT Generator',   path: '/app/ppt' },
     { icon: FileText,    label: 'PDF Tools',        path: '/app/pdf' },
     { icon: Gift,        label: 'My Points',        path: '/app/rewards' },

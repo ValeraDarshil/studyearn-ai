@@ -261,6 +261,7 @@ import { ReferFriends } from "./pages/ReferFriends";
 import { QuizGenerator } from "./pages/QuizGenerator";
 import { StudyPlanner } from "./pages/StudyPlanner";
 import { DailyChallenge } from "./pages/DailyChallenge";
+import { Analytics } from "./pages/Analytics";
 import { ACHIEVEMENTS } from "./data/achievements";
 import { CursorSpotlight } from "./components/CursorSpotlight";
 
@@ -588,6 +589,7 @@ function AppContent() {
             <Route path="quiz" element={<QuizGenerator />} />
             <Route path="planner" element={<StudyPlanner />} />
             <Route path="challenge" element={<DailyChallenge />} />
+            <Route path="analytics" element={<Analytics />} />
           </Route>
         </Routes>
       </AppContext.Provider>
