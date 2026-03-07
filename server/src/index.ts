@@ -16,6 +16,7 @@ import PptxGenJS from "pptxgenjs";
 import { connectDB } from "./db.js";
 import { User } from "./models/User.model.js";
 import { Activity } from "./models/Activity.model.js";
+import { Redemption } from "./models/Redemption.model.js";
 import {
   globalLimiter,
   aiAskLimiter,
@@ -1730,6 +1731,105 @@ app.post("/api/excel-to-pdf", fileToolsLimiter, upload.single("file"), async (re
   } catch (err: any) {
     console.error("EXCEL→PDF ERROR:", err.message);
     res.status(500).json({ success: false, message: "Conversion failed: " + err.message });
+  }
+});
+
+/* ================= REWARDS — TIERS & REDEMPTION ================= */
+
+const REWARD_TIERS = [
+  { id: "tier_1000",  title: "7-Day Premium",     desc: "Extra 10 AI questions/day for 7 days", pointsCost: 1000,  type: "premium",  icon: "⚡" },
+  { id: "tier_2500",  title: "₹10 Paytm Voucher", desc: "UPI/Paytm cash voucher",               pointsCost: 2500,  type: "voucher",  icon: "💳" },
+  { id: "tier_5000",  title: "₹25 Amazon GC",      desc: "Amazon India gift card",               pointsCost: 5000,  type: "giftcard", icon: "🎁" },
+  { id: "tier_10000", title: "₹50 Amazon GC",      desc: "Amazon India gift card",               pointsCost: 10000, type: "giftcard", icon: "🎁" },
+  { id: "tier_25000", title: "₹150 Amazon GC",     desc: "Amazon India gift card",               pointsCost: 25000, type: "giftcard", icon: "💎" },
+];
+
+// GET /api/rewards/tiers — list all reward tiers
+app.get("/api/rewards/tiers", (_req, res) => {
+  res.json({ success: true, tiers: REWARD_TIERS });
+});
+
+// POST /api/rewards/redeem — submit a redemption request
+app.post("/api/rewards/redeem", async (req: any, res) => {
+  try {
+    const userId = getUserIdFromToken(req);
+    if (!userId) return res.status(401).json({ success: false, message: "Login required" });
+
+    const { rewardId, deliveryInfo } = req.body;
+    if (!rewardId) return res.status(400).json({ success: false, message: "rewardId required" });
+
+    const tier = REWARD_TIERS.find(t => t.id === rewardId);
+    if (!tier) return res.status(400).json({ success: false, message: "Invalid reward" });
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ success: false, message: "User not found" });
+
+    if (user.points < tier.pointsCost)
+      return res.status(400).json({
+        success: false,
+        message: `Not enough points. Need ${tier.pointsCost}, you have ${user.points}`,
+      });
+
+    // Only one pending/processing redemption at a time
+    const existing = await Redemption.findOne({ userId, status: { $in: ["pending", "processing"] } });
+    if (existing)
+      return res.status(400).json({
+        success: false,
+        message: "You already have a pending redemption. Please wait for it to be processed.",
+      });
+
+    // Deduct points
+    user.points -= tier.pointsCost;
+    await user.save();
+
+    // Create redemption record
+    const redemption = await Redemption.create({
+      userId,
+      userName:     user.name,
+      userEmail:    user.email,
+      rewardId:     tier.id,
+      rewardTitle:  tier.title,
+      pointsCost:   tier.pointsCost,
+      deliveryInfo: deliveryInfo || "",
+      status:       "pending",
+    });
+
+    // Log activity
+    await Activity.create({
+      userId,
+      action:       "referral",
+      details:      `Redeemed ${tier.title} for ${tier.pointsCost} pts`,
+      pointsEarned: 0,
+    });
+
+    console.log(`✅ REDEEM: ${user.email} → ${tier.title} (${tier.pointsCost} pts)`);
+    res.json({
+      success:          true,
+      message:          `Successfully redeemed ${tier.title}! We'll process it within 2–3 business days.`,
+      redemptionId:     redemption._id,
+      pointsRemaining:  user.points,
+    });
+
+  } catch (err: any) {
+    console.error("REDEEM ERROR:", err.message);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// GET /api/rewards/history — user's redemption history
+app.get("/api/rewards/history", async (req: any, res) => {
+  try {
+    const userId = getUserIdFromToken(req);
+    if (!userId) return res.status(401).json({ success: false, message: "Login required" });
+
+    const history = await Redemption.find({ userId })
+      .sort({ createdAt: -1 })
+      .limit(20)
+      .lean();
+
+    res.json({ success: true, history });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
   }
 });
 
