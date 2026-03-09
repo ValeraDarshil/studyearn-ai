@@ -1,236 +1,3 @@
-// import { Login } from "./pages/Login";
-// import { Signup } from "./pages/Signup";
-// import { HashRouter, Routes, Route, useLocation } from "react-router-dom";
-// import { useState, useEffect } from "react";
-// import { LandingPage } from "./pages/LandingPage";
-// import { Dashboard } from "./pages/Dashboard";
-// import { AskAI } from "./pages/AskAI";
-// import { PPTGenerator } from "./pages/PPTGenerator";
-// import { PDFTools } from "./pages/PDFTools";
-// import { Rewards } from "./pages/Rewards";
-// import { Leaderboard } from "./pages/Leaderboard";
-// import { Profile } from "./pages/Profile";
-// import { DashboardLayout } from "./components/DashboardLayout";
-// import { ProtectedRoute } from "./components/ProtectedRoute";
-// import { LoadingScreen } from "./components/LoadingScreen";
-// import { StreakCelebration } from "./components/StreakCelebration";
-// import { AppContext } from "./context/AppContext";
-// import {
-//   getCurrentUser,
-//   updateUserPoints,
-//   useQuestion as useQuestionAPI,
-//   logActivity as logActivityAPI,
-//   getRecentActivity,
-// } from "./utils/user-api";
-// import { ReferFriends } from "./pages/ReferFriends";
-
-// // ✅ WRAPPER to check location before showing celebration
-// function AppContent() {
-//   const location = useLocation();
-//   const [points, setPoints] = useState(0);
-//   const [questionsLeft, setQuestionsLeft] = useState(5);
-//   const [recentActivity, setRecentActivity] = useState<any[]>([]);
-//   const [streak, setStreak] = useState(0);
-//   const [isLoggedIn, setIsLoggedIn] = useState(false);
-//   const [userId, setUserId] = useState("");
-//   const [userName, setUserName] = useState("");
-//   const [loading, setLoading] = useState(true);
-
-//   const [showStreakCelebration, setShowStreakCelebration] = useState(false);
-//   const [celebrationStreak, setCelebrationStreak] = useState(0);
-
-//   useEffect(() => {
-//     loadUserData();
-//   }, []);
-
-//   const loadUserData = async () => {
-//     const token = localStorage.getItem("token");
-
-//     if (!token) {
-//       setLoading(false);
-//       return;
-//     }
-
-//     try {
-//       const user = await getCurrentUser();
-
-//       if (user) {
-//         setIsLoggedIn(true);
-//         setUserId(user._id);
-//         setUserName(user.name || "");
-//         setPoints(user.points);
-//         setQuestionsLeft(user.questionsLeft);
-//         setStreak(user.streak || 0);
-
-//         getRecentActivity().then((activityData) => {
-//           if (activityData.success) {
-//             setRecentActivity(activityData.activities);
-//           }
-//         });
-
-//         // ✅ Check streak ONLY if logged in
-//         checkStreak().catch((err) =>
-//           console.error("Streak check failed:", err),
-//         );
-//       } else {
-//         localStorage.removeItem("token");
-//         localStorage.removeItem("user");
-//         setIsLoggedIn(false);
-//       }
-//     } catch (error) {
-//       console.error("Load user error:", error);
-//       localStorage.removeItem("token");
-//       localStorage.removeItem("user");
-//       setIsLoggedIn(false);
-//     } finally {
-//       setTimeout(() => setLoading(false), 1000);
-//     }
-//   };
-
-//   const checkStreak = async () => {
-//     try {
-//       const token = localStorage.getItem("token");
-//       if (!token) return;
-
-//       const res = await fetch(
-//         "https://studyearn-backend.onrender.com/api/user/update-streak",
-//         {
-//           method: "POST",
-//           headers: {
-//             "Content-Type": "application/json",
-//             Authorization: `Bearer ${token}`,
-//           },
-//         },
-//       );
-
-//       if (!res.ok) return;
-
-//       const data = await res.json();
-//       if (data.success) {
-//         setStreak(data.streak);
-
-//         // ✅ ONLY show celebration if:
-//         // 1. Streak increased
-//         // 2. User is on /app route (dashboard area)
-//         if (data.streakIncreased && location.pathname.startsWith("/app")) {
-//           setCelebrationStreak(data.streak);
-//           setTimeout(() => setShowStreakCelebration(true), 1500);
-//         }
-//       }
-//     } catch (err) {
-//       console.error("Streak check error:", err);
-//     }
-//   };
-
-//   const addPoints = async (amount: number) => {
-//     setPoints((prev) => prev + amount);
-//     const result = await updateUserPoints(amount);
-//     if (result.success) {
-//       setPoints(result.points);
-//     }
-//   };
-
-//   const useQuestion = async () => {
-//     setQuestionsLeft((prev) => Math.max(0, prev - 1));
-//     const result = await useQuestionAPI();
-//     if (result.success) {
-//       setQuestionsLeft(result.questionsLeft);
-//     }
-//   };
-
-//   const logActivity = async (
-//     action: string,
-//     details: string,
-//     pointsEarned: number,
-//   ) => {
-//     const newActivity = {
-//       _id: Date.now().toString(),
-//       action,
-//       details,
-//       pointsEarned,
-//       timestamp: new Date().toISOString(),
-//     };
-//     setRecentActivity((prev) => [newActivity, ...prev].slice(0, 10));
-//     await logActivityAPI(action, details, pointsEarned);
-//   };
-
-//   const resetProgress = () => {
-//     setPoints(0);
-//     setQuestionsLeft(5);
-//     setRecentActivity([]);
-//   };
-
-//   // ✅ ONLY show celebration if on dashboard routes
-//   const shouldShowCelebration =
-//     showStreakCelebration && location.pathname.startsWith("/app");
-
-//   return (
-//     <>
-//       <LoadingScreen show={loading} />
-
-//       {/* ✅ Celebration ONLY in dashboard */}
-//       {shouldShowCelebration && (
-//         <StreakCelebration
-//           streak={celebrationStreak}
-//           show={true}
-//           onClose={() => setShowStreakCelebration(false)}
-//         />
-//       )}
-
-//       <AppContext.Provider
-//         value={{
-//           points,
-//           streak,
-//           questionsLeft,
-//           isLoggedIn,
-//           setIsLoggedIn,
-//           addPoints,
-//           useQuestion,
-//           userId,
-//           userName,
-//           resetProgress,
-//           recentActivity,
-//           logActivity,
-//           loading,
-//         }}
-//       >
-//         <Routes>
-//           <Route path="/" element={<LandingPage />} />
-//           <Route path="/login" element={<Login />} />
-//           <Route path="/signup" element={<Signup />} />
-
-//           <Route
-//             path="/app"
-//             element={
-//               <ProtectedRoute>
-//                 <DashboardLayout />
-//               </ProtectedRoute>
-//             }
-//           >
-//             <Route index element={<Dashboard />} />
-//             <Route path="ask" element={<AskAI />} />
-//             <Route path="ppt" element={<PPTGenerator />} />
-//             <Route path="pdf" element={<PDFTools />} />
-//             <Route path="rewards" element={<Rewards />} />
-//             <Route path="leaderboard" element={<Leaderboard />} />
-//             <Route path="profile" element={<Profile />} />
-//             <Route path="refer" element={<ReferFriends />} />
-//           </Route>
-//         </Routes>
-//       </AppContext.Provider>
-//     </>
-//   );
-// }
-
-// export function App() {
-//   return (
-//     <HashRouter>
-//       <AppContent />
-//     </HashRouter>
-//   );
-// }
-
-
 import { Login } from "./pages/Login";
 import { Signup } from "./pages/Signup";
 import { HashRouter, Routes, Route, useLocation } from "react-router-dom";
@@ -250,7 +17,6 @@ import { StreakCelebration } from "./components/StreakCelebration";
 import { AppContext, UserStats } from "./context/AppContext";
 import {
   getCurrentUser,
-  updateUserPoints,
   useQuestion as useQuestionAPI,
   logActivity as logActivityAPI,
   getRecentActivity,
@@ -266,7 +32,7 @@ import { FormulaSheet } from "./pages/FormulaSheet";
 import { ACHIEVEMENTS } from "./data/achievements";
 import { CursorSpotlight } from "./components/CursorSpotlight";
 
-// ── Achievement Toast Notification ──────────────────────────────────────────
+// ── Achievement Toast Notification ───────────────────────────
 function AchievementToast({ achievement, onClose }: { achievement: any; onClose: () => void }) {
   useEffect(() => {
     const t = setTimeout(onClose, 4000);
@@ -308,7 +74,7 @@ function AppContent() {
   const [questionsLeft, setQuestionsLeft] = useState(5);
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
   const [streak, setStreak] = useState(0);
-  const [totalXP, setTotalXP] = useState(0);  // Never decreases — used for level
+  const [totalXP, setTotalXP] = useState(0); // Never decreases — used for level
   const [isPremium, setIsPremium] = useState(false);
   const [premiumExpiresAt, setPremiumExpiresAt] = useState<string | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -319,25 +85,36 @@ function AppContent() {
   const [showStreakCelebration, setShowStreakCelebration] = useState(false);
   const [celebrationStreak, setCelebrationStreak] = useState(0);
 
-  // ✅ Achievements state
+  // Achievements state
   const [unlockedAchievements, setUnlockedAchievements] = useState<string[]>([]);
   const [userStats, setUserStats] = useState<UserStats>({
     totalQuestionsAsked: 0,
     totalPPTsGenerated: 0,
     totalPDFsConverted: 0,
   });
+
+  // Toast queue — ek ek karke dikhao, sabhi achievements miss nahi hongi
+  const [toastQueue, setToastQueue] = useState<any[]>([]);
   const [toastAchievement, setToastAchievement] = useState<any>(null);
 
-  // Use refs to always have latest values in callbacks
-  const pointsRef = useRef(points);
-  const streakRef = useRef(streak);
+  // Refs to always have latest values in callbacks
+  const pointsRef    = useRef(points);
+  const streakRef    = useRef(streak);
   const userStatsRef = useRef(userStats);
-  const unlockedRef = useRef(unlockedAchievements);
+  const unlockedRef  = useRef(unlockedAchievements);
 
-  useEffect(() => { pointsRef.current = points; }, [points]);
-  useEffect(() => { streakRef.current = streak; }, [streak]);
-  useEffect(() => { userStatsRef.current = userStats; }, [userStats]);
-  useEffect(() => { unlockedRef.current = unlockedAchievements; }, [unlockedAchievements]);
+  useEffect(() => { pointsRef.current    = points;               }, [points]);
+  useEffect(() => { streakRef.current    = streak;               }, [streak]);
+  useEffect(() => { userStatsRef.current = userStats;            }, [userStats]);
+  useEffect(() => { unlockedRef.current  = unlockedAchievements; }, [unlockedAchievements]);
+
+  // Toast queue processor — jab current toast close ho toh agla dikhao
+  useEffect(() => {
+    if (!toastAchievement && toastQueue.length > 0) {
+      setToastAchievement(toastQueue[0]);
+      setToastQueue(prev => prev.slice(1));
+    }
+  }, [toastAchievement, toastQueue]);
 
   useEffect(() => { loadUserData(); }, []);
 
@@ -353,6 +130,7 @@ function AppContent() {
         setUserName(user.name || "");
         setPoints(user.points);
         setTotalXP((user as any).totalXP || user.points);
+
         // Premium status — check if active
         const premExpiry = (user as any).premiumExpiresAt;
         const premActive = (user as any).isPremium === true && premExpiry && new Date(premExpiry) > new Date();
@@ -363,7 +141,7 @@ function AppContent() {
 
         getRecentActivity().then((d) => { if (d.success) setRecentActivity(d.activities); });
 
-        // ── Show streak celebration if login returned streakInfo ──
+        // Show streak celebration if login returned streakInfo
         const streakCelebration = sessionStorage.getItem("streakCelebration");
         const loginBonus = sessionStorage.getItem("loginBonus");
         if (streakCelebration) {
@@ -373,13 +151,12 @@ function AppContent() {
           sessionStorage.removeItem("streakCelebration");
         }
         if (loginBonus) {
-          // Points are already updated in DB — just update UI
           sessionStorage.removeItem("loginBonus");
         }
 
         checkStreak().catch(console.error);
 
-        // Load achievements from server, then immediately check for any newly eligible ones
+        // Load achievements from server, then check for newly eligible ones
         getAchievements().then((d) => {
           if (d.success) {
             const unlocked = d.unlockedAchievements || [];
@@ -393,8 +170,7 @@ function AppContent() {
             setUserStats(stats);
             userStatsRef.current = stats;
 
-            // 🔑 KEY FIX: check right now with fresh server data + current points
-            // Use a small delay so pointsRef is populated first
+            // Check with fresh server data + current points
             setTimeout(() => {
               checkAndUnlockAchievements({
                 ...stats,
@@ -419,13 +195,14 @@ function AppContent() {
     }
   };
 
-  // ✅ Check & unlock achievements — bulletproof, checks ALL eligible at once
+  // ── Check & unlock achievements ───────────────────────────
+  // Server validates threshold — sirf eligible achievements unlock hongi
   const checkAndUnlockAchievements = useCallback(async (
     override?: Partial<UserStats & { points: number; streak: number }>
   ) => {
-    const currentPoints = override?.points ?? pointsRef.current;
-    const currentStreak = override?.streak ?? streakRef.current;
-    const currentStats  = { ...userStatsRef.current, ...override };
+    const currentPoints   = override?.points ?? pointsRef.current;
+    const currentStreak   = override?.streak ?? streakRef.current;
+    const currentStats    = { ...userStatsRef.current, ...override };
     const currentUnlocked = [...unlockedRef.current];
 
     const statMap: Record<string, number> = {
@@ -436,7 +213,7 @@ function AppContent() {
       points: currentPoints || 0,
     };
 
-    // Collect all newly eligible achievements (not yet unlocked)
+    // Collect all newly eligible achievements
     const toUnlock = ACHIEVEMENTS.filter(ach => {
       if (currentUnlocked.includes(ach.id)) return false;
       const val = statMap[ach.stat] ?? 0;
@@ -445,32 +222,30 @@ function AppContent() {
 
     if (toUnlock.length === 0) return;
 
-    // Unlock all of them sequentially
-    let lastToast = null;
-    let bonusPoints = 0;
+    const newlyUnlocked: any[] = [];
 
     for (const ach of toUnlock) {
       try {
         const result = await unlockAchievement(ach.id);
         if (result.success) {
-          // Update ref immediately so next iteration sees it
           unlockedRef.current = result.unlockedAchievements;
           setUnlockedAchievements(result.unlockedAchievements);
-          lastToast = ach;
-          if (ach.reward > 0) bonusPoints += ach.reward;
+          newlyUnlocked.push(ach);
+
+          // Server already awards reward points — update UI to reflect
+          if (result.rewardPoints > 0) {
+            setPoints(prev => prev + result.rewardPoints);
+            setTotalXP(prev => prev + result.rewardPoints);
+          }
         }
       } catch (e) {
         console.error("unlock error", ach.id, e);
       }
     }
 
-    // Show toast for the last (most impressive) unlocked achievement
-    if (lastToast) setToastAchievement(lastToast);
-
-    // Award all bonus points in one shot
-    if (bonusPoints > 0) {
-      setPoints(prev => prev + bonusPoints);
-      updateUserPoints(bonusPoints);
+    // Toast queue — sabhi achievements ek ek karke dikhao (4s gap)
+    if (newlyUnlocked.length > 0) {
+      setToastQueue(prev => [...prev, ...newlyUnlocked]);
     }
   }, []);
 
@@ -502,8 +277,8 @@ function AppContent() {
     // Update UI immediately
     const newPoints = pointsRef.current + amount;
     setPoints(newPoints);
-    setTotalXP(prev => prev + amount); // XP also increases — never decreases
-    // Server handles actual DB update in /api/ai/ask — no double call needed
+    setTotalXP(prev => prev + amount); // XP never decreases
+    // Server handles actual DB update in /api/ai/ask — no extra call needed
     checkAndUnlockAchievements({ points: newPoints });
   };
 
@@ -545,7 +320,7 @@ function AppContent() {
         />
       )}
 
-      {/* ✅ Achievement Toast */}
+      {/* Achievement Toast — queue se ek ek karke aata hai */}
       {toastAchievement && (
         <AchievementToast
           achievement={toastAchievement}

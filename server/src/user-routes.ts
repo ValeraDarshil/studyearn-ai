@@ -1,327 +1,3 @@
-// import express from 'express';
-// import jwt from 'jsonwebtoken';
-// import { User } from './models/User.model.js';
-// import { Activity } from './models/Activity.model.js';
-// import { connectDB } from './db.js';
-
-// const router = express.Router();
-// const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this-in-production';
-
-// // Middleware to verify token
-// async function authenticate(req: any, res: any, next: any) {
-//   try {
-//     const token = req.headers.authorization?.replace('Bearer ', '');
-//     if (!token) {
-//       return res.status(401).json({ success: false, message: 'No token provided' });
-//     }
-//     const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
-//     req.userId = decoded.userId;
-//     next();
-//   } catch (error) {
-//     res.status(401).json({ success: false, message: 'Invalid token' });
-//   }
-// }
-
-// // ── ADD POINTS ───────────────────────────────────────────────────────────────
-// router.post('/add-points', authenticate, async (req: any, res) => {
-//   try {
-//     await connectDB();
-//     const { points } = req.body;
-//     if (typeof points !== 'number' || points <= 0) {
-//       return res.status(400).json({ success: false, message: 'Invalid points value' });
-//     }
-//     const user = await User.findById(req.userId);
-//     if (!user) {
-//       return res.status(404).json({ success: false, message: 'User not found' });
-//     }
-//     user.points += points;
-//     await user.save();
-//     res.json({ success: true, points: user.points });
-//     console.log(`✅ Points added: ${user.email} +${points} → ${user.points}`);
-//   } catch (error) {
-//     console.error('Add points error:', error);
-//     res.status(500).json({ success: false, message: 'Server error' });
-//   }
-// });
-
-// // ── USE QUESTION ─────────────────────────────────────────────────────────────
-// router.post('/use-question', authenticate, async (req: any, res) => {
-//   try {
-//     await connectDB();
-//     const user = await User.findById(req.userId);
-//     if (!user) {
-//       return res.status(404).json({ success: false, message: 'User not found' });
-//     }
-//     const today = new Date().toISOString().split('T')[0];
-//     if (user.questionsDate !== today) {
-//       user.questionsLeft = 5;
-//       user.questionsDate = today;
-//     }
-//     if (user.questionsLeft <= 0) {
-//       return res.json({ success: false, message: 'No questions left today', questionsLeft: 0 });
-//     }
-//     user.questionsLeft -= 1;
-//     await user.save();
-//     res.json({ success: true, questionsLeft: user.questionsLeft });
-//     console.log(`✅ Question used: ${user.email} → ${user.questionsLeft} left`);
-//   } catch (error) {
-//     console.error('Use question error:', error);
-//     res.status(500).json({ success: false, message: 'Server error' });
-//   }
-// });
-
-// // ── LOG ACTIVITY ─────────────────────────────────────────────────────────────
-// router.post('/log-activity', authenticate, async (req: any, res) => {
-//   try {
-//     await connectDB();
-//     const { action, details, pointsEarned } = req.body;
-//     await Activity.create({
-//       userId: req.userId,
-//       action,
-//       details,
-//       pointsEarned: pointsEarned || 0,
-//     });
-//     res.json({ success: true });
-//     console.log(`✅ Activity logged: ${action} - ${details}`);
-//   } catch (error) {
-//     console.error('Log activity error:', error);
-//     res.status(500).json({ success: false, message: 'Server error' });
-//   }
-// });
-
-// // ── GET RECENT ACTIVITY ──────────────────────────────────────────────────────
-// router.get('/activity', authenticate, async (req: any, res) => {
-//   try {
-//     await connectDB();
-//     const activities = await Activity.find({ userId: req.userId })
-//       .sort({ timestamp: -1 })
-//       .limit(10)
-//       .lean();
-//     res.json({ success: true, activities });
-//   } catch (error) {
-//     console.error('Get activity error:', error);
-//     res.status(500).json({ success: false, message: 'Server error' });
-//   }
-// });
-
-// // ── UPDATE PROFILE ───────────────────────────────────────────────────────────
-// router.post('/update-profile', authenticate, async (req: any, res) => {
-//   try {
-//     await connectDB();
-//     const { name, email, avatar } = req.body;
-
-//     if (!name || !email) {
-//       return res.status(400).json({ success: false, message: 'Name and email required' });
-//     }
-
-//     const user = await User.findById(req.userId);
-//     if (!user) {
-//       return res.status(404).json({ success: false, message: 'User not found' });
-//     }
-
-//     if (email !== user.email) {
-//       const existingUser = await User.findOne({ email });
-//       if (existingUser) {
-//         return res.status(400).json({ success: false, message: 'Email already in use' });
-//       }
-//     }
-
-//     user.name = name;
-//     user.email = email;
-//     if (avatar !== undefined) (user as any).avatar = avatar;
-//     await user.save();
-
-//     res.json({ 
-//       success: true, 
-//       user: {
-//         name: user.name,
-//         email: user.email,
-//         avatar: (user as any).avatar ?? null,
-//       }
-//     });
-
-//     console.log(`✅ Profile updated: ${user.email}`);
-//   } catch (error) {
-//     console.error('Update profile error:', error);
-//     res.status(500).json({ success: false, message: 'Server error' });
-//   }
-// });
-
-// // ── UPDATE STREAK ON LOGIN ───────────────────────────────────────────────────
-// router.post('/update-streak', authenticate, async (req: any, res) => {
-//   try {
-//     await connectDB();
-    
-//     const user = await User.findById(req.userId);
-//     if (!user) {
-//       return res.status(404).json({ success: false, message: 'User not found' });
-//     }
-
-//     const today = new Date().toISOString().split('T')[0];
-//     const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
-//     const lastActiveDate = user.lastActive ? new Date(user.lastActive).toISOString().split('T')[0] : null;
-
-//     let streakIncreased = false;
-    
-//     if (lastActiveDate === today) {
-//       // Already logged in today, no change
-//       return res.json({ 
-//         success: true, 
-//         streak: user.streak,
-//         streakIncreased: false
-//       });
-//     } else if (lastActiveDate === yesterday) {
-//       // Logged in yesterday, continue streak
-//       user.streak += 1;
-//       streakIncreased = true;
-//     } else {
-//       // ✅ Streak broken - RESET TO 1 (not 0)
-//       user.streak = 1;
-//       streakIncreased = false;
-//     }
-
-//     user.lastActive = new Date();
-//     await user.save();
-
-//     res.json({ 
-//       success: true, 
-//       streak: user.streak,
-//       streakIncreased,
-//       isNewStreak: !lastActiveDate || lastActiveDate !== yesterday
-//     });
-
-//     console.log(`✅ Streak updated: ${user.email} → ${user.streak} days`);
-//   } catch (error) {
-//     console.error('Update streak error:', error);
-//     res.status(500).json({ success: false, message: 'Server error' });
-//   }
-// });
-
-// // ── GENERATE REFERRAL CODE ──────────────────────────────────────────────────
-// function generateReferralCode(name: string, userId: string): string {
-//   const namePart = name.substring(0, 3).toUpperCase();
-//   const randomPart = Math.random().toString(36).substring(2, 6).toUpperCase();
-//   const idPart = userId.substring(userId.length - 3).toUpperCase();
-//   return `${namePart}${randomPart}${idPart}`;
-// }
-
-// // ── GET REFERRAL DATA ───────────────────────────────────────────────────────
-// router.get('/referral-data', authenticate, async (req: any, res) => {
-//   try {
-//     await connectDB();
-    
-//     const user = await User.findById(req.userId);
-//     if (!user) {
-//       return res.status(404).json({ success: false, message: 'User not found' });
-//     }
-
-//     // Generate referral code if doesn't exist
-//     if (!user.referralCode) {
-//       user.referralCode = generateReferralCode(user.name, user._id.toString());
-//       await user.save();
-//     }
-
-//     // Find all users referred by this user
-//     const referredUsers = await User.find({ referredBy: user.referralCode })
-//       .select('name email createdAt')
-//       .sort({ createdAt: -1 })
-//       .lean();
-
-//     const referredUsersFormatted = referredUsers.map(u => ({
-//       name: u.name,
-//       email: u.email,
-//       joinedAt: u.createdAt,
-//     }));
-
-//     res.json({
-//       success: true,
-//       referralCode: user.referralCode,
-//       referredUsers: referredUsersFormatted,
-//       totalReferrals: referredUsers.length,
-//       totalEarned: referredUsers.length * 100,
-//     });
-
-//     console.log(`✅ Referral data fetched: ${user.email} - ${referredUsers.length} referrals`);
-//   } catch (error) {
-//     console.error('Get referral data error:', error);
-//     res.status(500).json({ success: false, message: 'Server error' });
-//   }
-// });
-
-// export default router;
-
-// // ── GET ACHIEVEMENTS ──────────────────────────────────────────────────────────
-// router.get('/achievements', authenticate, async (req: any, res) => {
-//   try {
-//     await connectDB();
-//     const user = await User.findById(req.userId).lean() as any;
-//     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
-
-//     res.json({
-//       success: true,
-//       unlockedAchievements: user.unlockedAchievements || [],
-//       totalQuestionsAsked: user.totalQuestionsAsked || 0,
-//       totalPPTsGenerated: user.totalPPTsGenerated || 0,
-//       totalPDFsConverted: user.totalPDFsConverted || 0,
-//     });
-//   } catch (error) {
-//     console.error('Get achievements error:', error);
-//     res.status(500).json({ success: false, message: 'Server error' });
-//   }
-// });
-
-// // ── UNLOCK ACHIEVEMENT ────────────────────────────────────────────────────────
-// router.post('/unlock-achievement', authenticate, async (req: any, res) => {
-//   try {
-//     await connectDB();
-//     const { achievementId } = req.body;
-//     if (!achievementId) return res.status(400).json({ success: false, message: 'achievementId required' });
-
-//     const user = await User.findById(req.userId) as any;
-//     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
-
-//     if (!user.unlockedAchievements.includes(achievementId)) {
-//       user.unlockedAchievements.push(achievementId);
-//       await user.save();
-//       console.log(`🏆 Achievement unlocked: ${user.email} → ${achievementId}`);
-//     }
-
-//     res.json({ success: true, unlockedAchievements: user.unlockedAchievements });
-//   } catch (error) {
-//     console.error('Unlock achievement error:', error);
-//     res.status(500).json({ success: false, message: 'Server error' });
-//   }
-// });
-
-// // ── INCREMENT ACTION COUNT (questions/ppts/pdfs) ──────────────────────────────
-// router.post('/increment-action', authenticate, async (req: any, res) => {
-//   try {
-//     await connectDB();
-//     const { action } = req.body; // 'question' | 'ppt' | 'pdf'
-
-//     const user = await User.findById(req.userId) as any;
-//     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
-
-//     if (action === 'question') user.totalQuestionsAsked = (user.totalQuestionsAsked || 0) + 1;
-//     if (action === 'ppt') user.totalPPTsGenerated = (user.totalPPTsGenerated || 0) + 1;
-//     if (action === 'pdf') user.totalPDFsConverted = (user.totalPDFsConverted || 0) + 1;
-
-//     await user.save();
-
-//     res.json({
-//       success: true,
-//       totalQuestionsAsked: user.totalQuestionsAsked,
-//       totalPPTsGenerated: user.totalPPTsGenerated,
-//       totalPDFsConverted: user.totalPDFsConverted,
-//     });
-//   } catch (error) {
-//     console.error('Increment action error:', error);
-//     res.status(500).json({ success: false, message: 'Server error' });
-//   }
-// });
-
-// Clearner Version //
-
 /**
  * StudyEarn AI — User Routes
  * ─────────────────────────────────────────────────────────────
@@ -334,7 +10,7 @@
  *   POST /update-streak       → Update login streak
  *   GET  /referral-data       → Get referral code + referred users
  *   GET  /achievements        → Get unlocked achievements
- *   POST /unlock-achievement  → Unlock a new achievement
+ *   POST /unlock-achievement  → Unlock a new achievement (server validates threshold)
  *   POST /increment-action    → Increment question/ppt/pdf counters
  */
 
@@ -373,6 +49,29 @@ function generateReferralCode(name: string, userId: string): string {
   const idPart     = userId.substring(userId.length - 3).toUpperCase();
   return `${namePart}${randomPart}${idPart}`;
 }
+
+// ─────────────────────────────────────────────────────────────
+// ACHIEVEMENT DEFINITIONS (mirrored from frontend)
+// Server validates threshold before unlocking — client can't cheat
+// Keep in sync with: src/data/achievements.ts
+// ─────────────────────────────────────────────────────────────
+const ACHIEVEMENT_MAP: Record<string, { stat: string; threshold: number; reward: number }> = {
+  first_question:   { stat: 'totalQuestionsAsked', threshold: 1,    reward: 20  },
+  curious_mind:     { stat: 'totalQuestionsAsked', threshold: 10,   reward: 30  },
+  knowledge_seeker: { stat: 'totalQuestionsAsked', threshold: 50,   reward: 75  },
+  question_master:  { stat: 'totalQuestionsAsked', threshold: 100,  reward: 150 },
+  first_ppt:        { stat: 'totalPPTsGenerated',  threshold: 1,    reward: 25  },
+  ppt_pro:          { stat: 'totalPPTsGenerated',  threshold: 5,    reward: 60  },
+  ppt_master:       { stat: 'totalPPTsGenerated',  threshold: 20,   reward: 200 },
+  first_pdf:        { stat: 'totalPDFsConverted',  threshold: 1,    reward: 15  },
+  pdf_expert:       { stat: 'totalPDFsConverted',  threshold: 10,   reward: 50  },
+  streak_3:         { stat: 'streak',              threshold: 3,    reward: 30  },
+  streak_7:         { stat: 'streak',              threshold: 7,    reward: 70  },
+  streak_30:        { stat: 'streak',              threshold: 30,   reward: 500 },
+  points_500:       { stat: 'totalXP',             threshold: 500,  reward: 0   },
+  points_1000:      { stat: 'totalXP',             threshold: 1000, reward: 100 },
+  points_5000:      { stat: 'totalXP',             threshold: 5000, reward: 500 },
+};
 
 // ─────────────────────────────────────────────────────────────
 // ADD POINTS — POST /api/user/add-points
@@ -595,6 +294,9 @@ router.get('/achievements', authenticate, async (req: any, res) => {
 // ─────────────────────────────────────────────────────────────
 // UNLOCK ACHIEVEMENT — POST /api/user/unlock-achievement
 // ─────────────────────────────────────────────────────────────
+// 🔒 SERVER validates threshold — client pe bilkul trust nahi
+// Koi bhi DevTools se cheat nahi kar sakta ab
+// ─────────────────────────────────────────────────────────────
 router.post('/unlock-achievement', authenticate, async (req: any, res) => {
   try {
     await connectDB();
@@ -604,16 +306,47 @@ router.post('/unlock-achievement', authenticate, async (req: any, res) => {
       return res.status(400).json({ success: false, message: 'achievementId required' });
     }
 
+    // Kya yeh achievement exist karti hai?
+    const achDef = ACHIEVEMENT_MAP[achievementId];
+    if (!achDef) {
+      return res.status(400).json({ success: false, message: 'Unknown achievement' });
+    }
+
     const user = await User.findById(req.userId) as any;
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
-    if (!user.unlockedAchievements.includes(achievementId)) {
-      user.unlockedAchievements.push(achievementId);
-      await user.save();
-      console.log(`🏆 Achievement unlocked: ${user.email} → ${achievementId}`);
+    // Already unlocked? Idempotent — as-is return karo
+    if (user.unlockedAchievements.includes(achievementId)) {
+      return res.json({ success: true, unlockedAchievements: user.unlockedAchievements, rewardPoints: 0 });
     }
 
-    res.json({ success: true, unlockedAchievements: user.unlockedAchievements });
+    // ── SERVER-SIDE THRESHOLD CHECK ──────────────────────────
+    // streak achievement ke liye user.streak, baaki ke liye DB field check karo
+    const statValue = (user[achDef.stat] || 0) as number;
+    if (statValue < achDef.threshold) {
+      return res.status(403).json({
+        success: false,
+        message: `Achievement not earned yet. Need ${achDef.threshold} ${achDef.stat}, you have ${statValue}.`,
+      });
+    }
+
+    // Threshold verified — unlock karo
+    user.unlockedAchievements.push(achievementId);
+
+    // Reward points award karo (server side — frontend pe updateUserPoints call mat karo)
+    if (achDef.reward > 0) {
+      user.points  = (user.points  || 0) + achDef.reward;
+      user.totalXP = (user.totalXP || 0) + achDef.reward;
+    }
+
+    await user.save();
+    console.log(`🏆 Achievement unlocked: ${user.email} → ${achievementId} (+${achDef.reward} pts)`);
+
+    res.json({
+      success:              true,
+      unlockedAchievements: user.unlockedAchievements,
+      rewardPoints:         achDef.reward,
+    });
   } catch (error) {
     console.error('Unlock achievement error:', error);
     res.status(500).json({ success: false, message: 'Server error' });
