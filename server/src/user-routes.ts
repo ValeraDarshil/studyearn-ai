@@ -143,7 +143,8 @@ router.post('/log-activity', authenticate, async (req: any, res) => {
 router.get('/activity', authenticate, async (req: any, res) => {
   try {
     await connectDB();
-    const activities = await Activity.find({ userId: req.userId }).sort({ timestamp: -1 }).limit(10).lean();
+    // 50 activities — enough for 7-day weekly chart + 30-day challenge stats in Analytics
+    const activities = await Activity.find({ userId: req.userId }).sort({ timestamp: -1 }).limit(50).lean();
     res.json({ success: true, activities });
   } catch (error) {
     console.error('Get activity error:', error);

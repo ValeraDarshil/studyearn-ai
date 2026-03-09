@@ -2,6 +2,7 @@
  * StudyEarn AI — Analytics Dashboard
  * Progress graphs, weak subjects tracker, study stats
  * Pure React — no external chart libraries
+ * ✅ Fixed: All data from server activity feed (no localStorage)
  */
 import { useState, useEffect, useMemo } from "react";
 import {
@@ -30,7 +31,7 @@ interface DayStat {
   questions: number;
   ppts: number;
   pdfs: number;
-  quizzes: number;
+  challenges: number;
 }
 
 interface SubjectStat {
@@ -55,20 +56,22 @@ function getSubjectFromDetails(details: string): string {
   if (lower.includes("econ") || lower.includes("market") || lower.includes("gdp")) return "Economics";
   if (lower.includes("code") || lower.includes("program") || lower.includes("computer") || lower.includes("algorithm")) return "Computer Sci";
   if (lower.includes("english") || lower.includes("grammar") || lower.includes("literature")) return "English";
+  if (lower.includes("reasoning") || lower.includes("puzzle") || lower.includes("logical")) return "Reasoning";
   return "General";
 }
 
 const SUBJECT_META: Record<string, { emoji: string; color: string }> = {
-  "Mathematics":    { emoji: "📐", color: "bg-blue-500" },
-  "Physics":        { emoji: "⚛️",  color: "bg-purple-500" },
-  "Chemistry":      { emoji: "🧪", color: "bg-green-500" },
-  "Biology":        { emoji: "🧬", color: "bg-emerald-500" },
-  "History":        { emoji: "📜", color: "bg-amber-500" },
-  "Geography":      { emoji: "🌍", color: "bg-cyan-500" },
-  "Economics":      { emoji: "📊", color: "bg-pink-500" },
-  "Computer Sci":   { emoji: "💻", color: "bg-violet-500" },
-  "English":        { emoji: "📝", color: "bg-orange-500" },
-  "General":        { emoji: "📚", color: "bg-slate-500" },
+  "Mathematics":  { emoji: "📐", color: "bg-blue-500" },
+  "Physics":      { emoji: "⚛️",  color: "bg-purple-500" },
+  "Chemistry":    { emoji: "🧪", color: "bg-green-500" },
+  "Biology":      { emoji: "🧬", color: "bg-emerald-500" },
+  "History":      { emoji: "📜", color: "bg-amber-500" },
+  "Geography":    { emoji: "🌍", color: "bg-cyan-500" },
+  "Economics":    { emoji: "📊", color: "bg-pink-500" },
+  "Computer Sci": { emoji: "💻", color: "bg-violet-500" },
+  "English":      { emoji: "📝", color: "bg-orange-500" },
+  "Reasoning":    { emoji: "🧩", color: "bg-red-500" },
+  "General":      { emoji: "📚", color: "bg-slate-500" },
 };
 
 function getLast7Days(): DayStat[] {
@@ -76,9 +79,9 @@ function getLast7Days(): DayStat[] {
     const d = new Date();
     d.setDate(d.getDate() - (6 - i));
     return {
-      date: d.toLocaleDateString("en-IN", { weekday: "short" }).slice(0, 3),
+      date:     d.toLocaleDateString("en-IN", { weekday: "short" }).slice(0, 3),
       fullDate: d.toLocaleDateString("en-IN", { day: "numeric", month: "short" }),
-      points: 0, questions: 0, ppts: 0, pdfs: 0, quizzes: 0,
+      points: 0, questions: 0, ppts: 0, pdfs: 0, challenges: 0,
     };
   });
 }
@@ -86,8 +89,6 @@ function getLast7Days(): DayStat[] {
 // ─────────────────────────────────────────────────────────────
 // SUB-COMPONENTS
 // ─────────────────────────────────────────────────────────────
-
-// Mini bar chart
 function BarChart({ data, maxVal, color = "bg-blue-500", height = 80 }: {
   data: number[]; maxVal: number; color?: string; height?: number;
 }) {
@@ -106,12 +107,11 @@ function BarChart({ data, maxVal, color = "bg-blue-500", height = 80 }: {
   );
 }
 
-// Radial progress ring
 function RadialProgress({ pct, size = 80, stroke = 8, color = "#6366f1", children }: {
   pct: number; size?: number; stroke?: number; color?: string; children?: React.ReactNode;
 }) {
-  const r = (size - stroke) / 2;
-  const circ = 2 * Math.PI * r;
+  const r      = (size - stroke) / 2;
+  const circ   = 2 * Math.PI * r;
   const offset = circ * (1 - Math.min(pct, 100) / 100);
   return (
     <div className="relative" style={{ width: size, height: size }}>
@@ -127,7 +127,6 @@ function RadialProgress({ pct, size = 80, stroke = 8, color = "#6366f1", childre
   );
 }
 
-// Stat card
 function StatCard({ icon: Icon, label, value, sub, trend, color }: {
   icon: any; label: string; value: string | number; sub?: string;
   trend?: { dir: "up" | "down" | "same"; val: string }; color: string;
@@ -165,90 +164,97 @@ export function Analytics() {
   const [loading, setLoading]       = useState(true);
   const [activeTab, setActiveTab]   = useState<"overview" | "subjects" | "activity">("overview");
 
-  // Load activity from server
+  // Load ALL activities (server returns last 50 — enough for 7-day + 30-day stats)
   useEffect(() => {
     getRecentActivity().then((d) => {
       if (d.success) setActivities(d.activities || []);
     }).finally(() => setLoading(false));
   }, []);
 
-  // ── Derived stats ────────────────────────────────────────
+  // ── Derived stats ──────────────────────────────────────────
   const levelInfo  = calculateLevel(totalXP);
   const levelTier  = getLevelTier(levelInfo.currentLevel);
   const levelColor = getLevelColor(levelInfo.currentLevel);
 
-  // Last 7 days activity breakdown
+  // ── Last 7 days breakdown — 100% from server activity feed ─
+  // NO localStorage reads — daily_challenge action is already in the feed
   const weekStats = useMemo<DayStat[]>(() => {
     const days = getLast7Days();
-    const now = new Date();
+    const now  = new Date(); now.setHours(23, 59, 59, 999);
 
     activities.forEach(act => {
-      const actDate = new Date(act.timestamp);
-      const daysAgo = Math.round((now.getTime() - actDate.getTime()) / 86400000);
-      if (daysAgo > 6) return;
-      const idx = 6 - daysAgo;
-      if (idx < 0 || idx >= 7) return;
+      const actDate  = new Date(act.timestamp);
+      // Calculate which day slot this activity belongs to (0 = 6 days ago, 6 = today)
+      const actDay   = new Date(actDate); actDay.setHours(0, 0, 0, 0);
+      const today    = new Date(); today.setHours(0, 0, 0, 0);
+      const daysAgo  = Math.round((today.getTime() - actDay.getTime()) / 86400000);
+
+      if (daysAgo < 0 || daysAgo > 6) return;
+      const idx = 6 - daysAgo; // idx 6 = today, idx 0 = 6 days ago
 
       days[idx].points += act.pointsEarned || 0;
-      if (act.action === "ask_question" || act.action === "quiz_completed") days[idx].questions++;
-      if (act.action === "generate_ppt" || act.action === "ppt_generated") days[idx].ppts++;
-      if (act.action === "convert_pdf" || act.action === "pdf_tool") days[idx].pdfs++;
-    });
 
-    // Also read Daily Challenge from localStorage
-    Array.from({ length: 7 }, (_, i) => {
-      const d = new Date(); d.setDate(d.getDate() - (6 - i));
-      const key = d.toISOString().split("T")[0];
-      const saved = localStorage.getItem(`dc_result_${key}`);
-      if (saved) {
-        try {
-          const res = JSON.parse(saved);
-          if (res.completed) {
-            days[i].points += res.ptsEarned || 0;
-            days[i].quizzes++;
-          }
-        } catch {}
+      switch (act.action) {
+        case "ask_question":
+        case "quiz_completed":
+          days[idx].questions++;
+          break;
+        case "generate_ppt":
+        case "ppt_generated":
+          days[idx].ppts++;
+          break;
+        case "convert_pdf":
+        case "pdf_tool":
+          days[idx].pdfs++;
+          break;
+        case "daily_challenge":
+          days[idx].challenges++;
+          break;
       }
     });
 
     return days;
   }, [activities]);
 
-  // Subject breakdown
+  // ── Subject breakdown — from server activity ───────────────
   const subjectStats = useMemo<SubjectStat[]>(() => {
     const map: Record<string, SubjectStat> = {};
-
     activities.forEach(act => {
-      if (!["ask_question", "quiz_completed", "ppt_generated", "generate_ppt"].includes(act.action)) return;
+      if (!["ask_question", "quiz_completed", "ppt_generated", "generate_ppt", "daily_challenge"].includes(act.action)) return;
       const subj = getSubjectFromDetails(act.details);
       const meta = SUBJECT_META[subj] || SUBJECT_META["General"];
       if (!map[subj]) map[subj] = { subject: subj, count: 0, points: 0, ...meta };
       map[subj].count++;
       map[subj].points += act.pointsEarned || 0;
     });
-
     return Object.values(map).sort((a, b) => b.count - a.count).slice(0, 8);
   }, [activities]);
 
-  // Quiz stats from localStorage
+  // ── Daily Challenge stats — from server activity feed ─────
+  // action = "daily_challenge", details includes "Correct ✅" or "Incorrect ❌"
   const quizStats = useMemo(() => {
-    let total = 0, correct = 0, streak7 = 0;
-    for (let i = 0; i < 30; i++) {
-      const d = new Date(); d.setDate(d.getDate() - i);
-      const key = d.toISOString().split("T")[0];
-      const saved = localStorage.getItem(`dc_result_${key}`);
-      if (saved) {
-        try {
-          const r = JSON.parse(saved);
-          if (r.completed) { total++; if (r.correct) { correct++; if (i < 7) streak7++; } }
-        } catch {}
-      }
-    }
-    return { total, correct, accuracy: total > 0 ? Math.round((correct / total) * 100) : 0, streak7 };
-  }, []);
+    const thirtyDaysAgo = Date.now() - 30 * 86400000;
+    const sevenDaysAgo  = Date.now() - 7  * 86400000;
 
-  const totalActions = userStats.totalQuestionsAsked + userStats.totalPPTsGenerated + userStats.totalPDFsConverted;
-  const maxWeekPoints = Math.max(...weekStats.map(d => d.points), 1);
+    const challenges = activities.filter(a =>
+      a.action === "daily_challenge" &&
+      new Date(a.timestamp).getTime() > thirtyDaysAgo
+    );
+
+    const total   = challenges.length;
+    const correct = challenges.filter(a => a.details?.includes("Correct")).length;
+    const week    = challenges.filter(a => new Date(a.timestamp).getTime() > sevenDaysAgo && a.details?.includes("Correct")).length;
+
+    return {
+      total,
+      correct,
+      accuracy: total > 0 ? Math.round((correct / total) * 100) : 0,
+      streak7: week,
+    };
+  }, [activities]);
+
+  const totalActions    = userStats.totalQuestionsAsked + userStats.totalPPTsGenerated + userStats.totalPDFsConverted;
+  const maxWeekPoints   = Math.max(...weekStats.map(d => d.points), 1);
   const totalWeekPoints = weekStats.reduce((s, d) => s + d.points, 0);
 
   // ─────────────────────────────────────────────────────────
@@ -267,8 +273,7 @@ export function Analytics() {
             {userName ? `${userName.split(" ")[0]}'s` : "Your"} study progress & insights
           </p>
         </div>
-        {/* Level badge */}
-        <div className={`flex items-center gap-3 px-4 py-2.5 rounded-xl glass border border-white/10 self-start sm:self-auto`}>
+        <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl glass border border-white/10 self-start sm:self-auto">
           <RadialProgress pct={levelInfo.progress} size={44} stroke={5}
             color={levelInfo.currentLevel >= 10 ? "#22c55e" : levelInfo.currentLevel >= 5 ? "#6366f1" : "#64748b"}>
             <span className="text-[10px] font-bold text-white">{levelInfo.currentLevel}</span>
@@ -291,7 +296,7 @@ export function Analytics() {
         ))}
       </div>
 
-      {/* ── OVERVIEW TAB ──────────────────────────────────── */}
+      {/* ── OVERVIEW TAB ────────────────────────────────────── */}
       {activeTab === "overview" && (
         <div className="space-y-5">
 
@@ -314,7 +319,7 @@ export function Analytics() {
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-semibold text-white">Points This Week</h3>
-                <p className="text-xs text-slate-500 mt-0.5">Last 7 days activity</p>
+                <p className="text-xs text-slate-500 mt-0.5">Last 7 days — all activities combined</p>
               </div>
               <div className="text-right">
                 <div className="text-xl font-bold text-white">{totalWeekPoints}</div>
@@ -322,18 +327,21 @@ export function Analytics() {
               </div>
             </div>
 
-            {/* Bar chart */}
-            <div>
-              <BarChart data={weekStats.map(d => d.points)} maxVal={maxWeekPoints} color="bg-blue-500" height={80} />
-              <div className="flex gap-1 mt-1">
-                {weekStats.map((d, i) => (
-                  <div key={i} className="flex-1 text-center">
-                    <div className="text-[10px] text-slate-500">{d.date}</div>
-                    {d.points > 0 && <div className="text-[9px] text-blue-400">{d.points}</div>}
-                  </div>
-                ))}
+            {loading ? (
+              <div className="h-20 bg-white/[0.02] rounded-xl animate-pulse" />
+            ) : (
+              <div>
+                <BarChart data={weekStats.map(d => d.points)} maxVal={maxWeekPoints} color="bg-blue-500" height={80} />
+                <div className="flex gap-1 mt-1">
+                  {weekStats.map((d, i) => (
+                    <div key={i} className="flex-1 text-center">
+                      <div className="text-[10px] text-slate-500">{d.date}</div>
+                      {d.points > 0 && <div className="text-[9px] text-blue-400">{d.points}</div>}
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Action breakdown + Level progress */}
@@ -343,37 +351,37 @@ export function Analytics() {
             <div className="rounded-2xl p-5 border border-white/10 bg-white/[0.02] space-y-4">
               <h3 className="text-sm font-semibold text-white">Activity Breakdown</h3>
               {[
-                { icon: Brain,        label: "AI Questions",  val: userStats.totalQuestionsAsked, color: "from-blue-500 to-cyan-500",    max: Math.max(userStats.totalQuestionsAsked, 1) },
-                { icon: Presentation, label: "PPTs Created",  val: userStats.totalPPTsGenerated,  color: "from-purple-500 to-blue-500",  max: Math.max(userStats.totalQuestionsAsked, 1) },
-                { icon: FileText,     label: "PDFs Converted",val: userStats.totalPDFsConverted,  color: "from-cyan-500 to-teal-500",    max: Math.max(userStats.totalQuestionsAsked, 1) },
-                { icon: HelpCircle,   label: "Daily Challenges", val: quizStats.total,            color: "from-orange-500 to-red-500",   max: Math.max(userStats.totalQuestionsAsked, 1) },
-              ].map(item => (
-                <div key={item.label} className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <item.icon className="w-3.5 h-3.5 text-slate-400" />
-                      <span className="text-xs text-slate-400">{item.label}</span>
+                { icon: Brain,        label: "AI Questions",     val: userStats.totalQuestionsAsked, color: "from-blue-500 to-cyan-500" },
+                { icon: Presentation, label: "PPTs Created",     val: userStats.totalPPTsGenerated,  color: "from-purple-500 to-blue-500" },
+                { icon: FileText,     label: "PDFs Converted",   val: userStats.totalPDFsConverted,  color: "from-cyan-500 to-teal-500" },
+                { icon: HelpCircle,   label: "Daily Challenges", val: quizStats.total,               color: "from-orange-500 to-red-500" },
+              ].map(item => {
+                const maxVal = Math.max(userStats.totalQuestionsAsked, userStats.totalPPTsGenerated, userStats.totalPDFsConverted, quizStats.total, 1);
+                return (
+                  <div key={item.label} className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <item.icon className="w-3.5 h-3.5 text-slate-400" />
+                        <span className="text-xs text-slate-400">{item.label}</span>
+                      </div>
+                      <span className="text-xs font-semibold text-white">{item.val}</span>
                     </div>
-                    <span className="text-xs font-semibold text-white">{item.val}</span>
+                    <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+                      <div className={`h-full rounded-full bg-gradient-to-r ${item.color} transition-all duration-700`}
+                        style={{ width: `${Math.round((item.val / maxVal) * 100)}%` }} />
+                    </div>
                   </div>
-                  <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
-                    <div className={`h-full rounded-full bg-gradient-to-r ${item.color} transition-all duration-700`}
-                      style={{ width: totalActions > 0 ? `${Math.round((item.val / Math.max(totalActions, item.val)) * 100)}%` : "0%" }} />
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             {/* Level progress */}
             <div className="rounded-2xl p-5 border border-white/10 bg-white/[0.02] space-y-4">
               <h3 className="text-sm font-semibold text-white">Level Progress</h3>
-
               <div className="flex items-center gap-4">
                 <RadialProgress pct={levelInfo.progress} size={80} stroke={8}
                   color={levelInfo.currentLevel >= 30 ? "#a855f7" : levelInfo.currentLevel >= 10 ? "#22c55e" : "#6366f1"}>
-                  <div className="text-center">
-                    <div className="text-base font-bold text-white">{levelInfo.currentLevel}</div>
-                  </div>
+                  <div className="text-base font-bold text-white">{levelInfo.currentLevel}</div>
                 </RadialProgress>
                 <div className="flex-1 space-y-2">
                   <div>
@@ -392,25 +400,24 @@ export function Analytics() {
                 </div>
               </div>
 
-              {/* Milestones */}
               <div className="space-y-2 pt-2 border-t border-white/5">
                 {[
-                  { level: 5,  label: "Beginner+", pts: 2500 },
-                  { level: 10, label: "Intermediate", pts: 10000 },
-                  { level: 20, label: "Advanced", pts: 40000 },
+                  { level: 5,  label: "Beginner+",   xp: 2500  },
+                  { level: 10, label: "Intermediate", xp: 10000 },
+                  { level: 20, label: "Advanced",     xp: 40000 },
                 ].map(m => (
                   <div key={m.level} className="flex items-center justify-between">
                     <span className="text-xs text-slate-500">Level {m.level} — {m.label}</span>
-                    {points >= m.pts
+                    {totalXP >= m.xp
                       ? <span className="text-xs text-green-400">✅ Reached</span>
-                      : <span className="text-xs text-slate-600">{(m.pts - points).toLocaleString()} pts away</span>}
+                      : <span className="text-xs text-slate-600">{(m.xp - totalXP).toLocaleString()} XP away</span>}
                   </div>
                 ))}
               </div>
             </div>
           </div>
 
-          {/* Quiz accuracy */}
+          {/* Daily Challenge stats */}
           {quizStats.total > 0 && (
             <div className="rounded-2xl p-5 border border-white/10 bg-white/[0.02]">
               <h3 className="text-sm font-semibold text-white mb-4">Daily Challenge Stats (Last 30 days)</h3>
@@ -430,7 +437,6 @@ export function Analytics() {
                   <div className="text-xs text-slate-500 mt-1">Correct this week</div>
                 </div>
               </div>
-              {/* Accuracy bar */}
               <div className="mt-4 space-y-1">
                 <div className="flex justify-between text-xs text-slate-500">
                   <span>Accuracy</span>
@@ -447,21 +453,26 @@ export function Analytics() {
         </div>
       )}
 
-      {/* ── SUBJECTS TAB ─────────────────────────────────── */}
+      {/* ── SUBJECTS TAB ──────────────────────────────────── */}
       {activeTab === "subjects" && (
         <div className="space-y-4">
-          {subjectStats.length === 0 ? (
+          {loading ? (
+            <div className="rounded-2xl p-12 border border-white/10 bg-white/[0.02] text-center">
+              <div className="w-8 h-8 border-2 border-blue-400 border-t-transparent rounded-full animate-spin mx-auto" />
+            </div>
+          ) : subjectStats.length === 0 ? (
             <div className="rounded-2xl p-12 border border-white/10 bg-white/[0.02] text-center">
               <BookOpen className="w-10 h-10 text-slate-600 mx-auto mb-3" />
               <p className="text-slate-400 text-sm">No subject data yet.</p>
-              <p className="text-slate-500 text-xs mt-1">Ask AI questions or take quizzes to see your subject breakdown!</p>
+              <p className="text-slate-500 text-xs mt-1">Ask AI questions or take daily challenges to see your subject breakdown!</p>
             </div>
           ) : (
             <>
               <div className="rounded-2xl p-5 border border-white/10 bg-white/[0.02] space-y-4">
-                <h3 className="text-sm font-semibold text-white">Subject Breakdown</h3>
-                <p className="text-xs text-slate-500">Based on your questions & quizzes</p>
-
+                <div>
+                  <h3 className="text-sm font-semibold text-white">Subject Breakdown</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">Based on your questions & daily challenges</p>
+                </div>
                 {subjectStats.map((s, i) => {
                   const maxCount = subjectStats[0]?.count || 1;
                   const pct = Math.round((s.count / maxCount) * 100);
@@ -487,7 +498,6 @@ export function Analytics() {
                 })}
               </div>
 
-              {/* Weak subjects */}
               {subjectStats.length >= 3 && (
                 <div className="rounded-2xl p-5 border border-orange-500/20 bg-orange-500/5 space-y-3">
                   <div className="flex items-center gap-2">
@@ -514,11 +524,11 @@ export function Analytics() {
         </div>
       )}
 
-      {/* ── ACTIVITY TAB ─────────────────────────────────── */}
+      {/* ── ACTIVITY TAB ──────────────────────────────────── */}
       {activeTab === "activity" && (
         <div className="space-y-4">
 
-          {/* Daily heatmap — last 28 days */}
+          {/* Heatmap — last 28 days from server */}
           <div className="rounded-2xl p-5 border border-white/10 bg-white/[0.02] space-y-3">
             <h3 className="text-sm font-semibold text-white">Activity Heatmap (Last 28 days)</h3>
             <div className="grid grid-cols-7 gap-1.5">
@@ -528,11 +538,7 @@ export function Analytics() {
               {Array.from({ length: 28 }, (_, i) => {
                 const d = new Date(); d.setDate(d.getDate() - (27 - i));
                 const key = d.toISOString().split("T")[0];
-                // Count activities on this day
-                const dayActs = activities.filter(a => {
-                  const ad = new Date(a.timestamp).toISOString().split("T")[0];
-                  return ad === key;
-                });
+                const dayActs = activities.filter(a => new Date(a.timestamp).toISOString().split("T")[0] === key);
                 const pts = dayActs.reduce((s, a) => s + (a.pointsEarned || 0), 0);
                 const intensity = pts === 0 ? 0 : pts < 20 ? 1 : pts < 50 ? 2 : pts < 100 ? 3 : 4;
                 const colors = ["bg-white/5", "bg-blue-500/20", "bg-blue-500/40", "bg-blue-500/70", "bg-blue-500"];
@@ -576,22 +582,23 @@ export function Analytics() {
               ) : (
                 activities.slice(0, 20).map((act, i) => {
                   const icons: Record<string, { icon: any; color: string; bg: string }> = {
-                    ask_question:  { icon: Brain,        color: "text-blue-400",   bg: "bg-blue-500/10" },
-                    quiz_completed:{ icon: HelpCircle,   color: "text-purple-400", bg: "bg-purple-500/10" },
-                    ppt_generated: { icon: Presentation, color: "text-purple-400", bg: "bg-purple-500/10" },
-                    generate_ppt:  { icon: Presentation, color: "text-purple-400", bg: "bg-purple-500/10" },
-                    pdf_tool:      { icon: FileText,     color: "text-cyan-400",   bg: "bg-cyan-500/10" },
-                    convert_pdf:   { icon: FileText,     color: "text-cyan-400",   bg: "bg-cyan-500/10" },
-                    daily_login:   { icon: Flame,        color: "text-orange-400", bg: "bg-orange-500/10" },
-                    streak_bonus:  { icon: Award,        color: "text-yellow-400", bg: "bg-yellow-500/10" },
-                    daily_challenge:{ icon: Target,      color: "text-red-400",    bg: "bg-red-500/10" },
+                    ask_question:    { icon: Brain,        color: "text-blue-400",   bg: "bg-blue-500/10"   },
+                    quiz_completed:  { icon: HelpCircle,   color: "text-purple-400", bg: "bg-purple-500/10" },
+                    ppt_generated:   { icon: Presentation, color: "text-purple-400", bg: "bg-purple-500/10" },
+                    generate_ppt:    { icon: Presentation, color: "text-purple-400", bg: "bg-purple-500/10" },
+                    pdf_tool:        { icon: FileText,     color: "text-cyan-400",   bg: "bg-cyan-500/10"   },
+                    convert_pdf:     { icon: FileText,     color: "text-cyan-400",   bg: "bg-cyan-500/10"   },
+                    daily_login:     { icon: Flame,        color: "text-orange-400", bg: "bg-orange-500/10" },
+                    streak_bonus:    { icon: Award,        color: "text-yellow-400", bg: "bg-yellow-500/10" },
+                    daily_challenge: { icon: Target,       color: "text-red-400",    bg: "bg-red-500/10"    },
+                    study_plan_created: { icon: Calendar,  color: "text-green-400",  bg: "bg-green-500/10"  },
                   };
                   const meta = icons[act.action] || { icon: Zap, color: "text-green-400", bg: "bg-green-500/10" };
                   const Icon = meta.icon;
                   const timeAgo = (() => {
                     const diff = Date.now() - new Date(act.timestamp).getTime();
                     const m = Math.floor(diff / 60000);
-                    if (m < 1) return "just now";
+                    if (m < 1)  return "just now";
                     if (m < 60) return `${m}m ago`;
                     const h = Math.floor(m / 60);
                     if (h < 24) return `${h}h ago`;
