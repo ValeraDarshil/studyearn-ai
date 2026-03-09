@@ -8,6 +8,22 @@
 
 import { logger } from '../utils/logger.js';
 
+// ─────────────────────────────────────────────────────────────
+// AI TIMEOUT HELPER
+// Agar AI 30 seconds mein reply nahi deta → abort karo
+// Bina iske agar Groq/OpenRouter hang ho toh request
+// forever wait karti rahegi — server slow ho jaata
+// ─────────────────────────────────────────────────────────────
+const AI_TIMEOUT_MS = 30_000; // 30 seconds
+
+function fetchWithTimeout(url: string, options: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
+
+  return fetch(url, { ...options, signal: controller.signal })
+    .finally(() => clearTimeout(timer));
+}
+
 const GROQ_KEY       = process.env.GROQ_API_KEY       || '';
 const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY || '';
 
@@ -38,7 +54,7 @@ async function groqText(userPrompt: string): Promise<string> {
   for (const model of MODELS) {
     try {
       logger.debug(`[Groq text] trying ${model}`);
-      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      const res = await fetchWithTimeout('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type':  'application/json',
@@ -68,6 +84,7 @@ async function groqText(userPrompt: string): Promise<string> {
         return answer;
       }
     } catch (e: any) {
+      // AbortError = timeout ho gaya — next model try karo
       logger.debug(`[Groq text] ${model} error: ${e.message}`);
     }
   }
@@ -91,7 +108,7 @@ async function openRouterText(userPrompt: string): Promise<string> {
   for (const model of MODELS) {
     try {
       logger.debug(`[OpenRouter text] trying ${model}`);
-      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      const res = await fetchWithTimeout('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type':  'application/json',
@@ -164,7 +181,7 @@ const VISION_MODELS = [
 
 async function callGroqVision(imageUrl: string, prompt: string): Promise<string> {
   if (!GROQ_KEY) throw new Error('No Groq key');
-  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+  const res = await fetchWithTimeout('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_KEY}` },
     body: JSON.stringify({
@@ -188,7 +205,7 @@ async function callGroqVision(imageUrl: string, prompt: string): Promise<string>
 
 async function callOpenRouterVision(model: string, imageUrl: string, prompt: string): Promise<string> {
   if (!OPENROUTER_KEY) throw new Error('OPENROUTER_API_KEY not configured');
-  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+  const res = await fetchWithTimeout('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type':  'application/json',
@@ -291,7 +308,7 @@ export async function generatePPTContent(system: string, user: string): Promise<
   for (const model of GROQ_MODELS) {
     try {
       logger.debug(`[PPT Groq] trying ${model}`);
-      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      const res = await fetchWithTimeout('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_KEY}` },
         body: JSON.stringify({
@@ -325,7 +342,7 @@ export async function generatePPTContent(system: string, user: string): Promise<
   for (const model of OR_MODELS) {
     try {
       logger.debug(`[PPT OR] trying ${model}`);
-      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      const res = await fetchWithTimeout('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type':  'application/json',

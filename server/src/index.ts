@@ -23,6 +23,8 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import helmet from 'helmet';
+import compression from 'compression';
 
 dotenv.config();
 
@@ -85,6 +87,13 @@ app.use(cors({
   },
   credentials: true,
 }));
+
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' }, // PDF/PPTX downloads ke liye
+  contentSecurityPolicy: false, // Frontend alag server pe hai toh off rakho
+}));
+
+app.use(compression());
 
 /* ─── 6. MIDDLEWARE ─────────────────────────────────────── */
 app.use(globalLimiter);
