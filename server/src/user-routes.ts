@@ -342,7 +342,7 @@ import express from 'express';
 import jwt from 'jsonwebtoken';
 import { User } from './models/User.model.js';
 import { Activity } from './models/Activity.model.js';
-import { connectDB } from './db.js';
+import { connectDB } from './config/db.js';
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET!;

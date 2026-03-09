@@ -274,7 +274,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { User } from './models/User.model.js';
 import { Activity } from './models/Activity.model.js';
-import { connectDB } from './db.js';
+import { connectDB } from './config/db.js';
 import { authLimiter } from './middleware/rateLimiter.js';
 import { validateSignup, validateLogin } from './middleware/validate.js';
 

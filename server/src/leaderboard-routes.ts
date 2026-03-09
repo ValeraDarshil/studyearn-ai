@@ -3,7 +3,7 @@
 
 import express from 'express';
 import { User } from './models/User.model.js';
-import { connectDB } from './db.js';
+import { connectDB } from './config/db.js';
 
 const router = express.Router();
 
