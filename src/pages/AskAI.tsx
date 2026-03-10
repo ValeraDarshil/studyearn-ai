@@ -1,36 +1,43 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import {
-  Brain, Send, Zap, ImagePlus, FileText, AlertCircle, X,
-  Trash2, User, Sparkles, Lightbulb,
+  Brain, Send, Zap, ImagePlus, FileText, X,
+  Trash2, User, Sparkles, Plus, MessageSquare,
+  ChevronLeft, MoreHorizontal, Check, Pencil,
 } from "lucide-react";
 import { useApp } from "../context/AppContext";
 import { API_URL } from "../utils/api";
 import { incrementAction } from "../utils/user-api";
 import { MarkdownRenderer } from "../components/MarkdownRenderer";
 
+// ─── Types ────────────────────────────────────────────────────
 type Role = "user" | "assistant";
-interface ChatMessage {
+interface ChatMsg {
   role: Role;
   content: string;
   imagePreview?: string;
   fileName?: string;
+  fileType?: "image" | "pdf";
   pointsAwarded?: number;
   isError?: boolean;
 }
+interface ConvoSummary {
+  _id: string;
+  title: string;
+  lastMessageAt: string;
+}
 
+// ─── Helpers ──────────────────────────────────────────────────
 async function compressImage(base64: string, maxPx = 1024): Promise<string> {
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {
       const scale = Math.min(1, maxPx / Math.max(img.width, img.height));
-      const w = Math.round(img.width * scale);
-      const h = Math.round(img.height * scale);
       const canvas = document.createElement("canvas");
-      canvas.width = w; canvas.height = h;
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
       const ctx = canvas.getContext("2d")!;
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(0, 0, w, h);
-      ctx.drawImage(img, 0, 0, w, h);
+      ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       resolve(canvas.toDataURL("image/jpeg", 0.88));
     };
     img.onerror = () => resolve(base64);
@@ -38,7 +45,35 @@ async function compressImage(base64: string, maxPx = 1024): Promise<string> {
   });
 }
 
-function UserBubble({ msg }: { msg: ChatMessage }) {
+function authHeaders(): Record<string, string> {
+  return { Authorization: `Bearer ${localStorage.getItem("token") || ""}` };
+}
+
+function groupByDate(convos: ConvoSummary[]) {
+  const now   = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yest  = new Date(today); yest.setDate(yest.getDate() - 1);
+  const week  = new Date(today); week.setDate(week.getDate() - 7);
+
+  const groups: { label: string; items: ConvoSummary[] }[] = [
+    { label: "Today",       items: [] },
+    { label: "Yesterday",   items: [] },
+    { label: "Last 7 days", items: [] },
+    { label: "Older",       items: [] },
+  ];
+
+  for (const c of convos) {
+    const d = new Date(c.lastMessageAt);
+    if (d >= today)      groups[0].items.push(c);
+    else if (d >= yest)  groups[1].items.push(c);
+    else if (d >= week)  groups[2].items.push(c);
+    else                 groups[3].items.push(c);
+  }
+  return groups.filter(g => g.items.length > 0);
+}
+
+// ─── Bubbles ──────────────────────────────────────────────────
+function UserBubble({ msg }: { msg: ChatMsg }) {
   return (
     <div className="flex justify-end gap-2 items-end">
       <div className="max-w-[80%] space-y-2">
@@ -69,7 +104,7 @@ function UserBubble({ msg }: { msg: ChatMessage }) {
   );
 }
 
-function AIBubble({ msg, isPremium }: { msg: ChatMessage; isPremium: boolean }) {
+function AIBubble({ msg, isPremium }: { msg: ChatMsg; isPremium: boolean }) {
   return (
     <div className="flex gap-2 items-end">
       <div className="w-7 h-7 rounded-full bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center flex-shrink-0 mb-0.5">
@@ -82,7 +117,7 @@ function AIBubble({ msg, isPremium }: { msg: ChatMessage; isPremium: boolean }) 
             ? <p className="text-sm text-red-300 leading-relaxed">{msg.content}</p>
             : <MarkdownRenderer content={msg.content} />}
         </div>
-        {msg.pointsAwarded && (
+        {!!msg.pointsAwarded && (
           <div className="px-2">
             <span className="text-xs font-medium text-green-400">
               +{msg.pointsAwarded} pts ✓{isPremium && msg.pointsAwarded > 10 ? " ⚡" : ""}
@@ -101,29 +136,53 @@ const SUGGESTIONS = [
   "Explain supply and demand with a simple example",
 ];
 
+// ═══════════════════════════════════════════════════════════════
+// MAIN COMPONENT
+// ═══════════════════════════════════════════════════════════════
 export function AskAI() {
   const {
     questionsLeft, setQuestionsLeft, useQuestion, addPoints, userId,
     logActivity, isPremium, checkAndUnlockAchievements, userStats, setUserStats,
   } = useApp();
 
-  const [messages,    setMessages]    = useState<ChatMessage[]>([]);
+  // ── Sidebar state ────────────────────────────────────────
+  const [convos,      setConvos]      = useState<ConvoSummary[]>([]);
+  const [activeId,    setActiveId]    = useState<string | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false); // mobile
+  const [loadingConvos, setLoadingConvos] = useState(true);
+
+  // Rename state
+  const [renamingId,    setRenamingId]    = useState<string | null>(null);
+  const [renameValue,   setRenameValue]   = useState("");
+  const [menuOpenId,    setMenuOpenId]    = useState<string | null>(null);
+
+  // ── Chat state ───────────────────────────────────────────
+  const [messages,    setMessages]    = useState<ChatMsg[]>([]);
   const [question,    setQuestion]    = useState("");
   const [loading,     setLoading]     = useState(false);
   const [loadingStep, setLoadingStep] = useState("");
-  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
-  const [fileType,     setFileType]     = useState<"image" | "pdf" | null>(null);
-  const [previewSrc,   setPreviewSrc]   = useState<string | null>(null);
-  const [isDragging,   setIsDragging]   = useState(false);
+
+  // ── File state ───────────────────────────────────────────
+  const [uploadedFile,  setUploadedFile]  = useState<File | null>(null);
+  const [fileType,      setFileType]      = useState<"image" | "pdf" | null>(null);
+  const [previewSrc,    setPreviewSrc]    = useState<string | null>(null);
+  const [isDragging,    setIsDragging]    = useState(false);
 
   const fileRef     = useRef<HTMLInputElement>(null);
   const bottomRef   = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  // ── Load conversations on mount ──────────────────────────
+  useEffect(() => {
+    fetchConvos();
+  }, []);
+
+  // ── Auto scroll ──────────────────────────────────────────
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
+  // ── Auto-resize textarea ─────────────────────────────────
   useEffect(() => {
     const ta = textareaRef.current;
     if (!ta) return;
@@ -131,6 +190,123 @@ export function AskAI() {
     ta.style.height = Math.min(ta.scrollHeight, 160) + "px";
   }, [question]);
 
+  // ── Close menu on outside click ──────────────────────────
+  useEffect(() => {
+    if (!menuOpenId) return;
+    const close = () => setMenuOpenId(null);
+    document.addEventListener("click", close);
+    return () => document.removeEventListener("click", close);
+  }, [menuOpenId]);
+
+  // ─────────────────────────────────────────────────────────
+  // API helpers
+  // ─────────────────────────────────────────────────────────
+  async function fetchConvos() {
+    setLoadingConvos(true);
+    try {
+      const res  = await fetch(`${API_URL}/api/chat`, { headers: authHeaders() });
+      const data = await res.json();
+      if (data.success) setConvos(data.conversations);
+    } catch { /* silent */ }
+    finally { setLoadingConvos(false); }
+  }
+
+  async function loadConversation(id: string) {
+    setActiveId(id);
+    setSidebarOpen(false);
+    try {
+      const res  = await fetch(`${API_URL}/api/chat/${id}`, { headers: authHeaders() });
+      const data = await res.json();
+      if (data.success) {
+        setMessages(data.conversation.messages.map((m: any) => ({
+          role:          m.role,
+          content:       m.content,
+          fileName:      m.fileName  || undefined,
+          fileType:      m.fileType  || undefined,
+          pointsAwarded: m.pointsAwarded || undefined,
+          isError:       m.isError   || false,
+        })));
+      }
+    } catch { /* silent */ }
+  }
+
+  async function createNewConvo(firstMessage?: string): Promise<string | null> {
+    try {
+      const res  = await fetch(`${API_URL}/api/chat`, {
+        method:  "POST",
+        headers: { ...authHeaders(), "Content-Type": "application/json" },
+        body:    JSON.stringify({ firstMessage }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        const newConvo: ConvoSummary = {
+          _id:           data.conversation._id,
+          title:         data.conversation.title,
+          lastMessageAt: data.conversation.lastMessageAt,
+        };
+        setConvos(prev => [newConvo, ...prev]);
+        setActiveId(data.conversation._id);
+        return data.conversation._id;
+      }
+    } catch { /* silent */ }
+    return null;
+  }
+
+  async function saveMessages(convoId: string, msgs: ChatMsg[]) {
+    try {
+      const res = await fetch(`${API_URL}/api/chat/${convoId}/messages`, {
+        method:  "POST",
+        headers: { ...authHeaders(), "Content-Type": "application/json" },
+        body:    JSON.stringify({ messages: msgs.map(m => ({
+          role:          m.role,
+          content:       m.content,
+          fileName:      m.fileName  || null,
+          fileType:      m.fileType  || null,
+          pointsAwarded: m.pointsAwarded || null,
+          isError:       m.isError   || false,
+        })) }),
+      });
+      const data = await res.json();
+      // Update title in sidebar if it changed
+      if (data.success && data.title) {
+        setConvos(prev => prev.map(c =>
+          c._id === convoId
+            ? { ...c, title: data.title, lastMessageAt: new Date().toISOString() }
+            : c
+        ));
+      }
+    } catch { /* silent */ }
+  }
+
+  async function handleDeleteConvo(id: string) {
+    setMenuOpenId(null);
+    try {
+      await fetch(`${API_URL}/api/chat/${id}`, { method: "DELETE", headers: authHeaders() });
+    } catch { /* silent */ }
+    setConvos(prev => prev.filter(c => c._id !== id));
+    if (activeId === id) {
+      setActiveId(null);
+      setMessages([]);
+    }
+  }
+
+  async function handleRename(id: string) {
+    const title = renameValue.trim();
+    if (!title) { setRenamingId(null); return; }
+    try {
+      await fetch(`${API_URL}/api/chat/${id}/title`, {
+        method:  "PATCH",
+        headers: { ...authHeaders(), "Content-Type": "application/json" },
+        body:    JSON.stringify({ title }),
+      });
+      setConvos(prev => prev.map(c => c._id === id ? { ...c, title } : c));
+    } catch { /* silent */ }
+    setRenamingId(null);
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // File handlers
+  // ─────────────────────────────────────────────────────────
   const handleFile = useCallback((file: File) => {
     const isImg = file.type.startsWith("image/");
     const isPdf = file.type === "application/pdf";
@@ -141,9 +317,7 @@ export function AskAI() {
       const reader = new FileReader();
       reader.onloadend = () => setPreviewSrc(reader.result as string);
       reader.readAsDataURL(file);
-    } else {
-      setPreviewSrc(null);
-    }
+    } else setPreviewSrc(null);
     textareaRef.current?.focus();
   }, []);
 
@@ -152,8 +326,21 @@ export function AskAI() {
     if (fileRef.current) fileRef.current.value = "";
   };
 
-  const clearChat = () => { setMessages([]); setQuestion(""); removeFile(); };
+  // ─────────────────────────────────────────────────────────
+  // New chat
+  // ─────────────────────────────────────────────────────────
+  function startNewChat() {
+    setActiveId(null);
+    setMessages([]);
+    setQuestion("");
+    removeFile();
+    setSidebarOpen(false);
+    textareaRef.current?.focus();
+  }
 
+  // ─────────────────────────────────────────────────────────
+  // SEND MESSAGE
+  // ─────────────────────────────────────────────────────────
   const buildHistory = () =>
     messages
       .filter(m => !m.isError && !m.imagePreview && !m.fileName)
@@ -164,12 +351,15 @@ export function AskAI() {
     const text = question.trim();
     if ((!text && !uploadedFile) || loading || questionsLeft <= 0) return;
 
-    const userMsg: ChatMessage = {
+    // Optimistic UI — add user message immediately
+    const userMsg: ChatMsg = {
       role: "user", content: text,
-      imagePreview: previewSrc || undefined,
-      fileName: uploadedFile?.name,
+      imagePreview: previewSrc   || undefined,
+      fileName:     uploadedFile?.name,
+      fileType:     fileType     || undefined,
     };
-    setMessages(prev => [...prev, userMsg]);
+    const newMessages = [...messages, userMsg];
+    setMessages(newMessages);
     setQuestion("");
     setLoading(true);
 
@@ -178,9 +368,14 @@ export function AskAI() {
     const currentPreview  = previewSrc;
     removeFile();
 
+    // Create conversation if new chat
+    let convoId = activeId;
+    if (!convoId) {
+      convoId = await createNewConvo(text || currentFile?.name);
+    }
+
     try {
-      const token   = localStorage.getItem("token");
-      const headers: Record<string, string> = { Authorization: `Bearer ${token || ""}` };
+      const headers = authHeaders();
       let result: { success: boolean; answer: string; pointsAwarded?: number; questionsLeft?: number };
 
       if (currentFileType === "pdf" && currentFile) {
@@ -203,7 +398,7 @@ export function AskAI() {
           method: "POST",
           headers: { ...headers, "Content-Type": "application/json" },
           body: JSON.stringify({
-            prompt:  text || undefined,
+            prompt:  text    || undefined,
             image:   imageData,
             history: imageData ? [] : buildHistory(),
             userId,
@@ -212,8 +407,8 @@ export function AskAI() {
         result = await res.json();
       }
 
-      const aiMsg: ChatMessage = {
-        role: "assistant",
+      const aiMsg: ChatMsg = {
+        role:    "assistant",
         content: result.answer || "No answer received. Please try again.",
         isError: !result.success,
       };
@@ -231,13 +426,17 @@ export function AskAI() {
         checkAndUnlockAchievements({ totalQuestionsAsked: newTotal });
       }
 
-      setMessages(prev => [...prev, aiMsg]);
+      const finalMessages = [...newMessages, aiMsg];
+      setMessages(finalMessages);
+
+      // Save both messages to DB
+      if (convoId) {
+        await saveMessages(convoId, [userMsg, aiMsg]);
+      }
+
     } catch {
-      setMessages(prev => [...prev, {
-        role: "assistant",
-        content: "Connection error. Please check your internet and try again.",
-        isError: true,
-      }]);
+      const errMsg: ChatMsg = { role: "assistant", content: "Connection error. Please check your internet and try again.", isError: true };
+      setMessages(prev => [...prev, errMsg]);
     } finally {
       setLoading(false); setLoadingStep("");
       textareaRef.current?.focus();
@@ -246,55 +445,207 @@ export function AskAI() {
 
   const canSend = (!!question.trim() || !!uploadedFile) && questionsLeft > 0 && !loading;
   const hasChat = messages.length > 0;
+  const grouped = groupByDate(convos);
 
-  return (
-    <div className="max-w-3xl mx-auto flex flex-col h-[calc(100vh-8rem)]">
-
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4 flex-shrink-0">
-        <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-            <Brain className="w-6 h-6 text-blue-400" /> Ask AI
-          </h1>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Earn {isPremium ? "20" : "10"} pts per question{isPremium ? " ⚡ 2×" : ""} • Context stays in chat
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-sm font-medium
-            ${questionsLeft > 0 ? "border-blue-500/20 bg-blue-500/5 text-blue-300" : "border-red-500/20 bg-red-500/5 text-red-300"}`}>
-            <Zap className="w-3.5 h-3.5" />
-            {questionsLeft} left
-            {isPremium && <span className="text-xs font-bold text-yellow-300 ml-1">⚡</span>}
-          </div>
-          {hasChat && (
-            <button onClick={clearChat} title="Clear chat"
-              className="p-2 rounded-xl border border-white/10 text-slate-500 hover:text-red-400 hover:border-red-500/20 transition-all">
-              <Trash2 className="w-4 h-4" />
-            </button>
-          )}
-        </div>
+  // ─────────────────────────────────────────────────────────
+  // SIDEBAR
+  // ─────────────────────────────────────────────────────────
+  const sidebar = (
+    <div className="flex flex-col h-full">
+      {/* New Chat button */}
+      <div className="p-3 flex-shrink-0">
+        <button
+          onClick={startNewChat}
+          className="w-full flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-500/15 to-purple-500/15 border border-blue-500/20 text-sm font-semibold text-white hover:from-blue-500/25 hover:to-purple-500/25 transition-all"
+        >
+          <Plus className="w-4 h-4 text-blue-400" />
+          New Chat
+        </button>
       </div>
 
-      {/* Chat area */}
-      <div className="flex-1 overflow-y-auto space-y-4 pr-1 pb-2 min-h-0">
+      {/* Conversations list */}
+      <div className="flex-1 overflow-y-auto px-2 space-y-4 pb-4">
+        {loadingConvos ? (
+          <div className="space-y-2 px-1 pt-2">
+            {[1,2,3].map(i => (
+              <div key={i} className="h-9 rounded-lg bg-white/[0.03] animate-pulse" />
+            ))}
+          </div>
+        ) : convos.length === 0 ? (
+          <div className="text-center py-8 px-4">
+            <MessageSquare className="w-8 h-8 text-slate-700 mx-auto mb-2" />
+            <p className="text-xs text-slate-600">No conversations yet.<br />Start chatting!</p>
+          </div>
+        ) : (
+          grouped.map(group => (
+            <div key={group.label}>
+              <p className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider px-3 mb-1">
+                {group.label}
+              </p>
+              {group.items.map(c => (
+                <div key={c._id} className="relative group/item">
+                  {renamingId === c._id ? (
+                    /* Rename input */
+                    <div className="flex items-center gap-1 px-2 py-1">
+                      <input
+                        value={renameValue}
+                        onChange={e => setRenameValue(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === "Enter") handleRename(c._id);
+                          if (e.key === "Escape") setRenamingId(null);
+                        }}
+                        autoFocus
+                        className="flex-1 bg-white/[0.06] border border-blue-500/30 rounded-lg px-2 py-1.5 text-xs text-white outline-none"
+                      />
+                      <button onClick={() => handleRename(c._id)} className="text-green-400 hover:text-green-300 p-1">
+                        <Check className="w-3.5 h-3.5" />
+                      </button>
+                      <button onClick={() => setRenamingId(null)} className="text-slate-500 hover:text-slate-300 p-1">
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => loadConversation(c._id)}
+                      className={`w-full text-left flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs transition-all group/btn
+                        ${activeId === c._id
+                          ? "bg-white/[0.07] text-white border border-white/10"
+                          : "text-slate-400 hover:text-white hover:bg-white/[0.04]"}`}
+                    >
+                      <MessageSquare className="w-3.5 h-3.5 flex-shrink-0 text-slate-600 group-hover/btn:text-slate-400" />
+                      <span className="flex-1 truncate">{c.title}</span>
+                      {/* Context menu button */}
+                      <span
+                        onClick={e => { e.stopPropagation(); setMenuOpenId(prev => prev === c._id ? null : c._id); }}
+                        className={`p-0.5 rounded transition-opacity flex-shrink-0
+                          ${menuOpenId === c._id ? "opacity-100" : "opacity-0 group-hover/item:opacity-100"}`}
+                      >
+                        <MoreHorizontal className="w-3.5 h-3.5 text-slate-500 hover:text-white" />
+                      </span>
+                    </button>
+                  )}
 
-        {!hasChat && (
-          <div className="flex flex-col items-center justify-center h-full gap-6 text-center px-4">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-white/10 flex items-center justify-center">
-              <Sparkles className="w-7 h-7 text-blue-400" />
+                  {/* Dropdown menu */}
+                  {menuOpenId === c._id && renamingId !== c._id && (
+                    <div
+                      className="absolute right-2 top-8 z-50 bg-[#0f1120] border border-white/10 rounded-xl shadow-xl overflow-hidden w-36"
+                      onClick={e => e.stopPropagation()}
+                    >
+                      <button
+                        onClick={() => { setMenuOpenId(null); setRenamingId(c._id); setRenameValue(c.title); }}
+                        className="w-full flex items-center gap-2 px-3 py-2.5 text-xs text-slate-300 hover:text-white hover:bg-white/[0.06] transition-colors"
+                      >
+                        <Pencil className="w-3.5 h-3.5" /> Rename
+                      </button>
+                      <button
+                        onClick={() => handleDeleteConvo(c._id)}
+                        className="w-full flex items-center gap-2 px-3 py-2.5 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" /> Delete
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+
+  // ─────────────────────────────────────────────────────────
+  // RENDER
+  // ─────────────────────────────────────────────────────────
+  return (
+    /* Full-width layout that breaks out of page padding */
+    <div className="flex -m-3 sm:-m-4 md:-m-8 h-[calc(100vh-4rem)] md:h-[calc(100vh-5rem)] overflow-hidden rounded-xl border border-white/8">
+
+      {/* ── SIDEBAR (desktop always visible, mobile overlay) ── */}
+      {/* Mobile overlay backdrop */}
+      {sidebarOpen && (
+        <div className="fixed inset-0 z-40 bg-black/60 md:hidden" onClick={() => setSidebarOpen(false)} />
+      )}
+
+      {/* Sidebar panel */}
+      <aside className={`
+        fixed md:relative top-0 left-0 h-full w-64 flex-shrink-0 z-50 md:z-auto
+        border-r border-white/8 transition-transform duration-300
+        ${sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
+      `} style={{ background: "rgba(5, 8, 22, 0.98)", backdropFilter: "blur(20px)" }}>
+        {/* Mobile close button */}
+        <div className="md:hidden flex items-center justify-between px-4 py-3 border-b border-white/8">
+          <span className="text-sm font-semibold text-white flex items-center gap-2">
+            <Brain className="w-4 h-4 text-blue-400" /> Ask AI
+          </span>
+          <button onClick={() => setSidebarOpen(false)} className="text-slate-400 hover:text-white">
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+        </div>
+        {sidebar}
+      </aside>
+
+      {/* ── CHAT AREA ─────────────────────────────────────── */}
+      <div className="flex-1 flex flex-col min-w-0 bg-[#060914]">
+
+        {/* Chat topbar */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-white/8 flex-shrink-0">
+          <div className="flex items-center gap-3">
+            {/* Mobile sidebar toggle */}
+            <button
+              className="md:hidden p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-colors"
+              onClick={() => setSidebarOpen(true)}
+            >
+              <MessageSquare className="w-4 h-4" />
+            </button>
             <div>
-              <h2 className="text-lg font-semibold text-white mb-1">Start a conversation</h2>
-              <p className="text-sm text-slate-500">
-                Ask a question, upload an image or PDF.<br />AI remembers your chat context!
-              </p>
+              <h1 className="text-sm font-bold text-white flex items-center gap-1.5">
+                <Brain className="w-4 h-4 text-blue-400 hidden md:block" />
+                {activeId
+                  ? (convos.find(c => c._id === activeId)?.title || "Chat")
+                  : "New Chat"
+                }
+              </h1>
             </div>
-            <div className="w-full max-w-lg">
-              <p className="text-xs text-slate-600 mb-3 flex items-center justify-center gap-1.5">
-                <Lightbulb className="w-3.5 h-3.5 text-yellow-500" /> Try these
-              </p>
-              <div className="grid sm:grid-cols-2 gap-2">
+          </div>
+
+          <div className="flex items-center gap-2">
+            {/* Questions left */}
+            <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-medium
+              ${questionsLeft > 0 ? "border-blue-500/20 bg-blue-500/5 text-blue-300" : "border-red-500/20 bg-red-500/5 text-red-300"}`}>
+              <Zap className="w-3 h-3" />
+              {questionsLeft} left
+              {isPremium && <span className="text-yellow-300 ml-0.5">⚡</span>}
+            </div>
+            {/* New chat (desktop) */}
+            <button
+              onClick={startNewChat}
+              title="New chat"
+              className="hidden md:flex p-1.5 rounded-lg border border-white/10 text-slate-400 hover:text-white hover:border-white/20 transition-all items-center gap-1.5 text-xs"
+            >
+              <Plus className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Messages area */}
+        <div className="flex-1 overflow-y-auto space-y-4 px-4 py-5 min-h-0">
+
+          {/* Empty state */}
+          {!hasChat && (
+            <div className="flex flex-col items-center justify-center h-full gap-5 text-center px-4">
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-white/10 flex items-center justify-center">
+                <Sparkles className="w-6 h-6 text-blue-400" />
+              </div>
+              <div>
+                <h2 className="text-base font-semibold text-white mb-1">
+                  {activeId ? "Conversation loaded" : "Start a conversation"}
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Ask a question, upload image/PDF.<br />AI remembers context within a chat.
+                </p>
+              </div>
+              <div className="w-full max-w-md grid sm:grid-cols-2 gap-2">
                 {SUGGESTIONS.map(q => (
                   <button key={q}
                     onClick={() => { setQuestion(q); textareaRef.current?.focus(); }}
@@ -304,103 +655,112 @@ export function AskAI() {
                 ))}
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {messages.map((msg, i) => (
-          msg.role === "user"
-            ? <UserBubble key={i} msg={msg} />
-            : <AIBubble   key={i} msg={msg} isPremium={isPremium} />
-        ))}
+          {messages.map((msg, i) =>
+            msg.role === "user"
+              ? <UserBubble key={i} msg={msg} />
+              : <AIBubble   key={i} msg={msg} isPremium={isPremium} />
+          )}
 
-        {loading && (
-          <div className="flex gap-2 items-end">
-            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center flex-shrink-0">
-              <Brain className="w-3.5 h-3.5 text-white" />
-            </div>
-            <div className="rounded-2xl rounded-bl-sm px-4 py-3 border border-white/10 bg-white/[0.04] flex items-center gap-3">
-              <div className="flex gap-1">
-                <span className="w-2 h-2 rounded-full bg-blue-400 animate-bounce" style={{ animationDelay: "0ms" }} />
-                <span className="w-2 h-2 rounded-full bg-purple-400 animate-bounce" style={{ animationDelay: "150ms" }} />
-                <span className="w-2 h-2 rounded-full bg-blue-400 animate-bounce" style={{ animationDelay: "300ms" }} />
+          {/* Typing indicator */}
+          {loading && (
+            <div className="flex gap-2 items-end">
+              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center flex-shrink-0">
+                <Brain className="w-3.5 h-3.5 text-white" />
               </div>
-              <span className="text-xs text-slate-500">{loadingStep || "AI is thinking…"}</span>
+              <div className="rounded-2xl rounded-bl-sm px-4 py-3 border border-white/10 bg-white/[0.04] flex items-center gap-3">
+                <div className="flex gap-1">
+                  {[0, 150, 300].map(delay => (
+                    <span key={delay} className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-bounce"
+                      style={{ animationDelay: `${delay}ms` }} />
+                  ))}
+                </div>
+                <span className="text-xs text-slate-500">{loadingStep || "AI is thinking…"}</span>
+              </div>
             </div>
+          )}
+
+          <div ref={bottomRef} />
+        </div>
+
+        {/* Limit banner */}
+        {questionsLeft <= 0 && (
+          <div className="flex-shrink-0 mx-4 mb-2 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-2.5 flex items-center gap-2">
+            <Zap className="w-4 h-4 text-red-400 flex-shrink-0" />
+            <p className="text-xs text-red-300">
+              Daily limit reached. {isPremium ? "Come back tomorrow!" : "Upgrade to Premium for 10 questions/day ⚡"}
+            </p>
           </div>
         )}
 
-        <div ref={bottomRef} />
-      </div>
+        {/* ── Input box ───────────────────────────────────── */}
+        <div className="flex-shrink-0 p-3 border-t border-white/8">
+          <div className="rounded-2xl border border-white/10 bg-white/[0.02] px-3 py-2 space-y-2">
 
-      {/* Limit banner */}
-      {questionsLeft <= 0 && (
-        <div className="flex-shrink-0 mb-2 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
-          <p className="text-sm text-red-300">
-            Daily limit reached. {isPremium ? "Come back tomorrow!" : "Upgrade to Premium for 10 questions/day ⚡"}
+            {/* File strip */}
+            {uploadedFile && (
+              <div className="flex items-center gap-2 px-1 py-1 rounded-xl bg-white/[0.03] border border-white/10">
+                <div className={`w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0
+                  ${fileType === "pdf" ? "bg-red-500/15" : "bg-blue-500/15"}`}>
+                  {fileType === "pdf"
+                    ? <FileText className="w-3 h-3 text-red-400" />
+                    : <ImagePlus className="w-3 h-3 text-blue-400" />}
+                </div>
+                {previewSrc && (
+                  <img src={previewSrc} alt="preview" className="h-7 w-7 rounded object-cover border border-white/10" />
+                )}
+                <span className="text-xs text-slate-300 flex-1 truncate">{uploadedFile.name}</span>
+                <button onClick={removeFile} className="text-slate-500 hover:text-red-400 transition-colors">
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            )}
+
+            <div className="flex items-end gap-2"
+              onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
+              onDragLeave={() => setIsDragging(false)}
+              onDrop={e => { e.preventDefault(); setIsDragging(false); const f = e.dataTransfer.files[0]; if (f) handleFile(f); }}>
+
+              <button onClick={() => fileRef.current?.click()} title="Upload"
+                className={`p-1.5 rounded-lg border transition-all flex-shrink-0 mb-0.5
+                  ${isDragging ? "border-blue-500/50 text-blue-400" : "border-white/10 text-slate-500 hover:text-blue-400 hover:border-blue-500/20"}`}>
+                <ImagePlus className="w-4 h-4" />
+              </button>
+
+              <textarea
+                ref={textareaRef}
+                value={question}
+                onChange={e => setQuestion(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+                placeholder={
+                  questionsLeft <= 0     ? "Daily limit reached…"
+                  : fileType === "pdf"   ? "What to do with this PDF? (leave blank to auto-solve)"
+                  : fileType === "image" ? "Describe what to solve (optional)…"
+                  : hasChat              ? "Ask a follow-up…"
+                  :                       "Ask anything… (Shift+Enter for new line)"
+                }
+                disabled={questionsLeft <= 0 || loading}
+                rows={1}
+                className="flex-1 bg-transparent text-white placeholder-slate-600 resize-none focus:outline-none text-sm leading-relaxed py-1.5 disabled:opacity-40"
+                style={{ minHeight: "32px", maxHeight: "160px" }}
+              />
+
+              <button onClick={handleSend} disabled={!canSend}
+                className="p-2 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 text-white disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-90 transition-all flex-shrink-0 mb-0.5 glow-btn">
+                <Send className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+
+          <p className="text-center text-[10px] text-slate-700 mt-1.5">
+            Earn {isPremium ? "20" : "10"} pts per question • History saved 30 days
           </p>
         </div>
-      )}
-
-      {/* Input area */}
-      <div className="flex-shrink-0 rounded-2xl border border-white/10 bg-white/[0.02] p-3 space-y-2">
-
-        {uploadedFile && (
-          <div className="flex items-center gap-2 px-2 py-1.5 rounded-xl bg-white/[0.03] border border-white/10">
-            <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0
-              ${fileType === "pdf" ? "bg-red-500/15 border border-red-500/20" : "bg-blue-500/15 border border-blue-500/20"}`}>
-              {fileType === "pdf"
-                ? <FileText className="w-3.5 h-3.5 text-red-400" />
-                : <ImagePlus className="w-3.5 h-3.5 text-blue-400" />}
-            </div>
-            {previewSrc && (
-              <img src={previewSrc} alt="preview" className="h-8 w-8 rounded object-cover border border-white/10" />
-            )}
-            <span className="text-xs text-slate-300 flex-1 truncate">{uploadedFile.name}</span>
-            <button onClick={removeFile} className="text-slate-500 hover:text-red-400 transition-colors">
-              <X className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        )}
-
-        <div className="flex items-end gap-2">
-          <button onClick={() => fileRef.current?.click()} title="Upload image or PDF"
-            className="p-2 rounded-xl border border-white/10 text-slate-500 hover:text-blue-400 hover:border-blue-500/20 transition-all flex-shrink-0 mb-0.5">
-            <ImagePlus className="w-4 h-4" />
-          </button>
-
-          <div className={`flex-1 relative transition-all ${isDragging ? "opacity-70" : ""}`}
-            onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
-            onDragLeave={() => setIsDragging(false)}
-            onDrop={e => { e.preventDefault(); setIsDragging(false); const f = e.dataTransfer.files[0]; if (f) handleFile(f); }}>
-            <textarea
-              ref={textareaRef}
-              value={question}
-              onChange={e => setQuestion(e.target.value)}
-              onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-              placeholder={
-                questionsLeft <= 0    ? "Daily limit reached…"
-                : fileType === "pdf"  ? "What to do with this PDF? (or leave blank to auto-solve)"
-                : fileType === "image"? "Describe what to solve (optional)…"
-                : hasChat             ? "Ask a follow-up question…"
-                :                      "Ask anything… (Shift+Enter for new line)"
-              }
-              disabled={questionsLeft <= 0 || loading}
-              rows={1}
-              className="w-full bg-transparent text-white placeholder-slate-600 resize-none focus:outline-none text-sm leading-relaxed py-2 disabled:opacity-40"
-              style={{ minHeight: "36px", maxHeight: "160px" }}
-            />
-          </div>
-
-          <button onClick={handleSend} disabled={!canSend}
-            className="p-2.5 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 text-white disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-90 transition-all flex-shrink-0 mb-0.5 glow-btn">
-            <Send className="w-4 h-4" />
-          </button>
-        </div>
-
-        <input ref={fileRef} type="file" accept="image/*,application/pdf" className="hidden"
-          onChange={e => { if (e.target.files?.[0]) handleFile(e.target.files[0]); }} />
       </div>
+
+      <input ref={fileRef} type="file" accept="image/*,application/pdf" className="hidden"
+        onChange={e => { if (e.target.files?.[0]) handleFile(e.target.files[0]); }} />
     </div>
   );
 }
