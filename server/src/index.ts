@@ -99,7 +99,7 @@ app.use(compression());
 /* ─── 6. MIDDLEWARE ─────────────────────────────────────── */
 app.set('trust proxy', 1); // Render/Vercel ke peeche proxy hai
 app.use(globalLimiter);
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '20mb' })); // 20mb for high-res base64 images
 
 /* ─── 7. HEALTH CHECK ───────────────────────────────────── */
 app.get('/health', (_req, res) => {

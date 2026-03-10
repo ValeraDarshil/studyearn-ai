@@ -189,7 +189,7 @@ async function callGroqVision(imageUrl: string, prompt: string): Promise<string>
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_KEY}` },
     body: JSON.stringify({
-      model: 'llama-3.2-90b-vision-preview',
+      model: 'meta-llama/llama-4-scout-17b-16e-instruct',
       messages: [{ role: 'user', content: [
         { type: 'image_url', image_url: { url: imageUrl } },
         { type: 'text',      text: prompt },
