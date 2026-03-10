@@ -174,10 +174,24 @@ export function AskAI() {
   const bottomRef   = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // ── Load conversations on mount ──────────────────────────
+  // ── Load conversations ───────────────────────────────────
+  const fetchConvos = useCallback(async () => {
+    setLoadingConvos(true);
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) { setLoadingConvos(false); return; }
+      const res  = await fetch(`${API_URL}/api/chat`, { headers: authHeaders() });
+      if (!res.ok) { console.error('[Chat] fetchConvos HTTP:', res.status); setLoadingConvos(false); return; }
+      const data = await res.json();
+      console.log('[Chat] fetchConvos:', data.conversations?.length, 'convos');
+      if (data.success) setConvos(data.conversations);
+    } catch(e) { console.error('[Chat] fetchConvos error:', e); }
+    finally { setLoadingConvos(false); }
+  }, []);
+
   useEffect(() => {
     fetchConvos();
-  }, []);
+  }, [fetchConvos]);
 
   // ── Auto scroll ──────────────────────────────────────────
   useEffect(() => {
@@ -203,15 +217,7 @@ export function AskAI() {
   // ─────────────────────────────────────────────────────────
   // API helpers
   // ─────────────────────────────────────────────────────────
-  async function fetchConvos() {
-    setLoadingConvos(true);
-    try {
-      const res  = await fetch(`${API_URL}/api/chat`, { headers: authHeaders() });
-      const data = await res.json();
-      if (data.success) setConvos(data.conversations);
-    } catch { /* silent */ }
-    finally { setLoadingConvos(false); }
-  }
+
 
   async function loadConversation(id: string) {
     setActiveId(id);
@@ -241,6 +247,7 @@ export function AskAI() {
         body:    JSON.stringify({ firstMessage }),
       });
       const data = await res.json();
+      console.log('[Chat] createNewConvo:', data);
       if (data.success) {
         const newConvo: ConvoSummary = {
           _id:           data.conversation._id,
@@ -251,7 +258,7 @@ export function AskAI() {
         setActiveId(data.conversation._id);
         return data.conversation._id;
       }
-    } catch { /* silent */ }
+    } catch(e) { console.error('[Chat] createNewConvo error:', e); }
     return null;
   }
 
@@ -270,6 +277,7 @@ export function AskAI() {
         })) }),
       });
       const data = await res.json();
+      console.log('[Chat] saveMessages:', data);
       // Update title in sidebar if it changed
       if (data.success && data.title) {
         setConvos(prev => prev.map(c =>
@@ -278,7 +286,7 @@ export function AskAI() {
             : c
         ));
       }
-    } catch { /* silent */ }
+    } catch(e) { console.error('[Chat] saveMessages error:', e); }
   }
 
   async function handleDeleteConvo(id: string) {
@@ -440,6 +448,8 @@ export function AskAI() {
       // Save both messages to DB
       if (convoId) {
         await saveMessages(convoId, [userMsg, aiMsg]);
+        // Refresh sidebar to show updated title/timestamp
+        fetchConvos();
       }
 
     } catch {
