@@ -25,13 +25,26 @@ async function handlePDFAction(req: Request, actionLabel: string): Promise<void>
   try {
     const user = await User.findById(userId);
     if (!user) return;
-    const pts = 10;
+
+    // ✅ Auto-expire premium check
+    if ((user as any).isPremium && (user as any).premiumExpiresAt) {
+      if (new Date((user as any).premiumExpiresAt) < new Date()) {
+        (user as any).isPremium        = false;
+        (user as any).premiumExpiresAt = null;
+      }
+    }
+    const isPremiumActive = (user as any).isPremium === true;
+
+    // ✅ Premium users get 1.5x points
+    const basePts = 10;
+    const pts = isPremiumActive ? Math.round(basePts * 1.5) : basePts; // 10 or 15
+
     user.points                     += pts;
     (user as any).totalXP            = ((user as any).totalXP || 0) + pts;
     (user as any).totalPDFsConverted = ((user as any).totalPDFsConverted || 0) + 1;
     await user.save();
     await Activity.create({ userId, action: 'convert_pdf', details: actionLabel, pointsEarned: pts });
-    logger.info(`PDF action (${actionLabel}): ${user.email} | +${pts}pts`);
+    logger.info(`PDF action (${actionLabel}): ${user.email} | +${pts}pts${isPremiumActive ? ' (1.5x premium)' : ''}`);
   } catch (err: any) {
     logger.error('handlePDFAction error:', err.message);
   }

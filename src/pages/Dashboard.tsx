@@ -111,7 +111,7 @@ export function Dashboard() {
             </div>
           </div>
           <div className="text-2xl font-bold text-white">
-            <AnimatedNumber value={5 - questionsLeft} suffix={'/5'} />
+            <AnimatedNumber value={(isPremium ? 15 : 5) - questionsLeft} suffix={isPremium ? '/15' : '/5'} />
           </div>
           <div className="w-full h-0.5 mt-3 rounded-full bg-gradient-to-r from-blue-500/40 to-transparent" />
         </div>

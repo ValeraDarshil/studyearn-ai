@@ -206,7 +206,7 @@ const PPT_STYLES = [
 
 
 export function PPTGenerator() {
-  const { addPoints, userId, logActivity, checkAndUnlockAchievements, userStats, setUserStats } = useApp();
+  const { addPoints, userId, logActivity, checkAndUnlockAchievements, userStats, setUserStats, isPremium } = useApp();
   const [topic, setTopic]       = useState("");
   const [classLevel, setClassLevel] = useState("");
   const [style, setStyle]       = useState("detailed");
@@ -406,8 +406,10 @@ Output the JSON array now:`;
       setDownloadUrl(url);
       setSlideCount(normalized.length);
       setGenerated(true);
-      addPoints(25);
-      logActivity("ppt_generated", `PPT: ${topic}`, 25);
+      // ✅ Premium users get 1.5x — base 20 → 30 pts
+      const pptPts = isPremium ? 30 : 20;
+      addPoints(pptPts);
+      logActivity("ppt_generated", `PPT: ${topic}${isPremium ? " ⚡" : ""}`, pptPts);
       const newTotal = (userStats.totalPPTsGenerated || 0) + 1;
       setUserStats({ ...userStats, totalPPTsGenerated: newTotal });
       incrementAction("ppt");
@@ -434,7 +436,7 @@ Output the JSON array now:`;
           <Presentation className="w-6 h-6 text-purple-400" /> PPT Generator
         </h1>
         <p className="text-sm text-slate-400 mt-1">
-          AI builds a professional presentation for your exact level • Earn 25 pts
+          AI builds a professional presentation for your exact level • Earn {isPremium ? "30 ⚡" : "20"} pts
         </p>
       </div>
 

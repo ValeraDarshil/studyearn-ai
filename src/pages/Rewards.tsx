@@ -64,13 +64,18 @@ function StatusBadge({ status }: { status: Redemption["status"] }) {
 // ─────────────────────────────────────────────────────────────
 export function Rewards() {
   const navigate  = useNavigate();
-  const { points, streak, userId, unlockedAchievements, userStats, addPoints } = useApp();
+  const { points, streak, userId, unlockedAchievements, userStats, addPoints, isPremium, premiumExpiresAt } = useApp();
 
   const [tiers,      setTiers]      = useState<Tier[]>([]);
   const [history,    setHistory]    = useState<Redemption[]>([]);
   const [topUsers,   setTopUsers]   = useState<any[]>([]);
   const [activeTab,  setActiveTab]  = useState<"earn" | "redeem" | "history" | "achievements">("earn");
   const [loadingLB,  setLoadingLB]  = useState(true);
+
+  // Premium status polling
+  const [hasPending,        setHasPending]        = useState(false);
+  const [pendingCreatedAt,  setPendingCreatedAt]   = useState<string | null>(null);
+  const [premiumJustActivated, setPremiumJustActivated] = useState(false);
 
   // Redemption modal state
   const [selectedTier,   setSelectedTier]   = useState<Tier | null>(null);
@@ -83,8 +88,42 @@ export function Rewards() {
   useEffect(() => {
     loadTiers();
     loadLeaderboard();
-    if (token) loadHistory();
+    if (token) {
+      loadHistory();
+      checkRewardStatus();
+    }
   }, []);
+
+  // ✅ Poll every 30s when there's a pending redemption
+  useEffect(() => {
+    if (!hasPending || !token) return;
+    const interval = setInterval(() => {
+      checkRewardStatus();
+    }, 30_000);
+    return () => clearInterval(interval);
+  }, [hasPending, token]);
+
+  const checkRewardStatus = async () => {
+    try {
+      const res  = await fetch(`${API}/api/rewards/status`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!data.success) return;
+
+      setHasPending(data.hasPendingRedemption);
+      if (data.pendingRedemption?.createdAt) {
+        setPendingCreatedAt(data.pendingRedemption.createdAt);
+      }
+
+      // ✅ Premium just activated! Show celebration
+      if (data.isPremium && !isPremium) {
+        setPremiumJustActivated(true);
+        loadHistory(); // refresh to show fulfilled status
+        setTimeout(() => setPremiumJustActivated(false), 8000);
+      }
+    } catch {}
+  };
 
   const loadTiers = async () => {
     try {
@@ -128,9 +167,13 @@ export function Rewards() {
       const data = await res.json();
       setRedeemResult({ success: data.success, message: data.message });
       if (data.success) {
-        // Refresh history
+        // ✅ Start polling immediately after redemption
+        setHasPending(true);
+        setPendingCreatedAt(new Date().toISOString());
         loadHistory();
         setDeliveryInfo("");
+        // Check status after 1s to get pendingRedemption details
+        setTimeout(checkRewardStatus, 1000);
       }
     } catch {
       setRedeemResult({ success: false, message: "Something went wrong. Please try again." });
@@ -293,6 +336,48 @@ export function Rewards() {
       {/* ── REDEEM TAB ───────────────────────────────────── */}
       {activeTab === "redeem" && (
         <div className="space-y-4">
+
+          {/* ✅ Premium just activated celebration */}
+          {premiumJustActivated && (
+            <div className="rounded-2xl p-4 border border-yellow-500/30 bg-yellow-500/10 text-center animate-pulse">
+              <div className="text-2xl mb-1">🎉</div>
+              <p className="text-yellow-300 font-bold text-sm">Premium Activated!</p>
+              <p className="text-yellow-400/70 text-xs mt-0.5">Reload the page to see your 15 questions/day & 1.5× points!</p>
+            </div>
+          )}
+
+          {/* ✅ Active premium banner */}
+          {isPremium && !premiumJustActivated && (
+            <div className="rounded-2xl p-4 border border-purple-500/30 bg-purple-500/10 flex items-center gap-3">
+              <span className="text-2xl">⚡</span>
+              <div>
+                <p className="text-purple-300 font-bold text-sm">Premium Active</p>
+                <p className="text-purple-400/70 text-xs">
+                  Expires: {premiumExpiresAt ? new Date(premiumExpiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—"}
+                  {" "}• 15 questions/day • 1.5× points ⚡
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* ✅ Pending redemption countdown */}
+          {hasPending && !isPremium && (
+            <div className="rounded-2xl p-4 border border-orange-500/30 bg-orange-500/10">
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-2 h-2 rounded-full bg-orange-400 animate-pulse" />
+                <p className="text-orange-300 font-bold text-sm">Premium Verification In Progress</p>
+              </div>
+              <p className="text-orange-400/70 text-xs">
+                We're verifying your activity. Plan activates automatically within 30 minutes.
+                {pendingCreatedAt && (() => {
+                  const elapsed = Math.floor((Date.now() - new Date(pendingCreatedAt).getTime()) / 60000);
+                  const remaining = Math.max(0, 30 - elapsed);
+                  return remaining > 0 ? ` (~${remaining} min remaining)` : " Any moment now...";
+                })()}
+              </p>
+            </div>
+          )}
+
           <p className="text-xs text-slate-500">
             Click a reward to redeem. Points are deducted immediately. Premium activates within 30 minutes after verification.
           </p>

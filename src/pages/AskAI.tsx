@@ -78,8 +78,8 @@ async function compressImage(base64: string, maxPx = 1024): Promise<string> {
 
 export function AskAI() {
   const {
-    questionsLeft, useQuestion, addPoints, userId, logActivity, isPremium,
-    checkAndUnlockAchievements, userStats, setUserStats,
+    questionsLeft, setQuestionsLeft, useQuestion, addPoints, userId,
+    logActivity, isPremium, checkAndUnlockAchievements, userStats, setUserStats,
   } = useApp();
 
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
@@ -92,6 +92,7 @@ export function AskAI() {
   const [loading, setLoading]       = useState(false);
   const [loadingStep, setLoadingStep] = useState("");
   const [isDragging, setIsDragging] = useState(false);
+  const [lastPointsAwarded, setLastPointsAwarded] = useState(10); // tracks actual pts from server
 
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -126,7 +127,12 @@ export function AskAI() {
     setLoading(true); setShowAnswer(false);
 
     try {
-      let result: { success: boolean; answer: string };
+      let result: {
+        success: boolean;
+        answer: string;
+        pointsAwarded?: number;
+        questionsLeft?: number;
+      };
       const token = localStorage.getItem("token");
       const headers: Record<string, string> = { Authorization: `Bearer ${token || ""}` };
 
@@ -169,9 +175,19 @@ export function AskAI() {
       setAnswer(result.answer || "No answer received. Please try again.");
 
       if (result.success) {
-        addPoints(10);       // +10 pts shown in UI
-        useQuestion();       // decrement questionsLeft in UI
-        logActivity("ask_question", question.substring(0, 50) || `${fileType} question`, 10);
+        // ✅ Server ka actual pointsAwarded use karo — premium pe 2x milta hai server side se
+        const actualPts = result.pointsAwarded ?? (isPremium ? 30 : 15);
+        setLastPointsAwarded(actualPts);
+        addPoints(actualPts);
+
+        // ✅ Server se exact questionsLeft sync karo — premium = 15/day, free = 5/day
+        if (result.questionsLeft !== undefined) {
+          setQuestionsLeft(result.questionsLeft); // server truth use karo
+        } else {
+          useQuestion(); // fallback: local decrement
+        }
+
+        logActivity("ask_question", question.substring(0, 50) || `${fileType} question`, actualPts);
         const newTotal = (userStats.totalQuestionsAsked || 0) + 1;
         setUserStats({ ...userStats, totalQuestionsAsked: newTotal });
         incrementAction("question");
@@ -207,7 +223,7 @@ export function AskAI() {
             <Brain className="w-6 h-6 text-blue-400" /> Ask AI
           </h1>
           <p className="text-sm text-slate-400 mt-1">
-            Type a question • Upload an image or PDF • Earn 10 pts per question
+            Type a question • Upload an image or PDF • Earn {isPremium ? "30" : "15"} pts per question{isPremium ? " ⚡" : ""}
           </p>
         </div>
         <div className={`flex items-center gap-2 px-4 py-2 rounded-xl border w-fit
@@ -380,7 +396,7 @@ export function AskAI() {
               )}
             </div>
             <span className="text-xs font-medium text-green-400 bg-green-400/10 px-2 py-1 rounded-lg">
-              +10 pts ✓
+              +{lastPointsAwarded} pts ✓{isPremium && lastPointsAwarded > 10 ? " ⚡" : ""}
             </span>
           </div>
 

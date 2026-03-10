@@ -451,7 +451,16 @@ router.post('/daily-challenge/result', authenticate, async (req: any, res) => {
 
     const challenge = dc.challenge;
     const correct   = selectedIdx === challenge.answer;
-    const ptsEarned = correct ? challenge.pts : Math.round(challenge.pts * 0.1);
+
+    // ✅ Auto-expire premium check
+    if (user.isPremium && user.premiumExpiresAt && new Date(user.premiumExpiresAt) < new Date()) {
+      user.isPremium = false; user.premiumExpiresAt = null;
+    }
+    const isPremiumActive = user.isPremium === true;
+
+    // ✅ Premium users get 1.5x points on daily challenge
+    const basePts   = correct ? challenge.pts : Math.round(challenge.pts * 0.1);
+    const ptsEarned = isPremiumActive ? Math.round(basePts * 1.5) : basePts;
 
     const result = { date: todayKey, completed: true, correct, ptsEarned };
 
@@ -464,12 +473,12 @@ router.post('/daily-challenge/result', authenticate, async (req: any, res) => {
     await Activity.create({
       userId:       req.userId,
       action:       'daily_challenge',
-      details:      `Daily Challenge: ${challenge.subject} — ${correct ? 'Correct ✅' : 'Incorrect ❌'}`,
+      details:      `Daily Challenge: ${challenge.subject} — ${correct ? 'Correct ✅' : 'Incorrect ❌'}${isPremiumActive ? ' (1.5x)' : ''}`,
       pointsEarned: ptsEarned,
     });
 
-    console.log(`✅ Daily challenge: ${user.email} ${correct ? '✅' : '❌'} (+${ptsEarned} pts)`);
-    res.json({ success: true, result, ptsEarned });
+    console.log(`✅ Daily challenge: ${user.email} ${correct ? '✅' : '❌'} (+${ptsEarned} pts${isPremiumActive ? ' 1.5x' : ''})`);
+    res.json({ success: true, result, ptsEarned, isPremium: isPremiumActive });
   } catch (error) {
     console.error('Daily challenge result error:', error);
     res.status(500).json({ success: false, message: 'Server error' });

@@ -509,11 +509,20 @@ router.post('/login', authLimiter, validateLogin, async (req, res) => {
       return res.status(401).json({ success: false, message: 'Invalid credentials' });
     }
 
-    // Check daily reset
+    // Check daily reset — premium users get 15/day, free users get 5/day
     const today = new Date().toISOString().split('T')[0];
+    const isPremiumNow = (user as any).isPremium === true
+      && (user as any).premiumExpiresAt
+      && new Date((user as any).premiumExpiresAt) > new Date();
+    const dailyLimit = isPremiumNow ? 15 : 5;
+
     if (user.questionsDate !== today) {
-      user.questionsLeft = 5;
+      user.questionsLeft = dailyLimit;
       user.questionsDate = today;
+      await user.save();
+    } else if (isPremiumNow && user.questionsLeft < 15 && user.questionsLeft === 5) {
+      // Edge case: user just bought premium today — upgrade their quota immediately
+      user.questionsLeft = 15;
       await user.save();
     }
 
@@ -589,8 +598,28 @@ router.get('/me', async (req, res) => {
     // ── Auto-migrate: seed totalXP for existing users ──
     if (!(user as any).totalXP && user.points > 0) {
       (user as any).totalXP = user.points;
-      await user.save();
       console.log(`✅ XP migrated for ${user.email}: totalXP = ${user.points}`);
+    }
+
+    // ── Auto-expire premium if past expiry date ──
+    if ((user as any).isPremium && (user as any).premiumExpiresAt) {
+      if (new Date((user as any).premiumExpiresAt) < new Date()) {
+        (user as any).isPremium        = false;
+        (user as any).premiumExpiresAt = null;
+        console.info(`Premium auto-expired for ${user.email}`);
+      }
+    }
+    const isPremiumActive = (user as any).isPremium === true;
+    const dailyLimit = isPremiumActive ? 15 : 5;
+
+    // ── Fix questionsLeft if premium just activated ──
+    const meToday = new Date().toISOString().split('T')[0];
+    if (user.questionsDate !== meToday) {
+      user.questionsLeft = dailyLimit;
+      user.questionsDate = meToday;
+    } else if (isPremiumActive && user.questionsLeft <= 5 && user.questionsLeft === 5) {
+      // Premium just bought today — bump their quota
+      user.questionsLeft = 15;
     }
 
     // ── Check streak on /me — ensures animation works on any device/browser ──
@@ -618,8 +647,10 @@ router.get('/me', async (req, res) => {
       user.points    += bonusPoints;
       (user as any).totalXP = ((user as any).totalXP || 0) + bonusPoints;
       user.lastActive = new Date();
-      await user.save();
     }
+
+    // Single save for all mutations above
+    await user.save();
 
     res.json({
       success: true,

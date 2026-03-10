@@ -115,7 +115,7 @@ function parseQuestions(text: string): Question[] {
 // COMPONENT
 // ─────────────────────────────────────────────────────────────
 export function QuizGenerator() {
-  const { addPoints, logActivity, questionsLeft, useQuestion } = useApp();
+  const { addPoints, logActivity, questionsLeft, useQuestion, isPremium } = useApp();
 
   const [state, setState]           = useState<QuizState>("setup");
   const [topic, setTopic]           = useState("");
@@ -208,10 +208,12 @@ CRITICAL RULES:
     if (current + 1 >= questions.length) {
       // Calculate score and award points
       const correct = answers.filter((a, i) => a === questions[i]?.answer).length;
-      const pts = correct * 5; // 5 pts per correct answer
+      const basePts = correct * 5; // 5 pts per correct answer
+      // ✅ Premium users get 1.5x points on quiz
+      const pts = isPremium ? Math.round(basePts * 1.5) : basePts;
       if (pts > 0) {
         addPoints(pts);
-        logActivity("quiz_completed", `Quiz: ${topic || subject} (${correct}/${questions.length})`, pts);
+        logActivity("quiz_completed", `Quiz: ${topic || subject} (${correct}/${questions.length})${isPremium ? " ⚡" : ""}`, pts);
       }
       setState("result");
     } else {

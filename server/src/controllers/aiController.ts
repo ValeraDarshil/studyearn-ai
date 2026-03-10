@@ -48,8 +48,9 @@ async function handleQuestionUsed(
     }
     if (user.questionsLeft > 0) user.questionsLeft -= 1;
 
-    // Premium users 2x points
-    if (isPremiumActive) pointsToAward = pointsToAward * 2;
+    // ✅ Premium users get 1.5x points (consistent across all features)
+    const basePts = pointsToAward; // 15 base
+    if (isPremiumActive) pointsToAward = Math.round(basePts * 1.5); // 15 → 22
 
     user.points                       += pointsToAward;
     (user as any).totalXP              = ((user as any).totalXP || 0) + pointsToAward;
