@@ -53,6 +53,7 @@ import aiRoutes      from './routes/aiRoutes.js';
 import pptRoutes     from './routes/pptRoutes.js';
 import pdfRoutes     from './routes/pdfRoutes.js';
 import rewardsRoutes from './routes/rewardsRoutes.js';
+import chatRoutes    from './routes/chatRoutes.js';
 
 // Background jobs
 import { fixStuckRedemptions, processPendingPremiums } from './controllers/rewardsController.js';
@@ -96,6 +97,7 @@ app.use(helmet({
 app.use(compression());
 
 /* ─── 6. MIDDLEWARE ─────────────────────────────────────── */
+app.set('trust proxy', 1); // Render/Vercel ke peeche proxy hai
 app.use(globalLimiter);
 app.use(express.json({ limit: '10mb' }));
 
@@ -116,6 +118,7 @@ app.use('/api/ai',      aiRoutes);       // POST /api/ai/ask, /api/ai/solve-pdf
 app.use('/api/ppt',     pptRoutes);      // POST /api/ppt/content, /api/ppt/generate
 app.use('/api',         pdfRoutes);      // POST /api/img-to-pdf, /api/merge-pdf ...
 app.use('/api/rewards', rewardsRoutes);  // GET/POST /api/rewards/*
+app.use('/api/chat',    chatRoutes);     // GET/POST /api/chat/*
 
 /* ─── 9. GLOBAL ERROR HANDLER (SABSE LAST) ─────────────── */
 app.use(errorHandler);
