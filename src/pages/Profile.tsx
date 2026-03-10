@@ -240,9 +240,7 @@ export function Profile() {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ name, email, avatar: newId }),
       });
-      const user = JSON.parse(localStorage.getItem("user") || "{}");
-      user.avatar = newId;
-      localStorage.setItem("user", JSON.stringify(user));
+      // ✅ localStorage.user hata diya — data server pe save ho gaya, wahi real source hai
     } catch {}
   };
 
@@ -262,9 +260,8 @@ export function Profile() {
       if (data.success) {
         setSuccess("Profile updated!");
         setEditMode(false);
-        const user = JSON.parse(localStorage.getItem("user") || "{}");
-        user.name = name; user.email = email; user.avatar = avatarId;
-        localStorage.setItem("user", JSON.stringify(user));
+        // ✅ localStorage.user hata diya — server already update ho gaya
+        // Next page refresh pe /api/auth/me se fresh data milega
         setTimeout(() => setSuccess(""), 3000);
       } else {
         setError(data.message || "Update failed");

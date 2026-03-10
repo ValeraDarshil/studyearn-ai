@@ -141,7 +141,8 @@ function AppContent() {
 
         getRecentActivity().then((d) => { if (d.success) setRecentActivity(d.activities); });
 
-        // Show streak celebration if login returned streakInfo
+        // ── Streak Celebration — 3 layer guarantee ─────────────────
+        // Layer 1: sessionStorage se (login page ne store kiya tha — same device, same browser)
         const streakCelebration = sessionStorage.getItem("streakCelebration");
         const loginBonus = sessionStorage.getItem("loginBonus");
         if (streakCelebration) {
@@ -154,7 +155,21 @@ function AppContent() {
           sessionStorage.removeItem("loginBonus");
         }
 
-        checkStreak().catch(console.error);
+        // Layer 2: /me response mein streakInfo — works on ANY device/browser
+        // Server ne /me pe hi streak update kar diya aur response mein bheja
+        const streakInfoFromMe = (user as any)._streakInfo;
+        if (!streakCelebration && streakInfoFromMe?.streakIncreased) {
+          setCelebrationStreak(streakInfoFromMe.currentStreak);
+          // Points bhi update karo (server ne bonus already diya)
+          setPoints(user.points);
+          setTotalXP((user as any).totalXP || user.points);
+          setTimeout(() => setShowStreakCelebration(true), 1500);
+        }
+
+        // Layer 3: /update-streak endpoint — safety net (only if layers 1+2 missed)
+        if (!streakCelebration && !streakInfoFromMe?.streakIncreased) {
+          checkStreak().catch(console.error);
+        }
 
         // Load achievements from server, then check for newly eligible ones
         getAchievements().then((d) => {
@@ -182,13 +197,11 @@ function AppContent() {
         });
       } else {
         localStorage.removeItem("token");
-        localStorage.removeItem("user");
         setIsLoggedIn(false);
       }
     } catch (error) {
       console.error("Load user error:", error);
       localStorage.removeItem("token");
-      localStorage.removeItem("user");
       setIsLoggedIn(false);
     } finally {
       setTimeout(() => setLoading(false), 1000);
@@ -263,7 +276,9 @@ function AppContent() {
       const data = await res.json();
       if (data.success) {
         setStreak(data.streak);
-        if (data.streakIncreased && location.pathname.startsWith("/app")) {
+        // ✅ Agar streak increase hua — kisi bhi device/browser pe animation dikhaao
+        // Yeh ensures karta hai ki agar session storage miss ho toh bhi kaam kare
+        if (data.streakIncreased) {
           setCelebrationStreak(data.streak);
           setTimeout(() => setShowStreakCelebration(true), 1500);
         }

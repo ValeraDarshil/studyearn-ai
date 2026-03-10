@@ -195,20 +195,68 @@ export async function addWatermark(buffer: Buffer, text: string): Promise<Buffer
 
 /** Word/PPT/Excel → PDF (LibreOffice se convert karo) */
 export async function convertOfficeToPDF(inputBuffer: Buffer, originalName: string): Promise<Buffer> {
-  const tmpDir    = fs.mkdtempSync(path.join(os.tmpdir(), 'lo-'));
-  const inputPath = path.join(tmpDir, originalName);
-  const outName   = originalName.replace(/\.[^.]+$/, '.pdf');
-  const outPath   = path.join(tmpDir, outName);
+  // ── Sanitize filename (spaces aur special chars se bachao) ──
+  const safeExt  = path.extname(originalName).toLowerCase();
+  const safeName = 'input' + safeExt;                          // predictable output name
+  const tmpDir   = fs.mkdtempSync(path.join(os.tmpdir(), 'lo-'));
+  const inputPath = path.join(tmpDir, safeName);
+  const outPath   = path.join(tmpDir, 'input.pdf');            // LibreOffice always outputs 'input.pdf'
 
   try {
     fs.writeFileSync(inputPath, inputBuffer);
-    await execAsync(
-      `libreoffice --headless --convert-to pdf --outdir "${tmpDir}" "${inputPath}"`,
-      { timeout: 30000 },
-    );
-    if (!fs.existsSync(outPath)) throw new Error('LibreOffice conversion failed — output not found');
-    return fs.readFileSync(outPath);
+
+    // ── Find LibreOffice binary (different paths on different servers) ──
+    const loPaths = [
+      'libreoffice',
+      'soffice',
+      '/usr/bin/libreoffice',
+      '/usr/bin/soffice',
+      '/usr/lib/libreoffice/program/soffice',
+      '/Applications/LibreOffice.app/Contents/MacOS/soffice',
+    ];
+
+    let loCmd = 'libreoffice';
+    for (const p of loPaths) {
+      try {
+        await execAsync(`"${p}" --version`, { timeout: 3000 });
+        loCmd = p;
+        break;
+      } catch {}
+    }
+
+    // ── Convert with all required flags for headless server environments ──
+    // --norestore: prevents crash recovery dialog
+    // --nofirststartwizard: prevents setup wizard
+    // --nolockcheck: prevents lock file issues when multiple conversions run
+    // --invisible: no GUI even if DISPLAY is set
+    const cmd = `"${loCmd}" --headless --norestore --nofirststartwizard --nolockcheck --invisible --convert-to pdf --outdir "${tmpDir}" "${inputPath}"`;
+
+    const { stderr } = await execAsync(cmd, {
+      timeout: 60000,  // 60s — heavy files pe zyada time lagta hai
+      env: {
+        ...process.env,
+        HOME: tmpDir,   // LibreOffice user profile isolation — parallel conversions ke liye
+        UserInstallation: `file://${tmpDir}`,
+      },
+    });
+
+    if (stderr && stderr.includes('Error')) {
+      throw new Error(`LibreOffice error: ${stderr.substring(0, 200)}`);
+    }
+
+    if (!fs.existsSync(outPath)) {
+      // Try alternate output name (some versions use original name)
+      const altOut = path.join(tmpDir, safeName.replace(safeExt, '.pdf'));
+      if (fs.existsSync(altOut)) return fs.readFileSync(altOut);
+      throw new Error('LibreOffice conversion failed — output PDF not found. File might be password-protected or corrupted.');
+    }
+
+    const result = fs.readFileSync(outPath);
+    if (result.length < 100) throw new Error('LibreOffice produced empty PDF — file may be corrupted.');
+    return result;
+
   } finally {
+    // Always cleanup temp files
     try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
   }
 }

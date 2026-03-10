@@ -15,11 +15,11 @@ import { logger } from '../utils/logger.js';
 // REWARD TIERS — single source of truth
 // ─────────────────────────────────────────────────────────────
 export const REWARD_TIERS = [
-  { id: 'tier_1000',  title: '7-Day Premium',     desc: '15 AI questions/day • 2× points • Premium badge', pointsCost: 1000,  type: 'premium',  icon: '⚡' },
-  { id: 'tier_2500',  title: '₹10 Paytm Voucher', desc: 'UPI/Paytm cash voucher',                          pointsCost: 2500,  type: 'voucher',  icon: '💳' },
-  { id: 'tier_5000',  title: '₹25 Amazon GC',     desc: 'Amazon India gift card',                           pointsCost: 5000,  type: 'giftcard', icon: '🎁' },
-  { id: 'tier_10000', title: '₹50 Amazon GC',      desc: 'Amazon India gift card',                           pointsCost: 10000, type: 'giftcard', icon: '🎁' },
-  { id: 'tier_25000', title: '₹150 Amazon GC',     desc: 'Amazon India gift card',                           pointsCost: 25000, type: 'giftcard', icon: '💎' },
+  { id: 'tier_1000',  title: '7-Day Premium',     desc: '15 AI questions/day • 2× points • Premium badge', pointsCost: 1000,  type: 'premium',  icon: '⚡', available: true  },
+  { id: 'tier_2500',  title: '₹10 Paytm Voucher', desc: 'UPI/Paytm cash voucher',                          pointsCost: 2500,  type: 'voucher',  icon: '💳', available: false },
+  { id: 'tier_5000',  title: '₹25 Amazon GC',     desc: 'Amazon India gift card',                           pointsCost: 5000,  type: 'giftcard', icon: '🎁', available: false },
+  { id: 'tier_10000', title: '₹50 Amazon GC',      desc: 'Amazon India gift card',                           pointsCost: 10000, type: 'giftcard', icon: '🎁', available: false },
+  { id: 'tier_25000', title: '₹150 Amazon GC',     desc: 'Amazon India gift card',                           pointsCost: 25000, type: 'giftcard', icon: '💎', available: false },
 ];
 
 // ─────────────────────────────────────────────────────────────
@@ -162,6 +162,11 @@ export async function redeemReward(req: Request, res: Response) {
 
     const tier = REWARD_TIERS.find(t => t.id === rewardId);
     if (!tier)  return res.status(400).json({ success: false, message: 'Invalid reward' });
+
+    // ✅ Only tier_1000 (7-Day Premium) is currently available
+    if (!tier.available) {
+      return res.status(400).json({ success: false, message: 'This reward is Coming Soon! Stay tuned 🚀' });
+    }
 
     const user = await User.findById(userId);
     if (!user)  return res.status(404).json({ success: false, message: 'User not found' });

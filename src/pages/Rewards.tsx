@@ -28,6 +28,7 @@ interface Tier {
   pointsCost: number;
   type: "premium" | "voucher" | "giftcard";
   icon: string;
+  available?: boolean;
 }
 
 interface Redemption {
@@ -293,33 +294,55 @@ export function Rewards() {
       {activeTab === "redeem" && (
         <div className="space-y-4">
           <p className="text-xs text-slate-500">
-            Click a reward to redeem. Points are deducted immediately. Delivery within 2–3 business days.
+            Click a reward to redeem. Points are deducted immediately. Premium activates within 30 minutes after verification.
           </p>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {tiers.map(tier => {
+              const isAvailable = (tier as any).available !== false; // tier_1000 only
               const canAfford = points >= tier.pointsCost;
+              const canRedeem = isAvailable && canAfford;
               return (
                 <div key={tier.id}
-                  className={`rounded-2xl p-5 border transition-all
-                    ${canAfford
+                  className={`rounded-2xl p-5 border transition-all relative overflow-hidden
+                    ${canRedeem
                       ? "glass border-white/10 hover:border-purple-500/30 hover:-translate-y-0.5 cursor-pointer"
-                      : "border-white/5 bg-white/[0.01] opacity-60 cursor-not-allowed"}`}
-                  onClick={() => canAfford && setSelectedTier(tier)}>
+                      : isAvailable
+                        ? "border-white/5 bg-white/[0.01] opacity-60 cursor-not-allowed"
+                        : "border-white/5 bg-white/[0.01] cursor-not-allowed"}`}
+                  onClick={() => canRedeem && setSelectedTier(tier)}>
+
+                  {/* Coming Soon overlay for unavailable tiers */}
+                  {!isAvailable && (
+                    <div className="absolute inset-0 flex items-center justify-center rounded-2xl z-10"
+                      style={{ background: "rgba(5,8,20,0.75)", backdropFilter: "blur(2px)" }}>
+                      <div className="text-center px-3">
+                        <div className="text-2xl mb-1">🔒</div>
+                        <p className="text-xs font-bold text-slate-300">Coming Soon</p>
+                        <p className="text-[10px] text-slate-500 mt-0.5">Stay tuned!</p>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="flex items-start justify-between mb-3">
                     <span className="text-3xl">{tier.icon}</span>
-                    {canAfford && (
+                    {isAvailable && canAfford && (
                       <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-500/15 border border-green-500/20 text-green-400 font-semibold">
                         Available ✓
+                      </span>
+                    )}
+                    {isAvailable && !canAfford && (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-slate-500 font-semibold">
+                        Locked
                       </span>
                     )}
                   </div>
                   <h3 className="font-bold text-white text-sm mb-1">{tier.title}</h3>
                   <p className="text-xs text-slate-500 mb-3">{tier.desc}</p>
                   <div className="flex items-center justify-between">
-                    <span className={`text-sm font-black ${canAfford ? "gradient-text" : "text-slate-600"}`}>
+                    <span className={`text-sm font-black ${canAfford && isAvailable ? "gradient-text" : "text-slate-600"}`}>
                       {tier.pointsCost.toLocaleString()} pts
                     </span>
-                    {!canAfford && (
+                    {isAvailable && !canAfford && (
                       <span className="text-[10px] text-slate-600">
                         Need {(tier.pointsCost - points).toLocaleString()} more
                       </span>

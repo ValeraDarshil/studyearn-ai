@@ -57,8 +57,8 @@ export function Signup() {
       const data = await res.json();
 
       if (data.success) {
+        // ✅ Sirf token store karo — user data server se fetch hoga App.tsx mein
         localStorage.setItem("token", data.token);
-        localStorage.setItem("user", JSON.stringify(data.user));
 
         // Show bonus message if referred
         if (data.referralBonus) {

@@ -182,7 +182,9 @@ export async function getCurrentUser() {
   try {
     const res  = await fetch(`${AUTH_BASE}/auth/me`, { headers: { Authorization: `Bearer ${token}` } });
     const data = await res.json();
-    return data.success ? data.user : null;
+    if (!data.success) return null;
+    // Return user + streakInfo together
+    return data.streakInfo ? { ...data.user, _streakInfo: data.streakInfo } : data.user;
   } catch {
     return null;
   }

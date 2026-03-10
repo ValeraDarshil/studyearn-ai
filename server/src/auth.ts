@@ -593,7 +593,44 @@ router.get('/me', async (req, res) => {
       console.log(`✅ XP migrated for ${user.email}: totalXP = ${user.points}`);
     }
 
-    res.json({ success: true, user });
+    // ── Check streak on /me — ensures animation works on any device/browser ──
+    // Yeh important hai kyunki agar user direct URL pe aaye (na ki login page se)
+    // toh sessionStorage nahi hoga — /me se fresh streak state milti hai
+    const today     = new Date().toISOString().split('T')[0];
+    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+    const lastDate  = user.lastActive ? new Date(user.lastActive).toISOString().split('T')[0] : null;
+    let streakIncreased = false;
+    let bonusPoints = 0;
+
+    if (lastDate !== today) {
+      // Day change hua hai — streak update karo
+      bonusPoints = 10;
+      if (lastDate === yesterday) {
+        user.streak   += 1;
+        streakIncreased = true;
+        if (user.streak === 7)  bonusPoints = 50;
+        else if (user.streak === 14) bonusPoints = 100;
+        else if (user.streak === 30) bonusPoints = 250;
+        else if (user.streak > 30 && user.streak % 7 === 0) bonusPoints = 75;
+      } else if (lastDate !== today) {
+        user.streak = 1; // reset
+      }
+      user.points    += bonusPoints;
+      (user as any).totalXP = ((user as any).totalXP || 0) + bonusPoints;
+      user.lastActive = new Date();
+      await user.save();
+    }
+
+    res.json({
+      success: true,
+      user,
+      // Frontend uses this to show streak animation on ANY device
+      streakInfo: streakIncreased ? {
+        streakIncreased: true,
+        currentStreak: user.streak,
+        bonusPoints,
+      } : null,
+    });
   } catch (error) {
     res.status(401).json({ success: false, message: 'Invalid token' });
   }

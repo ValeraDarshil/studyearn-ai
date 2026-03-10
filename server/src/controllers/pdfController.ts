@@ -6,6 +6,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import { Request, Response } from 'express';
+import path from 'path';
 import {
   imagesToPDF, mergePDFs, splitPDF, compressPDF,
   rotatePDF, addPageNumbers, addWatermark, convertOfficeToPDF,
@@ -210,6 +211,12 @@ export async function officeToPDFHandler(req: Request, res: Response) {
   try {
     if (!req.file) return res.status(400).json({ success: false, message: 'No file uploaded' });
 
+    const ext = path.extname(req.file.originalname).toLowerCase();
+    const allowed = ['.docx', '.doc', '.odt', '.pptx', '.ppt', '.xlsx', '.xls', '.ods'];
+    if (!allowed.includes(ext)) {
+      return res.status(400).json({ success: false, message: `Unsupported file type: ${ext}. Allowed: ${allowed.join(', ')}` });
+    }
+
     const pdfBuffer = await convertOfficeToPDF(req.file.buffer, req.file.originalname);
 
     res.setHeader('Content-Type', 'application/pdf');
@@ -220,6 +227,12 @@ export async function officeToPDFHandler(req: Request, res: Response) {
     handlePDFAction(req, `Converted ${req.file.originalname} to PDF`).catch(logger.error);
   } catch (err: any) {
     logger.error('OFFICE→PDF ERROR:', err.message);
-    res.status(500).json({ success: false, message: 'Conversion failed: ' + err.message });
+    const isLOError = err.message.includes('LibreOffice') || err.message.includes('soffice');
+    res.status(500).json({
+      success: false,
+      message: isLOError
+        ? 'Conversion failed. Make sure the file is not password-protected or corrupted. If the problem persists, try saving the file again before uploading.'
+        : 'Conversion failed: ' + err.message,
+    });
   }
 }

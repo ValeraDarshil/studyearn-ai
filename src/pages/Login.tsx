@@ -26,13 +26,12 @@ export function Login() {
       const data = await res.json();
 
       if (data.success) {
+        // ✅ Sirf token store karo — user data HAMESHA server se aata hai
+        // localStorage mein user object store karne se stale/wrong data milta hai
         localStorage.setItem("token", data.token);
-        localStorage.setItem("user", JSON.stringify({
-          ...data.user,
-          points: data.user.points,
-          streak: data.streakInfo?.currentStreak ?? data.user.streak,
-        }));
 
+        // ✅ Streak celebration — server ne bataya ki streak increase hua
+        // sessionStorage use karo taaki page reload ke baad bhi kaam kare
         if (data.streakInfo?.streakIncreased) {
           sessionStorage.setItem("streakCelebration", JSON.stringify(data.streakInfo));
         }
@@ -41,7 +40,6 @@ export function Login() {
         }
 
         navigate("/app");
-        
         window.location.reload();
       } else {
         setError(data.message || "Invalid email or password");
