@@ -176,11 +176,11 @@ function buildVisionPrompt(userPrompt: string): string {
 }
 
 const VISION_MODELS = [
-  'qwen/qwen2.5-vl-72b-instruct:free',
+  'qwen/qwen2.5-vl-72b-instruct:free',       // Best vision model
+  'qwen/qwen2.5-vl-7b-instruct:free',        // Faster Qwen
   'meta-llama/llama-3.2-11b-vision-instruct:free',
-  'google/gemma-3-27b-it:free',
-  'mistralai/mistral-small-3.1-24b-instruct:free',
   'microsoft/phi-4-multimodal-instruct:free',
+  'google/gemini-2.0-flash-exp:free',         // Gemini vision
 ];
 
 async function callGroqVision(imageUrl: string, prompt: string): Promise<string> {
@@ -189,10 +189,10 @@ async function callGroqVision(imageUrl: string, prompt: string): Promise<string>
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_KEY}` },
     body: JSON.stringify({
-      model: 'llama-3.2-11b-vision-preview',
+      model: 'llama-3.2-90b-vision-preview',
       messages: [{ role: 'user', content: [
-        { type: 'text',      text: prompt },
         { type: 'image_url', image_url: { url: imageUrl } },
+        { type: 'text',      text: prompt },
       ]}],
       temperature: 0.2,
       max_tokens:  4096,

@@ -27,7 +27,7 @@ interface ConvoSummary {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────
-async function compressImage(base64: string, maxPx = 1024): Promise<string> {
+async function compressImage(base64: string, maxPx = 1600): Promise<string> {
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {
@@ -38,9 +38,10 @@ async function compressImage(base64: string, maxPx = 1024): Promise<string> {
       const ctx = canvas.getContext("2d")!;
       ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      resolve(canvas.toDataURL("image/jpeg", 0.88));
+      // Higher quality for OCR — math questions need clarity
+      resolve(canvas.toDataURL("image/jpeg", 0.95));
     };
-    img.onerror = () => resolve(base64);
+    img.onerror = () => resolve(base64); // If compression fails, send original
     img.src = base64;
   });
 }
@@ -320,7 +321,7 @@ export function AskAI() {
   // File handlers
   // ─────────────────────────────────────────────────────────
   const handleFile = useCallback((file: File) => {
-    const isImg = file.type.startsWith("image/");
+    const isImg = file.type.startsWith("image/"); // includes jpg, png, webp, gif, etc.
     const isPdf = file.type === "application/pdf";
     if (!isImg && !isPdf) { alert("Only images and PDF files are supported."); return; }
     setUploadedFile(file);
@@ -405,7 +406,7 @@ export function AskAI() {
         let imageData: string | undefined;
         if (currentFileType === "image" && currentPreview) {
           setLoadingStep("Compressing image…");
-          imageData = await compressImage(currentPreview, 1024);
+          imageData = await compressImage(currentPreview, 1600); // Higher res for better OCR
           setLoadingStep("AI is analyzing image…");
         } else {
           setLoadingStep("AI is thinking…");
@@ -777,7 +778,7 @@ export function AskAI() {
         </div>
       </div>
 
-      <input ref={fileRef} type="file" accept="image/*,application/pdf" className="hidden"
+      <input ref={fileRef} type="file" accept="image/*,.webp,application/pdf" className="hidden"
         onChange={e => { if (e.target.files?.[0]) handleFile(e.target.files[0]); }} />
     </div>
   );
