@@ -66,6 +66,7 @@ async function groqText(userPrompt: string, history: ChatMessage[] = []): Promis
           model,
           messages: [
             { role: 'system', content: SYSTEM_PROMPT },
+            ...history,
             { role: 'user',   content: userPrompt },
           ],
           temperature: 0.4,
@@ -122,6 +123,7 @@ async function openRouterText(userPrompt: string, history: ChatMessage[] = []): 
           model,
           messages: [
             { role: 'system', content: SYSTEM_PROMPT },
+            ...history,
             { role: 'user',   content: userPrompt },
           ],
           temperature: 0.4,

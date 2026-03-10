@@ -346,12 +346,13 @@ export function AskAI() {
   // ─────────────────────────────────────────────────────────
   // SEND MESSAGE
   // ─────────────────────────────────────────────────────────
-  // Pass current messages explicitly — avoids stale closure bug
-  const buildHistory = (currentMsgs: ChatMsg[]) =>
-    currentMsgs
+  // Build conversation history for AI context
+  // Uses `messages` state directly (previous exchanges only — current prompt goes as `prompt` field)
+  const buildHistory = () =>
+    messages
       .filter(m => !m.isError && !m.imagePreview && !m.fileName)
       .slice(-10)
-      .map(m => ({ role: m.role, content: m.content }));
+      .map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }));
 
   const handleSend = async () => {
     const text = question.trim();
@@ -407,7 +408,7 @@ export function AskAI() {
           body: JSON.stringify({
             prompt:  text    || undefined,
             image:   imageData,
-            history: imageData ? [] : buildHistory(newMessages),
+            history: imageData ? [] : buildHistory(),
             userId,
           }),
         });
