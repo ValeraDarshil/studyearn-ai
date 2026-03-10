@@ -1,5 +1,6 @@
 import { Login } from "./pages/Login";
 import { Signup } from "./pages/Signup";
+import { ForgotPassword } from "./pages/ForgotPassword";
 import { HashRouter, Routes, Route, useLocation } from "react-router-dom";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { LandingPage } from "./pages/LandingPage";
@@ -373,6 +374,7 @@ function AppContent() {
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
 
           <Route
             path="/app"

@@ -124,3 +124,18 @@ export const globalLimiter = rateLimit({
   },
   handler: rateLimitHandler,
 });
+// ─────────────────────────────────────────────────────────────
+// 7. OTP / FORGOT PASSWORD — Strict limit to prevent spam
+//    Rule: Max 3 OTP requests per 15 minutes per IP
+// ─────────────────────────────────────────────────────────────
+export const otpLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,  // 15 minutes
+  max: 3,                     // only 3 OTP emails per 15 min
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: '⏳ Too many OTP requests. Please wait 15 minutes before trying again.',
+  },
+  handler: rateLimitHandler,
+});
