@@ -452,19 +452,17 @@ router.post('/daily-challenge/result', authenticate, async (req: any, res) => {
     const challenge = dc.challenge;
     const correct   = selectedIdx === challenge.answer;
 
-    // ✅ Auto-expire premium check
-    if (user.isPremium && user.premiumExpiresAt && new Date(user.premiumExpiresAt) < new Date()) {
-      user.isPremium = false; user.premiumExpiresAt = null;
-    }
-    const isPremiumActive = user.isPremium === true;
+    // Premium check
+    const premExp = user.premiumExpiresAt;
+    const premium = user.isPremium === true && premExp && new Date(premExp) > new Date();
+    if (user.isPremium && !premium) { user.isPremium = false; user.premiumExpiresAt = null; }
 
-    // ✅ Premium users get 1.5x points on daily challenge
+    // Points: free = challenge.pts (or 10% on wrong), premium = 2x
     const basePts   = correct ? challenge.pts : Math.round(challenge.pts * 0.1);
-    const ptsEarned = isPremiumActive ? Math.round(basePts * 1.5) : basePts;
+    const ptsEarned = premium ? basePts * 2 : basePts;
 
     const result = { date: todayKey, completed: true, correct, ptsEarned };
 
-    // Award points server-side
     user.points  = (user.points  || 0) + ptsEarned;
     user.totalXP = (user.totalXP || 0) + ptsEarned;
     user.dailyChallenge = { ...dc, result };
@@ -473,12 +471,12 @@ router.post('/daily-challenge/result', authenticate, async (req: any, res) => {
     await Activity.create({
       userId:       req.userId,
       action:       'daily_challenge',
-      details:      `Daily Challenge: ${challenge.subject} — ${correct ? 'Correct ✅' : 'Incorrect ❌'}${isPremiumActive ? ' (1.5x)' : ''}`,
+      details:      `Daily Challenge: ${challenge.subject} — ${correct ? 'Correct ✅' : 'Incorrect ❌'}`,
       pointsEarned: ptsEarned,
     });
 
-    console.log(`✅ Daily challenge: ${user.email} ${correct ? '✅' : '❌'} (+${ptsEarned} pts${isPremiumActive ? ' 1.5x' : ''})`);
-    res.json({ success: true, result, ptsEarned, isPremium: isPremiumActive });
+    console.log(`✅ Daily challenge: ${user.email} ${correct ? '✅' : '❌'} | premium=${premium} | +${ptsEarned}pts`);
+    res.json({ success: true, result, ptsEarned });
   } catch (error) {
     console.error('Daily challenge result error:', error);
     res.status(500).json({ success: false, message: 'Server error' });

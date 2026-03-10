@@ -407,7 +407,7 @@ Output the JSON array now:`;
       setSlideCount(normalized.length);
       setGenerated(true);
       // ✅ Premium users get 1.5x — base 20 → 30 pts
-      const pptPts = isPremium ? 30 : 20;
+      const pptPts = isPremium ? 40 : 20;
       addPoints(pptPts);
       logActivity("ppt_generated", `PPT: ${topic}${isPremium ? " ⚡" : ""}`, pptPts);
       const newTotal = (userStats.totalPPTsGenerated || 0) + 1;
@@ -436,7 +436,7 @@ Output the JSON array now:`;
           <Presentation className="w-6 h-6 text-purple-400" /> PPT Generator
         </h1>
         <p className="text-sm text-slate-400 mt-1">
-          AI builds a professional presentation for your exact level • Earn {isPremium ? "30 ⚡" : "20"} pts
+          AI builds a professional presentation for your exact level • Earn {isPremium ? "40 ⚡" : "20"} pts
         </p>
       </div>
 

@@ -17,9 +17,28 @@ import { logger } from '../utils/logger.js';
 // PRIVATE HELPER — question deduct + points award
 // Server-authoritative: client pe trust nahi karte
 // ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────
+// PREMIUM CONSTANTS — change here, applies everywhere
+// ─────────────────────────────────────────────────────────────
+const BASE_AI_POINTS   = 10;  // free user gets 10 pts per question
+const PREMIUM_MULTIPLIER = 2; // premium user gets 2x = 20 pts
+const FREE_DAILY_LIMIT   = 5;
+const PREMIUM_DAILY_LIMIT = 10;
+
+function isPremiumValid(user: any): boolean {
+  if (!user.isPremium) return false;
+  if (!user.premiumExpiresAt) return false;
+  if (new Date(user.premiumExpiresAt) < new Date()) {
+    // expired — clear it in-place (caller must save)
+    user.isPremium = false;
+    user.premiumExpiresAt = null;
+    return false;
+  }
+  return true;
+}
+
 async function handleQuestionUsed(
   req: Request,
-  pointsToAward = 15,
 ): Promise<{ questionsLeft: number; pointsAwarded: number } | null> {
   const userId = getUserIdFromToken(req);
   if (!userId) return null;
@@ -28,39 +47,29 @@ async function handleQuestionUsed(
     const user = await User.findById(userId);
     if (!user) return null;
 
-    const today = new Date().toISOString().split('T')[0];
+    const premium = isPremiumValid(user);
+    const today   = new Date().toISOString().split('T')[0];
 
-    // Auto-expire premium if past expiry
-    if ((user as any).isPremium && (user as any).premiumExpiresAt) {
-      if (new Date((user as any).premiumExpiresAt) < new Date()) {
-        (user as any).isPremium        = false;
-        (user as any).premiumExpiresAt = null;
-        logger.info(`Premium auto-expired for ${user.email}`);
-      }
-    }
-    const isPremiumActive = (user as any).isPremium === true;
-
-    // Premium = 15/day, Free = 5/day
-    const dailyLimit = isPremiumActive ? 15 : 5;
+    // Reset daily quota if new day
+    const dailyLimit = premium ? PREMIUM_DAILY_LIMIT : FREE_DAILY_LIMIT;
     if (user.questionsDate !== today) {
       user.questionsLeft = dailyLimit;
       user.questionsDate = today;
     }
     if (user.questionsLeft > 0) user.questionsLeft -= 1;
 
-    // ✅ Premium users get 1.5x points (consistent across all features)
-    const basePts = pointsToAward; // 15 base
-    if (isPremiumActive) pointsToAward = Math.round(basePts * 1.5); // 15 → 22
+    // Points: free = 10, premium = 20 (2x)
+    const pts = premium ? BASE_AI_POINTS * PREMIUM_MULTIPLIER : BASE_AI_POINTS;
 
-    user.points                       += pointsToAward;
-    (user as any).totalXP              = ((user as any).totalXP || 0) + pointsToAward;
+    user.points                       += pts;
+    (user as any).totalXP              = ((user as any).totalXP || 0) + pts;
     (user as any).totalQuestionsAsked  = ((user as any).totalQuestionsAsked || 0) + 1;
     await user.save();
 
-    await Activity.create({ userId, action: 'ask_question', details: 'Asked AI a question', pointsEarned: pointsToAward });
-    logger.info(`Question used: ${user.email} | left=${user.questionsLeft} | +${pointsToAward}pts`);
+    await Activity.create({ userId, action: 'ask_question', details: 'Asked AI a question', pointsEarned: pts });
+    logger.info(`AI question: ${user.email} | premium=${premium} | +${pts}pts | left=${user.questionsLeft}`);
 
-    return { questionsLeft: user.questionsLeft, pointsAwarded: pointsToAward };
+    return { questionsLeft: user.questionsLeft, pointsAwarded: pts };
   } catch (err: any) {
     logger.error('handleQuestionUsed error:', err.message);
     return null;
@@ -100,7 +109,7 @@ export async function askAI(req: Request, res: Response) {
       answer = await solveText(prompt);
     }
 
-    const userAction = await handleQuestionUsed(req, 15);
+    const userAction = await handleQuestionUsed(req);
 
     res.json({
       success: true,
@@ -144,7 +153,7 @@ export async function solvePDF(req: Request, res: Response) {
       : `Here is the content of a PDF document/question paper:\n\n${text}\n\nFind ALL questions in this document and solve each one completely, step-by-step with full working. Number your answers to match the original question numbers.`;
 
     const answer     = await solveText(solvePrompt);
-    const userAction = await handleQuestionUsed(req, 15);
+    const userAction = await handleQuestionUsed(req);
 
     res.json({
       success: true,

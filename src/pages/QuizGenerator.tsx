@@ -210,7 +210,7 @@ CRITICAL RULES:
       const correct = answers.filter((a, i) => a === questions[i]?.answer).length;
       const basePts = correct * 5; // 5 pts per correct answer
       // ✅ Premium users get 1.5x points on quiz
-      const pts = isPremium ? Math.round(basePts * 1.5) : basePts;
+      const pts = isPremium ? basePts * 2 : basePts;
       if (pts > 0) {
         addPoints(pts);
         logActivity("quiz_completed", `Quiz: ${topic || subject} (${correct}/${questions.length})${isPremium ? " ⚡" : ""}`, pts);

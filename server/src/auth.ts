@@ -514,15 +514,15 @@ router.post('/login', authLimiter, validateLogin, async (req, res) => {
     const isPremiumNow = (user as any).isPremium === true
       && (user as any).premiumExpiresAt
       && new Date((user as any).premiumExpiresAt) > new Date();
-    const dailyLimit = isPremiumNow ? 15 : 5;
+    const dailyLimit = isPremiumNow ? 10 : 5;
 
     if (user.questionsDate !== today) {
       user.questionsLeft = dailyLimit;
       user.questionsDate = today;
       await user.save();
-    } else if (isPremiumNow && user.questionsLeft < 15 && user.questionsLeft === 5) {
+    } else if (isPremiumNow && user.questionsLeft < 10 && user.questionsLeft === 5) {
       // Edge case: user just bought premium today — upgrade their quota immediately
-      user.questionsLeft = 15;
+      user.questionsLeft = 10;
       await user.save();
     }
 
@@ -610,7 +610,7 @@ router.get('/me', async (req, res) => {
       }
     }
     const isPremiumActive = (user as any).isPremium === true;
-    const dailyLimit = isPremiumActive ? 15 : 5;
+    const dailyLimit = isPremiumActive ? 10 : 5;
 
     // ── Fix questionsLeft if premium just activated ──
     const meToday = new Date().toISOString().split('T')[0];
@@ -619,7 +619,7 @@ router.get('/me', async (req, res) => {
       user.questionsDate = meToday;
     } else if (isPremiumActive && user.questionsLeft <= 5 && user.questionsLeft === 5) {
       // Premium just bought today — bump their quota
-      user.questionsLeft = 15;
+      user.questionsLeft = 10;
     }
 
     // ── Check streak on /me — ensures animation works on any device/browser ──

@@ -19,6 +19,23 @@ import { logger } from '../utils/logger.js';
 // ─────────────────────────────────────────────────────────────
 // PRIVATE HELPER — PDF action pe points award karo
 // ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────
+// POINTS CONSTANTS
+// ─────────────────────────────────────────────────────────────
+const BASE_PDF_POINTS    = 10;
+const PREMIUM_MULTIPLIER = 2;
+
+function isPremiumValid(user: any): boolean {
+  if (!user.isPremium) return false;
+  if (!user.premiumExpiresAt) return false;
+  if (new Date(user.premiumExpiresAt) < new Date()) {
+    user.isPremium = false;
+    user.premiumExpiresAt = null;
+    return false;
+  }
+  return true;
+}
+
 async function handlePDFAction(req: Request, actionLabel: string): Promise<void> {
   const userId = getUserIdFromToken(req);
   if (!userId) return;
@@ -26,25 +43,16 @@ async function handlePDFAction(req: Request, actionLabel: string): Promise<void>
     const user = await User.findById(userId);
     if (!user) return;
 
-    // ✅ Auto-expire premium check
-    if ((user as any).isPremium && (user as any).premiumExpiresAt) {
-      if (new Date((user as any).premiumExpiresAt) < new Date()) {
-        (user as any).isPremium        = false;
-        (user as any).premiumExpiresAt = null;
-      }
-    }
-    const isPremiumActive = (user as any).isPremium === true;
-
-    // ✅ Premium users get 1.5x points
-    const basePts = 10;
-    const pts = isPremiumActive ? Math.round(basePts * 1.5) : basePts; // 10 or 15
+    const premium = isPremiumValid(user);
+    const pts     = premium ? BASE_PDF_POINTS * PREMIUM_MULTIPLIER : BASE_PDF_POINTS;
+    // free=10, premium=20
 
     user.points                     += pts;
     (user as any).totalXP            = ((user as any).totalXP || 0) + pts;
     (user as any).totalPDFsConverted = ((user as any).totalPDFsConverted || 0) + 1;
     await user.save();
     await Activity.create({ userId, action: 'convert_pdf', details: actionLabel, pointsEarned: pts });
-    logger.info(`PDF action (${actionLabel}): ${user.email} | +${pts}pts${isPremiumActive ? ' (1.5x premium)' : ''}`);
+    logger.info(`PDF action (${actionLabel}): ${user.email} | premium=${premium} | +${pts}pts`);
   } catch (err: any) {
     logger.error('handlePDFAction error:', err.message);
   }

@@ -193,8 +193,8 @@ export function Rewards() {
 
   const EARN_METHODS = [
     { icon: "💬", title: "Ask AI",           desc: "10 pts per question",  pts: "+10", route: "/app/ask",       color: "from-blue-500/10 to-blue-600/10" },
-    { icon: "📊", title: "Generate PPT",     desc: "25 pts per PPT",       pts: "+25", route: "/app/ppt",       color: "from-purple-500/10 to-purple-600/10" },
-    { icon: "📄", title: "PDF Tools",        desc: "5 pts per action",     pts: "+5",  route: "/app/pdf",       color: "from-cyan-500/10 to-cyan-600/10" },
+    { icon: "📊", title: "Generate PPT",     desc: "20 pts per PPT",       pts: "+20", route: "/app/ppt",       color: "from-purple-500/10 to-purple-600/10" },
+    { icon: "📄", title: "PDF Tools",        desc: "10 pts per action",    pts: "+10", route: "/app/pdf",       color: "from-cyan-500/10 to-cyan-600/10" },
     { icon: "🧪", title: "AI Quiz",          desc: "5 pts per correct",    pts: "+5",  route: "/app/quiz",      color: "from-violet-500/10 to-violet-600/10" },
     { icon: "🎯", title: "Daily Challenge",  desc: "Up to 35 pts/day",     pts: "+35", route: "/app/challenge", color: "from-orange-500/10 to-orange-600/10" },
     { icon: "👥", title: "Refer Friends",    desc: "100 pts per referral", pts: "+100",route: "/app/refer",     color: "from-green-500/10 to-green-600/10" },
@@ -342,7 +342,7 @@ export function Rewards() {
             <div className="rounded-2xl p-4 border border-yellow-500/30 bg-yellow-500/10 text-center animate-pulse">
               <div className="text-2xl mb-1">🎉</div>
               <p className="text-yellow-300 font-bold text-sm">Premium Activated!</p>
-              <p className="text-yellow-400/70 text-xs mt-0.5">Reload the page to see your 15 questions/day & 1.5× points!</p>
+              <p className="text-yellow-400/70 text-xs mt-0.5">Reload the page to see your 10 questions/day & 2× points!</p>
             </div>
           )}
 
@@ -354,7 +354,7 @@ export function Rewards() {
                 <p className="text-purple-300 font-bold text-sm">Premium Active</p>
                 <p className="text-purple-400/70 text-xs">
                   Expires: {premiumExpiresAt ? new Date(premiumExpiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—"}
-                  {" "}• 15 questions/day • 1.5× points ⚡
+                  {" "}• 10 questions/day • 2× points ⚡
                 </p>
               </div>
             </div>

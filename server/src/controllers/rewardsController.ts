@@ -15,7 +15,7 @@ import { logger } from '../utils/logger.js';
 // REWARD TIERS — single source of truth
 // ─────────────────────────────────────────────────────────────
 export const REWARD_TIERS = [
-  { id: 'tier_1000',  title: '7-Day Premium',     desc: '15 AI questions/day • 1.5× points & XP • Premium badge', pointsCost: 1000,  type: 'premium',  icon: '⚡', available: true  },
+  { id: 'tier_1000',  title: '7-Day Premium',     desc: '10 AI questions/day • 2× points & XP • Premium badge', pointsCost: 1000,  type: 'premium',  icon: '⚡', available: true  },
   { id: 'tier_2500',  title: '₹10 Paytm Voucher', desc: 'UPI/Paytm cash voucher',                          pointsCost: 2500,  type: 'voucher',  icon: '💳', available: false },
   { id: 'tier_5000',  title: '₹25 Amazon GC',     desc: 'Amazon India gift card',                           pointsCost: 5000,  type: 'giftcard', icon: '🎁', available: false },
   { id: 'tier_10000', title: '₹50 Amazon GC',      desc: 'Amazon India gift card',                           pointsCost: 10000, type: 'giftcard', icon: '🎁', available: false },
@@ -101,13 +101,13 @@ export async function processPendingPremiums(): Promise<void> {
             (u as any).premiumExpiresAt   = expiry;
             (u as any).premiumActivatedAt = new Date();
 
-            // ✅ Turant questionsLeft = 15 kar do — user ko wait nahi karna chahiye
+            // ✅ Turant questionsLeft = 10 kar do — user ko wait nahi karna chahiye
             const today = new Date().toISOString().split('T')[0];
-            u.questionsLeft = 15;
+            u.questionsLeft = 10;
             u.questionsDate = today;
 
             await u.save();
-            logger.info(`Premium ACTIVATED for ${u.email} — expires ${expiry.toISOString()} | questionsLeft set to 15`);
+            logger.info(`Premium ACTIVATED for ${u.email} — expires ${expiry.toISOString()} | questionsLeft set to 10`);
           }
         }
       } catch (err: any) {

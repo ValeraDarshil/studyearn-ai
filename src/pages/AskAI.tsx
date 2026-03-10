@@ -176,11 +176,11 @@ export function AskAI() {
 
       if (result.success) {
         // ✅ Server ka actual pointsAwarded use karo — premium pe 2x milta hai server side se
-        const actualPts = result.pointsAwarded ?? (isPremium ? 30 : 15);
+        const actualPts = result.pointsAwarded ?? (isPremium ? 20 : 10);
         setLastPointsAwarded(actualPts);
         addPoints(actualPts);
 
-        // ✅ Server se exact questionsLeft sync karo — premium = 15/day, free = 5/day
+        // ✅ Server se exact questionsLeft sync karo — premium = 10/day, free = 5/day
         if (result.questionsLeft !== undefined) {
           setQuestionsLeft(result.questionsLeft); // server truth use karo
         } else {
@@ -223,7 +223,7 @@ export function AskAI() {
             <Brain className="w-6 h-6 text-blue-400" /> Ask AI
           </h1>
           <p className="text-sm text-slate-400 mt-1">
-            Type a question • Upload an image or PDF • Earn {isPremium ? "30" : "15"} pts per question{isPremium ? " ⚡" : ""}
+            Type a question • Upload an image or PDF • Earn {isPremium ? "20" : "10"} pts per question{isPremium ? " ⚡" : ""}
           </p>
         </div>
         <div className={`flex items-center gap-2 px-4 py-2 rounded-xl border w-fit

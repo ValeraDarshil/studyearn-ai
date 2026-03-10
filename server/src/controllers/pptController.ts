@@ -15,6 +15,23 @@ import { logger } from '../utils/logger.js';
 // ─────────────────────────────────────────────────────────────
 // PRIVATE HELPER — PPT generate karne pe points award karo
 // ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────
+// POINTS CONSTANTS
+// ─────────────────────────────────────────────────────────────
+const BASE_PPT_POINTS    = 20;
+const PREMIUM_MULTIPLIER = 2;
+
+function isPremiumValid(user: any): boolean {
+  if (!user.isPremium) return false;
+  if (!user.premiumExpiresAt) return false;
+  if (new Date(user.premiumExpiresAt) < new Date()) {
+    user.isPremium = false;
+    user.premiumExpiresAt = null;
+    return false;
+  }
+  return true;
+}
+
 async function handlePPTGenerated(req: Request): Promise<number> {
   const userId = getUserIdFromToken(req);
   if (!userId) return 0;
@@ -22,25 +39,16 @@ async function handlePPTGenerated(req: Request): Promise<number> {
     const user = await User.findById(userId);
     if (!user) return 0;
 
-    // ✅ Auto-expire premium check
-    if ((user as any).isPremium && (user as any).premiumExpiresAt) {
-      if (new Date((user as any).premiumExpiresAt) < new Date()) {
-        (user as any).isPremium        = false;
-        (user as any).premiumExpiresAt = null;
-      }
-    }
-    const isPremiumActive = (user as any).isPremium === true;
-
-    // ✅ Premium users get 1.5x points
-    const basePts = 20;
-    const pts = isPremiumActive ? Math.round(basePts * 1.5) : basePts; // 20 or 30
+    const premium = isPremiumValid(user);
+    const pts     = premium ? BASE_PPT_POINTS * PREMIUM_MULTIPLIER : BASE_PPT_POINTS;
+    // free=20, premium=40
 
     user.points                       += pts;
     (user as any).totalXP              = ((user as any).totalXP || 0) + pts;
     (user as any).totalPPTsGenerated   = ((user as any).totalPPTsGenerated || 0) + 1;
     await user.save();
     await Activity.create({ userId, action: 'generate_ppt', details: 'Generated a PPT presentation', pointsEarned: pts });
-    logger.info(`PPT generated: ${user.email} | +${pts}pts${isPremiumActive ? ' (1.5x premium)' : ''}`);
+    logger.info(`PPT generated: ${user.email} | premium=${premium} | +${pts}pts`);
     return pts;
   } catch (err: any) {
     logger.error('handlePPTGenerated error:', err.message);
