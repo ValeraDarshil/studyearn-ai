@@ -6,7 +6,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import { Request, Response } from 'express';
-import { solveText, solveWithVision } from '../services/aiService.js';
+import { solveText, solveWithVision, ChatMessage } from '../services/aiService.js';
 import { parsePDFText } from '../services/pdfService.js';
 import { getUserIdFromToken } from '../middleware/authMiddleware.js';
 import { User } from '../models/User.model.js';
@@ -81,7 +81,12 @@ async function handleQuestionUsed(
 // ─────────────────────────────────────────────────────────────
 export async function askAI(req: Request, res: Response) {
   try {
-    const { prompt, image } = req.body;
+    const { prompt, image, history = [] } = req.body;
+    // Sanitize history — only last 10 messages, only user/assistant roles
+    const safeHistory: ChatMessage[] = (Array.isArray(history) ? history : [])
+      .slice(-10)
+      .filter((m: any) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
+      .map((m: any) => ({ role: m.role as 'user' | 'assistant', content: m.content.slice(0, 2000) }));
     if (!prompt && !image) {
       return res.status(400).json({ success: false, answer: 'Please enter a question or upload an image.' });
     }
@@ -106,7 +111,7 @@ export async function askAI(req: Request, res: Response) {
       if (imgSizeKB > 4000) logger.warn(`Large image: ${imgSizeKB}KB — may be slow`);
       answer = await solveWithVision(imageUrl, prompt || '');
     } else {
-      answer = await solveText(prompt);
+      answer = await solveText(prompt, safeHistory);
     }
 
     const userAction = await handleQuestionUsed(req);

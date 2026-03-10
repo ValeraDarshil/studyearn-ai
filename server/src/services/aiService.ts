@@ -43,7 +43,9 @@ Rules:
 // ─────────────────────────────────────────────────────────────
 // PRIVATE — Groq Text (primary, fast, free)
 // ─────────────────────────────────────────────────────────────
-async function groqText(userPrompt: string): Promise<string> {
+export type ChatMessage = { role: 'user' | 'assistant'; content: string };
+
+async function groqText(userPrompt: string, history: ChatMessage[] = []): Promise<string> {
   const MODELS = [
     'llama-3.3-70b-versatile',
     'llama-3.1-70b-versatile',
@@ -94,7 +96,7 @@ async function groqText(userPrompt: string): Promise<string> {
 // ─────────────────────────────────────────────────────────────
 // PRIVATE — OpenRouter Text (fallback)
 // ─────────────────────────────────────────────────────────────
-async function openRouterText(userPrompt: string): Promise<string> {
+async function openRouterText(userPrompt: string, history: ChatMessage[] = []): Promise<string> {
   if (!OPENROUTER_KEY) throw new Error('OPENROUTER_API_KEY not set');
 
   const MODELS = [
@@ -242,13 +244,13 @@ async function callOpenRouterVision(model: string, imageUrl: string, prompt: str
  * Plain text question solve karo
  * Chain: Groq → OpenRouter fallback
  */
-export async function solveText(prompt: string): Promise<string> {
+export async function solveText(prompt: string, history: ChatMessage[] = []): Promise<string> {
   if (GROQ_KEY) {
-    try { return await groqText(prompt); } catch {}
+    try { return await groqText(prompt, history); } catch {}
     logger.warn('Text chain: Groq failed → OpenRouter fallback');
   }
   if (OPENROUTER_KEY) {
-    try { return await openRouterText(prompt); } catch {}
+    try { return await openRouterText(prompt, history); } catch {}
   }
   throw new Error('All text AI providers failed');
 }
