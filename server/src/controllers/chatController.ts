@@ -9,10 +9,71 @@ import { Conversation } from '../models/Conversation.model.js';
 import { connectDB } from '../config/db.js';
 import { logger } from '../utils/logger.js';
 
-// Helper: Title generate karo from first user message
-function makeTitle(text: string): string {
-  const clean = text.replace(/\s+/g, ' ').trim();
-  return clean.length > 60 ? clean.slice(0, 57) + '…' : clean || 'New Chat';
+// ─────────────────────────────────────────────────────────────
+// AI-powered title generator — Groq se smart 4-5 word title
+// ─────────────────────────────────────────────────────────────
+async function generateTitle(userMessage: string): Promise<string> {
+  const GROQ_KEY = process.env.GROQ_API_KEY || '';
+  if (!GROQ_KEY) return fallbackTitle(userMessage);
+
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000); // 8 sec timeout
+
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      signal: controller.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${GROQ_KEY}`,
+      },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        messages: [
+          {
+            role: 'system',
+            content: `Generate a short, smart chat title (3-5 words max) for a student's question.
+Rules:
+- Title must be TOPIC-BASED, not a copy of the question
+- No quotes, no punctuation at end
+- Be specific: "Newton's Laws of Motion" not "Physics Question"
+- Examples:
+  "hey what is AI?" → Artificial Intelligence Basics
+  "solve x^2 + 5x + 6 = 0" → Quadratic Equation Solution
+  "explain photosynthesis with diagram" → Photosynthesis Process Explained
+  "what caused world war 2" → World War 2 Causes
+  "help me with derivatives" → Calculus Derivatives Help
+Respond with ONLY the title, nothing else.`
+          },
+          { role: 'user', content: userMessage.slice(0, 300) }
+        ],
+        temperature: 0.3,
+        max_tokens: 20,
+      }),
+    });
+
+    clearTimeout(timer);
+
+    if (!res.ok) return fallbackTitle(userMessage);
+
+    const data = await res.json();
+    const raw = data.choices?.[0]?.message?.content?.trim() || '';
+    // Clean up — remove quotes, extra punctuation
+    const clean = raw.replace(/^["']|["']$/g, '').replace(/[.!?]$/, '').trim();
+    if (clean.length > 0 && clean.length <= 60) return clean;
+  } catch (e: any) {
+    logger.debug('generateTitle error:', e.message);
+  }
+  return fallbackTitle(userMessage);
+}
+
+// Fallback: simple keyword extraction if AI fails
+function fallbackTitle(text: string): string {
+  const clean = text.replace(/[^a-zA-Z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+  const words = clean.split(' ').filter(w => w.length > 2);
+  const skip = new Set(['what', 'when', 'where', 'which', 'how', 'why', 'who', 'the', 'is', 'are', 'was', 'were', 'can', 'does', 'do', 'did', 'will', 'would', 'should', 'could', 'have', 'has', 'had', 'please', 'help', 'tell', 'explain', 'give', 'show', 'me', 'my', 'and', 'or', 'but', 'for', 'with', 'hey', 'hi', 'hello', 'okay', 'aab', 'mujhe', 'batao', 'kya']);
+  const keywords = words.filter(w => !skip.has(w.toLowerCase())).slice(0, 5);
+  return keywords.length >= 2 ? keywords.join(' ') : clean.slice(0, 50) || 'New Chat';
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -70,9 +131,12 @@ export async function createConversation(req: Request, res: Response) {
     const userId = req.userId!;
     const { firstMessage } = req.body; // optional — title ke liye
 
+    // Generate smart AI title (async, but don't block conversation creation)
+    const title = firstMessage ? await generateTitle(firstMessage) : 'New Chat';
+
     const convo = await Conversation.create({
       userId,
-      title: firstMessage ? makeTitle(firstMessage) : 'New Chat',
+      title,
       messages: [],
       lastMessageAt: new Date(),
     });
@@ -119,7 +183,7 @@ export async function appendMessages(req: Request, res: Response) {
     // Update title from first user message (if still default)
     if (convo.title === 'New Chat') {
       const firstUser = messages.find((m: any) => m.role === 'user');
-      if (firstUser?.content) convo.title = makeTitle(firstUser.content);
+      if (firstUser?.content) convo.title = await generateTitle(firstUser.content);
     }
 
     convo.lastMessageAt = new Date();
