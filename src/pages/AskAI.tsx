@@ -169,6 +169,8 @@ export function AskAI() {
   const [isDragging,    setIsDragging]    = useState(false);
 
   const fileRef     = useRef<HTMLInputElement>(null);
+  // Ref to track current convoId reliably across async calls
+  const convoIdRef  = useRef<string | null>(null);
   const bottomRef   = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -213,6 +215,7 @@ export function AskAI() {
 
   async function loadConversation(id: string) {
     setActiveId(id);
+    convoIdRef.current = id;
     setSidebarOpen(false);
     try {
       const res  = await fetch(`${API_URL}/api/chat/${id}`, { headers: authHeaders() });
@@ -286,6 +289,7 @@ export function AskAI() {
     setConvos(prev => prev.filter(c => c._id !== id));
     if (activeId === id) {
       setActiveId(null);
+      convoIdRef.current = null;
       setMessages([]);
     }
   }
@@ -331,6 +335,7 @@ export function AskAI() {
   // ─────────────────────────────────────────────────────────
   function startNewChat() {
     setActiveId(null);
+    convoIdRef.current = null;
     setMessages([]);
     setQuestion("");
     removeFile();
@@ -341,8 +346,9 @@ export function AskAI() {
   // ─────────────────────────────────────────────────────────
   // SEND MESSAGE
   // ─────────────────────────────────────────────────────────
-  const buildHistory = () =>
-    messages
+  // Pass current messages explicitly — avoids stale closure bug
+  const buildHistory = (currentMsgs: ChatMsg[]) =>
+    currentMsgs
       .filter(m => !m.isError && !m.imagePreview && !m.fileName)
       .slice(-10)
       .map(m => ({ role: m.role, content: m.content }));
@@ -368,10 +374,11 @@ export function AskAI() {
     const currentPreview  = previewSrc;
     removeFile();
 
-    // Create conversation if new chat
-    let convoId = activeId;
+    // Create conversation if new chat — use ref (not state) for reliability
+    let convoId = convoIdRef.current;
     if (!convoId) {
       convoId = await createNewConvo(text || currentFile?.name);
+      if (convoId) convoIdRef.current = convoId; // persist for next messages
     }
 
     try {
@@ -400,7 +407,7 @@ export function AskAI() {
           body: JSON.stringify({
             prompt:  text    || undefined,
             image:   imageData,
-            history: imageData ? [] : buildHistory(),
+            history: imageData ? [] : buildHistory(newMessages),
             userId,
           }),
         });
