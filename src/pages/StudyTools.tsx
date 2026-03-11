@@ -3,11 +3,12 @@ import { useApp } from '../context/AppContext';
 import { API_URL } from '../utils/api';
 import {
   Sparkles, FileText, Upload, X, Copy, Download,
-  Check, Loader2, ChevronDown, BookOpen, Brain,
+  Check, Loader2, BookOpen, Brain,
   AlignLeft, List, Lightbulb, Globe, Map, CreditCard,
   MessageSquare, ClipboardList, Layers, HelpCircle,
-  Zap, RotateCcw,
+  Zap, RotateCcw, Mic, MicOff,
 } from 'lucide-react';
+import { useVoiceInput } from '../hooks/useVoiceInput';
 
 // ── Types ─────────────────────────────────────────────────────
 type Tab = 'notes' | 'pdf';
@@ -88,6 +89,21 @@ export function StudyTools() {
   const [noteLoading, setNoteLoading] = useState(false);
   const [notePoints, setNotePoints] = useState(0);
   const [noteCopied, setNoteCopied] = useState(false);
+  const [voiceLang,  setVoiceLang]  = useState<'hi-IN'|'en-IN'>('hi-IN');
+  const notesTextareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // ── Voice Input for Notes ─────────────────────────────────
+  const { isListening, isUnsupported, interimText, error: voiceError,
+          toggleListening } = useVoiceInput({
+    lang: voiceLang,
+    onTranscript: (text) => {
+      setNotes(text);
+      if (notesTextareaRef.current) {
+        notesTextareaRef.current.style.height = 'auto';
+        notesTextareaRef.current.style.height = notesTextareaRef.current.scrollHeight + 'px';
+      }
+    },
+  });
 
   // PDF state
   const [pdfFile, setPdfFile]         = useState<File | null>(null);
@@ -265,10 +281,33 @@ export function StudyTools() {
 
             {/* Input */}
             <div className="glass rounded-2xl border border-white/8 flex flex-col" style={{ minHeight: '320px' }}>
-              <div className="flex items-center justify-between px-4 pt-4 pb-2 border-b border-white/5">
+              <div className="flex items-center justify-between px-4 pt-3 pb-2 border-b border-white/5">
                 <span className="text-xs font-semibold text-slate-400">Your Notes</span>
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] text-slate-600">{notes.length} chars</span>
+                  {/* Lang toggle */}
+                  {!isUnsupported && (
+                    <button
+                      onClick={() => setVoiceLang(l => l === 'hi-IN' ? 'en-IN' : 'hi-IN')}
+                      className="text-[10px] text-slate-600 hover:text-slate-300 px-1.5 py-0.5 rounded border border-white/8 transition-colors"
+                      title="Toggle language"
+                    >🎤 {voiceLang === 'hi-IN' ? 'HI' : 'EN'}</button>
+                  )}
+                  {/* Mic button */}
+                  {!isUnsupported && (
+                    <button
+                      onClick={() => toggleListening(notes)}
+                      title={isListening ? "Stop recording" : "Speak your notes"}
+                      className={`relative p-1.5 rounded-lg border transition-all ${
+                        isListening
+                          ? 'border-red-500/50 bg-red-500/10 text-red-400'
+                          : 'border-white/10 text-slate-500 hover:text-purple-400 hover:border-purple-500/20'
+                      }`}
+                    >
+                      {isListening ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
+                      {isListening && <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-red-500 animate-pulse" />}
+                    </button>
+                  )}
                   {notes && (
                     <button onClick={() => { setNotes(''); setNoteResult(''); }}
                       className="text-slate-600 hover:text-red-400 transition-colors">
@@ -277,10 +316,28 @@ export function StudyTools() {
                   )}
                 </div>
               </div>
+              {/* Voice status bar */}
+              {isListening && (
+                <div className="flex items-center gap-2 px-4 py-1.5 bg-red-500/5 border-b border-red-500/10">
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse flex-shrink-0" />
+                  <span className="text-[11px] text-red-300 flex-1 truncate">
+                    {interimText || "Listening… speak now"}
+                  </span>
+                  <span className="text-[10px] text-red-400/60">Tap 🎤 to stop</span>
+                </div>
+              )}
+              {voiceError && (
+                <div className="px-4 py-1.5 bg-red-500/5 border-b border-red-500/10">
+                  <span className="text-[11px] text-red-400">{voiceError}</span>
+                </div>
+              )}
               <textarea
+                ref={notesTextareaRef}
                 value={notes}
                 onChange={e => setNotes(e.target.value)}
-                placeholder="Paste your notes here...&#10;&#10;Example:&#10;- Photosynthesis is process by which plants make food&#10;- Needs sunlight, water, CO2&#10;- Produces glucose and oxygen"
+                placeholder={isListening
+                  ? (interimText || "🎤 Listening… speak your notes in Hindi or English")
+                  : "Paste notes or tap 🎤 to speak… (Hindi & English supported)"}
                 className="flex-1 w-full bg-transparent text-sm text-slate-200 placeholder-slate-700 resize-none focus:outline-none p-4 leading-relaxed"
                 style={{ minHeight: '260px' }}
               />

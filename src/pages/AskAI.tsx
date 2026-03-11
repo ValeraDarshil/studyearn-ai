@@ -3,7 +3,9 @@ import {
   Brain, Send, Zap, ImagePlus, FileText, X,
   Trash2, User, Sparkles, Plus, MessageSquare,
   ChevronLeft, MoreHorizontal, Check, Pencil,
+  Mic, MicOff,
 } from "lucide-react";
+import { useVoiceInput } from "../hooks/useVoiceInput";
 import { useApp } from "../context/AppContext";
 import { API_URL } from "../utils/api";
 import { incrementAction } from "../utils/user-api";
@@ -168,6 +170,21 @@ export function AskAI() {
   const [fileType,      setFileType]      = useState<"image" | "pdf" | null>(null);
   const [previewSrc,    setPreviewSrc]    = useState<string | null>(null);
   const [isDragging,    setIsDragging]    = useState(false);
+  const [voiceLang,     setVoiceLang]     = useState<'hi-IN'|'en-IN'>('hi-IN');
+
+  // ── Voice Input ───────────────────────────────────────────
+  const { isListening, isUnsupported, interimText, error: voiceError,
+          toggleListening } = useVoiceInput({
+    lang: voiceLang,
+    onTranscript: (text) => {
+      setQuestion(text);
+      // Auto resize textarea
+      if (textareaRef.current) {
+        textareaRef.current.style.height = 'auto';
+        textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
+      }
+    },
+  });
 
   // ── Hourly refill + video ad state ───────────────────────
   const [nextRefillSecs, setNextRefillSecs] = useState<number>(0);
@@ -824,11 +841,33 @@ export function AskAI() {
               onDragLeave={() => setIsDragging(false)}
               onDrop={e => { e.preventDefault(); setIsDragging(false); const f = e.dataTransfer.files[0]; if (f) handleFile(f); }}>
 
-              <button onClick={() => fileRef.current?.click()} title="Upload"
+              <button onClick={() => fileRef.current?.click()} title="Upload image or PDF"
                 className={`p-1.5 rounded-lg border transition-all flex-shrink-0 mb-0.5
                   ${isDragging ? "border-blue-500/50 text-blue-400" : "border-white/10 text-slate-500 hover:text-blue-400 hover:border-blue-500/20"}`}>
                 <ImagePlus className="w-4 h-4" />
               </button>
+
+              {/* Voice input button */}
+              {!isUnsupported && (
+                <div className="relative flex-shrink-0 mb-0.5">
+                  <button
+                    onClick={() => toggleListening(question)}
+                    title={isListening ? "Stop recording" : "Voice input (Hindi/English)"}
+                    className={`p-1.5 rounded-lg border transition-all relative ${
+                      isListening
+                        ? "border-red-500/50 bg-red-500/10 text-red-400"
+                        : "border-white/10 text-slate-500 hover:text-purple-400 hover:border-purple-500/20"
+                    }`}>
+                    {isListening
+                      ? <MicOff className="w-4 h-4" />
+                      : <Mic className="w-4 h-4" />
+                    }
+                    {isListening && (
+                      <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                    )}
+                  </button>
+                </div>
+              )}
 
               <textarea
                 ref={textareaRef}
@@ -836,11 +875,12 @@ export function AskAI() {
                 onChange={e => setQuestion(e.target.value)}
                 onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
                 placeholder={
-                  questionsLeft <= 0     ? "Daily limit reached…"
+                  isListening            ? (interimText || "🎤 Listening… speak now (Hindi or English)")
+                  : questionsLeft <= 0   ? "Daily limit reached…"
                   : fileType === "pdf"   ? "What to do with this PDF? (leave blank to auto-solve)"
                   : fileType === "image" ? "Describe what to solve (optional)…"
-                  : hasChat              ? "Ask a follow-up…"
-                  :                       "Ask anything… (Shift+Enter for new line)"
+                  : hasChat              ? "Ask a follow-up… or tap 🎤 to speak"
+                  :                       "Ask anything… or tap 🎤 to speak"
                 }
                 disabled={questionsLeft <= 0 || loading}
                 rows={1}
@@ -855,9 +895,29 @@ export function AskAI() {
             </div>
           </div>
 
-          <p className="text-center text-[10px] text-slate-700 mt-1.5">
-            Earn {isPremium ? "20" : "10"} pts per question • History saved 30 days
-          </p>
+          <div className="flex items-center justify-between mt-1.5 px-1">
+            <p className="text-[10px] text-slate-700">
+              Earn {isPremium ? "20" : "10"} pts per question • History saved 30 days
+            </p>
+            {!isUnsupported && (
+              <div className="flex items-center gap-1">
+                {voiceError && <span className="text-[10px] text-red-400">{voiceError}</span>}
+                {isListening && (
+                  <span className="text-[10px] text-red-400 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse inline-block" />
+                    Recording…
+                  </span>
+                )}
+                <button
+                  onClick={() => setVoiceLang(l => l === 'hi-IN' ? 'en-IN' : 'hi-IN')}
+                  className="text-[10px] text-slate-600 hover:text-slate-400 transition-colors px-1.5 py-0.5 rounded border border-white/5 hover:border-white/10"
+                  title="Toggle voice language"
+                >
+                  🎤 {voiceLang === 'hi-IN' ? 'HI' : 'EN'}
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
