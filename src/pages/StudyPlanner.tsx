@@ -253,7 +253,7 @@ Continue for all ${daysLeft} days.`;
         </button>
       </div>
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {[
           { label: "Days Left",   value: daysLeft,   icon: Target,      color: "text-purple-400" },
           { label: "Total Tasks", value: totalTasks, icon: BookOpen,    color: "text-blue-400" },
@@ -279,7 +279,7 @@ Continue for all ${daysLeft} days.`;
         </div>
       )}
 
-      <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+      <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide -mx-1 px-1">
         {plan.days.map((d, i) => {
           const allDone = d.completed.every(Boolean);
           const someD   = d.completed.some(Boolean);

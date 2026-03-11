@@ -542,7 +542,7 @@ Output the JSON array now:`;
                 const active = style === s.id;
                 return (
                 <button key={s.id} onClick={() => setStyle(s.id)}
-                  className={`relative p-4 rounded-xl border text-center transition-all duration-300 overflow-hidden group
+                  className={`relative p-3 sm:p-4 rounded-xl border text-center transition-all duration-300 overflow-hidden group
                     ${active
                       ? `bg-gradient-to-br ${s.color} ${s.border} ring-1 ${s.ring} shadow-lg ${s.glow}`
                       : "bg-white/[0.02] border-white/5 hover:border-white/15 hover:bg-white/[0.04]"

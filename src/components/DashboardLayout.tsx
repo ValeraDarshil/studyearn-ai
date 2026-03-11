@@ -185,7 +185,7 @@ export function DashboardLayout() {
       </aside>
 
       {/* Main Content */}
-      <main className="md:ml-64 min-h-screen pb-20 md:pb-0">
+      <main className="md:ml-64 min-h-screen" style={{ paddingBottom: "calc(5rem + env(safe-area-inset-bottom))" }}>
 
         {/* Top Bar */}
         <div className="sticky top-0 z-30 glass border-b border-white/5 px-3 md:px-8 py-3 md:py-4 flex items-center justify-between gap-2">
@@ -207,16 +207,16 @@ export function DashboardLayout() {
           {/* Right badges */}
           <div className="flex items-center gap-2 ml-auto">
             {/* Questions left */}
-            <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg glass border border-blue-500/20">
+            <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg glass border border-blue-500/20">
               <Zap className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
               <span className="text-[11px] font-semibold text-blue-300 whitespace-nowrap">
                 <span className="hidden sm:inline">{questionsLeft} questions left</span>
-                <span className="sm:hidden">{questionsLeft}Q left</span>
+                <span className="sm:hidden">{questionsLeft}Q</span>
               </span>
             </div>
 
-            {/* Points */}
-            <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg glass border border-purple-500/20">
+            {/* Points — hidden on xs, show from sm */}
+            <div className="hidden xs:flex items-center gap-1.5 px-2 py-1.5 rounded-lg glass border border-purple-500/20">
               <Gift className="w-3.5 h-3.5 text-purple-400 flex-shrink-0" />
               <span className="text-[11px] font-semibold text-purple-300 whitespace-nowrap">{points} pts</span>
             </div>

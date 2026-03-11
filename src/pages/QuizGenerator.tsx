@@ -259,7 +259,7 @@ CRITICAL RULES:
           {/* Subject quick-select */}
           <div className="rounded-2xl p-5 border border-white/10 bg-white/[0.02] space-y-3">
             <p className="text-sm font-medium text-slate-300">Quick select subject:</p>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               {SUBJECTS.map(s => (
                 <button key={s.label} onClick={() => { setSubject(s.label); setTopic(""); }}
                   className={`flex flex-col items-center gap-1 p-3 rounded-xl border text-xs font-medium transition-all
@@ -287,7 +287,7 @@ CRITICAL RULES:
           {/* Difficulty */}
           <div className="rounded-2xl p-5 border border-white/10 bg-white/[0.02] space-y-3">
             <p className="text-sm font-medium text-slate-300">Difficulty:</p>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
               {DIFFICULTIES.map(d => (
                 <button key={d.value} onClick={() => setDifficulty(d.value)}
                   className={`flex flex-col items-center gap-1 p-3 rounded-xl border text-xs font-medium transition-all

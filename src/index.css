@@ -16,6 +16,31 @@
   --color-neon-pink: #ec4899;
   --color-glass-white: rgba(255, 255, 255, 0.05);
   --color-glass-border: rgba(255, 255, 255, 0.08);
+
+  /* Custom breakpoints */
+  --breakpoint-xs: 375px;
+}
+
+/* Scrollbar hide utility */
+@layer utilities {
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Safe area padding for mobile bottom nav */
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* Touch-friendly tap targets */
+  .tap-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
 }
 
 * {

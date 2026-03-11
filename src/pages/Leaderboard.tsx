@@ -99,15 +99,15 @@ export function Leaderboard() {
 
       {/* Top 3 Podium */}
       {leaderboard.length >= 3 && (
-        <div className="glass rounded-2xl p-8 border border-white/10">
-          <div className="grid grid-cols-3 gap-4 items-end">
+        <div className="glass rounded-2xl p-4 sm:p-8 border border-white/10">
+          <div className="grid grid-cols-3 gap-2 sm:gap-4 items-end">
             
             {/* 2nd Place */}
             <div className="text-center">
-              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-slate-400 to-slate-600 flex items-center justify-center mx-auto mb-3">
-                <Medal className="w-8 h-8 text-white" />
+              <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br from-slate-400 to-slate-600 flex items-center justify-center mx-auto mb-2 sm:mb-3">
+                <Medal className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
               </div>
-              <div className="text-sm font-semibold text-white">{leaderboard[1].name}</div>
+              <div className="text-xs sm:text-sm font-semibold text-white truncate">{leaderboard[1].name}</div>
               <div className="flex items-center justify-center gap-1 text-xs text-slate-400 mt-1">
                 <Zap className="w-3 h-3 text-yellow-400" />
                 {leaderboard[1].points.toLocaleString()}
@@ -119,10 +119,10 @@ export function Leaderboard() {
 
             {/* 1st Place */}
             <div className="text-center -mt-8">
-              <div className="w-20 h-20 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center mx-auto mb-3 ring-4 ring-yellow-500/20">
-                <Crown className="w-10 h-10 text-white" />
+              <div className="w-14 h-14 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center mx-auto mb-2 sm:mb-3 ring-4 ring-yellow-500/20">
+                <Crown className="w-7 h-7 sm:w-10 sm:h-10 text-white" />
               </div>
-              <div className="text-lg font-bold text-white">{leaderboard[0].name}</div>
+              <div className="text-sm sm:text-lg font-bold text-white truncate">{leaderboard[0].name}</div>
               <div className="flex items-center justify-center gap-1 text-sm text-slate-400 mt-1">
                 <Zap className="w-4 h-4 text-yellow-400" />
                 {leaderboard[0].points.toLocaleString()}
@@ -134,10 +134,10 @@ export function Leaderboard() {
 
             {/* 3rd Place */}
             <div className="text-center">
-              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center mx-auto mb-3">
-                <Award className="w-8 h-8 text-white" />
+              <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center mx-auto mb-2 sm:mb-3">
+                <Award className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
               </div>
-              <div className="text-sm font-semibold text-white">{leaderboard[2].name}</div>
+              <div className="text-xs sm:text-sm font-semibold text-white truncate">{leaderboard[2].name}</div>
               <div className="flex items-center justify-center gap-1 text-xs text-slate-400 mt-1">
                 <Zap className="w-3 h-3 text-yellow-400" />
                 {leaderboard[2].points.toLocaleString()}
@@ -168,7 +168,7 @@ export function Leaderboard() {
             return (
               <div
                 key={user.id}
-                className={`flex items-center justify-between p-4 transition-colors ${
+                className={`flex items-center justify-between px-3 py-3 sm:p-4 transition-colors ${
                   isCurrentUser 
                     ? 'bg-purple-500/10 border-l-4 border-purple-500' 
                     : 'hover:bg-white/[0.02]'
@@ -176,7 +176,7 @@ export function Leaderboard() {
               >
                 <div className="flex items-center gap-4 flex-1">
                   {/* Rank Badge */}
-                  <div className={`w-10 h-10 rounded-full ${badge.bg} flex items-center justify-center`}>
+                  <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex-shrink-0 ${badge.bg} flex items-center justify-center`}>
                     {user.rank <= 3 ? (
                       <badge.icon className={`w-5 h-5 ${badge.color}`} />
                     ) : (
@@ -200,9 +200,9 @@ export function Leaderboard() {
                   </div>
 
                   {/* Points */}
-                  <div className="flex items-center gap-2">
-                    <Zap className="w-4 h-4 text-yellow-400" />
-                    <span className="text-lg font-bold text-white">
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <Zap className="w-3.5 h-3.5 text-yellow-400" />
+                    <span className="text-sm sm:text-lg font-bold text-white">
                       {user.points.toLocaleString()}
                     </span>
                   </div>

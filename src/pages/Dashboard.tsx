@@ -149,7 +149,7 @@ export function Dashboard() {
       )}
 
       {/* Stats Row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 stagger-children">
+      <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4 stagger-children">
         {/* Points */}
         <div className="glass glass-hover card-shine rounded-2xl p-4 animate-slide-up border border-purple-500/10 hover:border-purple-500/25 hover:-translate-y-1 transition-all duration-300 group">
           <div className="flex items-center justify-between mb-3">
@@ -256,7 +256,7 @@ export function Dashboard() {
         <h2 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
           Quick Actions
         </h2>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 stagger-children">
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4 stagger-children">
           {quickActions.map((action) => (
             <button
               key={action.label}

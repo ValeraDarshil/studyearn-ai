@@ -258,7 +258,7 @@ export function StudyTools() {
           {/* Mode selector */}
           <div className="glass rounded-2xl p-4 border border-white/8 space-y-3">
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Choose Mode</p>
-            <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
               {NOTE_MODES.map(mode => {
                 const isActive = noteMode === mode.id;
                 const Icon = mode.icon;
@@ -277,7 +277,7 @@ export function StudyTools() {
           </div>
 
           {/* Two column layout on desktop */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
 
             {/* Input */}
             <div className="glass rounded-2xl border border-white/8 flex flex-col" style={{ minHeight: '320px' }}>
@@ -416,7 +416,7 @@ export function StudyTools() {
           {/* Analysis type selector */}
           <div className="glass rounded-2xl p-4 border border-white/8 space-y-3">
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Analysis Type</p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
               {PDF_TYPES.map(type => {
                 const isActive = pdfType === type.id;
                 const Icon = type.icon;
@@ -435,7 +435,7 @@ export function StudyTools() {
           </div>
 
           {/* Two column layout */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
 
             {/* Upload area */}
             <div className="space-y-3">
