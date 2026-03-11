@@ -275,11 +275,11 @@ export function Dashboard() {
       </div>
 
       {/* Recent Activity + Achievements */}
-      <div className="grid lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-6">
         
         {/* Recent Activity */}
-        <div className="glass rounded-2xl p-5">
-          <div className="flex items-center justify-between mb-4">
+        <div className="glass rounded-2xl p-4 sm:p-5 overflow-hidden">
+          <div className="flex items-center justify-between mb-3 sm:mb-4">
             <h2 className="text-lg font-semibold text-white">Recent Activity</h2>
             <Clock className="w-4 h-4 text-slate-500" />
           </div>
@@ -294,18 +294,20 @@ export function Dashboard() {
               {recentActivity.slice(0, 5).map((activity) => {
                 const { Icon, color, iconColor } = getActivityIcon(activity.action);
                 return (
-                  <div key={activity._id} className="flex items-start gap-3 p-3 rounded-xl hover:bg-white/[0.02] transition-colors">
+                  <div key={activity._id} className="flex items-start gap-2.5 p-2.5 rounded-xl hover:bg-white/[0.02] transition-colors min-w-0 overflow-hidden">
                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${color}`}>
                       <Icon className={`w-4 h-4 ${iconColor}`} />
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-slate-300 truncate">{activity.details}</p>
+                    <div className="flex-1 min-w-0 overflow-hidden">
+                      <p className="text-sm text-slate-300 truncate max-w-full">{activity.details}</p>
                       <p className="text-xs text-slate-600 mt-0.5">{formatTime(activity.timestamp)}</p>
                     </div>
-                    <div className="flex items-center gap-1 flex-shrink-0">
-                      <Zap className="w-3 h-3 text-yellow-400" />
-                      <span className="text-xs font-semibold text-yellow-400">+{activity.pointsEarned}</span>
-                    </div>
+                    {activity.pointsEarned > 0 && (
+                      <div className="flex items-center gap-0.5 flex-shrink-0 ml-1">
+                        <Zap className="w-3 h-3 text-yellow-400" />
+                        <span className="text-xs font-semibold text-yellow-400">+{activity.pointsEarned}</span>
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -314,9 +316,9 @@ export function Dashboard() {
         </div>
 
         {/* Achievements — compact preview card */}
-        <div className="glass rounded-2xl p-5">
+        <div className="glass rounded-2xl p-4 sm:p-5 overflow-hidden">
           {/* Header */}
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-3 sm:mb-4">
             <div className="flex items-center gap-2">
               <Trophy className="w-4 h-4 text-yellow-400" />
               <h2 className="text-lg font-semibold text-white">Achievements</h2>
@@ -372,7 +374,7 @@ export function Dashboard() {
                 return (
                   <div
                     key={ach.id}
-                    className={`flex items-center gap-3 p-2.5 rounded-xl border transition-all duration-200
+                    className={`flex items-center gap-2.5 p-2.5 rounded-xl border transition-all duration-200 min-w-0 overflow-hidden
                       ${isUnlocked
                         ? `bg-gradient-to-r ${styles.bg} ${styles.border}`
                         : 'bg-white/[0.01] border-white/5'}`}
@@ -383,7 +385,7 @@ export function Dashboard() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5 mb-0.5">
-                        <span className={`text-xs font-semibold truncate ${isUnlocked ? 'text-white' : 'text-slate-500'}`}>{ach.name}</span>
+                        <span className={`text-xs font-semibold truncate min-w-0 ${isUnlocked ? 'text-white' : 'text-slate-500'}`}>{ach.name}</span>
                         <span className={`text-[8px] px-1 py-0.5 rounded-full uppercase font-bold flex-shrink-0 ${styles.badge}`}>{ach.rarity}</span>
                       </div>
                       {!isUnlocked && (
