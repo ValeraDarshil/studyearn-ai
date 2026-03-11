@@ -798,55 +798,81 @@ export function AskAI() {
 
         {/* ── Input box ───────────────────────────────────── */}
         <div className="flex-shrink-0 p-3 border-t border-white/8">
-          {/* Quota info + refill timer + watch ad */}
-          {questionsLeft <= 0 && (
-            <div className="mb-2 rounded-xl border border-red-500/20 bg-red-500/[0.07] p-3 space-y-2">
-              <div className="flex items-center gap-2">
-                <Zap className="w-4 h-4 text-red-400 flex-shrink-0" />
-                <p className="text-xs font-semibold text-red-300 flex-1">
-                  No questions left!
-                </p>
-                {nextRefillSecs > 0 && (
-                  <div className="flex items-center gap-1 text-[10px] text-slate-400">
-                    <Clock className="w-3 h-3" />
-                    <span>{Math.floor(nextRefillSecs/60)}:{String(nextRefillSecs%60).padStart(2,'0')} refill</span>
-                  </div>
-                )}
+          {/* ── Smart quota bar — jaise hi 1 question use ho dikhna shuru ── */}
+          {(() => {
+            const dailyLimit = isPremium ? 30 : 15;
+            const used = dailyLimit - questionsLeft;
+            const pct  = Math.round((questionsLeft / dailyLimit) * 100);
+            const mins = Math.floor(nextRefillSecs / 60);
+            const secs = nextRefillSecs % 60;
+            const timeStr = `${mins}:${String(secs).padStart(2,'0')}`;
+
+            // Show bar only if at least 1 question has been used
+            if (used === 0) return null;
+
+            return (
+              <div className={`mb-2 rounded-xl border p-2.5 space-y-2 transition-all
+                ${questionsLeft === 0
+                  ? 'border-red-500/25 bg-red-500/[0.07]'
+                  : 'border-white/8 bg-white/[0.02]'}`}>
+
+                {/* Row 1: status + timer */}
+                <div className="flex items-center gap-2">
+                  {questionsLeft === 0 ? (
+                    <Zap className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />
+                  ) : (
+                    <Clock className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
+                  )}
+                  <span className={`text-xs font-semibold flex-1 ${questionsLeft === 0 ? 'text-red-300' : 'text-slate-300'}`}>
+                    {questionsLeft === 0 ? 'No questions left' : `${questionsLeft}/${dailyLimit} questions left`}
+                  </span>
+                  {nextRefillSecs > 0 && questionsLeft < dailyLimit && (
+                    <span className="text-[10px] text-blue-300 font-medium">
+                      +1 in {timeStr}
+                    </span>
+                  )}
+                </div>
+
+                {/* Row 2: progress bar */}
+                <div className="w-full h-1.5 rounded-full bg-white/5 overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all duration-500"
+                    style={{
+                      width: `${pct}%`,
+                      background: pct > 40 ? 'linear-gradient(90deg,#3b82f6,#8b5cf6)'
+                                : pct > 15 ? 'linear-gradient(90deg,#f59e0b,#f97316)'
+                                : '#ef4444'
+                    }}
+                  />
+                </div>
+
+                {/* Row 3: Watch Video button — always visible when any question used */}
+                <div className="flex gap-2">
+                  {videoAdsLeft > 0 && questionsLeft < dailyLimit && (
+                    <button
+                      onClick={handleWatchAd}
+                      disabled={watchingAd || questionsLeft >= dailyLimit}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-green-500/12 border border-green-500/25 text-[11px] font-semibold text-green-300 hover:bg-green-500/20 hover:border-green-500/40 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      {watchingAd ? (
+                        <><RefreshCw className="w-3 h-3 animate-spin" /> Watching ad… {adCountdown}s</>
+                      ) : (
+                        <><Play className="w-3 h-3" /> Watch Video → +1 Q &nbsp;·&nbsp; {videoAdsLeft} left today</>
+                      )}
+                    </button>
+                  )}
+                  {!isPremium && questionsLeft === 0 && (
+                    <button
+                      onClick={() => window.location.href = '/app/rewards'}
+                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-yellow-500/12 border border-yellow-500/25 text-[11px] font-semibold text-yellow-300 hover:bg-yellow-500/20 transition-all flex-shrink-0"
+                    >
+                      ⚡ Get Premium
+                    </button>
+                  )}
+                </div>
               </div>
-              <div className="flex gap-2">
-                {videoAdsLeft > 0 && (
-                  <button
-                    onClick={handleWatchAd}
-                    disabled={watchingAd}
-                    className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-green-500/15 border border-green-500/30 text-xs font-semibold text-green-300 hover:bg-green-500/25 transition-all disabled:opacity-60"
-                  >
-                    {watchingAd ? (
-                      <><RefreshCw className="w-3 h-3 animate-spin" /> Watching… {adCountdown}s</>
-                    ) : (
-                      <><Play className="w-3 h-3" /> Watch Video (+1 Question) · {videoAdsLeft} left</>
-                    )}
-                  </button>
-                )}
-                {!isPremium && (
-                  <button
-                    onClick={() => window.location.href = '/app/rewards'}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-yellow-500/15 border border-yellow-500/30 text-xs font-semibold text-yellow-300 hover:bg-yellow-500/25 transition-all"
-                  >
-                    ⚡ Premium (30/day)
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-          {/* Refill timer when questions > 0 but getting low */}
-          {questionsLeft > 0 && questionsLeft <= 3 && nextRefillSecs > 0 && (
-            <div className="mb-2 flex items-center gap-2 px-3 py-1.5 rounded-lg bg-orange-500/10 border border-orange-500/20">
-              <Clock className="w-3 h-3 text-orange-400 flex-shrink-0" />
-              <p className="text-[10px] text-orange-300">
-                {questionsLeft} left · Next refill in {Math.floor(nextRefillSecs/60)}:{String(nextRefillSecs%60).padStart(2,'0')}
-              </p>
-            </div>
-          )}
+            );
+          })()}
           <div className="rounded-2xl border border-white/10 bg-white/[0.02] px-3 py-2 space-y-2">
 
             {/* File strip */}
