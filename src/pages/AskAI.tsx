@@ -3,6 +3,7 @@ import {
   Brain, Send, Zap, ImagePlus, FileText, X,
   Trash2, User, Sparkles, Plus, MessageSquare,
   ChevronLeft, MoreHorizontal, Check, Pencil,
+  Play, Clock, RefreshCw,
 } from "lucide-react";
 import { useApp } from "../context/AppContext";
 import { API_URL } from "../utils/api";
@@ -169,6 +170,13 @@ export function AskAI() {
   const [previewSrc,    setPreviewSrc]    = useState<string | null>(null);
   const [isDragging,    setIsDragging]    = useState(false);
 
+  // ── Hourly refill + video ad state ───────────────────────
+  const [nextRefillSecs, setNextRefillSecs] = useState<number>(0);
+  const [videoAdsLeft,   setVideoAdsLeft]   = useState<number>(5);
+  const [watchingAd,     setWatchingAd]     = useState(false);
+  const [adCountdown,    setAdCountdown]    = useState(0);
+  const refillTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   const fileRef     = useRef<HTMLInputElement>(null);
   // Ref to track current convoId reliably across async calls
   const convoIdRef  = useRef<string | null>(null);
@@ -193,6 +201,43 @@ export function AskAI() {
   useEffect(() => {
     fetchConvos();
   }, [fetchConvos]);
+
+  // ── Fetch quota on mount & start refill timer ────────────
+  useEffect(() => {
+    async function fetchQuota() {
+      try {
+        const res  = await fetch(`${API_URL}/api/ai/quota`, { headers: authHeaders() });
+        const data = await res.json();
+        if (data.success) {
+          setQuestionsLeft(data.questionsLeft);
+          setNextRefillSecs(data.nextRefillSecs || 0);
+          setVideoAdsLeft(data.videoAdsLeft ?? 5);
+        }
+      } catch { /* silent */ }
+    }
+    fetchQuota();
+  }, []);
+
+  // ── Countdown timer — tick every second ──────────────────
+  useEffect(() => {
+    if (refillTimerRef.current) clearInterval(refillTimerRef.current);
+    if (nextRefillSecs <= 0) return;
+    refillTimerRef.current = setInterval(() => {
+      setNextRefillSecs(prev => {
+        if (prev <= 1) {
+          clearInterval(refillTimerRef.current!);
+          // Auto-refill: re-fetch quota
+          fetch(`${API_URL}/api/ai/quota`, { headers: authHeaders() })
+            .then(r => r.json())
+            .then(d => { if (d.success) { setQuestionsLeft(d.questionsLeft); setNextRefillSecs(d.nextRefillSecs || 0); } })
+            .catch(() => {});
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => { if (refillTimerRef.current) clearInterval(refillTimerRef.current); };
+  }, [nextRefillSecs]);
 
   // ── Auto scroll ──────────────────────────────────────────
   useEffect(() => {
@@ -355,8 +400,49 @@ export function AskAI() {
   // ─────────────────────────────────────────────────────────
   // SEND MESSAGE
   // ─────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────
+  // WATCH VIDEO AD → +1 Question
+  // ─────────────────────────────────────────────────────────
+  const handleWatchAd = async () => {
+    if (watchingAd || videoAdsLeft <= 0) return;
+    setWatchingAd(true);
+    setAdCountdown(15); // 15 sec fake video
+
+    // Fake video countdown
+    const timer = setInterval(() => {
+      setAdCountdown(prev => {
+        if (prev <= 1) { clearInterval(timer); return 0; }
+        return prev - 1;
+      });
+    }, 1000);
+
+    // Wait 15 seconds (fake ad duration)
+    await new Promise(resolve => setTimeout(resolve, 15000));
+    clearInterval(timer);
+
+    try {
+      const res  = await fetch(`${API_URL}/api/ai/watch-ad`, {
+        method: 'POST',
+        headers: authHeaders(),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setQuestionsLeft(data.questionsLeft);
+        setVideoAdsLeft(data.videoAdsLeft ?? 0);
+        if (data.nextRefillSecs !== undefined) setNextRefillSecs(data.nextRefillSecs);
+        alert(`🎓 ${data.message}`);
+      } else {
+        alert(data.message || 'Could not unlock question.');
+      }
+    } catch {
+      alert('Connection error. Please try again.');
+    }
+    setWatchingAd(false);
+    setAdCountdown(0);
+  };
+
   // Build conversation history for AI context
-  // Uses `messages` state directly (previous exchanges only — current prompt goes as `prompt` field)
+  // Uses \`messages\` state directly (previous exchanges only — current prompt goes as `prompt` field)
   const buildHistory = () =>
     messages
       .filter(m => !m.isError && !m.imagePreview && !m.fileName)
@@ -393,7 +479,7 @@ export function AskAI() {
 
     try {
       const headers = authHeaders();
-      let result: { success: boolean; answer: string; pointsAwarded?: number; questionsLeft?: number };
+      let result: { success: boolean; answer: string; pointsAwarded?: number; questionsLeft?: number; nextRefillSecs?: number };
 
       if (currentFileType === "pdf" && currentFile) {
         setLoadingStep("Extracting PDF text…");
@@ -436,6 +522,7 @@ export function AskAI() {
         addPoints(pts);
         if (result.questionsLeft !== undefined) setQuestionsLeft(result.questionsLeft);
         else useQuestion();
+        if (result.nextRefillSecs !== undefined) setNextRefillSecs(result.nextRefillSecs);
         logActivity("ask_question", text.substring(0, 50) || `${currentFileType} question`, pts);
         const newTotal = (userStats.totalQuestionsAsked || 0) + 1;
         setUserStats({ ...userStats, totalQuestionsAsked: newTotal });
@@ -636,8 +723,11 @@ export function AskAI() {
             <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-medium
               ${questionsLeft > 0 ? "border-blue-500/20 bg-blue-500/5 text-blue-300" : "border-red-500/20 bg-red-500/5 text-red-300"}`}>
               <Zap className="w-3 h-3" />
-              {questionsLeft} left
+              {questionsLeft}/{isPremium ? 30 : 15}
               {isPremium && <span className="text-yellow-300 ml-0.5">⚡</span>}
+              {questionsLeft <= 0 && nextRefillSecs > 0 && (
+                <span className="text-[10px] text-slate-500 ml-1">{Math.floor(nextRefillSecs/60)}m</span>
+              )}
             </div>
             {/* New chat (desktop) */}
             <button
@@ -708,12 +798,52 @@ export function AskAI() {
 
         {/* ── Input box ───────────────────────────────────── */}
         <div className="flex-shrink-0 p-3 border-t border-white/8">
-          {/* Limit banner — inside input area to avoid extra blank space */}
+          {/* Quota info + refill timer + watch ad */}
           {questionsLeft <= 0 && (
-            <div className="mb-2 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-2.5 flex items-center gap-2">
-              <Zap className="w-4 h-4 text-red-400 flex-shrink-0" />
-              <p className="text-xs text-red-300">
-                Daily limit reached. {isPremium ? "Come back tomorrow!" : "Upgrade to Premium for 10 questions/day ⚡"}
+            <div className="mb-2 rounded-xl border border-red-500/20 bg-red-500/[0.07] p-3 space-y-2">
+              <div className="flex items-center gap-2">
+                <Zap className="w-4 h-4 text-red-400 flex-shrink-0" />
+                <p className="text-xs font-semibold text-red-300 flex-1">
+                  No questions left!
+                </p>
+                {nextRefillSecs > 0 && (
+                  <div className="flex items-center gap-1 text-[10px] text-slate-400">
+                    <Clock className="w-3 h-3" />
+                    <span>{Math.floor(nextRefillSecs/60)}:{String(nextRefillSecs%60).padStart(2,'0')} refill</span>
+                  </div>
+                )}
+              </div>
+              <div className="flex gap-2">
+                {videoAdsLeft > 0 && (
+                  <button
+                    onClick={handleWatchAd}
+                    disabled={watchingAd}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-green-500/15 border border-green-500/30 text-xs font-semibold text-green-300 hover:bg-green-500/25 transition-all disabled:opacity-60"
+                  >
+                    {watchingAd ? (
+                      <><RefreshCw className="w-3 h-3 animate-spin" /> Watching… {adCountdown}s</>
+                    ) : (
+                      <><Play className="w-3 h-3" /> Watch Video (+1 Question) · {videoAdsLeft} left</>
+                    )}
+                  </button>
+                )}
+                {!isPremium && (
+                  <button
+                    onClick={() => window.location.href = '/app/rewards'}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-yellow-500/15 border border-yellow-500/30 text-xs font-semibold text-yellow-300 hover:bg-yellow-500/25 transition-all"
+                  >
+                    ⚡ Premium (30/day)
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+          {/* Refill timer when questions > 0 but getting low */}
+          {questionsLeft > 0 && questionsLeft <= 3 && nextRefillSecs > 0 && (
+            <div className="mb-2 flex items-center gap-2 px-3 py-1.5 rounded-lg bg-orange-500/10 border border-orange-500/20">
+              <Clock className="w-3 h-3 text-orange-400 flex-shrink-0" />
+              <p className="text-[10px] text-orange-300">
+                {questionsLeft} left · Next refill in {Math.floor(nextRefillSecs/60)}:{String(nextRefillSecs%60).padStart(2,'0')}
               </p>
             </div>
           )}

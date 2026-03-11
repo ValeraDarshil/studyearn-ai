@@ -20,10 +20,43 @@ import { logger } from '../utils/logger.js';
 // ─────────────────────────────────────────────────────────────
 // PREMIUM CONSTANTS — change here, applies everywhere
 // ─────────────────────────────────────────────────────────────
-const BASE_AI_POINTS   = 10;  // free user gets 10 pts per question
-const PREMIUM_MULTIPLIER = 2; // premium user gets 2x = 20 pts
-const FREE_DAILY_LIMIT   = 5;
-const PREMIUM_DAILY_LIMIT = 10;
+const BASE_AI_POINTS      = 10;   // free = 10pts, premium = 20pts
+const PREMIUM_MULTIPLIER  = 2;
+const FREE_DAILY_LIMIT    = 15;   // 15 questions/day free
+const PREMIUM_DAILY_LIMIT = 30;   // 30 questions/day premium (2x)
+const REFILL_INTERVAL_MS  = 60 * 60 * 1000; // 1 hour in ms
+const MAX_VIDEO_ADS_DAY   = 5;    // max 5 bonus questions via video/day
+
+// ─────────────────────────────────────────────────────────────
+// Midnight IST mein din badla ya nahi
+// ─────────────────────────────────────────────────────────────
+function getTodayIST(): string {
+  // IST = UTC+5:30
+  const now = new Date();
+  const istOffset = 5.5 * 60 * 60 * 1000;
+  const ist = new Date(now.getTime() + istOffset);
+  return ist.toISOString().split('T')[0]; // 'YYYY-MM-DD'
+}
+
+// ─────────────────────────────────────────────────────────────
+// Hourly refill: questionUsedAt array check karo
+// Jo timestamps 1hr se purane hain unhe remove karo aur
+// questionsLeft ko recalculate karo
+// ─────────────────────────────────────────────────────────────
+function applyHourlyRefill(user: any, dailyLimit: number): void {
+  const now = Date.now();
+  const cutoff = now - REFILL_INTERVAL_MS;
+
+  // Sirf last 1hr ke andar use hue questions count karo
+  const recentUsed: Date[] = (user.questionUsedAt || [])
+    .filter((t: Date) => new Date(t).getTime() > cutoff);
+
+  user.questionUsedAt = recentUsed;
+
+  // questionsLeft = dailyLimit - recentUsed (can't go below 0 or above limit)
+  const used = recentUsed.length;
+  user.questionsLeft = Math.max(0, Math.min(dailyLimit, dailyLimit - used));
+}
 
 function isPremiumValid(user: any): boolean {
   if (!user.isPremium) return false;
@@ -37,39 +70,67 @@ function isPremiumValid(user: any): boolean {
   return true;
 }
 
+// ─────────────────────────────────────────────────────────────
+// Next refill time — seconds until oldest used question expires
+// ─────────────────────────────────────────────────────────────
+function getNextRefillSecs(user: any): number {
+  const used: Date[] = user.questionUsedAt || [];
+  if (used.length === 0) return 0;
+  const oldest = Math.min(...used.map((t: Date) => new Date(t).getTime()));
+  const refillAt = oldest + REFILL_INTERVAL_MS;
+  return Math.max(0, Math.ceil((refillAt - Date.now()) / 1000));
+}
+
 async function handleQuestionUsed(
   req: Request,
-): Promise<{ questionsLeft: number; pointsAwarded: number } | null> {
+): Promise<{ questionsLeft: number; pointsAwarded: number; nextRefillSecs: number } | null> {
   const userId = getUserIdFromToken(req);
   if (!userId) return null;
 
   try {
-    const user = await User.findById(userId);
+    const user    = await User.findById(userId);
     if (!user) return null;
 
-    const premium = isPremiumValid(user);
-    const today   = new Date().toISOString().split('T')[0];
-
-    // Reset daily quota if new day
+    const premium    = isPremiumValid(user);
+    const today      = getTodayIST();
     const dailyLimit = premium ? PREMIUM_DAILY_LIMIT : FREE_DAILY_LIMIT;
-    if (user.questionsDate !== today) {
-      user.questionsLeft = dailyLimit;
-      user.questionsDate = today;
+
+    // ── Midnight IST reset ──────────────────────────────────
+    if ((user as any).questionsDate !== today) {
+      (user as any).questionsDate   = today;
+      (user as any).questionUsedAt  = [];
+      (user as any).videoAdsToday   = 0;
+      (user as any).videoAdsDate    = today;
     }
-    if (user.questionsLeft > 0) user.questionsLeft -= 1;
 
-    // Points: free = 10, premium = 20 (2x)
+    // ── Apply hourly refill ─────────────────────────────────
+    applyHourlyRefill(user, dailyLimit);
+
+    if ((user as any).questionsLeft <= 0) {
+      await user.save();
+      return { questionsLeft: 0, pointsAwarded: 0, nextRefillSecs: getNextRefillSecs(user) };
+    }
+
+    // ── Deduct 1 question ───────────────────────────────────
+    (user as any).questionUsedAt = [...((user as any).questionUsedAt || []), new Date()];
+    applyHourlyRefill(user, dailyLimit); // recalculate after push
+
+    // ── Points ──────────────────────────────────────────────
     const pts = premium ? BASE_AI_POINTS * PREMIUM_MULTIPLIER : BASE_AI_POINTS;
-
     user.points                       += pts;
     (user as any).totalXP              = ((user as any).totalXP || 0) + pts;
     (user as any).totalQuestionsAsked  = ((user as any).totalQuestionsAsked || 0) + 1;
+
     await user.save();
 
     await Activity.create({ userId, action: 'ask_question', details: 'Asked AI a question', pointsEarned: pts });
-    logger.info(`AI question: ${user.email} | premium=${premium} | +${pts}pts | left=${user.questionsLeft}`);
+    logger.info(`AI question: ${user.email} | premium=${premium} | +${pts}pts | left=${(user as any).questionsLeft}`);
 
-    return { questionsLeft: user.questionsLeft, pointsAwarded: pts };
+    return {
+      questionsLeft:   (user as any).questionsLeft,
+      pointsAwarded:   pts,
+      nextRefillSecs:  getNextRefillSecs(user),
+    };
   } catch (err: any) {
     logger.error('handleQuestionUsed error:', err.message);
     return null;
@@ -119,7 +180,11 @@ export async function askAI(req: Request, res: Response) {
     res.json({
       success: true,
       answer,
-      ...(userAction ? { questionsLeft: userAction.questionsLeft, pointsAwarded: userAction.pointsAwarded } : {}),
+      ...(userAction ? {
+        questionsLeft:  userAction.questionsLeft,
+        pointsAwarded:  userAction.pointsAwarded,
+        nextRefillSecs: userAction.nextRefillSecs,
+      } : {}),
     });
   } catch (error: any) {
     logger.error('/api/ai/ask error:', error.message);
@@ -163,10 +228,121 @@ export async function solvePDF(req: Request, res: Response) {
     res.json({
       success: true,
       answer,
-      ...(userAction ? { questionsLeft: userAction.questionsLeft, pointsAwarded: userAction.pointsAwarded } : {}),
+      ...(userAction ? {
+        questionsLeft:  userAction.questionsLeft,
+        pointsAwarded:  userAction.pointsAwarded,
+        nextRefillSecs: userAction.nextRefillSecs,
+      } : {}),
     });
   } catch (error: any) {
     logger.error('/api/ai/solve-pdf error:', error.message);
     res.status(500).json({ success: false, answer: 'Failed to process PDF. Please try again.' });
+  }
+}
+// ─────────────────────────────────────────────────────────────
+// POST /api/ai/watch-ad — fake video ad → +1 question
+// ─────────────────────────────────────────────────────────────
+export async function watchAd(req: Request, res: Response) {
+  const userId = getUserIdFromToken(req);
+  if (!userId) return res.status(401).json({ success: false, message: 'Login required' });
+
+  try {
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    const premium    = isPremiumValid(user);
+    const today      = getTodayIST();
+    const dailyLimit = premium ? PREMIUM_DAILY_LIMIT : FREE_DAILY_LIMIT;
+
+    // Reset if new day
+    if ((user as any).videoAdsDate !== today) {
+      (user as any).videoAdsToday = 0;
+      (user as any).videoAdsDate  = today;
+    }
+
+    // Max 5 video ads per day
+    if ((user as any).videoAdsToday >= MAX_VIDEO_ADS_DAY) {
+      return res.json({
+        success: false,
+        message: `Max ${MAX_VIDEO_ADS_DAY} video bonuses per day reached. Come back tomorrow!`,
+        questionsLeft: (user as any).questionsLeft,
+      });
+    }
+
+    // Already at full quota?
+    applyHourlyRefill(user, dailyLimit);
+    if ((user as any).questionsLeft >= dailyLimit) {
+      return res.json({
+        success: false,
+        message: 'You already have full questions! No need to watch an ad.',
+        questionsLeft: (user as any).questionsLeft,
+      });
+    }
+
+    // Grant +1 question by removing the oldest questionUsedAt entry
+    const used: Date[] = (user as any).questionUsedAt || [];
+    if (used.length > 0) {
+      // Remove oldest used timestamp → effectively refills 1 question
+      used.sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+      (user as any).questionUsedAt = used.slice(1);
+    }
+
+    (user as any).videoAdsToday = ((user as any).videoAdsToday || 0) + 1;
+    applyHourlyRefill(user, dailyLimit);
+
+    await user.save();
+
+    logger.info(`Video ad: ${(user as any).email} | +1 question | left=${(user as any).questionsLeft}`);
+
+    return res.json({
+      success:       true,
+      message:       '+1 question unlocked! Keep studying! 🎓',
+      questionsLeft: (user as any).questionsLeft,
+      videoAdsLeft:  MAX_VIDEO_ADS_DAY - (user as any).videoAdsToday,
+      nextRefillSecs: getNextRefillSecs(user),
+    });
+  } catch (err: any) {
+    logger.error('watchAd error:', err.message);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// GET /api/ai/quota — current quota status (for page load)
+// ─────────────────────────────────────────────────────────────
+export async function getQuota(req: Request, res: Response) {
+  const userId = getUserIdFromToken(req);
+  if (!userId) return res.status(401).json({ success: false });
+
+  try {
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ success: false });
+
+    const premium    = isPremiumValid(user);
+    const today      = getTodayIST();
+    const dailyLimit = premium ? PREMIUM_DAILY_LIMIT : FREE_DAILY_LIMIT;
+
+    if ((user as any).questionsDate !== today) {
+      (user as any).questionsDate  = today;
+      (user as any).questionUsedAt = [];
+      (user as any).videoAdsToday  = 0;
+      (user as any).videoAdsDate   = today;
+      await user.save();
+    }
+
+    applyHourlyRefill(user, dailyLimit);
+    await user.save();
+
+    return res.json({
+      success:        true,
+      questionsLeft:  (user as any).questionsLeft,
+      dailyLimit,
+      nextRefillSecs: getNextRefillSecs(user),
+      videoAdsLeft:   MAX_VIDEO_ADS_DAY - Math.min((user as any).videoAdsToday || 0, MAX_VIDEO_ADS_DAY),
+      isPremium:      premium,
+    });
+  } catch (err: any) {
+    logger.error('getQuota error:', err.message);
+    return res.status(500).json({ success: false });
   }
 }

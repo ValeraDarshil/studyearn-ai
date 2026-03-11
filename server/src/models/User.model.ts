@@ -32,11 +32,15 @@ const userSchema = new mongoose.Schema({
 
 
 
-  // ── Daily Question Quota ──────────────────────────────────
-
-  questionsLeft: { type: Number, default: 5 },
-
+  // ── Daily Question Quota (Hourly Refill System) ─────────────
+  questionsLeft: { type: Number, default: 15 },
   questionsDate: { type: String, default: () => new Date().toISOString().split('T')[0] },
+  // Timestamps of each question used — for hourly refill tracking
+  // Each entry = ISO timestamp when question was consumed
+  questionUsedAt: { type: [Date], default: [] },
+  // Video ad usage today — max 5 per day
+  videoAdsToday:  { type: Number, default: 0 },
+  videoAdsDate:   { type: String, default: () => new Date().toISOString().split('T')[0] },
 
 
 

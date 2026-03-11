@@ -107,7 +107,7 @@ router.post('/use-question', authenticate, async (req: any, res) => {
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
     const today = new Date().toISOString().split('T')[0];
-    if (user.questionsDate !== today) { user.questionsLeft = 5; user.questionsDate = today; }
+    if (user.questionsDate !== today) { user.questionsLeft = 15; user.questionsDate = today; } // 15 = free daily limit
     if (user.questionsLeft <= 0)
       return res.json({ success: false, message: 'No questions left today', questionsLeft: 0 });
 
