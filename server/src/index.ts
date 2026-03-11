@@ -53,7 +53,8 @@ import aiRoutes      from './routes/aiRoutes.js';
 import pptRoutes     from './routes/pptRoutes.js';
 import pdfRoutes     from './routes/pdfRoutes.js';
 import rewardsRoutes from './routes/rewardsRoutes.js';
-import chatRoutes    from './routes/chatRoutes.js';
+import chatRoutes        from './routes/chatRoutes.js';
+import studyToolsRoutes from './routes/studyToolsRoutes.js';
 
 // Background jobs
 import { fixStuckRedemptions, processPendingPremiums } from './controllers/rewardsController.js';
@@ -119,6 +120,7 @@ app.use('/api/ppt',     pptRoutes);      // POST /api/ppt/content, /api/ppt/gene
 app.use('/api',         pdfRoutes);      // POST /api/img-to-pdf, /api/merge-pdf ...
 app.use('/api/rewards', rewardsRoutes);  // GET/POST /api/rewards/*
 app.use('/api/chat',    chatRoutes);     // GET/POST /api/chat/*
+app.use('/api/study',   studyToolsRoutes); // POST /api/study/improve-notes, /api/study/analyze-pdf
 
 /* ─── 9. GLOBAL ERROR HANDLER (SABSE LAST) ─────────────── */
 app.use(errorHandler);
