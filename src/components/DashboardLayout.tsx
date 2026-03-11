@@ -210,7 +210,7 @@ export function DashboardLayout() {
               <Zap className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
               <span className="text-[11px] font-semibold text-blue-300 whitespace-nowrap">
                 <span className="hidden sm:inline">{questionsLeft} questions left</span>
-                <span className="sm:hidden">{questionsLeft}Q</span>
+                <span className="sm:hidden">{questionsLeft}Q left</span>
               </span>
             </div>
 

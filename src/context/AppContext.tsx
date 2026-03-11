@@ -38,7 +38,7 @@ export const AppContext = createContext<AppContextType>({
   isPremium: false,
   premiumExpiresAt: null,
   streak: 0,
-  questionsLeft: 5,
+  questionsLeft: 15,
   isLoggedIn: false,
   userId: '',
   loading: true,

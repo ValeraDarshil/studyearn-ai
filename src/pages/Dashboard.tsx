@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Brain, Presentation, FileText, Gift, TrendingUp, Zap, ArrowRight, Clock, Lock, Trophy, X, ChevronRight, Star, CheckCircle } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { API_URL } from '../utils/api';
 import { ACHIEVEMENTS, RARITY_STYLES } from '../data/achievements';
 import { AnimatedNumber } from '../components/AnimatedNumber';
 import { calculateLevel, getLevelTier, getLevelColor } from '../utils/level-utils';
@@ -14,10 +15,40 @@ export function Dashboard() {
   const navigate = useNavigate();
   const [showStreakCelebration, setShowStreakCelebration] = useState(false);
   const [showAchievementsModal, setShowAchievementsModal] = useState(false);
+  const [nextRefillSecs, setNextRefillSecs] = useState(0);
+  const [videoAdsLeft,   setVideoAdsLeft]   = useState(5);
+  const refillTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const levelInfo = calculateLevel(totalXP);
   const levelTier = getLevelTier(levelInfo.currentLevel);
   const levelColor = getLevelColor(levelInfo.currentLevel);
+  const dailyLimit = isPremium ? 30 : 15;
+  const questionsUsed = dailyLimit - questionsLeft;
+
+  // Fetch refill info on mount
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    fetch(`${API_URL}/api/ai/quota`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json())
+      .then(d => { if (d.success) { setNextRefillSecs(d.nextRefillSecs || 0); setVideoAdsLeft(d.videoAdsLeft ?? 5); } })
+      .catch(() => {});
+  }, []);
+
+  // Countdown timer
+  useEffect(() => {
+    if (refillTimerRef.current) clearInterval(refillTimerRef.current);
+    if (nextRefillSecs <= 0) return;
+    refillTimerRef.current = setInterval(() => {
+      setNextRefillSecs(p => {
+        if (p <= 1) { clearInterval(refillTimerRef.current!); return 0; }
+        return p - 1;
+      });
+    }, 1000);
+    return () => { if (refillTimerRef.current) clearInterval(refillTimerRef.current); };
+  }, [nextRefillSecs]);
+
+  const fmtTime = (secs: number) => `${Math.floor(secs/60)}m ${secs%60}s`;
 
   const quickActions = [
     { icon: Brain, label: 'Ask AI', desc: 'Get instant answers', path: '/app/ask', gradient: 'from-blue-500 to-blue-600', glow: 'hover:shadow-blue-500/20' },
@@ -102,18 +133,44 @@ export function Dashboard() {
           <div className="w-full h-0.5 mt-3 rounded-full bg-gradient-to-r from-purple-500/40 to-transparent" />
         </div>
 
-        {/* Questions */}
-        <div className="glass glass-hover card-shine rounded-2xl p-4 animate-slide-up border border-blue-500/10 hover:border-blue-500/25 hover:-translate-y-1 transition-all duration-300 group">
-          <div className="flex items-center justify-between mb-3">
+        {/* Questions Today — with progress bar + refill timer */}
+        <div
+          className="glass glass-hover card-shine rounded-2xl p-4 animate-slide-up border border-blue-500/10 hover:border-blue-500/25 hover:-translate-y-1 transition-all duration-300 group cursor-pointer"
+          onClick={() => navigate('/app/ask')}
+        >
+          <div className="flex items-center justify-between mb-2">
             <span className="text-xs text-slate-500 font-medium">Questions Today</span>
             <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
               <Brain className="w-4 h-4 text-blue-400" />
             </div>
           </div>
-          <div className="text-2xl font-bold text-white">
-            <AnimatedNumber value={(isPremium ? 10 : 5) - questionsLeft} suffix={isPremium ? '/10' : '/5'} />
+          <div className="text-2xl font-bold text-white mb-1">
+            {questionsLeft}<span className="text-sm text-slate-500 font-normal">/{dailyLimit} left</span>
           </div>
-          <div className="w-full h-0.5 mt-3 rounded-full bg-gradient-to-r from-blue-500/40 to-transparent" />
+          {/* Progress bar */}
+          <div className="w-full h-1.5 rounded-full bg-white/5 overflow-hidden mb-2">
+            <div
+              className="h-full rounded-full transition-all duration-500"
+              style={{
+                width: `${Math.max(0, Math.min(100, (questionsLeft / dailyLimit) * 100))}%`,
+                background: questionsLeft > 5 ? 'linear-gradient(90deg,#3b82f6,#8b5cf6)' : questionsLeft > 0 ? 'linear-gradient(90deg,#f59e0b,#ef4444)' : '#ef4444'
+              }}
+            />
+          </div>
+          {/* Refill timer or all-good status */}
+          {nextRefillSecs > 0 && questionsLeft < dailyLimit ? (
+            <div className="flex items-center gap-1 text-[10px] text-slate-500">
+              <Clock className="w-3 h-3 text-blue-400" />
+              <span>+1 in <span className="text-blue-300 font-semibold">{fmtTime(nextRefillSecs)}</span></span>
+              {videoAdsLeft > 0 && (
+                <span className="ml-auto text-green-400 font-medium">{videoAdsLeft} video bonuses left</span>
+              )}
+            </div>
+          ) : questionsLeft >= dailyLimit ? (
+            <span className="text-[10px] text-green-400">✓ Full quota available</span>
+          ) : (
+            <span className="text-[10px] text-slate-600">Refilling hourly</span>
+          )}
         </div>
 
         {/* Streak — clickable */}
