@@ -89,7 +89,6 @@ router.post('/add-points', authenticate, async (req: any, res) => {
 
     user.points += points;
     await user.save();
-    console.log(`✅ Points: ${user.email} +${points} → ${user.points}`);
     res.json({ success: true, points: user.points });
   } catch (error) {
     console.error('Add points error:', error);
@@ -113,7 +112,6 @@ router.post('/use-question', authenticate, async (req: any, res) => {
 
     user.questionsLeft -= 1;
     await user.save();
-    console.log(`✅ Question used: ${user.email} → ${user.questionsLeft} left`);
     res.json({ success: true, questionsLeft: user.questionsLeft });
   } catch (error) {
     console.error('Use question error:', error);
@@ -129,7 +127,6 @@ router.post('/log-activity', authenticate, async (req: any, res) => {
     await connectDB();
     const { action, details, pointsEarned } = req.body;
     await Activity.create({ userId: req.userId, action, details, pointsEarned: pointsEarned || 0 });
-    console.log(`✅ Activity: ${action} — ${details}`);
     res.json({ success: true });
   } catch (error) {
     console.error('Log activity error:', error);
@@ -172,7 +169,6 @@ router.post('/update-profile', authenticate, async (req: any, res) => {
     user.name = name; user.email = email;
     if (avatar !== undefined) (user as any).avatar = avatar;
     await user.save();
-    console.log(`✅ Profile updated: ${user.email}`);
     res.json({ success: true, user: { name: user.name, email: user.email, avatar: (user as any).avatar ?? null } });
   } catch (error) {
     console.error('Update profile error:', error);
@@ -201,7 +197,6 @@ router.post('/update-streak', authenticate, async (req: any, res) => {
 
     user.lastActive = new Date();
     await user.save();
-    console.log(`✅ Streak: ${user.email} → ${user.streak} days`);
     res.json({ success: true, streak: user.streak, streakIncreased, isNewStreak: !lastDate || lastDate !== yesterday });
   } catch (error) {
     console.error('Update streak error:', error);
@@ -226,7 +221,6 @@ router.get('/referral-data', authenticate, async (req: any, res) => {
     const referredUsers = await User.find({ referredBy: user.referralCode })
       .select('name email createdAt').sort({ createdAt: -1 }).lean();
 
-    console.log(`✅ Referral: ${user.email} — ${referredUsers.length} referrals`);
     res.json({
       success: true,
       referralCode:   user.referralCode,
@@ -294,7 +288,6 @@ router.post('/unlock-achievement', authenticate, async (req: any, res) => {
       user.totalXP = (user.totalXP || 0) + achDef.reward;
     }
     await user.save();
-    console.log(`🏆 Achievement: ${user.email} → ${achievementId} (+${achDef.reward} pts)`);
     res.json({ success: true, unlockedAchievements: user.unlockedAchievements, rewardPoints: achDef.reward });
   } catch (error) {
     console.error('Unlock achievement error:', error);
@@ -358,7 +351,6 @@ router.post('/study-plan', authenticate, async (req: any, res) => {
       return res.status(400).json({ success: false, message: 'Invalid plan data' });
 
     await User.findByIdAndUpdate(req.userId, { studyPlan: plan });
-    console.log(`✅ Study plan saved: ${req.userId} — ${plan.examName}`);
     res.json({ success: true });
   } catch (error) {
     console.error('Save study plan error:', error);
@@ -475,7 +467,6 @@ router.post('/daily-challenge/result', authenticate, async (req: any, res) => {
       pointsEarned: ptsEarned,
     });
 
-    console.log(`✅ Daily challenge: ${user.email} ${correct ? '✅' : '❌'} | premium=${premium} | +${ptsEarned}pts`);
     res.json({ success: true, result, ptsEarned });
   } catch (error) {
     console.error('Daily challenge result error:', error);

@@ -22,7 +22,6 @@ import os from 'os';
 const NUM_WORKERS = Math.min(os.cpus().length, 4); // max 4 workers — zyada se overhead badh jaata hai
 
 if (cluster.isPrimary) {
-  console.log(`🚀 Primary ${process.pid} — spawning ${NUM_WORKERS} workers`);
 
   // Utne workers spawn karo jitne CPUs hain
   for (let i = 0; i < NUM_WORKERS; i++) {
@@ -39,5 +38,4 @@ if (cluster.isPrimary) {
   // Har worker apna Express server start karta hai
   // Yeh import automatically index.ts run kar deta hai
   await import('./index.js');
-  console.log(`✅ Worker ${process.pid} started`);
 }

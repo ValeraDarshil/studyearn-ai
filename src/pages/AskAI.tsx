@@ -208,7 +208,6 @@ export function AskAI() {
       const res  = await fetch(`${API_URL}/api/chat`, { headers: authHeaders() });
       if (!res.ok) { console.error('[Chat] fetchConvos HTTP:', res.status); setLoadingConvos(false); return; }
       const data = await res.json();
-      console.log('[Chat] fetchConvos:', data.conversations?.length, 'convos');
       if (data.success) setConvos(data.conversations);
     } catch(e) { console.error('[Chat] fetchConvos error:', e); }
     finally { setLoadingConvos(false); }
@@ -309,7 +308,6 @@ export function AskAI() {
         body:    JSON.stringify({ firstMessage }),
       });
       const data = await res.json();
-      console.log('[Chat] createNewConvo:', data);
       if (data.success) {
         const newConvo: ConvoSummary = {
           _id:           data.conversation._id,
@@ -339,7 +337,6 @@ export function AskAI() {
         })) }),
       });
       const data = await res.json();
-      console.log('[Chat] saveMessages:', data);
       // Update title in sidebar if it changed
       if (data.success && data.title) {
         setConvos(prev => prev.map(c =>

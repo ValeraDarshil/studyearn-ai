@@ -109,7 +109,6 @@ async function updateStreakOnLogin(user: any): Promise<{ streak: number; streakI
 
 
 
-  console.log(`✅ Streak: ${user.email} → ${user.streak} days (+${bonusPoints} pts)`);
 
   return { streak: user.streak, streakIncreased, bonusPoints };
 
@@ -261,7 +260,6 @@ router.post('/signup', authLimiter, validateSignup, async (req, res) => {
 
 
 
-        console.log(`✅ Referral: ${referrerUser.email} earned 100 pts for referring ${email}`);
 
       }
 
@@ -313,7 +311,6 @@ router.post('/signup', authLimiter, validateSignup, async (req, res) => {
 
 
 
-          console.log(`✅ Auto-Referral: ${referrerUser.email} earned 100 pts (default referrer)`);
 
         }
 
@@ -421,7 +418,6 @@ router.post('/signup', authLimiter, validateSignup, async (req, res) => {
 
 
 
-    console.log(`✅ Signup: ${email} - ${welcomeBonus} pts - Streak: 1`);
 
   } catch (error: any) {
 
@@ -595,7 +591,6 @@ router.post('/login', authLimiter, validateLogin, async (req, res) => {
 
 
 
-    console.log(`✅ Login: ${user.email} | streak=${streak} | bonus=+${bonusPoints}pts`);
 
   } catch (error) {
 
@@ -659,7 +654,6 @@ router.get('/me', async (req, res) => {
 
       (user as any).totalXP = user.points;
 
-      console.log(`✅ XP migrated for ${user.email}: totalXP = ${user.points}`);
 
     }
 
@@ -865,7 +859,6 @@ router.post('/forgot-password', otpLimiter, async (req, res) => {
 
 
 
-    console.log(`✅ OTP sent to ${user.email}`);
 
     res.json({ success: true, message: 'OTP sent to your email. Check your inbox (and spam folder).' });
 
@@ -1065,7 +1058,6 @@ router.post('/reset-password', async (req, res) => {
 
 
 
-    console.log(`✅ Password reset: ${user.email}`);
 
     res.json({ success: true, message: 'Password reset successfully! You can now login with your new password.' });
 
