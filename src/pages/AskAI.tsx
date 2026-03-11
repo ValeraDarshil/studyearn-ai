@@ -170,7 +170,7 @@ export function AskAI() {
   const [fileType,      setFileType]      = useState<"image" | "pdf" | null>(null);
   const [previewSrc,    setPreviewSrc]    = useState<string | null>(null);
   const [isDragging,    setIsDragging]    = useState(false);
-  const [voiceLang,     setVoiceLang]     = useState<'hi-IN'|'en-IN'>('hi-IN');
+  const [voiceLang,     setVoiceLang]     = useState<'hi-IN'|'en-IN'>('en-IN');
 
   // ── Voice Input ───────────────────────────────────────────
   const { isListening, isUnsupported, interimText, error: voiceError,

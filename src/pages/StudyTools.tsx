@@ -89,7 +89,7 @@ export function StudyTools() {
   const [noteLoading, setNoteLoading] = useState(false);
   const [notePoints, setNotePoints] = useState(0);
   const [noteCopied, setNoteCopied] = useState(false);
-  const [voiceLang,  setVoiceLang]  = useState<'hi-IN'|'en-IN'>('hi-IN');
+  const [voiceLang,  setVoiceLang]  = useState<'hi-IN'|'en-IN'>('en-IN');
   const notesTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   // ── Voice Input for Notes ─────────────────────────────────

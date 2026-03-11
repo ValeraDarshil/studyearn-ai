@@ -1,52 +1,67 @@
 // ─────────────────────────────────────────────────────────────
-// useVoiceInput — Web Speech API hook
+// useVoiceInput — Web Speech API hook (Fixed & Reliable)
 // Hindi + English + Hinglish support
-// Works on: Chrome, Edge, Android Chrome, iOS Safari (14.5+)
 // ─────────────────────────────────────────────────────────────
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 
-export type VoiceState = 'idle' | 'listening' | 'processing' | 'unsupported';
+export type VoiceState = 'idle' | 'listening' | 'unsupported';
 
 interface UseVoiceInputOptions {
-  onTranscript: (text: string) => void;  // final text milne pe
-  onInterim?:   (text: string) => void;  // real-time preview
-  lang?: string;                          // default: 'hi-IN' (Hindi)
+  onTranscript: (text: string) => void;
+  onInterim?:   (text: string) => void;
+  lang?: string;
 }
 
-export function useVoiceInput({ onTranscript, onInterim, lang = 'hi-IN' }: UseVoiceInputOptions) {
-  const [state,        setState]       = useState<VoiceState>('idle');
-  const [interimText,  setInterimText] = useState('');
-  const [error,        setError]       = useState('');
-  const recognitionRef = useRef<any>(null);
-  const accumulatedRef = useRef(''); // jo already type kiya hua hai usse preserve karo
+export function useVoiceInput({ onTranscript, onInterim, lang = 'en-IN' }: UseVoiceInputOptions) {
+  const [state,       setState]       = useState<VoiceState>('idle');
+  const [interimText, setInterimText] = useState('');
+  const [error,       setError]       = useState('');
 
-  // Check support
-  const isSupported = typeof window !== 'undefined' &&
-    ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window);
+  const recognitionRef = useRef<any>(null);
+  const accumulatedRef = useRef('');
+  const isListeningRef = useRef(false);
+  const langRef        = useRef(lang);
+
+  useEffect(() => { langRef.current = lang; }, [lang]);
 
   useEffect(() => {
-    if (!isSupported) setState('unsupported');
-  }, [isSupported]);
+    const supported = typeof window !== 'undefined' &&
+      ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window);
+    if (!supported) setState('unsupported');
+  }, []);
+
+  const stopListening = useCallback(() => {
+    isListeningRef.current = false;
+    try { recognitionRef.current?.stop(); } catch {}
+    recognitionRef.current = null;
+    setState('idle');
+    setInterimText('');
+  }, []);
 
   const startListening = useCallback((existingText = '') => {
-    if (!isSupported) { setError('Voice input is not supported in this browser.'); return; }
-    if (state === 'listening') return;
-
-    accumulatedRef.current = existingText;
-
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    const recognition = new SpeechRecognition();
+    if (!SpeechRecognition) {
+      setError('Voice input not supported. Use Chrome browser.');
+      return;
+    }
 
-    recognition.continuous     = true;   // jab tak stop na karo
-    recognition.interimResults = true;   // real-time results
-    recognition.lang           = lang;   // Hindi by default
+    try { recognitionRef.current?.stop(); } catch {}
+
+    accumulatedRef.current = existingText ? existingText + ' ' : '';
+    setError('');
+    setInterimText('');
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous     = false;
+    recognition.interimResults = true;
+    recognition.lang           = langRef.current;
     recognition.maxAlternatives = 1;
 
     recognition.onstart = () => {
+      isListeningRef.current = true;
       setState('listening');
       setError('');
-      setInterimText('');
     };
 
     recognition.onresult = (event: any) => {
@@ -54,72 +69,70 @@ export function useVoiceInput({ onTranscript, onInterim, lang = 'hi-IN' }: UseVo
       let final   = '';
 
       for (let i = event.resultIndex; i < event.results.length; i++) {
-        const transcript = event.results[i][0].transcript;
+        const t = event.results[i][0].transcript;
         if (event.results[i].isFinal) {
-          final += transcript + ' ';
+          final += t + ' ';
         } else {
-          interim += transcript;
+          interim += t;
         }
       }
 
-      if (final) {
+      if (interim) {
+        setInterimText(interim);
+        onInterim?.(interim);
+      }
+      if (final.trim()) {
         accumulatedRef.current += final;
         onTranscript(accumulatedRef.current.trim());
+        setInterimText('');
       }
-
-      setInterimText(interim);
-      onInterim?.(interim);
     };
 
     recognition.onerror = (event: any) => {
-      if (event.error === 'no-speech') {
-        setError('No speech detected. Try again.');
-      } else if (event.error === 'not-allowed') {
-        setError('Microphone permission denied. Please allow mic access.');
-      } else if (event.error === 'network') {
-        setError('Network error. Check your connection.');
-      } else {
-        setError(`Error: ${event.error}`);
-      }
+      isListeningRef.current = false;
       setState('idle');
+      setInterimText('');
+      if (event.error === 'no-speech') setError('No speech detected. Try again.');
+      else if (event.error === 'not-allowed' || event.error === 'permission-denied')
+        setError('Mic permission denied. Allow mic in browser settings.');
+      else if (event.error === 'network') setError('Network error. Check connection.');
+      else if (event.error === 'audio-capture') setError('Microphone not found.');
+      else if (event.error !== 'aborted') setError('Voice error: ' + event.error);
     };
 
     recognition.onend = () => {
+      // Auto-restart if user didn't manually stop
+      // This makes it feel like continuous mode but is more reliable
+      if (isListeningRef.current) {
+        try {
+          recognitionRef.current = null;
+          startListening(accumulatedRef.current.trim());
+          return;
+        } catch {}
+      }
+      isListeningRef.current = false;
       setState('idle');
       setInterimText('');
     };
 
     recognitionRef.current = recognition;
-    recognition.start();
-  }, [isSupported, state, lang, onTranscript, onInterim]);
-
-  const stopListening = useCallback(() => {
-    recognitionRef.current?.stop();
-    setState('idle');
-    setInterimText('');
-  }, []);
+    try {
+      recognition.start();
+    } catch {
+      setError('Could not start voice input. Try again.');
+      setState('idle');
+    }
+  }, [onTranscript, onInterim]);
 
   const toggleListening = useCallback((existingText = '') => {
-    if (state === 'listening') {
-      stopListening();
-    } else {
-      startListening(existingText);
-    }
-  }, [state, startListening, stopListening]);
+    if (isListeningRef.current) stopListening();
+    else startListening(existingText);
+  }, [startListening, stopListening]);
 
-  // Cleanup on unmount
   useEffect(() => {
-    return () => { recognitionRef.current?.stop(); };
+    return () => { try { recognitionRef.current?.stop(); } catch {} };
   }, []);
 
-  return {
-    state,
-    isListening:   state === 'listening',
-    isUnsupported: state === 'unsupported',
-    interimText,
-    error,
-    startListening,
-    stopListening,
-    toggleListening,
-  };
+  return { state, isListening: state === 'listening', isUnsupported: state === 'unsupported',
+           interimText, error, startListening, stopListening, toggleListening };
 }
