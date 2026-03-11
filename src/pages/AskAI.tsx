@@ -577,23 +577,26 @@ export function AskAI() {
   // RENDER
   // ─────────────────────────────────────────────────────────
   return (
-    /* Full-width layout that breaks out of page padding */
-    <div className="flex -m-3 sm:-m-4 md:-m-8 h-[calc(100vh-4rem)] md:h-[calc(100vh-5rem)] overflow-hidden rounded-xl border border-white/8">
+    /* Break out of page padding, fill remaining viewport height */
+    <div className="flex -mx-3 -mt-3 sm:-mx-4 sm:-mt-4 md:-mx-8 md:-mt-8" style={{ height: 'calc(100vh - 56px)', minHeight: 0 }}>
 
-      {/* ── SIDEBAR (desktop always visible, mobile overlay) ── */}
-      {/* Mobile overlay backdrop */}
+      {/* ── SIDEBAR OVERLAY (mobile only) ── */}
       {sidebarOpen && (
         <div className="fixed inset-0 z-40 bg-black/60 md:hidden" onClick={() => setSidebarOpen(false)} />
       )}
 
-      {/* Sidebar panel */}
-      <aside className={`
-        fixed md:relative top-0 left-0 h-full w-64 flex-shrink-0 z-50 md:z-auto
-        border-r border-white/8 transition-transform duration-300
-        ${sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
-      `} style={{ background: "rgba(5, 8, 22, 0.98)", backdropFilter: "blur(20px)" }}>
+      {/* ── SIDEBAR ── */}
+      <aside
+        className={`
+          flex-shrink-0 w-64 border-r border-white/8 flex flex-col overflow-hidden
+          transition-all duration-300 ease-in-out
+          fixed md:static top-0 left-0 h-full z-50 md:z-auto
+          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+        `}
+        style={{ background: 'rgba(5, 8, 22, 0.98)', backdropFilter: 'blur(20px)' }}
+      >
         {/* Mobile close button */}
-        <div className="md:hidden flex items-center justify-between px-4 py-3 border-b border-white/8">
+        <div className="md:hidden flex items-center justify-between px-4 py-3 border-b border-white/8 flex-shrink-0">
           <span className="text-sm font-semibold text-white flex items-center gap-2">
             <Brain className="w-4 h-4 text-blue-400" /> Ask AI
           </span>
@@ -604,8 +607,8 @@ export function AskAI() {
         {sidebar}
       </aside>
 
-      {/* ── CHAT AREA ─────────────────────────────────────── */}
-      <div className="flex-1 flex flex-col min-w-0 bg-[#060914]">
+      {/* ── CHAT AREA ── */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden" style={{ background: '#060914' }}>
 
         {/* Chat topbar */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-white/8 flex-shrink-0">
@@ -648,7 +651,7 @@ export function AskAI() {
         </div>
 
         {/* Messages area */}
-        <div className="flex-1 overflow-y-auto space-y-4 px-4 py-5 min-h-0">
+        <div className="flex-1 overflow-y-auto space-y-4 px-4 py-5" style={{ minHeight: 0 }}>
 
           {/* Empty state */}
           {!hasChat && (
@@ -703,18 +706,17 @@ export function AskAI() {
           <div ref={bottomRef} />
         </div>
 
-        {/* Limit banner */}
-        {questionsLeft <= 0 && (
-          <div className="flex-shrink-0 mx-4 mb-2 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-2.5 flex items-center gap-2">
-            <Zap className="w-4 h-4 text-red-400 flex-shrink-0" />
-            <p className="text-xs text-red-300">
-              Daily limit reached. {isPremium ? "Come back tomorrow!" : "Upgrade to Premium for 10 questions/day ⚡"}
-            </p>
-          </div>
-        )}
-
         {/* ── Input box ───────────────────────────────────── */}
         <div className="flex-shrink-0 p-3 border-t border-white/8">
+          {/* Limit banner — inside input area to avoid extra blank space */}
+          {questionsLeft <= 0 && (
+            <div className="mb-2 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-2.5 flex items-center gap-2">
+              <Zap className="w-4 h-4 text-red-400 flex-shrink-0" />
+              <p className="text-xs text-red-300">
+                Daily limit reached. {isPremium ? "Come back tomorrow!" : "Upgrade to Premium for 10 questions/day ⚡"}
+              </p>
+            </div>
+          )}
           <div className="rounded-2xl border border-white/10 bg-white/[0.02] px-3 py-2 space-y-2">
 
             {/* File strip */}
