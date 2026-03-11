@@ -385,13 +385,22 @@ router.get('/daily-challenge', authenticate, async (req: any, res) => {
     const todayKey = new Date().toISOString().split('T')[0];
     const dc = user.dailyChallenge || {};
 
-    // Only return today's data — stale entries are treated as empty
     const challenge = dc.date === todayKey ? (dc.challenge || null) : null;
     const result    = dc.date === todayKey ? (dc.result    || null) : null;
 
-    res.json({ success: true, challenge, result, todayKey });
+    // Build past 7 days history map from challengeHistory array
+    const history: Record<string, { completed: boolean; correct: boolean }> = {};
+    const histArr: any[] = user.challengeHistory || [];
+    // Also include today if completed
+    if (result?.completed) {
+      history[todayKey] = { completed: true, correct: !!result.correct };
+    }
+    for (const h of histArr) {
+      if (h.date) history[h.date] = { completed: !!h.completed, correct: !!h.correct };
+    }
+
+    res.json({ success: true, challenge, result, todayKey, history });
   } catch (error) {
-    console.error('Get daily challenge error:', error);
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
@@ -467,9 +476,15 @@ router.post('/daily-challenge/result', authenticate, async (req: any, res) => {
       pointsEarned: ptsEarned,
     });
 
+    // Save to challengeHistory for 7-day tracker
+    const histEntry = { date: todayKey, completed: true, correct };
+    const existingHist: any[] = user.challengeHistory || [];
+    const filteredHist = existingHist.filter((h: any) => h.date !== todayKey);
+    user.challengeHistory = [...filteredHist, histEntry].slice(-30); // keep last 30 days
+    await user.save();
+
     res.json({ success: true, result, ptsEarned });
   } catch (error) {
-    console.error('Daily challenge result error:', error);
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });

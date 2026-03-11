@@ -89,20 +89,49 @@ function getLast7Days(): DayStat[] {
 // ─────────────────────────────────────────────────────────────
 // SUB-COMPONENTS
 // ─────────────────────────────────────────────────────────────
-function BarChart({ data, maxVal, color = "bg-blue-500", height = 80 }: {
-  data: number[]; maxVal: number; color?: string; height?: number;
+function BarChart({ data, maxVal, color = "bg-blue-500", height = 80, labels }: {
+  data: number[]; maxVal: number; color?: string; height?: number; labels?: string[];
 }) {
+  const [activeIdx, setActiveIdx] = useState<number | null>(null);
+
   return (
     <div className="flex items-end gap-1 w-full" style={{ height }}>
-      {data.map((val, i) => (
-        <div key={i} className="flex-1 flex flex-col items-center gap-1">
-          <div className="w-full rounded-t-sm relative overflow-hidden"
-            style={{ height: maxVal > 0 ? `${Math.max(4, (val / maxVal) * height)}px` : "4px" }}>
-            <div className={`absolute inset-0 ${color} opacity-80`} />
-            <div className="absolute inset-0 bg-gradient-to-t from-transparent to-white/10" />
+      {data.map((val, i) => {
+        const barH   = maxVal > 0 ? Math.max(4, (val / maxVal) * height) : 4;
+        const isActive = activeIdx === i;
+        return (
+          <div
+            key={i}
+            className="flex-1 flex flex-col items-end relative cursor-pointer group"
+            style={{ height: "100%", justifyContent: "flex-end" }}
+            onMouseEnter={() => setActiveIdx(i)}
+            onMouseLeave={() => setActiveIdx(null)}
+            onClick={() => setActiveIdx(prev => prev === i ? null : i)}
+          >
+            {/* Tooltip — show on hover (desktop) or click (mobile) */}
+            {isActive && val > 0 && (
+              <div className="absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
+                <div className="bg-slate-800 border border-white/15 rounded-lg px-2.5 py-1.5 shadow-xl whitespace-nowrap">
+                  <div className="text-xs font-bold text-white">{val} pts</div>
+                  {labels?.[i] && <div className="text-[10px] text-slate-400">{labels[i]}</div>}
+                </div>
+                {/* Arrow */}
+                <div className="w-2 h-2 bg-slate-800 border-r border-b border-white/15 rotate-45 mx-auto -mt-1" />
+              </div>
+            )}
+            {/* Bar */}
+            <div
+              className={`w-full rounded-t-sm relative overflow-hidden transition-all duration-150 ${isActive ? "opacity-100 scale-x-105" : "opacity-80"}`}
+              style={{ height: `${barH}px` }}
+            >
+              <div className={`absolute inset-0 ${color} transition-opacity`} />
+              <div className="absolute inset-0 bg-gradient-to-t from-transparent to-white/15" />
+              {/* Glow on active */}
+              {isActive && <div className={`absolute inset-0 ${color} blur-sm opacity-50`} />}
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -331,12 +360,11 @@ export function Analytics() {
               <div className="h-20 bg-white/[0.02] rounded-xl animate-pulse" />
             ) : (
               <div>
-                <BarChart data={weekStats.map(d => d.points)} maxVal={maxWeekPoints} color="bg-blue-500" height={80} />
-                <div className="flex gap-1 mt-1">
+                <BarChart data={weekStats.map(d => d.points)} maxVal={maxWeekPoints} color="bg-blue-500" height={80} labels={weekStats.map(d => d.date)} />
+                <div className="flex gap-1 mt-1.5">
                   {weekStats.map((d, i) => (
                     <div key={i} className="flex-1 text-center">
                       <div className="text-[10px] text-slate-500">{d.date}</div>
-                      {d.points > 0 && <div className="text-[9px] text-blue-400">{d.points}</div>}
                     </div>
                   ))}
                 </div>

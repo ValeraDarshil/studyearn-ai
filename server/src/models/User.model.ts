@@ -105,7 +105,8 @@ const userSchema = new mongoose.Schema({
 
   // { date: 'YYYY-MM-DD', challenge: ChallengeData, result: ChallengeResult | null }
 
-  dailyChallenge: { type: mongoose.Schema.Types.Mixed, default: null },
+  dailyChallenge:        { type: mongoose.Schema.Types.Mixed, default: null },
+  challengeHistory:      { type: [mongoose.Schema.Types.Mixed], default: [] },
 
 });
 

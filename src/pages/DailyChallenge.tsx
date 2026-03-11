@@ -90,6 +90,7 @@ export function DailyChallenge() {
   const todayKey   = getTodayKey();
 
   const [challenge, setChallenge] = useState<ChallengeData | null>(null);
+  const [history,   setHistory]   = useState<Record<string, { completed: boolean; correct: boolean }>>({});
   const [result, setResult]       = useState<ChallengeResult | null>(null);
   const [fetching, setFetching]   = useState(true);
   const [loading, setLoading]     = useState(false);
@@ -121,6 +122,7 @@ export function DailyChallenge() {
       .then(d => {
         if (d.success) {
           if (d.challenge) setChallenge(d.challenge);
+          if (d.history)  setHistory(d.history);
           if (d.result?.completed) {
             setResult(d.result);
             if (d.challenge) {
@@ -201,18 +203,19 @@ Make the question thought-provoking, not trivial.`;
       const correct   = idx === challenge.answer;
       const ptsEarned = correct ? challenge.pts : Math.round(challenge.pts * 0.1);
       setResult({ date: todayKey, completed: true, correct, ptsEarned });
+      setHistory(prev => ({ ...prev, [todayKey]: { completed: true, correct } }));
     }
   };
 
-  // ── Past 7 days — fetched from server state ────────────────
-  // We only have today's data from server; past 6 days shown as unknown (no localStorage)
-  // This is intentional — keeping it simple without a separate history API
+  // ── Past 7 days — from server history ─────────────────────
   const past7 = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(); d.setDate(d.getDate() - (6 - i));
     const key     = d.toISOString().split("T")[0];
     const isToday = key === todayKey;
-    const done    = isToday && !!result?.completed;
-    const correct = isToday && !!result?.correct;
+    // Use server history for past days, local result for today
+    const h       = history[key];
+    const done    = isToday ? !!result?.completed : !!h?.completed;
+    const correct = isToday ? !!result?.correct   : !!h?.correct;
     return { key, isToday, done, correct, day: d.toLocaleDateString("en-IN", { weekday: "short" }).slice(0, 2) };
   });
 
