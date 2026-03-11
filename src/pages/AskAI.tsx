@@ -3,7 +3,6 @@ import {
   Brain, Send, Zap, ImagePlus, FileText, X,
   Trash2, User, Sparkles, Plus, MessageSquare,
   ChevronLeft, MoreHorizontal, Check, Pencil,
-  Play, Clock, RefreshCw,
 } from "lucide-react";
 import { useApp } from "../context/AppContext";
 import { API_URL } from "../utils/api";
@@ -798,81 +797,7 @@ export function AskAI() {
 
         {/* ── Input box ───────────────────────────────────── */}
         <div className="flex-shrink-0 p-3 border-t border-white/8">
-          {/* ── Smart quota bar — jaise hi 1 question use ho dikhna shuru ── */}
-          {(() => {
-            const dailyLimit = isPremium ? 30 : 15;
-            const used = dailyLimit - questionsLeft;
-            const pct  = Math.round((questionsLeft / dailyLimit) * 100);
-            const mins = Math.floor(nextRefillSecs / 60);
-            const secs = nextRefillSecs % 60;
-            const timeStr = `${mins}:${String(secs).padStart(2,'0')}`;
 
-            // Show bar only if at least 1 question has been used
-            if (used === 0) return null;
-
-            return (
-              <div className={`mb-2 rounded-xl border p-2.5 space-y-2 transition-all
-                ${questionsLeft === 0
-                  ? 'border-red-500/25 bg-red-500/[0.07]'
-                  : 'border-white/8 bg-white/[0.02]'}`}>
-
-                {/* Row 1: status + timer */}
-                <div className="flex items-center gap-2">
-                  {questionsLeft === 0 ? (
-                    <Zap className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />
-                  ) : (
-                    <Clock className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
-                  )}
-                  <span className={`text-xs font-semibold flex-1 ${questionsLeft === 0 ? 'text-red-300' : 'text-slate-300'}`}>
-                    {questionsLeft === 0 ? 'No questions left' : `${questionsLeft}/${dailyLimit} questions left`}
-                  </span>
-                  {nextRefillSecs > 0 && questionsLeft < dailyLimit && (
-                    <span className="text-[10px] text-blue-300 font-medium">
-                      +1 in {timeStr}
-                    </span>
-                  )}
-                </div>
-
-                {/* Row 2: progress bar */}
-                <div className="w-full h-1.5 rounded-full bg-white/5 overflow-hidden">
-                  <div
-                    className="h-full rounded-full transition-all duration-500"
-                    style={{
-                      width: `${pct}%`,
-                      background: pct > 40 ? 'linear-gradient(90deg,#3b82f6,#8b5cf6)'
-                                : pct > 15 ? 'linear-gradient(90deg,#f59e0b,#f97316)'
-                                : '#ef4444'
-                    }}
-                  />
-                </div>
-
-                {/* Row 3: Watch Video button — always visible when any question used */}
-                <div className="flex gap-2">
-                  {videoAdsLeft > 0 && questionsLeft < dailyLimit && (
-                    <button
-                      onClick={handleWatchAd}
-                      disabled={watchingAd || questionsLeft >= dailyLimit}
-                      className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-green-500/12 border border-green-500/25 text-[11px] font-semibold text-green-300 hover:bg-green-500/20 hover:border-green-500/40 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      {watchingAd ? (
-                        <><RefreshCw className="w-3 h-3 animate-spin" /> Watching ad… {adCountdown}s</>
-                      ) : (
-                        <><Play className="w-3 h-3" /> Watch Video → +1 Q &nbsp;·&nbsp; {videoAdsLeft} left today</>
-                      )}
-                    </button>
-                  )}
-                  {!isPremium && questionsLeft === 0 && (
-                    <button
-                      onClick={() => window.location.href = '/app/rewards'}
-                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-yellow-500/12 border border-yellow-500/25 text-[11px] font-semibold text-yellow-300 hover:bg-yellow-500/20 transition-all flex-shrink-0"
-                    >
-                      ⚡ Get Premium
-                    </button>
-                  )}
-                </div>
-              </div>
-            );
-          })()}
           <div className="rounded-2xl border border-white/10 bg-white/[0.02] px-3 py-2 space-y-2">
 
             {/* File strip */}

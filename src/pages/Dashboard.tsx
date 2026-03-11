@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Brain, Presentation, FileText, Gift, TrendingUp, Zap, ArrowRight, Clock, Lock, Trophy, X, ChevronRight, Star, CheckCircle } from 'lucide-react';
+import { Brain, Presentation, FileText, Gift, TrendingUp, Zap, ArrowRight, Clock, Lock, Trophy, X, ChevronRight, Star, CheckCircle, Play, RefreshCw } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { API_URL } from '../utils/api';
 import { ACHIEVEMENTS, RARITY_STYLES } from '../data/achievements';
@@ -17,6 +17,9 @@ export function Dashboard() {
   const [showAchievementsModal, setShowAchievementsModal] = useState(false);
   const [nextRefillSecs, setNextRefillSecs] = useState(0);
   const [videoAdsLeft,   setVideoAdsLeft]   = useState(5);
+  const [watchingAd,     setWatchingAd]     = useState(false);
+  const [adCountdown,    setAdCountdown]    = useState(0);
+  const [showAdModal,    setShowAdModal]    = useState(false);
   const refillTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const levelInfo = calculateLevel(totalXP);
@@ -49,6 +52,34 @@ export function Dashboard() {
   }, [nextRefillSecs]);
 
   const fmtTime = (secs: number) => `${Math.floor(secs/60)}m ${secs%60}s`;
+
+  const handleWatchAd = async () => {
+    if (watchingAd || videoAdsLeft <= 0) return;
+    setShowAdModal(true);
+    setWatchingAd(true);
+    setAdCountdown(15);
+    const timer = setInterval(() => {
+      setAdCountdown(p => { if (p <= 1) { clearInterval(timer); return 0; } return p - 1; });
+    }, 1000);
+    await new Promise(r => setTimeout(r, 15000));
+    clearInterval(timer);
+    try {
+      const token = localStorage.getItem('token');
+      const res  = await fetch(`${API_URL}/api/ai/watch-ad`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      if (data.success) {
+        setVideoAdsLeft(data.videoAdsLeft ?? 0);
+        setNextRefillSecs(data.nextRefillSecs || 0);
+        // Update questionsLeft via context won't work directly, re-fetch quota
+        const q = await fetch(`${API_URL}/api/ai/quota`, { headers: { Authorization: `Bearer ${token}` } });
+        const qd = await q.json();
+        if (qd.success) { setNextRefillSecs(qd.nextRefillSecs || 0); setVideoAdsLeft(qd.videoAdsLeft ?? 0); }
+      }
+    } catch {}
+    setWatchingAd(false);
+    setAdCountdown(0);
+    setShowAdModal(false);
+  };
 
   const quickActions = [
     { icon: Brain, label: 'Ask AI', desc: 'Get instant answers', path: '/app/ask', gradient: 'from-blue-500 to-blue-600', glow: 'hover:shadow-blue-500/20' },
@@ -133,44 +164,58 @@ export function Dashboard() {
           <div className="w-full h-0.5 mt-3 rounded-full bg-gradient-to-r from-purple-500/40 to-transparent" />
         </div>
 
-        {/* Questions Today — with progress bar + refill timer */}
-        <div
-          className="glass glass-hover card-shine rounded-2xl p-4 animate-slide-up border border-blue-500/10 hover:border-blue-500/25 hover:-translate-y-1 transition-all duration-300 group cursor-pointer"
-          onClick={() => navigate('/app/ask')}
-        >
+        {/* Questions Today — full featured card */}
+        <div className="glass glass-hover card-shine rounded-2xl p-4 animate-slide-up border border-blue-500/10 hover:border-blue-500/25 transition-all duration-300 group">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs text-slate-500 font-medium">Questions Today</span>
-            <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+            <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center group-hover:scale-110 transition-transform cursor-pointer" onClick={() => navigate('/app/ask')}>
               <Brain className="w-4 h-4 text-blue-400" />
             </div>
           </div>
-          <div className="text-2xl font-bold text-white mb-1">
-            {questionsLeft}<span className="text-sm text-slate-500 font-normal">/{dailyLimit} left</span>
+
+          {/* Count + limit */}
+          <div className="flex items-end gap-1 mb-2">
+            <span className="text-2xl font-bold text-white">{questionsLeft}</span>
+            <span className="text-sm text-slate-500 font-normal mb-0.5">/{dailyLimit} left</span>
+            {nextRefillSecs > 0 && questionsLeft < dailyLimit && (
+              <span className="ml-auto text-[10px] text-blue-300 font-medium flex items-center gap-1 mb-0.5">
+                <Clock className="w-2.5 h-2.5" />+1 in {fmtTime(nextRefillSecs)}
+              </span>
+            )}
           </div>
+
           {/* Progress bar */}
           <div className="w-full h-1.5 rounded-full bg-white/5 overflow-hidden mb-2">
-            <div
-              className="h-full rounded-full transition-all duration-500"
+            <div className="h-full rounded-full transition-all duration-700"
               style={{
                 width: `${Math.max(0, Math.min(100, (questionsLeft / dailyLimit) * 100))}%`,
-                background: questionsLeft > 5 ? 'linear-gradient(90deg,#3b82f6,#8b5cf6)' : questionsLeft > 0 ? 'linear-gradient(90deg,#f59e0b,#ef4444)' : '#ef4444'
+                background: questionsLeft > Math.floor(dailyLimit * 0.4)
+                  ? 'linear-gradient(90deg,#3b82f6,#8b5cf6)'
+                  : questionsLeft > 0
+                    ? 'linear-gradient(90deg,#f59e0b,#f97316)'
+                    : '#ef4444'
               }}
             />
           </div>
-          {/* Refill timer or all-good status */}
-          {nextRefillSecs > 0 && questionsLeft < dailyLimit ? (
-            <div className="flex items-center gap-1 text-[10px] text-slate-500">
-              <Clock className="w-3 h-3 text-blue-400" />
-              <span>+1 in <span className="text-blue-300 font-semibold">{fmtTime(nextRefillSecs)}</span></span>
-              {videoAdsLeft > 0 && (
-                <span className="ml-auto text-green-400 font-medium">{videoAdsLeft} video bonuses left</span>
-              )}
-            </div>
-          ) : questionsLeft >= dailyLimit ? (
-            <span className="text-[10px] text-green-400">✓ Full quota available</span>
-          ) : (
-            <span className="text-[10px] text-slate-600">Refilling hourly</span>
-          )}
+
+          {/* Bottom row: status + watch video button */}
+          <div className="flex items-center gap-2">
+            {questionsLeft >= dailyLimit ? (
+              <span className="text-[10px] text-green-400 flex items-center gap-1">✓ Full quota</span>
+            ) : (
+              <span className="text-[10px] text-slate-600">Refills every hour</span>
+            )}
+            {videoAdsLeft > 0 && questionsLeft < dailyLimit && (
+              <button
+                onClick={handleWatchAd}
+                disabled={watchingAd}
+                className="ml-auto flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold text-green-300 border border-green-500/25 bg-green-500/10 hover:bg-green-500/20 transition-all disabled:opacity-50"
+              >
+                <Play className="w-2.5 h-2.5" />
+                {watchingAd ? `Watching… ${adCountdown}s` : `Watch Video +1Q`}
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Streak — clickable */}
