@@ -30,7 +30,7 @@ export function DashboardLayout() {
     { icon: BookOpen,     label: 'Study Planner',   path: '/app/planner' },
     { icon: BarChart2,    label: 'Analytics',       path: '/app/analytics' },
     { icon: FlaskConical, label: 'Formula Sheet',   path: '/app/formulas' },
-    { icon: GraduationCap, label: 'AI Study Tools', path: '/app/study-tools' },
+    { icon: BookOpen, label: 'AI Study Tools', path: '/app/study-tools' },
     { icon: Presentation, label: 'PPT Generator',   path: '/app/ppt' },
     { icon: FileText,     label: 'PDF Tools',       path: '/app/pdf' },
     { icon: Gift,         label: 'My Points',       path: '/app/rewards' },
