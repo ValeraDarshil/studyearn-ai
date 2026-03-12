@@ -64,27 +64,63 @@ function timeAgo(iso: string) {
 
 // ── Rich Text Toolbar ─────────────────────────────────────────
 function RichToolbar({ editorRef }: { editorRef: React.RefObject<HTMLDivElement | null> }) {
+  const [activeFormats, setActiveFormats] = useState<Record<string, boolean>>({});
+
+  // Update active state on selection change
+  useEffect(() => {
+    const update = () => {
+      setActiveFormats({
+        bold:                 document.queryCommandState('bold'),
+        italic:               document.queryCommandState('italic'),
+        underline:            document.queryCommandState('underline'),
+        insertUnorderedList:  document.queryCommandState('insertUnorderedList'),
+        insertOrderedList:    document.queryCommandState('insertOrderedList'),
+        formatBlock:          ['h1','h2','h3'].includes(document.queryCommandValue('formatBlock').toLowerCase()),
+      });
+    };
+    document.addEventListener('selectionchange', update);
+    return () => document.removeEventListener('selectionchange', update);
+  }, []);
+
   const exec = (cmd: string, val?: string) => {
     editorRef.current?.focus();
     document.execCommand(cmd, false, val);
+    // Immediately refresh active state
+    setActiveFormats({
+      bold:                 document.queryCommandState('bold'),
+      italic:               document.queryCommandState('italic'),
+      underline:            document.queryCommandState('underline'),
+      insertUnorderedList:  document.queryCommandState('insertUnorderedList'),
+      insertOrderedList:    document.queryCommandState('insertOrderedList'),
+      formatBlock:          ['h1','h2','h3'].includes(document.queryCommandValue('formatBlock').toLowerCase()),
+    });
   };
+
   const btns = [
-    { icon: Bold,      cmd: 'bold',           title: 'Bold (Ctrl+B)' },
-    { icon: Italic,    cmd: 'italic',         title: 'Italic (Ctrl+I)' },
-    { icon: Underline, cmd: 'underline',      title: 'Underline (Ctrl+U)' },
-    { icon: Heading1,  cmd: 'formatBlock',    val: 'h2', title: 'Heading' },
-    { icon: ListIcon,  cmd: 'insertUnorderedList', title: 'Bullet list' },
-    { icon: List,      cmd: 'insertOrderedList',   title: 'Numbered list' },
+    { icon: Bold,      cmd: 'bold',                 title: 'Bold (Ctrl+B)' },
+    { icon: Italic,    cmd: 'italic',               title: 'Italic (Ctrl+I)' },
+    { icon: Underline, cmd: 'underline',            title: 'Underline (Ctrl+U)' },
+    { icon: Heading1,  cmd: 'formatBlock', val:'h2', title: 'Heading' },
+    { icon: ListIcon,  cmd: 'insertUnorderedList',  title: 'Bullet list' },
+    { icon: List,      cmd: 'insertOrderedList',    title: 'Numbered list' },
   ];
+
   return (
     <div className="flex items-center gap-0.5 px-3 py-1.5 border-b border-white/8 flex-shrink-0 flex-wrap">
-      {btns.map(b => (
-        <button key={b.cmd+b.title} title={b.title}
-          onMouseDown={e => { e.preventDefault(); exec(b.cmd, b.val); }}
-          className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-white/8 transition-colors">
-          <b.icon className="w-3.5 h-3.5" />
-        </button>
-      ))}
+      {btns.map(b => {
+        const isActive = activeFormats[b.cmd] ?? false;
+        return (
+          <button key={b.cmd + b.title} title={b.title}
+            onMouseDown={e => { e.preventDefault(); exec(b.cmd, b.val); }}
+            className={`p-1.5 rounded-lg transition-all ${
+              isActive
+                ? 'bg-blue-500/25 text-blue-300 ring-1 ring-blue-500/40'
+                : 'text-slate-500 hover:text-white hover:bg-white/8'
+            }`}>
+            <b.icon className="w-3.5 h-3.5" />
+          </button>
+        );
+      })}
       <div className="w-px h-4 bg-white/10 mx-1" />
       <button title="Clear formatting" onMouseDown={e => { e.preventDefault(); exec('removeFormat'); }}
         className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-white/8 transition-colors">
