@@ -55,6 +55,7 @@ import pdfRoutes     from './routes/pdfRoutes.js';
 import rewardsRoutes from './routes/rewardsRoutes.js';
 import chatRoutes        from './routes/chatRoutes.js';
 import studyToolsRoutes from './routes/studyToolsRoutes.js';
+import notesRoutes      from './routes/notesRoutes.js';
 
 // Background jobs
 import { fixStuckRedemptions, processPendingPremiums } from './controllers/rewardsController.js';
@@ -121,6 +122,7 @@ app.use('/api',         pdfRoutes);      // POST /api/img-to-pdf, /api/merge-pdf
 app.use('/api/rewards', rewardsRoutes);  // GET/POST /api/rewards/*
 app.use('/api/chat',    chatRoutes);     // GET/POST /api/chat/*
 app.use('/api/study',   studyToolsRoutes); // POST /api/study/improve-notes, /api/study/analyze-pdf
+app.use('/api/notes',   notesRoutes);      // CRUD /api/notes/*
 
 /* ─── 9. GLOBAL ERROR HANDLER (SABSE LAST) ─────────────── */
 app.use(errorHandler);

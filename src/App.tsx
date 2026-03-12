@@ -31,6 +31,7 @@ import { DailyChallenge } from "./pages/DailyChallenge";
 import { Analytics } from "./pages/Analytics";
 import { FormulaSheet } from "./pages/FormulaSheet";
 import { StudyTools } from "./pages/StudyTools";
+import { CollabNotes } from "./pages/CollabNotes";
 import { ACHIEVEMENTS } from "./data/achievements";
 import { CursorSpotlight } from "./components/CursorSpotlight";
 
@@ -415,6 +416,7 @@ function AppContent() {
             <Route path="analytics" element={<Analytics />} />
             <Route path="formulas" element={<FormulaSheet />} />
             <Route path="study-tools" element={<StudyTools />} />
+            <Route path="notes" element={<CollabNotes />} />
           </Route>
         </Routes>
       </AppContext.Provider>
