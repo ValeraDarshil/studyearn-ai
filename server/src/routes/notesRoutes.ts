@@ -43,10 +43,20 @@ function canEdit(note: any, userId: string) {
 router.get('/', authenticate, async (req: any, res) => {
   try {
     await connectDB();
-    const notes = await Note.find({
+    const rawNotes = await Note.find({
       $or: [{ owner: req.userId }, { 'collaborators.userId': req.userId }],
       isArchived: false,
-    }).sort({ isPinned: -1, updatedAt: -1 }).select('-content').lean();
+    }).sort({ isPinned: -1, updatedAt: -1 }).lean();
+
+    // Strip heavy content but keep flashcard count
+    const notes = rawNotes.map((n: any) => {
+      let flashcardCount = 0;
+      if (n.format === 'flashcards' && n.content) {
+        try { flashcardCount = JSON.parse(n.content).length; } catch {}
+      }
+      const { content: _c, ...rest } = n;
+      return { ...rest, flashcardCount };
+    });
     res.json({ success: true, notes });
   } catch { res.status(500).json({ success: false, message: 'Server error' }); }
 });
@@ -73,6 +83,28 @@ router.post('/', authenticate, async (req: any, res) => {
 });
 
 // ── GET /:id ──────────────────────────────────────────────────
+// ── GET /shared/:code — MUST be before /:id to avoid route conflict ──
+router.get('/shared/:code', authenticate, async (req: any, res) => {
+  try {
+    await connectDB();
+    const code = req.params.code.toUpperCase();
+    const note = await Note.findOne({ shareCode: code }).lean() as any;
+    if (!note) return res.status(404).json({ success: false, message: 'Note not found or code is invalid' });
+
+    const isOwner  = note.owner.toString() === req.userId;
+    const isCollab = note.collaborators?.some((c: any) => c.userId.toString() === req.userId);
+
+    // Private note: only owner and collaborators can access via code
+    // Public note: anyone with the code can access
+    if (!note.isPublic && !isOwner && !isCollab) {
+      return res.status(403).json({ success: false, message: 'This note is private. Ask the owner to make it public or add you as a collaborator.' });
+    }
+
+    await Note.findByIdAndUpdate(note._id, { $inc: { viewCount: 1 } });
+    res.json({ success: true, note, isOwner, canEdit: isOwner || isCollab });
+  } catch { res.status(500).json({ success: false }); }
+});
+
 router.get('/:id', authenticate, async (req: any, res) => {
   try {
     await connectDB();
@@ -153,8 +185,9 @@ router.post('/:id/share', authenticate, async (req: any, res) => {
     if (!note) return res.status(404).json({ success: false, message: 'Not found' });
     if (note.owner.toString() !== req.userId) return res.status(403).json({ success: false, message: 'Owner only' });
 
-    const { username, canEdit: allowEdit = false, makePublic = false } = req.body;
+    const { username, canEdit: allowEdit = false, makePublic = false, makePrivate = false } = req.body;
 
+    if (makePrivate) { note.isPublic = false; }
     if (!note.shareCode) {
       let code = genCode();
       while (await Note.findOne({ shareCode: code })) code = genCode();
@@ -300,16 +333,5 @@ router.post('/:id/ai', authenticate, async (req: any, res) => {
   } catch { res.status(500).json({ success: false, message: 'AI error' }); }
 });
 
-// ── GET /shared/:code ─────────────────────────────────────────
-router.get('/shared/:code', authenticate, async (req: any, res) => {
-  try {
-    await connectDB();
-    const note = await Note.findOne({ shareCode: req.params.code.toUpperCase() }).lean() as any;
-    if (!note) return res.status(404).json({ success: false, message: 'Not found' });
-    if (!canView(note, req.userId)) return res.status(403).json({ success: false, message: 'Private note' });
-    await Note.findByIdAndUpdate(note._id, { $inc: { viewCount: 1 } });
-    res.json({ success: true, note, isOwner: note.owner.toString() === req.userId, canEdit: canEdit(note, req.userId) });
-  } catch { res.status(500).json({ success: false }); }
-});
 
 export default router;

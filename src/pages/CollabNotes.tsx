@@ -20,7 +20,7 @@ interface Collaborator { userId: string; name: string; canEdit: boolean; }
 interface Comment { id: string; userId: string; userName: string; text: string; createdAt: string; resolved: boolean; }
 interface FlashCard { q: string; a: string; }
 interface Note {
-  _id: string; title: string; content: string; format: 'rich' | 'markdown' | 'flashcards';
+  _id: string; title: string; content: string; format: 'rich' | 'markdown' | 'flashcards'; flashcardCount?: number;
   subject: string; emoji: string; color: string; tags: string[];
   owner: string; ownerName: string;
   collaborators: Collaborator[];
@@ -192,8 +192,9 @@ function NoteCard({ note, isOwner, onOpen, onPin, onDelete, onShare }: {
   onOpen: () => void; onPin: () => void; onDelete: () => void; onShare: () => void;
 }) {
   const c = COLORS[note.color] || COLORS.blue;
+  const fcCount = note.flashcardCount ?? (note.content ? (() => { try { return JSON.parse(note.content).length; } catch { return 0; } })() : 0);
   const preview = note.format === 'flashcards'
-    ? `${JSON.parse(note.content || '[]').length || 0} flashcards`
+    ? `${fcCount} flashcard${fcCount !== 1 ? 's' : ''}`
     : (note.content || '').replace(/<[^>]*>/g, '').slice(0, 100) || 'No content yet…';
   const totalReactions = Object.values(note.reactions || {}).reduce((s, a) => s + a.length, 0);
 
@@ -285,6 +286,9 @@ export function CollabNotes() {
   const [panel,     setPanel]       = useState<null|'share'|'ai'|'comments'|'reactions'>( null);
 
   // Share
+  const [enterCode,    setEnterCode]    = useState('');
+  const [enterCodeMsg, setEnterCodeMsg] = useState('');
+  const [enteringCode, setEnteringCode] = useState(false);
   const [shareUsername, setShareUsername] = useState('');
   const [shareCanEdit,  setShareCanEdit]  = useState(false);
   const [sharing,       setSharing]       = useState(false);
@@ -464,19 +468,22 @@ export function CollabNotes() {
   };
 
   // ── Share ────────────────────────────────────────────────────
-  const handleShare = async (makePublic = false) => {
+  const handleShare = async (makePublic = false, makePrivate = false) => {
     if (!activeNote) return;
     setSharing(true); setShareMsg('');
     try {
       const r = await fetch(`${API_URL}/api/notes/${activeNote._id}/share`, {
         method: 'POST', headers: authHeaders(),
-        body: JSON.stringify({ username: shareUsername.trim(), canEdit: shareCanEdit, makePublic }),
+        body: JSON.stringify({ username: shareUsername.trim(), canEdit: shareCanEdit, makePublic, makePrivate }),
       });
       const d = await r.json();
       if (d.success) {
         setActiveNote(p => p ? { ...p, shareCode: d.shareCode, isPublic: d.isPublic, collaborators: d.collaborators } : p);
         setShareUsername('');
-        setShareMsg(shareUsername ? `✅ Added ${shareUsername}!` : '✅ Link generated!');
+        if (makePrivate) setShareMsg('🔒 Note set to private');
+        else if (makePublic) setShareMsg('🌐 Note is now public');
+        else if (shareUsername) setShareMsg(`✅ Added ${shareUsername}!`);
+        else setShareMsg('✅ Code generated!');
       } else setShareMsg(`❌ ${d.message}`);
     } catch { setShareMsg('❌ Error'); } finally { setSharing(false); }
   };
@@ -508,23 +515,68 @@ export function CollabNotes() {
     } catch {} finally { setAiLoading(false); }
   };
 
-  const applyAI = () => {
-    if (!aiResult) return;
+  const applyAI = async () => {
+    if (!aiResult || !activeNote) return;
     const m = aiResult.mode;
+    let newContent = aiResult.text;
+
     if (m === 'flashcards') {
       try {
         const cards = JSON.parse(aiResult.text);
-        handleFcChange(cards);
-      } catch {}
+        setFcCards(cards);
+        newContent = JSON.stringify(cards);
+      } catch { setAiResult(null); return; }
+    } else if (activeNote.format === 'rich' && editorRef.current) {
+      const html = aiResult.text.split('\n').filter(Boolean).map(l => `<p>${l}</p>`).join('');
+      editorRef.current.innerHTML = html;
+      newContent = html;
     } else {
-      if (activeNote?.format === 'rich' && editorRef.current) {
-        editorRef.current.innerHTML = aiResult.text.split('\n').map(l => `<p>${l}</p>`).join('');
-        handleRichChange();
-      } else {
-        handleMdChange(aiResult.text);
-      }
+      setMdContent(aiResult.text);
     }
+
+    // Clear debounce timer and save immediately
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    setSaving(true);
+    try {
+      const r = await fetch(`${API_URL}/api/notes/${activeNote._id}`, {
+        method: 'PUT', headers: authHeaders(),
+        body: JSON.stringify({ title: editTitle, content: newContent }),
+      });
+      const d = await r.json();
+      if (d.success) {
+        setVersion(d.version);
+        setActiveNote(prev => prev ? { ...prev, content: newContent, version: d.version } : prev);
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2000);
+        fetchNotes();
+      }
+    } catch {} finally { setSaving(false); }
+
     setAiResult(null);
+  };
+
+  // ── Open note by code ───────────────────────────────────────
+  const openByCode = async () => {
+    if (!enterCode.trim()) return;
+    setEnteringCode(true); setEnterCodeMsg('');
+    try {
+      const r = await fetch(`${API_URL}/api/notes/shared/${enterCode.trim().toUpperCase()}`, { headers: authHeaders() });
+      const d = await r.json();
+      if (d.success) {
+        setActiveNote(d.note);
+        setIsOwner(d.isOwner);
+        setCanEditNote(d.canEdit);
+        setEditTitle(d.note.title);
+        setVersion(d.note.version || 0);
+        setPanel(null); setAiResult(null);
+        if (d.note.format === 'markdown') { setMdContent(d.note.content || ''); setPendingRichContent(null); }
+        else if (d.note.format === 'flashcards') { try { setFcCards(JSON.parse(d.note.content || '[]')); } catch { setFcCards([]); } setPendingRichContent(null); }
+        else { setPendingRichContent(d.note.content || ''); }
+        setEnterCode(''); setView('editor');
+      } else {
+        setEnterCodeMsg(d.message || 'Invalid code or note is private');
+      }
+    } catch { setEnterCodeMsg('Something went wrong'); } finally { setEnteringCode(false); }
   };
 
   // ── Comments ─────────────────────────────────────────────────
@@ -766,10 +818,66 @@ export function CollabNotes() {
             {/* SHARE */}
             {panel === 'share' && isOwner && (
               <div className="p-4 space-y-4 overflow-y-auto flex-1">
-                {/* Add by username */}
+
+                {/* ── Public / Private toggle ── */}
+                <div>
+                  <p className="text-[11px] text-slate-500 font-medium uppercase tracking-wide mb-2">Visibility</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button onClick={() => activeNote.isPublic && handleShare(false, true)}
+                      className={`flex flex-col items-center gap-1 p-3 rounded-xl border text-xs transition-all
+                        ${!activeNote.isPublic ? 'bg-slate-500/15 border-slate-500/30 text-white' : 'bg-white/[0.02] border-white/8 text-slate-500 hover:border-white/20'}`}>
+                      <Lock className="w-4 h-4" />
+                      <span className="font-medium">Private</span>
+                      <span className="text-[10px] opacity-70">Only collaborators</span>
+                    </button>
+                    <button onClick={() => !activeNote.isPublic && handleShare(true)}
+                      className={`flex flex-col items-center gap-1 p-3 rounded-xl border text-xs transition-all
+                        ${activeNote.isPublic ? 'bg-green-500/15 border-green-500/30 text-green-300' : 'bg-white/[0.02] border-white/8 text-slate-500 hover:border-green-500/20'}`}>
+                      <Globe className="w-4 h-4" />
+                      <span className="font-medium">Public</span>
+                      <span className="text-[10px] opacity-70">Anyone with code</span>
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-slate-600 mt-2">
+                    {activeNote.isPublic
+                      ? '✅ Public — anyone can open via code or link'
+                      : '🔒 Private — only added collaborators can access'}
+                  </p>
+                </div>
+
+                {/* ── Share Code ── */}
+                <div>
+                  <p className="text-[11px] text-slate-500 font-medium uppercase tracking-wide mb-2">Share Code</p>
+                  <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                    {activeNote.shareCode ? (
+                      <>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-mono text-2xl font-bold text-white tracking-[0.3em]">{activeNote.shareCode}</span>
+                          <button onClick={copyLink}
+                            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-blue-500/20 border border-blue-500/30 text-blue-300 text-xs hover:bg-blue-500/30 transition-all">
+                            {copied ? <><Check className="w-3 h-3" /> Copied!</> : <><Copy className="w-3 h-3" /> Copy Link</>}
+                          </button>
+                        </div>
+                        <p className="text-[10px] text-slate-600">
+                          {activeNote.isPublic
+                            ? 'Share this code — anyone can open it'
+                            : 'Private — only works for added collaborators'}
+                        </p>
+                      </>
+                    ) : (
+                      <button onClick={() => handleShare(false)}
+                        className="w-full py-2 text-xs text-blue-400 hover:text-blue-300 transition-colors">
+                        Generate code →
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* ── Add Collaborator ── */}
                 <div className="space-y-2">
                   <p className="text-[11px] text-slate-500 font-medium uppercase tracking-wide">Add by Username</p>
                   <input value={shareUsername} onChange={e => setShareUsername(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleShare(false)}
                     placeholder="Friend's username…"
                     className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-600 outline-none focus:border-blue-500/30" />
                   <label className="flex items-center gap-2 cursor-pointer">
@@ -783,28 +891,7 @@ export function CollabNotes() {
                   {shareMsg && <p className="text-xs">{shareMsg}</p>}
                 </div>
 
-                {/* Public link */}
-                <div className="space-y-2">
-                  <p className="text-[11px] text-slate-500 font-medium uppercase tracking-wide">Public Link</p>
-                  <div className="flex gap-2">
-                    <button onClick={() => handleShare(true)} disabled={sharing}
-                      className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border text-xs transition-all
-                        ${activeNote.isPublic ? 'bg-green-500/15 border-green-500/25 text-green-400' : 'bg-white/5 border-white/10 text-slate-400 hover:text-white'}`}>
-                      <Globe className="w-3.5 h-3.5" />{activeNote.isPublic ? 'Public ✓' : 'Make Public'}
-                    </button>
-                    {activeNote.shareCode && (
-                      <button onClick={copyLink}
-                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-slate-400 text-xs hover:text-white transition-all">
-                        {copied ? <><Check className="w-3 h-3 text-green-400" /> Copied</> : <><Copy className="w-3 h-3" /> Copy</>}
-                      </button>
-                    )}
-                  </div>
-                  {activeNote.shareCode && (
-                    <p className="text-[10px] text-slate-600 font-mono break-all">Code: {activeNote.shareCode}</p>
-                  )}
-                </div>
-
-                {/* Collaborators */}
+                {/* ── Collaborators list ── */}
                 {activeNote.collaborators?.length > 0 && (
                   <div className="space-y-2">
                     <p className="text-[11px] text-slate-500 font-medium uppercase tracking-wide">Collaborators ({activeNote.collaborators.length})</p>
@@ -868,6 +955,26 @@ export function CollabNotes() {
             </button>
           ))}
         </div>
+      </div>
+
+      {/* Enter Code Box */}
+      <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.015] p-4">
+        <p className="text-xs text-slate-500 mb-2 font-medium flex items-center gap-1.5">
+          <span className="w-4 h-4 rounded-full bg-blue-500/20 border border-blue-500/30 flex items-center justify-center text-[9px] text-blue-400">↗</span>
+          Open a shared note by code
+        </p>
+        <div className="flex gap-2">
+          <input value={enterCode} onChange={e => setEnterCode(e.target.value.toUpperCase())}
+            onKeyDown={e => e.key === 'Enter' && openByCode()}
+            placeholder="Enter 6-digit code e.g. I3FJ03"
+            maxLength={6}
+            className="flex-1 bg-white/[0.04] border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-600 outline-none focus:border-blue-500/40 font-mono tracking-widest uppercase transition-colors" />
+          <button onClick={openByCode} disabled={enteringCode || !enterCode.trim()}
+            className="px-4 py-2.5 rounded-xl bg-blue-500/20 border border-blue-500/30 text-blue-300 text-sm font-medium disabled:opacity-40 hover:bg-blue-500/30 transition-all flex items-center gap-2">
+            {enteringCode ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Open →'}
+          </button>
+        </div>
+        {enterCodeMsg && <p className="text-xs mt-2 text-red-400">{enterCodeMsg}</p>}
       </div>
 
       {loading && <div className="flex items-center justify-center h-40"><Loader2 className="w-6 h-6 text-blue-400 animate-spin" /></div>}
