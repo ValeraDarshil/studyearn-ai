@@ -303,7 +303,7 @@ export function CollabNotes() {
   // AI
   const [aiMode,    setAiMode]    = useState('improve');
   const [aiLoading, setAiLoading] = useState(false);
-  const [aiResult,  setAiResult]  = useState<{text:string;mode:string;parseError?:boolean}|null>(null);
+  const [aiResult,  setAiResult]  = useState<{text:string;mode:string;parseError?:boolean;formatError?:boolean}|null>(null);
 
   // Comments
   const [newComment,  setNewComment]  = useState('');
@@ -528,6 +528,13 @@ export function CollabNotes() {
     const m = aiResult.mode;
     let newContent = aiResult.text;
 
+    // SAFETY GUARD: never overwrite flashcard JSON with plain text
+    // Only 'flashcards' mode can write to a flashcard-format note
+    if (note.format === 'flashcards' && m !== 'flashcards') {
+      setAiResult(prev => prev ? { ...prev, formatError: true } : null);
+      return;
+    }
+
     if (m === 'flashcards') {
       // AI returns JSON string — parse and set flashcards
       try {
@@ -539,7 +546,6 @@ export function CollabNotes() {
         setFcCards(cards);
         newContent = JSON.stringify(cards);
       } catch {
-        // Parsing failed — show error in panel but don't close
         setAiResult(prev => prev ? { ...prev, parseError: true } : null);
         return;
       }
@@ -551,7 +557,6 @@ export function CollabNotes() {
         .map(l => `<p>${l.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>`)
         .join('');
       newContent = html;
-      // Directly set DOM — must happen after state clears
       if (editorRef.current) {
         editorRef.current.innerHTML = html;
       }
@@ -809,15 +814,25 @@ export function CollabNotes() {
             {/* AI ENHANCE */}
             {panel === 'ai' && (
               <div className="p-4 space-y-4 overflow-y-auto flex-1">
+                {activeNote.format === 'flashcards' && (
+                  <p className="text-[11px] text-orange-400/80 bg-orange-500/8 border border-orange-500/20 rounded-xl px-3 py-2">
+                    🃏 Flashcard note — only "Flashcards" mode will replace cards. Other modes are for Rich/Markdown notes.
+                  </p>
+                )}
                 <div className="grid grid-cols-2 gap-2">
-                  {AI_MODES.map(m => (
-                    <button key={m.id} onClick={() => setAiMode(m.id)}
-                      className={`p-2.5 rounded-xl border text-left transition-all ${aiMode === m.id ? 'bg-purple-500/20 border-purple-500/40' : 'bg-white/[0.02] border-white/8 hover:border-purple-500/25'}`}>
-                      <m.icon className="w-3.5 h-3.5 text-purple-400 mb-1.5" />
-                      <div className="text-xs font-medium text-white">{m.label}</div>
-                      <div className="text-[10px] text-slate-500 mt-0.5">{m.desc}</div>
-                    </button>
-                  ))}
+                  {AI_MODES.map(m => {
+                    const disabledForFlashcard = activeNote.format === 'flashcards' && m.id !== 'flashcards';
+                    return (
+                      <button key={m.id} onClick={() => !disabledForFlashcard && setAiMode(m.id)}
+                        className={`p-2.5 rounded-xl border text-left transition-all
+                          ${disabledForFlashcard ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer hover:border-purple-500/25'}
+                          ${aiMode === m.id && !disabledForFlashcard ? 'bg-purple-500/20 border-purple-500/40' : 'bg-white/[0.02] border-white/8'}`}>
+                        <m.icon className="w-3.5 h-3.5 text-purple-400 mb-1.5" />
+                        <div className="text-xs font-medium text-white">{m.label}</div>
+                        <div className="text-[10px] text-slate-500 mt-0.5">{m.desc}</div>
+                      </button>
+                    );
+                  })}
                 </div>
                 <button onClick={handleAI} disabled={aiLoading}
                   className="w-full py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 text-white text-xs font-semibold disabled:opacity-40 hover:opacity-90 transition-all flex items-center justify-center gap-2">
@@ -830,6 +845,9 @@ export function CollabNotes() {
                     </div>
                     {aiResult?.parseError && (
                       <p className="text-[11px] text-red-400 mt-1">⚠️ Could not parse flashcards. Try generating again.</p>
+                    )}
+                    {aiResult?.formatError && (
+                      <p className="text-[11px] text-orange-400 mt-1">⚠️ This is a Flashcard note — only "Flashcards" mode can be applied here.</p>
                     )}
                     <div className="flex gap-2">
                       <button onClick={applyAI}
