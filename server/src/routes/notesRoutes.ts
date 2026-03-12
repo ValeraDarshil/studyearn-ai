@@ -328,13 +328,53 @@ router.post('/:id/ai', authenticate, async (req: any, res) => {
 
     const { mode = 'improve' } = req.body;
 
+    const STRUCTURE_RULES = `
+FORMATTING RULES (strictly follow):
+- Use ## for main section headings
+- Use ### for sub-headings
+- Use - for bullet points
+- Use **text** for bold/important terms
+- Use 1. 2. 3. for numbered steps/lists
+- Keep paragraphs short and readable
+- DO NOT use raw asterisks like *word* for bullets — use - instead
+- DO NOT add preamble like "Here are the notes:" — start content directly`;
+
     const prompts: Record<string, string> = {
-      improve:    `Improve and clean up these student notes. Fix grammar, improve clarity, organize content. Keep all key info. Return improved notes only:\n\n${rawText}`,
-      summarize:  `Summarize these notes into key bullet points for exam revision. Be concise:\n\n${rawText}`,
-      expand:     `Expand these notes with more detail and examples for Indian competitive exam prep:\n\n${rawText}`,
-      bullets:    `Convert these notes into clear bullet points organized by topic:\n\n${rawText}`,
-      flashcards: `Create 5-8 flashcard pairs from these notes. Format EXACTLY as JSON array:\n[{"q":"question","a":"answer"},...]\nReturn ONLY the JSON, no other text:\n\n${rawText}`,
-      quiz:       `Generate 3 MCQs from these notes for self-testing. Format as JSON:\n[{"q":"question","opts":["A","B","C","D"],"ans":0},...]\nReturn ONLY JSON:\n\n${rawText}`,
+      improve: `You are a professional note editor. Improve and clean up these student notes. Fix grammar, improve clarity, properly structure with headings and bullet points. Keep ALL key information.
+${STRUCTURE_RULES}
+
+Notes to improve:
+${rawText}`,
+
+      summarize: `You are a study coach. Create a concise exam-ready summary of these notes. Use clear headings and bullet points. Focus on most important facts, definitions, and concepts.
+${STRUCTURE_RULES}
+
+Notes to summarize:
+${rawText}`,
+
+      expand: `You are an expert teacher for Indian competitive exams (JEE/NEET/UPSC/SSC). Expand these notes with detailed explanations, real-world examples, and exam-relevant facts. Structure clearly with headings.
+${STRUCTURE_RULES}
+
+Notes to expand:
+${rawText}`,
+
+      bullets: `Convert these notes into well-organized bullet points grouped under clear topic headings. Each bullet should be a complete, standalone fact. Perfect for quick revision.
+${STRUCTURE_RULES}
+
+Notes to convert:
+${rawText}`,
+
+      flashcards: `Create 5-8 flashcard pairs from these notes. Format EXACTLY as JSON array:
+[{"q":"question","a":"answer"},...]
+Return ONLY the JSON array, no other text, no markdown fences:
+
+${rawText}`,
+
+      quiz: `Generate 3 MCQs from these notes for self-testing. Format as JSON:
+[{"q":"question","opts":["A","B","C","D"],"ans":0},...]
+Return ONLY JSON, no other text:
+
+${rawText}`,
     };
 
     let result = await solveText(prompts[mode] || prompts.improve, []);

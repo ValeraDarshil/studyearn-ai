@@ -94,6 +94,74 @@ function RichToolbar({ editorRef }: { editorRef: React.RefObject<HTMLDivElement 
   );
 }
 
+// ── Markdown → Rich HTML converter ──────────────────────────
+function markdownToHtml(text: string): string {
+  const lines = text.split('\n');
+  const html: string[] = [];
+  let inUl = false, inOl = false;
+
+  const closeList = () => {
+    if (inUl) { html.push('</ul>'); inUl = false; }
+    if (inOl) { html.push('</ol>'); inOl = false; }
+  };
+
+  const inlineFormat = (line: string) => line
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
+    .replace(/\*\*(.+?)\*\*/g,      '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g,           '<em>$1</em>')
+    .replace(/`(.+?)`/g,              '<code style="background:rgba(255,255,255,0.08);padding:1px 5px;border-radius:4px;font-family:monospace;font-size:0.9em">$1</code>');
+
+  for (const raw of lines) {
+    const line = raw.trimEnd();
+
+    // H1
+    if (/^# /.test(line)) {
+      closeList();
+      html.push(`<h1 style="font-size:1.4em;font-weight:700;margin:16px 0 8px;color:#fff">${inlineFormat(line.slice(2))}</h1>`);
+    }
+    // H2
+    else if (/^## /.test(line)) {
+      closeList();
+      html.push(`<h2 style="font-size:1.15em;font-weight:700;margin:14px 0 6px;color:#e2e8f0">${inlineFormat(line.slice(3))}</h2>`);
+    }
+    // H3
+    else if (/^### /.test(line)) {
+      closeList();
+      html.push(`<h3 style="font-size:1em;font-weight:600;margin:12px 0 4px;color:#cbd5e1">${inlineFormat(line.slice(4))}</h3>`);
+    }
+    // Unordered list: -, *, +
+    else if (/^[-*+] /.test(line)) {
+      if (inOl) { html.push('</ol>'); inOl = false; }
+      if (!inUl) { html.push('<ul style="margin:6px 0 6px 20px;list-style:disc">'); inUl = true; }
+      html.push(`<li style="margin:3px 0;color:#e2e8f0">${inlineFormat(line.slice(2))}</li>`);
+    }
+    // Ordered list: 1. 2. etc
+    else if (/^\d+\.\s/.test(line)) {
+      if (inUl) { html.push('</ul>'); inUl = false; }
+      if (!inOl) { html.push('<ol style="margin:6px 0 6px 20px;list-style:decimal">'); inOl = true; }
+      html.push(`<li style="margin:3px 0;color:#e2e8f0">${inlineFormat(line.replace(/^\d+\.\s/, ''))}</li>`);
+    }
+    // Horizontal rule
+    else if (/^---+$/.test(line.trim())) {
+      closeList();
+      html.push('<hr style="border:none;border-top:1px solid rgba(255,255,255,0.1);margin:12px 0" />');
+    }
+    // Blank line
+    else if (!line.trim()) {
+      closeList();
+      html.push('<p style="margin:4px 0">&nbsp;</p>');
+    }
+    // Normal paragraph
+    else {
+      closeList();
+      html.push(`<p style="margin:4px 0;line-height:1.7;color:#e2e8f0">${inlineFormat(line)}</p>`);
+    }
+  }
+  closeList();
+  return html.join('\n');
+}
+
 // ── Card color palettes ───────────────────────────────────────
 const CARD_PALETTES = [
   { bg: 'from-violet-600/30 to-purple-700/20',  border: 'border-violet-500/40',  accent: '#a78bfa', label: 'bg-violet-500/20 text-violet-300' },
@@ -730,12 +798,8 @@ export function CollabNotes() {
         return;
       }
     } else if (note.format === 'rich') {
-      // Convert plain text lines to HTML paragraphs
-      const html = aiResult.text
-        .split('\n')
-        .filter(l => l.trim())
-        .map(l => `<p>${l.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>`)
-        .join('');
+      // Convert markdown response → proper HTML with headings, lists, bold etc.
+      const html = markdownToHtml(aiResult.text);
       newContent = html;
       if (editorRef.current) {
         editorRef.current.innerHTML = html;
