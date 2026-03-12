@@ -1083,8 +1083,8 @@ export function CollabNotes() {
               </div>
               <h2 className="text-base font-bold text-white">Delete Note?</h2>
               <p className="text-sm text-slate-400 mt-1 leading-relaxed">
-                <span className="text-white font-medium">"{deleteModal.title}"</span> permanently delete ho jaayega.
-                <br /><span className="text-red-400/80 text-xs">Yeh action undo nahi ho sakta.</span>
+                <span className="text-white font-medium">"{deleteModal.title}"</span> will be permanently deleted.
+                <br /><span className="text-red-400/80 text-xs">This action cannot be undone.</span>
               </p>
             </div>
 
