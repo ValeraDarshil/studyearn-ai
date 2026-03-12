@@ -48,14 +48,23 @@ router.get('/', authenticate, async (req: any, res) => {
       isArchived: false,
     }).sort({ isPinned: -1, updatedAt: -1 }).lean();
 
-    // Strip heavy content but keep flashcard count
+    // Strip full content but send preview + flashcard count
     const notes = rawNotes.map((n: any) => {
       let flashcardCount = 0;
+      let contentPreview = '';
       if (n.format === 'flashcards' && n.content) {
         try { flashcardCount = JSON.parse(n.content).length; } catch {}
+      } else if (n.content) {
+        // Strip HTML tags for plain text preview
+        contentPreview = n.content
+          .replace(/<[^>]*>/g, ' ')   // remove HTML tags
+          .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')
+          .replace(/\s+/g, ' ')
+          .trim()
+          .slice(0, 150);
       }
       const { content: _c, ...rest } = n;
-      return { ...rest, flashcardCount };
+      return { ...rest, flashcardCount, contentPreview };
     });
     res.json({ success: true, notes });
   } catch { res.status(500).json({ success: false, message: 'Server error' }); }

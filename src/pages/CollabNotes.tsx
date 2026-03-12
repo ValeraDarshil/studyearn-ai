@@ -20,7 +20,7 @@ interface Collaborator { userId: string; name: string; canEdit: boolean; }
 interface Comment { id: string; userId: string; userName: string; text: string; createdAt: string; resolved: boolean; }
 interface FlashCard { q: string; a: string; }
 interface Note {
-  _id: string; title: string; content: string; format: 'rich' | 'markdown' | 'flashcards'; flashcardCount?: number;
+  _id: string; title: string; content: string; format: 'rich' | 'markdown' | 'flashcards'; flashcardCount?: number; contentPreview?: string;
   subject: string; emoji: string; color: string; tags: string[];
   owner: string; ownerName: string;
   collaborators: Collaborator[];
@@ -195,7 +195,7 @@ function NoteCard({ note, isOwner, onOpen, onPin, onDelete, onShare }: {
   const fcCount = note.flashcardCount ?? (note.content ? (() => { try { return JSON.parse(note.content).length; } catch { return 0; } })() : 0);
   const preview = note.format === 'flashcards'
     ? `${fcCount} flashcard${fcCount !== 1 ? 's' : ''}`
-    : (note.content || '').replace(/<[^>]*>/g, '').slice(0, 100) || 'No content yet…';
+    : (note.contentPreview || (note.content || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 150) || 'No content yet…');
   const totalReactions = Object.values(note.reactions || {}).reduce((s, a) => s + a.length, 0);
 
   return (
