@@ -82,9 +82,15 @@ function RichToolbar({ editorRef }: { editorRef: React.RefObject<HTMLDivElement 
     return () => document.removeEventListener('selectionchange', update);
   }, []);
 
-  const exec = (cmd: string, val?: string) => {
+  const exec = (cmd: string, val?: string, toggle?: boolean) => {
     editorRef.current?.focus();
-    document.execCommand(cmd, false, val);
+    // formatBlock toggle: if already heading, revert to paragraph
+    if (toggle && cmd === 'formatBlock') {
+      const current = document.queryCommandValue('formatBlock').toLowerCase();
+      document.execCommand('formatBlock', false, ['h1','h2','h3'].includes(current) ? 'p' : (val || 'h2'));
+    } else {
+      document.execCommand(cmd, false, val);
+    }
     // Immediately refresh active state
     setActiveFormats({
       bold:                 document.queryCommandState('bold'),
@@ -100,7 +106,7 @@ function RichToolbar({ editorRef }: { editorRef: React.RefObject<HTMLDivElement 
     { icon: Bold,      cmd: 'bold',                 title: 'Bold (Ctrl+B)' },
     { icon: Italic,    cmd: 'italic',               title: 'Italic (Ctrl+I)' },
     { icon: Underline, cmd: 'underline',            title: 'Underline (Ctrl+U)' },
-    { icon: Heading1,  cmd: 'formatBlock', val:'h2', title: 'Heading' },
+    { icon: Heading1,  cmd: 'formatBlock', val:'h2', title: 'Heading', toggle: true },
     { icon: ListIcon,  cmd: 'insertUnorderedList',  title: 'Bullet list' },
     { icon: List,      cmd: 'insertOrderedList',    title: 'Numbered list' },
   ];
@@ -111,7 +117,7 @@ function RichToolbar({ editorRef }: { editorRef: React.RefObject<HTMLDivElement 
         const isActive = activeFormats[b.cmd] ?? false;
         return (
           <button key={b.cmd + b.title} title={b.title}
-            onMouseDown={e => { e.preventDefault(); exec(b.cmd, b.val); }}
+            onMouseDown={e => { e.preventDefault(); exec(b.cmd, b.val, (b as any).toggle); }}
             className={`p-1.5 rounded-lg transition-all ${
               isActive
                 ? 'bg-blue-500/25 text-blue-300 ring-1 ring-blue-500/40'
