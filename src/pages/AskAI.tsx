@@ -263,8 +263,17 @@ export function AskAI() {
   useEffect(() => {
     const ta = textareaRef.current;
     if (!ta) return;
-    ta.style.height = "auto";
-    ta.style.height = Math.min(ta.scrollHeight, 160) + "px";
+    if (!question) {
+      // Empty — reset to minimum immediately
+      ta.style.height = "32px";
+      return;
+    }
+    // Use rAF to ensure DOM has updated before reading scrollHeight
+    requestAnimationFrame(() => {
+      if (!ta) return;
+      ta.style.height = "auto";
+      ta.style.height = Math.min(ta.scrollHeight, 160) + "px";
+    });
   }, [question]);
 
   // ── Close menu on outside click ──────────────────────────
@@ -476,6 +485,10 @@ export function AskAI() {
     const newMessages = [...messages, userMsg];
     setMessages(newMessages);
     setQuestion("");
+    // Force textarea height reset immediately — prevents blank space glitch
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "32px";
+    }
     setLoading(true);
 
     const currentFile     = uploadedFile;
@@ -812,11 +825,11 @@ export function AskAI() {
         {/* ── Input box ───────────────────────────────────── */}
         <div className="flex-shrink-0 p-3 border-t border-white/8">
 
-          <div className="rounded-2xl border border-white/10 bg-white/[0.02] px-3 py-2 space-y-2">
+          <div className="rounded-2xl border border-white/10 bg-white/[0.02] px-3 py-2">
 
-            {/* File strip */}
+            {/* File strip — only shown when file uploaded */}
             {uploadedFile && (
-              <div className="flex items-center gap-2 px-1 py-1 rounded-xl bg-white/[0.03] border border-white/10">
+              <div className="flex items-center gap-2 px-1 py-1 mb-2 rounded-xl bg-white/[0.03] border border-white/10">
                 <div className={`w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0
                   ${fileType === "pdf" ? "bg-red-500/15" : "bg-blue-500/15"}`}>
                   {fileType === "pdf"
