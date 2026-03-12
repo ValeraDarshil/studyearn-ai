@@ -291,6 +291,8 @@ export function CollabNotes() {
   const [panel,     setPanel]       = useState<null|'share'|'ai'|'comments'|'reactions'>( null);
 
   // Share
+  const [deleteModal,  setDeleteModal]  = useState<{id: string; title: string; emoji: string} | null>(null);
+  const [deleting,     setDeleting]     = useState(false);
   const [enterCode,    setEnterCode]    = useState('');
   const [enterCodeMsg, setEnterCodeMsg] = useState('');
   const [enteringCode, setEnteringCode] = useState(false);
@@ -459,11 +461,19 @@ export function CollabNotes() {
   };
 
   // ── Delete / Pin ─────────────────────────────────────────────
-  const handleDelete = async (id: string) => {
-    if (!confirm('Delete this note permanently?')) return;
-    await fetch(`${API_URL}/api/notes/${id}`, { method: 'DELETE', headers: authHeaders() });
-    setNotes(p => p.filter(n => n._id !== id));
-    if (activeNote?._id === id) { setView('list'); setActiveNote(null); }
+  const confirmDelete = (note: Note) => {
+    setDeleteModal({ id: note._id, title: note.title, emoji: note.emoji });
+  };
+
+  const handleDelete = async () => {
+    if (!deleteModal) return;
+    setDeleting(true);
+    try {
+      await fetch(`${API_URL}/api/notes/${deleteModal.id}`, { method: 'DELETE', headers: authHeaders() });
+      setNotes(p => p.filter(n => n._id !== deleteModal.id));
+      if (activeNote?._id === deleteModal.id) { setView('list'); setActiveNote(null); }
+      setDeleteModal(null);
+    } catch {} finally { setDeleting(false); }
   };
   const handlePin = async (note: Note) => {
     await fetch(`${API_URL}/api/notes/${note._id}`, {
@@ -1046,7 +1056,7 @@ export function CollabNotes() {
         <div>
           <p className="text-[11px] text-orange-400 font-semibold uppercase tracking-wider mb-3 flex items-center gap-1.5"><Pin className="w-3 h-3" /> Pinned</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {pinned.map(n => <NoteCard key={n._id} note={n} isOwner={n.owner === userId} onOpen={() => openNote(n._id)} onPin={() => handlePin(n)} onDelete={() => handleDelete(n._id)} onShare={async () => { await openNote(n._id); setPanel('share'); }} />)}
+            {pinned.map(n => <NoteCard key={n._id} note={n} isOwner={n.owner === userId} onOpen={() => openNote(n._id)} onPin={() => handlePin(n)} onDelete={() => confirmDelete(n)} onShare={async () => { await openNote(n._id); setPanel('share'); }} />)}
           </div>
         </div>
       )}
@@ -1054,7 +1064,43 @@ export function CollabNotes() {
         <div>
           {pinned.length > 0 && <p className="text-[11px] text-slate-500 font-semibold uppercase tracking-wider mb-3">All Notes</p>}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {unpinned.map(n => <NoteCard key={n._id} note={n} isOwner={n.owner === userId} onOpen={() => openNote(n._id)} onPin={() => handlePin(n)} onDelete={() => handleDelete(n._id)} onShare={async () => { await openNote(n._id); setPanel('share'); }} />)}
+            {unpinned.map(n => <NoteCard key={n._id} note={n} isOwner={n.owner === userId} onOpen={() => openNote(n._id)} onPin={() => handlePin(n)} onDelete={() => confirmDelete(n)} onShare={async () => { await openNote(n._id); setPanel('share'); }} />)}
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)' }}
+          onClick={e => { if (e.target === e.currentTarget) setDeleteModal(null); }}>
+          <div className="w-full max-w-sm rounded-2xl border border-red-500/20 bg-[#0d1117] p-6 shadow-2xl shadow-red-500/5">
+
+            {/* Icon */}
+            <div className="flex flex-col items-center text-center mb-5">
+              <div className="w-14 h-14 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center mb-3 text-2xl">
+                {deleteModal.emoji}
+              </div>
+              <h2 className="text-base font-bold text-white">Delete Note?</h2>
+              <p className="text-sm text-slate-400 mt-1 leading-relaxed">
+                <span className="text-white font-medium">"{deleteModal.title}"</span> permanently delete ho jaayega.
+                <br /><span className="text-red-400/80 text-xs">Yeh action undo nahi ho sakta.</span>
+              </p>
+            </div>
+
+            {/* Buttons */}
+            <div className="flex gap-3">
+              <button onClick={() => setDeleteModal(null)}
+                className="flex-1 py-2.5 rounded-xl border border-white/10 bg-white/[0.03] text-slate-300 text-sm font-medium hover:bg-white/[0.06] transition-all">
+                Cancel
+              </button>
+              <button onClick={handleDelete} disabled={deleting}
+                className="flex-1 py-2.5 rounded-xl bg-red-500/20 border border-red-500/30 text-red-300 text-sm font-semibold hover:bg-red-500/30 transition-all disabled:opacity-50 flex items-center justify-center gap-2">
+                {deleting
+                  ? <><Loader2 className="w-4 h-4 animate-spin" /> Deleting…</>
+                  : <><Trash2 className="w-4 h-4" /> Delete</>}
+              </button>
+            </div>
           </div>
         </div>
       )}
