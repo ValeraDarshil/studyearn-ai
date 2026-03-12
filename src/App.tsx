@@ -73,7 +73,7 @@ function AchievementToast({ achievement, onClose }: { achievement: any; onClose:
 function AppContent() {
   const location = useLocation();
   const [points, setPoints] = useState(0);
-  const [questionsLeft, setQuestionsLeft] = useState(5);
+  const [questionsLeft, setQuestionsLeft] = useState(15);
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
   const [streak, setStreak] = useState(0);
   const [totalXP, setTotalXP] = useState(0); // Never decreases — used for level
@@ -316,6 +316,21 @@ function AppContent() {
     await logActivityAPI(action, details, pointsEarned);
   };
 
+  // ── Refresh quota only (lightweight — no full reload) ──────
+  const refreshQuota = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    try {
+      const res  = await fetch(`${import.meta.env.VITE_API_URL}/api/ai/quota`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.success && data.questionsLeft !== undefined) {
+        setQuestionsLeft(data.questionsLeft);
+      }
+    } catch {}
+  };
+
   const resetProgress = () => {
     setPoints(0);
     setQuestionsLeft(5);
@@ -354,6 +369,7 @@ function AppContent() {
           streak,
           questionsLeft,
           setQuestionsLeft,
+          refreshQuota,
           isLoggedIn,
           setIsLoggedIn,
           addPoints,

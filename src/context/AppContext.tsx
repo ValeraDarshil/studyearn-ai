@@ -30,6 +30,7 @@ export interface AppContextType {
   setUnlockedAchievements: (ids: string[]) => void;
   setUserStats: (stats: UserStats) => void;
   setQuestionsLeft: (n: number) => void;
+  refreshQuota: () => Promise<void>;
 }
 
 export const AppContext = createContext<AppContextType>({
@@ -55,6 +56,7 @@ export const AppContext = createContext<AppContextType>({
   setUnlockedAchievements: () => {},
   setUserStats: () => {},
   setQuestionsLeft: () => {},
+  refreshQuota: async () => {},
 });
 
 export const useApp = () => useContext(AppContext);

@@ -10,7 +10,7 @@ import Lottie from 'lottie-react';
 import streakAnimation from '../assets/animations/streak-fire.json';
 
 export function Dashboard() {
-  const { points, totalXP, streak, questionsLeft, recentActivity, userName, unlockedAchievements, userStats, isPremium, premiumExpiresAt } = useApp();
+  const { points, totalXP, streak, questionsLeft, setQuestionsLeft, refreshQuota, recentActivity, userName, unlockedAchievements, userStats, isPremium, premiumExpiresAt } = useApp();
   const firstName = userName ? userName.trim().split(" ")[0] : "Student";
   const navigate = useNavigate();
   const [showStreakCelebration, setShowStreakCelebration] = useState(false);
@@ -28,23 +28,47 @@ export function Dashboard() {
   const dailyLimit = isPremium ? 30 : 15;
   const questionsUsed = dailyLimit - questionsLeft;
 
-  // Fetch refill info on mount
+  // Fetch quota on mount — gets fresh questionsLeft from server
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) return;
     fetch(`${API_URL}/api/ai/quota`, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.json())
-      .then(d => { if (d.success) { setNextRefillSecs(d.nextRefillSecs || 0); setVideoAdsLeft(d.videoAdsLeft ?? 5); } })
+      .then(d => {
+        if (d.success) {
+          // Update context so ALL pages see fresh count
+          if (d.questionsLeft !== undefined) setQuestionsLeft(d.questionsLeft);
+          setNextRefillSecs(d.nextRefillSecs || 0);
+          setVideoAdsLeft(d.videoAdsLeft ?? 5);
+        }
+      })
       .catch(() => {});
-  }, []);
+  }, []);  // eslint-disable-line
 
-  // Countdown timer
+  // Countdown timer — auto-refresh quota when timer hits zero
   useEffect(() => {
     if (refillTimerRef.current) clearInterval(refillTimerRef.current);
     if (nextRefillSecs <= 0) return;
     refillTimerRef.current = setInterval(() => {
       setNextRefillSecs(p => {
-        if (p <= 1) { clearInterval(refillTimerRef.current!); return 0; }
+        if (p <= 1) {
+          clearInterval(refillTimerRef.current!);
+          // Auto-refresh quota from server when refill time is up
+          const token = localStorage.getItem('token');
+          if (token) {
+            fetch(`${API_URL}/api/ai/quota`, { headers: { Authorization: `Bearer ${token}` } })
+              .then(r => r.json())
+              .then(d => {
+                if (d.success) {
+                  if (d.questionsLeft !== undefined) setQuestionsLeft(d.questionsLeft);
+                  setNextRefillSecs(d.nextRefillSecs || 0);
+                  setVideoAdsLeft(d.videoAdsLeft ?? 5);
+                }
+              })
+              .catch(() => {});
+          }
+          return 0;
+        }
         return p - 1;
       });
     }, 1000);
@@ -73,7 +97,11 @@ export function Dashboard() {
         // Update questionsLeft via context won't work directly, re-fetch quota
         const q = await fetch(`${API_URL}/api/ai/quota`, { headers: { Authorization: `Bearer ${token}` } });
         const qd = await q.json();
-        if (qd.success) { setNextRefillSecs(qd.nextRefillSecs || 0); setVideoAdsLeft(qd.videoAdsLeft ?? 0); }
+        if (qd.success) {
+          if (qd.questionsLeft !== undefined) setQuestionsLeft(qd.questionsLeft);
+          setNextRefillSecs(qd.nextRefillSecs || 0);
+          setVideoAdsLeft(qd.videoAdsLeft ?? 0);
+        }
       }
     } catch {}
     setWatchingAd(false);
