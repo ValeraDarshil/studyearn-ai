@@ -142,7 +142,7 @@ export function DailyChallenge() {
   }, []);
 
   // ── Load today's challenge question — server generates, NO quota used ──
-  const loadChallenge = async () => {
+  const loadChallenge = async (force = false) => {
     setLoading(true); setError("");
     try {
       const res  = await fetch(`${API_URL}/api/user/daily-challenge/generate`, {
@@ -152,6 +152,7 @@ export function DailyChallenge() {
           subject: todayTopic.subject,
           topic:   todayTopic.topic,
           pts:     todayTopic.pts,
+          force,
         }),
       });
       const data = await res.json();
@@ -296,7 +297,13 @@ export function DailyChallenge() {
                 </p>
               </div>
               {error && (
-                <div className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">{error}</div>
+                <div className="space-y-2">
+                  <div className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 text-center">{error}</div>
+                  <button onClick={() => loadChallenge(true)}
+                    className="w-full py-2 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-400 text-sm font-medium hover:bg-orange-500/20 transition-all">
+                    🔄 Regenerate Question
+                  </button>
+                </div>
               )}
               <button onClick={loadChallenge}
                 className="flex items-center justify-center gap-2 px-8 py-3 rounded-xl bg-gradient-to-r from-orange-500 to-red-500 text-white font-semibold text-sm hover:opacity-90 transition-all glow-btn mx-auto">

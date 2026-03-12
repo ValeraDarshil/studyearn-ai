@@ -449,44 +449,63 @@ router.post('/daily-challenge/generate', authenticate, async (req: any, res) => 
     const user = await User.findById(req.userId).lean() as any;
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
-    // If already generated today, return existing (idempotent)
+    // If already generated today, return existing (idempotent) — unless force=true
     const dc = user.dailyChallenge || {};
-    if (dc.date === todayKey && dc.challenge) {
+    const force = req.body.force === true;
+    if (!force && dc.date === todayKey && dc.challenge) {
       return res.json({ success: true, challenge: dc.challenge, cached: true });
     }
 
     const { subject, topic, pts } = req.body;
     if (!subject || !topic) return res.status(400).json({ success: false, message: 'subject and topic required' });
 
-    const prompt = `Generate 1 challenging MCQ about ${topic} for Indian students preparing for competitive exams.
+    // Use JSON format — much more reliable across all models including DeepSeek/Qwen
+    const prompt = `You are a quiz generator. Generate 1 MCQ about "${topic}" for Indian competitive exam students.
 
-Format EXACTLY:
-[question text - make it genuinely challenging and interesting]
-A) [option]
-B) [option]
-C) [option]
-D) [option]
-Answer: [A/B/C/D]
-Explanation: [clear 1-2 sentence explanation of why the answer is correct]
+Return ONLY a valid JSON object. No explanation, no markdown, no code fences, no text before or after the JSON:
+{"q":"question text here","opts":["option A text","option B text","option C text","option D text"],"ans":0,"exp":"brief explanation"}
 
-Make the question thought-provoking, not trivial.`;
+Rules:
+- "ans" is the 0-based index of the correct option (0=A, 1=B, 2=C, 3=D)
+- All 4 options must be different and plausible
+- Question must be specific to ${topic}
+- Return ONLY the JSON object, nothing else`;
 
     const raw = await solveText(prompt, []);
 
-    // Parse MCQ
-    const lines = raw.split('\n').map((l: string) => l.trim()).filter(Boolean);
-    const qLine = lines[0] || '';
-    const opts  = ['A','B','C','D'].map(l => {
-      const found = lines.find((ln: string) => ln.match(new RegExp(`^${l}[)\.]\s`)));
-      return found ? found.replace(/^[A-D][).]\s*/, '') : '';
-    });
-    const ansLine = lines.find((l: string) => l.toLowerCase().startsWith('answer:')) || '';
-    const ansLetter = ansLine.replace(/answer:\s*/i, '').trim().toUpperCase().charAt(0);
-    const ansIdx = ['A','B','C','D'].indexOf(ansLetter);
-    const expLine = lines.find((l: string) => l.toLowerCase().startsWith('explanation:')) || '';
-    const explanation = expLine.replace(/explanation:\s*/i, '').trim();
+    // Strip everything outside the JSON object
+    const cleaned = raw
+      .replace(/<think>[\s\S]*?<\/think>/gi, '')
+      .replace(/<\/think>/gi, '')
+      .replace(/^[\s\S]*?(\{)/, '$1')   // everything before first {
+      .replace(/(\})[\s\S]*$/, '$1')    // everything after last }
+      .replace(/\*\*/g, '')
+      .trim();
 
-    if (!qLine || opts.some((o: string) => !o) || ansIdx === -1) {
+    let parsed: any;
+    try {
+      parsed = JSON.parse(cleaned);
+    } catch {
+      // Fallback: try to extract JSON with regex
+      const match = raw.match(/\{[^{}]*"q"[^{}]*"opts"[^{}]*\}/s);
+      if (!match) {
+        console.error('[Daily Challenge] Parse failed. Raw:', raw.substring(0, 400));
+        return res.status(500).json({ success: false, message: 'Could not parse AI response. Try again.' });
+      }
+      try { parsed = JSON.parse(match[0]); }
+      catch {
+        console.error('[Daily Challenge] Fallback parse failed.');
+        return res.status(500).json({ success: false, message: 'Could not parse AI response. Try again.' });
+      }
+    }
+
+    const qLine = (parsed.q || '').trim();
+    const opts: string[] = Array.isArray(parsed.opts) ? parsed.opts.map((o: any) => String(o).trim()) : [];
+    const ansIdx: number = typeof parsed.ans === 'number' ? parsed.ans : -1;
+    const explanation = (parsed.exp || '').trim();
+
+    if (!qLine || opts.length !== 4 || opts.some((o: string) => !o) || ansIdx < 0 || ansIdx > 3) {
+      console.error('[Daily Challenge] Invalid structure. Parsed:', JSON.stringify(parsed));
       return res.status(500).json({ success: false, message: 'Could not parse AI response. Try again.' });
     }
 
