@@ -186,9 +186,9 @@ function FlashcardEditor({ cards, onChange, canEdit }: {
 }
 
 // ── Note Card ─────────────────────────────────────────────────
-function NoteCard({ note, isOwner, onOpen, onPin, onDelete }: {
+function NoteCard({ note, isOwner, onOpen, onPin, onDelete, onShare }: {
   note: Note; isOwner: boolean;
-  onOpen: () => void; onPin: () => void; onDelete: () => void;
+  onOpen: () => void; onPin: () => void; onDelete: () => void; onShare: () => void;
 }) {
   const c = COLORS[note.color] || COLORS.blue;
   const preview = note.format === 'flashcards'
@@ -214,6 +214,8 @@ function NoteCard({ note, isOwner, onOpen, onPin, onDelete }: {
           </div>
         </div>
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 ml-2">
+          {isOwner && <button onClick={e => { e.stopPropagation(); onShare(); }}
+            className="p-1 rounded-lg text-slate-600 hover:text-blue-400 transition-colors" title="Share"><Share2 className="w-3 h-3" /></button>}
           {isOwner && <button onClick={e => { e.stopPropagation(); onPin(); }}
             className={`p-1 rounded-lg transition-colors ${note.isPinned ? 'text-orange-400' : 'text-slate-600 hover:text-slate-400'}`}><Pin className="w-3 h-3" /></button>}
           {isOwner && <button onClick={e => { e.stopPropagation(); onDelete(); }}
@@ -274,6 +276,7 @@ export function CollabNotes() {
   const [saved,     setSaved]       = useState(false);
   const [version,   setVersion]     = useState(0);
   const saveTimer   = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [pendingRichContent, setPendingRichContent] = useState<string | null>(null);
   const pollTimer   = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Panels
@@ -316,17 +319,29 @@ export function CollabNotes() {
       setCanEditNote(d.canEdit);
       setEditTitle(d.note.title);
       setVersion(d.note.version || 0);
-      if (d.note.format === 'markdown') setMdContent(d.note.content || '');
-      else if (d.note.format === 'flashcards') {
-        try { setFcCards(JSON.parse(d.note.content || '[]')); } catch { setFcCards([]); }
-      } else if (editorRef.current) {
-        editorRef.current.innerHTML = d.note.content || '';
-      }
-      setView('editor');
       setPanel(null);
       setAiResult(null);
+      if (d.note.format === 'markdown') {
+        setMdContent(d.note.content || '');
+        setPendingRichContent(null);
+      } else if (d.note.format === 'flashcards') {
+        try { setFcCards(JSON.parse(d.note.content || '[]')); } catch { setFcCards([]); }
+        setPendingRichContent(null);
+      } else {
+        // Rich: store content, useEffect will inject after editor mounts
+        setPendingRichContent(d.note.content || '');
+      }
+      setView('editor');
     } catch {}
   };
+
+  // ── Inject rich content after editor mounts
+  useEffect(() => {
+    if (view === 'editor' && pendingRichContent !== null && editorRef.current) {
+      editorRef.current.innerHTML = pendingRichContent;
+      setPendingRichContent(null);
+    }
+  }, [view, pendingRichContent]);
 
   // ── Real-time polling ────────────────────────────────────────
   useEffect(() => {
@@ -841,7 +856,7 @@ export function CollabNotes() {
         <div>
           <p className="text-[11px] text-orange-400 font-semibold uppercase tracking-wider mb-3 flex items-center gap-1.5"><Pin className="w-3 h-3" /> Pinned</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {pinned.map(n => <NoteCard key={n._id} note={n} isOwner={n.owner === userId} onOpen={() => openNote(n._id)} onPin={() => handlePin(n)} onDelete={() => handleDelete(n._id)} />)}
+            {pinned.map(n => <NoteCard key={n._id} note={n} isOwner={n.owner === userId} onOpen={() => openNote(n._id)} onPin={() => handlePin(n)} onDelete={() => handleDelete(n._id)} onShare={async () => { await openNote(n._id); setPanel('share'); }} />)}
           </div>
         </div>
       )}
@@ -849,7 +864,7 @@ export function CollabNotes() {
         <div>
           {pinned.length > 0 && <p className="text-[11px] text-slate-500 font-semibold uppercase tracking-wider mb-3">All Notes</p>}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {unpinned.map(n => <NoteCard key={n._id} note={n} isOwner={n.owner === userId} onOpen={() => openNote(n._id)} onPin={() => handlePin(n)} onDelete={() => handleDelete(n._id)} />)}
+            {unpinned.map(n => <NoteCard key={n._id} note={n} isOwner={n.owner === userId} onOpen={() => openNote(n._id)} onPin={() => handlePin(n)} onDelete={() => handleDelete(n._id)} onShare={async () => { await openNote(n._id); setPanel('share'); }} />)}
           </div>
         </div>
       )}
