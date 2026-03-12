@@ -691,7 +691,7 @@ export function AskAI() {
   // ─────────────────────────────────────────────────────────
   return (
     /* Break out of page padding, fill remaining viewport height */
-    <div className="flex -mx-3 -mt-3 sm:-mx-4 sm:-mt-4 md:-mx-8 md:-mt-8" style={{ height: 'calc(100vh - 56px)', minHeight: 0 }}>
+    <div className="flex absolute inset-0">
 
       {/* ── SIDEBAR OVERLAY (mobile only) ── */}
       {sidebarOpen && (

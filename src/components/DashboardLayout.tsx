@@ -185,7 +185,7 @@ export function DashboardLayout() {
       </aside>
 
       {/* Main Content */}
-      <main className="md:ml-64 min-h-screen" style={{ paddingBottom: "calc(5rem + env(safe-area-inset-bottom))" }}>
+      <main className="md:ml-64 flex flex-col" style={{ height: "100dvh", overflow: "hidden" }}>
 
         {/* Top Bar */}
         <div className="sticky top-0 z-30 glass border-b border-white/5 px-3 md:px-8 py-3 md:py-4 flex items-center justify-between gap-2">
@@ -257,9 +257,14 @@ export function DashboardLayout() {
           </div>
         </div>
 
-        {/* Page Content */}
-        <div className="p-3 sm:p-4 md:p-8">
-          <Outlet />
+        {/* Page Content — flex-1, scrollable for normal pages. AskAI uses absolute inset-0 to escape. */}
+        <div
+          className="flex-1 overflow-y-auto relative"
+          style={{ paddingBottom: "calc(5rem + env(safe-area-inset-bottom))" }}
+        >
+          <div className="p-3 sm:p-4 md:p-8">
+            <Outlet />
+          </div>
         </div>
       </main>
 
