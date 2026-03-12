@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useParams } from 'react-router-dom';
 import {
   Plus, Search, Pin, Trash2, Share2, Sparkles, BookOpen, X, Check,
   Users, Globe, Lock, Copy, Save, Loader2, ArrowLeft, Wand2, UserPlus,
@@ -249,6 +250,7 @@ function NoteCard({ note, isOwner, onOpen, onPin, onDelete, onShare }: {
 // ── Main Component ────────────────────────────────────────────
 export function CollabNotes() {
   const { userId } = useApp();
+  const { code: sharedCode } = useParams<{ code?: string }>();
   const [notes,     setNotes]     = useState<Note[]>([]);
   const [loading,   setLoading]   = useState(true);
   const [view,      setView]      = useState<'list'|'editor'>('list');
@@ -307,6 +309,37 @@ export function CollabNotes() {
     } catch {} finally { setLoading(false); }
   }, []);
   useEffect(() => { fetchNotes(); }, [fetchNotes]);
+
+  // ── Auto-open shared note from URL (/app/notes/shared/:code)
+  useEffect(() => {
+    if (!sharedCode) return;
+    const openShared = async () => {
+      try {
+        const r = await fetch(`${API_URL}/api/notes/shared/${sharedCode}`, { headers: authHeaders() });
+        const d = await r.json();
+        if (d.success) {
+          setActiveNote(d.note);
+          setIsOwner(d.isOwner);
+          setCanEditNote(d.canEdit);
+          setEditTitle(d.note.title);
+          setVersion(d.note.version || 0);
+          setPanel(null);
+          setAiResult(null);
+          if (d.note.format === 'markdown') {
+            setMdContent(d.note.content || '');
+            setPendingRichContent(null);
+          } else if (d.note.format === 'flashcards') {
+            try { setFcCards(JSON.parse(d.note.content || '[]')); } catch { setFcCards([]); }
+            setPendingRichContent(null);
+          } else {
+            setPendingRichContent(d.note.content || '');
+          }
+          setView('editor');
+        }
+      } catch {}
+    };
+    openShared();
+  }, [sharedCode]);
 
   // ── Open note ────────────────────────────────────────────────
   const openNote = async (id: string) => {
@@ -410,8 +443,8 @@ export function CollabNotes() {
       const d = await r.json();
       if (d.success) {
         setShowCreate(false); setNewTitle(''); setNewSubject('General'); setNewEmoji('📝'); setNewColor('blue'); setNewFormat('rich');
-        await fetchNotes();
-        openNote(d.note._id);
+        await openNote(d.note._id);  // await so editor state is set before creating finishes
+        fetchNotes();                 // refresh list in background
       }
     } catch {} finally { setCreating(false); }
   };
@@ -458,6 +491,7 @@ export function CollabNotes() {
   const copyLink = () => {
     if (!activeNote?.shareCode) return;
     navigator.clipboard.writeText(`${window.location.origin}/#/app/notes/shared/${activeNote.shareCode}`)
+      // URL format matches App.tsx route: /app/notes/shared/:code
       .then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
   };
 

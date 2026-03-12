@@ -417,6 +417,7 @@ function AppContent() {
             <Route path="formulas" element={<FormulaSheet />} />
             <Route path="study-tools" element={<StudyTools />} />
             <Route path="notes" element={<CollabNotes />} />
+            <Route path="notes/shared/:code" element={<CollabNotes />} />
           </Route>
         </Routes>
       </AppContext.Provider>
