@@ -145,21 +145,22 @@ export function DailyChallenge() {
   const loadChallenge = async (force = false) => {
     setLoading(true); setError("");
     try {
+      // Explicitly extract only plain strings — prevents circular SVG refs from sneaking in
+      const subject = String(todayTopic.subject);
+      const topic   = String(todayTopic.topic);
+      const pts     = Number(todayTopic.pts);
+
       const res  = await fetch(`${API_URL}/api/user/daily-challenge/generate`, {
         method:  "POST",
         headers: authHeaders(),
-        body:    JSON.stringify({
-          subject: todayTopic.subject,
-          topic:   todayTopic.topic,
-          pts:     todayTopic.pts,
-          force,
-        }),
+        body:    JSON.stringify({ subject, topic, pts, force }),
       });
       const data = await res.json();
-      if (!data.success) throw new Error(data.message || "Could not generate question. Please try again.");
+      if (!data.success) throw new Error(String(data.message || "Could not generate question. Please try again."));
       setChallenge(data.challenge);
-    } catch (err: any) {
-      setError(err.message || "Something went wrong. Try again.");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Something went wrong. Try again.";
+      setError(String(msg));
     } finally {
       setLoading(false);
     }
@@ -305,7 +306,7 @@ export function DailyChallenge() {
                   </button>
                 </div>
               )}
-              <button onClick={loadChallenge}
+              <button onClick={() => loadChallenge(false)}
                 className="flex items-center justify-center gap-2 px-8 py-3 rounded-xl bg-gradient-to-r from-orange-500 to-red-500 text-white font-semibold text-sm hover:opacity-90 transition-all glow-btn mx-auto">
                 <Flame className="w-4 h-4" /> Start Challenge
               </button>
