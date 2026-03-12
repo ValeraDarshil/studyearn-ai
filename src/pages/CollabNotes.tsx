@@ -271,8 +271,13 @@ export function CollabNotes() {
   const [creating,   setCreating]   = useState(false);
 
   // Editor
-  const editorRef   = useRef<HTMLDivElement>(null);
+  const editorRef      = useRef<HTMLDivElement>(null);
+  const activeNoteRef  = useRef<Note | null>(null);
+  const editTitleRef   = useRef<string>('');
   const [editTitle, setEditTitle]   = useState('');
+  // Sync refs so callbacks always see latest values
+  useEffect(() => { activeNoteRef.current = activeNote; }, [activeNote]);
+  useEffect(() => { editTitleRef.current  = editTitle;  }, [editTitle]);
   const [mdContent, setMdContent]   = useState('');
   const [fcCards,   setFcCards]     = useState<FlashCard[]>([]);
   const [saving,    setSaving]      = useState(false);
@@ -298,7 +303,7 @@ export function CollabNotes() {
   // AI
   const [aiMode,    setAiMode]    = useState('improve');
   const [aiLoading, setAiLoading] = useState(false);
-  const [aiResult,  setAiResult]  = useState<{text:string;mode:string}|null>(null);
+  const [aiResult,  setAiResult]  = useState<{text:string;mode:string;parseError?:boolean}|null>(null);
 
   // Comments
   const [newComment,  setNewComment]  = useState('');
@@ -516,31 +521,56 @@ export function CollabNotes() {
   };
 
   const applyAI = async () => {
-    if (!aiResult || !activeNote) return;
+    // Use ref to always get latest activeNote — avoids stale closure
+    const note = activeNoteRef.current;
+    if (!aiResult || !note) return;
+
     const m = aiResult.mode;
     let newContent = aiResult.text;
 
     if (m === 'flashcards') {
+      // AI returns JSON string — parse and set flashcards
       try {
-        const cards = JSON.parse(aiResult.text);
+        const raw = aiResult.text.trim();
+        // Strip markdown code fences if AI wrapped in ```json
+        const clean = raw.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
+        const cards = JSON.parse(clean);
+        if (!Array.isArray(cards)) throw new Error('Not array');
         setFcCards(cards);
         newContent = JSON.stringify(cards);
-      } catch { setAiResult(null); return; }
-    } else if (activeNote.format === 'rich' && editorRef.current) {
-      const html = aiResult.text.split('\n').filter(Boolean).map(l => `<p>${l}</p>`).join('');
-      editorRef.current.innerHTML = html;
+      } catch {
+        // Parsing failed — show error in panel but don't close
+        setAiResult(prev => prev ? { ...prev, parseError: true } : null);
+        return;
+      }
+    } else if (note.format === 'rich') {
+      // Convert plain text lines to HTML paragraphs
+      const html = aiResult.text
+        .split('\n')
+        .filter(l => l.trim())
+        .map(l => `<p>${l.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>`)
+        .join('');
       newContent = html;
+      // Directly set DOM — must happen after state clears
+      if (editorRef.current) {
+        editorRef.current.innerHTML = html;
+      }
     } else {
+      // Markdown format
+      newContent = aiResult.text;
       setMdContent(aiResult.text);
     }
 
-    // Clear debounce timer and save immediately
+    // Clear result first so panel closes
+    setAiResult(null);
+
+    // Save immediately — bypass debounce
     if (saveTimer.current) clearTimeout(saveTimer.current);
     setSaving(true);
     try {
-      const r = await fetch(`${API_URL}/api/notes/${activeNote._id}`, {
+      const r = await fetch(`${API_URL}/api/notes/${note._id}`, {
         method: 'PUT', headers: authHeaders(),
-        body: JSON.stringify({ title: editTitle, content: newContent }),
+        body: JSON.stringify({ title: editTitleRef.current, content: newContent }),
       });
       const d = await r.json();
       if (d.success) {
@@ -551,8 +581,6 @@ export function CollabNotes() {
         fetchNotes();
       }
     } catch {} finally { setSaving(false); }
-
-    setAiResult(null);
   };
 
   // ── Open note by code ───────────────────────────────────────
@@ -800,10 +828,13 @@ export function CollabNotes() {
                     <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3 max-h-52 overflow-y-auto">
                       <p className="text-xs text-slate-300 whitespace-pre-wrap leading-relaxed">{aiResult.text}</p>
                     </div>
+                    {aiResult?.parseError && (
+                      <p className="text-[11px] text-red-400 mt-1">⚠️ Could not parse flashcards. Try generating again.</p>
+                    )}
                     <div className="flex gap-2">
                       <button onClick={applyAI}
                         className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-green-500/20 border border-green-500/30 text-green-400 text-xs font-medium hover:bg-green-500/30 transition-all">
-                        <Check className="w-3.5 h-3.5" /> Apply
+                        <Check className="w-3.5 h-3.5" /> Apply to Note
                       </button>
                       <button onClick={() => setAiResult(null)}
                         className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-slate-400 text-xs hover:text-white transition-all">

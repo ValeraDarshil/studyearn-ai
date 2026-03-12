@@ -328,7 +328,9 @@ router.post('/:id/ai', authenticate, async (req: any, res) => {
       quiz:       `Generate 3 MCQs from these notes for self-testing. Format as JSON:\n[{"q":"question","opts":["A","B","C","D"],"ans":0},...]\nReturn ONLY JSON:\n\n${rawText}`,
     };
 
-    const result = await solveText(prompts[mode] || prompts.improve, []);
+    let result = await solveText(prompts[mode] || prompts.improve, []);
+    // Strip markdown code fences if AI wrapped response (common with JSON modes)
+    result = result.replace(/^```(?:json|markdown)?\n?/i, '').replace(/\n?```$/i, '').trim();
     res.json({ success: true, result, mode });
   } catch { res.status(500).json({ success: false, message: 'AI error' }); }
 });
