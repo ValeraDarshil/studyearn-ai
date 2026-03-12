@@ -94,92 +94,262 @@ function RichToolbar({ editorRef }: { editorRef: React.RefObject<HTMLDivElement 
   );
 }
 
+// ── Card color palettes ───────────────────────────────────────
+const CARD_PALETTES = [
+  { bg: 'from-violet-600/30 to-purple-700/20',  border: 'border-violet-500/40',  accent: '#a78bfa', label: 'bg-violet-500/20 text-violet-300' },
+  { bg: 'from-cyan-500/30 to-blue-600/20',      border: 'border-cyan-500/40',    accent: '#67e8f9', label: 'bg-cyan-500/20 text-cyan-300' },
+  { bg: 'from-rose-500/30 to-pink-600/20',      border: 'border-rose-500/40',    accent: '#fb7185', label: 'bg-rose-500/20 text-rose-300' },
+  { bg: 'from-amber-500/30 to-orange-600/20',   border: 'border-amber-500/40',   accent: '#fbbf24', label: 'bg-amber-500/20 text-amber-300' },
+  { bg: 'from-emerald-500/30 to-teal-600/20',   border: 'border-emerald-500/40', accent: '#34d399', label: 'bg-emerald-500/20 text-emerald-300' },
+  { bg: 'from-sky-500/30 to-indigo-600/20',     border: 'border-sky-500/40',     accent: '#38bdf8', label: 'bg-sky-500/20 text-sky-300' },
+  { bg: 'from-fuchsia-500/30 to-purple-600/20', border: 'border-fuchsia-500/40', accent: '#e879f9', label: 'bg-fuchsia-500/20 text-fuchsia-300' },
+  { bg: 'from-lime-500/30 to-green-600/20',     border: 'border-lime-500/40',    accent: '#a3e635', label: 'bg-lime-500/20 text-lime-300' },
+];
+
 // ── Flashcard Editor ──────────────────────────────────────────
 function FlashcardEditor({ cards, onChange, canEdit }: {
   cards: FlashCard[]; onChange: (c: FlashCard[]) => void; canEdit: boolean;
 }) {
-  const [flipped, setFlipped] = useState<Record<number, boolean>>({});
-  const [study,   setStudy]   = useState(false);
+  const [flipped,  setFlipped]  = useState<Record<number, boolean>>({});
+  const [animating, setAnimating] = useState<Record<number, boolean>>({});
+  const [study,    setStudy]    = useState(false);
   const [studyIdx, setStudyIdx] = useState(0);
+  const [direction, setDirection] = useState<'next'|'prev'>('next');
+  const [sliding,  setSliding]  = useState(false);
 
   const add = () => onChange([...cards, { q: '', a: '' }]);
   const update = (i: number, field: 'q'|'a', val: string) => {
-    const next = cards.map((c, idx) => idx === i ? { ...c, [field]: val } : c);
-    onChange(next);
+    onChange(cards.map((c, idx) => idx === i ? { ...c, [field]: val } : c));
   };
   const remove = (i: number) => onChange(cards.filter((_, idx) => idx !== i));
 
+  const flipCard = (idx: number) => {
+    if (animating[idx]) return;
+    setAnimating(p => ({ ...p, [idx]: true }));
+    setTimeout(() => {
+      setFlipped(p => ({ ...p, [idx]: !p[idx] }));
+      setAnimating(p => ({ ...p, [idx]: false }));
+    }, 150);
+  };
+
+  const navigate = (dir: 'next'|'prev') => {
+    if (sliding) return;
+    setDirection(dir);
+    setSliding(true);
+    setTimeout(() => {
+      setStudyIdx(p => dir === 'next' ? Math.min(cards.length-1, p+1) : Math.max(0, p-1));
+      setFlipped({});
+      setSliding(false);
+    }, 200);
+  };
+
+  // ── Study Mode ──────────────────────────────────────────────
   if (study && cards.length > 0) {
     const card = cards[studyIdx];
+    const palette = CARD_PALETTES[studyIdx % CARD_PALETTES.length];
+    const isFlipped = !!flipped[studyIdx];
+    const isAnim    = !!animating[studyIdx];
+
     return (
-      <div className="flex flex-col items-center justify-center flex-1 gap-6 p-6">
-        <div className="flex items-center justify-between w-full max-w-lg">
-          <button onClick={() => setStudy(false)} className="text-slate-400 hover:text-white text-sm flex items-center gap-1"><ArrowLeft className="w-4 h-4" /> Exit Study</button>
-          <span className="text-xs text-slate-500">{studyIdx + 1} / {cards.length}</span>
+      <div className="flex flex-col flex-1 overflow-hidden" style={{ background: 'linear-gradient(135deg, #0a0a1a 0%, #0d0d20 100%)' }}>
+        {/* Ambient glow */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          <div className="absolute top-1/4 left-1/4 w-64 h-64 rounded-full blur-[80px] opacity-20"
+            style={{ background: palette.accent }} />
         </div>
-        <div className="w-full max-w-lg">
-          <div onClick={() => setFlipped(p => ({ ...p, [studyIdx]: !p[studyIdx] }))}
-            className="cursor-pointer rounded-2xl border border-white/15 bg-white/[0.04] p-8 text-center min-h-[180px] flex flex-col items-center justify-center gap-3 hover:border-white/25 transition-all select-none">
-            <span className="text-[10px] text-slate-500 uppercase tracking-widest">
-              {flipped[studyIdx] ? 'Answer' : 'Question'} — tap to flip
-            </span>
-            <p className="text-white text-lg font-medium leading-relaxed">
-              {flipped[studyIdx] ? card.a : card.q}
-            </p>
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 pt-4 pb-2 relative z-10">
+          <button onClick={() => { setStudy(false); setFlipped({}); setStudyIdx(0); }}
+            className="flex items-center gap-1.5 text-slate-400 hover:text-white text-xs transition-colors group">
+            <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition-transform" /> Exit
+          </button>
+          <div className="flex items-center gap-2">
+            {cards.map((_, i) => (
+              <button key={i} onClick={() => { setStudyIdx(i); setFlipped({}); }}
+                className="transition-all duration-300 rounded-full"
+                style={{
+                  width: i === studyIdx ? 20 : 6,
+                  height: 6,
+                  background: i === studyIdx ? palette.accent : 'rgba(255,255,255,0.15)',
+                }} />
+            ))}
           </div>
+          <span className="text-xs font-mono text-slate-500">{studyIdx + 1} / {cards.length}</span>
         </div>
-        <div className="flex gap-3">
-          <button onClick={() => { setStudyIdx(p => Math.max(0, p-1)); setFlipped({}); }}
-            disabled={studyIdx === 0}
-            className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-slate-400 text-sm disabled:opacity-30 hover:text-white transition-colors">← Prev</button>
-          <button onClick={() => { setStudyIdx(p => Math.min(cards.length-1, p+1)); setFlipped({}); }}
-            disabled={studyIdx === cards.length-1}
-            className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-slate-400 text-sm disabled:opacity-30 hover:text-white transition-colors">Next →</button>
+
+        {/* Card */}
+        <div className="flex-1 flex flex-col items-center justify-center px-5 relative z-10">
+          <div
+            style={{ perspective: '1000px', width: '100%', maxWidth: 480 }}
+            onClick={() => flipCard(studyIdx)}>
+            <div style={{
+              position: 'relative',
+              width: '100%',
+              minHeight: 240,
+              transformStyle: 'preserve-3d',
+              transform: isAnim
+                ? (isFlipped ? 'rotateY(-90deg)' : 'rotateY(90deg)')
+                : 'rotateY(0deg)',
+              transition: 'transform 0.15s cubic-bezier(0.4,0,0.2,1)',
+              cursor: 'pointer',
+            }}>
+              <div className={`absolute inset-0 rounded-2xl border bg-gradient-to-br ${palette.bg} ${palette.border} p-6 flex flex-col items-center justify-center gap-3 select-none`}
+                style={{ backfaceVisibility: 'hidden' }}>
+                {/* Decorative corner dots */}
+                <div className="absolute top-3 left-3 w-2 h-2 rounded-full opacity-40" style={{ background: palette.accent }} />
+                <div className="absolute top-3 right-3 w-2 h-2 rounded-full opacity-40" style={{ background: palette.accent }} />
+                <div className="absolute bottom-3 left-3 w-2 h-2 rounded-full opacity-40" style={{ background: palette.accent }} />
+                <div className="absolute bottom-3 right-3 w-2 h-2 rounded-full opacity-40" style={{ background: palette.accent }} />
+
+                <span className={`text-[9px] font-bold uppercase tracking-[0.2em] px-2.5 py-1 rounded-full ${palette.label}`}>
+                  {isFlipped ? '✓ Answer' : '? Question'}
+                </span>
+                <p className="text-white text-base font-medium text-center leading-relaxed">
+                  {isFlipped ? card.a : card.q}
+                </p>
+                <span className="text-[10px] text-white/30 mt-2">tap to flip</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Know it / Still learning */}
+          {isFlipped && (
+            <div className="flex gap-3 mt-4 w-full max-w-[480px]">
+              <button onClick={() => navigate('next')} disabled={studyIdx === cards.length-1}
+                className="flex-1 py-2.5 rounded-xl text-xs font-semibold border transition-all disabled:opacity-30"
+                style={{ background: 'rgba(52,211,153,0.1)', borderColor: 'rgba(52,211,153,0.3)', color: '#34d399' }}>
+                ✓ Got it!
+              </button>
+              <button onClick={() => navigate('prev')} disabled={studyIdx === 0}
+                className="flex-1 py-2.5 rounded-xl text-xs font-semibold border transition-all disabled:opacity-30"
+                style={{ background: 'rgba(251,113,133,0.1)', borderColor: 'rgba(251,113,133,0.3)', color: '#fb7185' }}>
+                ↩ Review again
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Nav arrows */}
+        <div className="flex justify-center gap-4 pb-5 relative z-10">
+          <button onClick={() => navigate('prev')} disabled={studyIdx === 0}
+            className="px-5 py-2 rounded-xl text-xs font-medium border border-white/10 bg-white/5 text-slate-400 disabled:opacity-20 hover:text-white hover:bg-white/10 transition-all">
+            ← Prev
+          </button>
+          <button onClick={() => navigate('next')} disabled={studyIdx === cards.length-1}
+            className="px-5 py-2 rounded-xl text-xs font-medium border border-white/10 bg-white/5 text-slate-400 disabled:opacity-20 hover:text-white hover:bg-white/10 transition-all">
+            Next →
+          </button>
         </div>
       </div>
     );
   }
 
+  // ── Edit / List View ─────────────────────────────────────────
   return (
-    <div className="flex-1 overflow-y-auto p-4 space-y-3">
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-xs text-slate-500">{cards.length} flashcard{cards.length !== 1 ? 's' : ''}</span>
+    <div className="flex-1 overflow-y-auto p-4">
+      {/* Header bar */}
+      <div className="flex items-center justify-between mb-4">
+        <span className="text-xs text-slate-500 font-medium">
+          {cards.length} {cards.length !== 1 ? 'flashcards' : 'flashcard'}
+        </span>
         <div className="flex gap-2">
           {cards.length > 0 && (
             <button onClick={() => { setStudy(true); setStudyIdx(0); setFlipped({}); }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-500/15 border border-purple-500/25 text-purple-300 text-xs hover:bg-purple-500/25 transition-all">
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all"
+              style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.25), rgba(168,85,247,0.15))', border: '1px solid rgba(139,92,246,0.4)', color: '#c4b5fd' }}>
               <Brain className="w-3.5 h-3.5" /> Study Mode
             </button>
           )}
           {canEdit && (
             <button onClick={add}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-500/15 border border-blue-500/25 text-blue-300 text-xs hover:bg-blue-500/25 transition-all">
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all"
+              style={{ background: 'linear-gradient(135deg, rgba(59,130,246,0.25), rgba(99,102,241,0.15))', border: '1px solid rgba(59,130,246,0.4)', color: '#93c5fd' }}>
               <Plus className="w-3.5 h-3.5" /> Add Card
             </button>
           )}
         </div>
       </div>
-      {cards.map((card, i) => (
-        <div key={i} className="rounded-xl border border-white/10 bg-white/[0.02] p-3 space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] text-slate-600 font-medium uppercase tracking-wide">Card {i+1}</span>
-            {canEdit && <button onClick={() => remove(i)} className="text-slate-600 hover:text-red-400 transition-colors"><X className="w-3.5 h-3.5" /></button>}
-          </div>
-          <div className="space-y-1.5">
-            <input value={card.q} onChange={e => update(i,'q',e.target.value)} disabled={!canEdit}
-              placeholder="Question…"
-              className="w-full bg-transparent border-b border-white/8 text-sm text-white placeholder-slate-600 pb-1 outline-none focus:border-blue-500/40 disabled:cursor-default" />
-            <input value={card.a} onChange={e => update(i,'a',e.target.value)} disabled={!canEdit}
-              placeholder="Answer…"
-              className="w-full bg-transparent border-b border-white/8 text-sm text-slate-300 placeholder-slate-600 pb-1 outline-none focus:border-green-500/40 disabled:cursor-default" />
-          </div>
-        </div>
-      ))}
+
+      {/* Card grid */}
+      <div className="space-y-3">
+        {cards.map((card, i) => {
+          const p = CARD_PALETTES[i % CARD_PALETTES.length];
+          const isF = !!flipped[i];
+          const isA = !!animating[i];
+          return (
+            <div key={i} className={`rounded-2xl border bg-gradient-to-br ${p.bg} ${p.border} overflow-hidden`}>
+              {/* Card number badge */}
+              <div className="flex items-center justify-between px-4 pt-3 pb-1">
+                <span className={`text-[9px] font-bold uppercase tracking-[0.15em] px-2 py-0.5 rounded-full ${p.label}`}>
+                  Card {i + 1}
+                </span>
+                {canEdit && (
+                  <button onClick={() => remove(i)}
+                    className="text-slate-600 hover:text-red-400 transition-colors p-1 rounded-lg hover:bg-red-400/10">
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+
+              {/* Flip preview (click to flip in list too) */}
+              <div className="px-4 pb-1 pt-1" style={{ perspective: '600px' }}>
+                <div
+                  onClick={() => !canEdit && flipCard(i)}
+                  style={{
+                    transformStyle: 'preserve-3d',
+                    transform: isA ? (isF ? 'rotateX(-90deg)' : 'rotateX(90deg)') : 'rotateX(0deg)',
+                    transition: 'transform 0.15s ease',
+                    cursor: !canEdit ? 'pointer' : 'default',
+                  }}>
+                  {canEdit ? (
+                    <div className="space-y-2 pb-3">
+                      <div>
+                        <label className="text-[9px] uppercase tracking-widest font-bold mb-1 block" style={{ color: p.accent }}>Q</label>
+                        <input value={card.q} onChange={e => update(i,'q',e.target.value)}
+                          placeholder="Type your question…"
+                          className="w-full bg-black/20 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-white/30 transition-colors" />
+                      </div>
+                      <div>
+                        <label className="text-[9px] uppercase tracking-widest font-bold mb-1 block" style={{ color: p.accent }}>A</label>
+                        <input value={card.a} onChange={e => update(i,'a',e.target.value)}
+                          placeholder="Type the answer…"
+                          className="w-full bg-black/20 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-white/30 transition-colors" />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="pb-3 text-center">
+                      <p className="text-[9px] uppercase tracking-widest font-bold mb-1.5" style={{ color: p.accent }}>
+                        {isF ? 'Answer' : 'Question'}
+                      </p>
+                      <p className="text-white text-sm font-medium">{isF ? card.a : card.q}</p>
+                      <p className="text-[9px] text-white/25 mt-2">tap to flip</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
       {cards.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-12 text-center gap-3">
-          <Brain className="w-10 h-10 text-purple-400/40" />
-          <p className="text-slate-500 text-sm">No flashcards yet</p>
-          {canEdit && <button onClick={add} className="text-blue-400 text-sm hover:text-blue-300">+ Add first card</button>}
+        <div className="flex flex-col items-center justify-center py-16 text-center gap-4">
+          <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl"
+            style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.2), rgba(59,130,246,0.1))', border: '1px solid rgba(139,92,246,0.25)' }}>
+            🃏
+          </div>
+          <div>
+            <p className="text-white/60 text-sm font-medium">No flashcards yet</p>
+            <p className="text-white/25 text-xs mt-0.5">Add your first card to start studying</p>
+          </div>
+          {canEdit && (
+            <button onClick={add}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all"
+              style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.3), rgba(59,130,246,0.2))', border: '1px solid rgba(139,92,246,0.4)', color: '#c4b5fd' }}>
+              <Plus className="w-4 h-4" /> Add first card
+            </button>
+          )}
         </div>
       )}
     </div>
