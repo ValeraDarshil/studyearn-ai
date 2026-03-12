@@ -17,27 +17,15 @@
  */
 
 import express from 'express';
-import jwt from 'jsonwebtoken';
 import { Note } from '../models/Note.model.js';
 import { User } from '../models/User.model.js';
 import { Activity } from '../models/Activity.model.js';
 import { connectDB } from '../config/db.js';
 import { solveText } from '../services/aiService.js';
+import { authenticate } from '../middleware/authMiddleware.js';
 import { v4 as uuid } from 'uuid';
 
 const router = express.Router();
-const JWT_SECRET = process.env.JWT_SECRET!;
-
-function authenticate(req: any, res: any, next: any) {
-  const auth = req.headers.authorization;
-  if (!auth?.startsWith('Bearer ')) return res.status(401).json({ success: false, message: 'No token' });
-  try {
-    const d: any = jwt.verify(auth.slice(7), JWT_SECRET);
-    req.userId = d.userId || d.id || d._id;
-    next();
-  } catch { res.status(401).json({ success: false, message: 'Invalid token' }); }
-}
-
 function genCode(): string { return Math.random().toString(36).slice(2, 8).toUpperCase(); }
 
 function canView(note: any, userId: string) {
