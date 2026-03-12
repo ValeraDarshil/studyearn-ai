@@ -136,40 +136,22 @@ export function DailyChallenge() {
       .finally(() => setFetching(false));
   }, []);
 
-  // ── Load today's challenge question ───────────────────────
+  // ── Load today's challenge question — server generates, NO quota used ──
   const loadChallenge = async () => {
     setLoading(true); setError("");
-    const prompt = `Generate 1 challenging MCQ about ${todayTopic.topic} for Indian students preparing for competitive exams.
-
-Format EXACTLY:
-[question text - make it genuinely challenging and interesting]
-A) [option]
-B) [option]  
-C) [option]
-D) [option]
-Answer: [A/B/C/D]
-Explanation: [clear 1-2 sentence explanation of why the answer is correct]
-
-Make the question thought-provoking, not trivial.`;
-
     try {
-      const res  = await fetch(`${API_URL}/api/ai/ask`, {
-        method: "POST", headers: authHeaders(), body: JSON.stringify({ prompt }),
+      const res  = await fetch(`${API_URL}/api/user/daily-challenge/generate`, {
+        method:  "POST",
+        headers: authHeaders(),
+        body:    JSON.stringify({
+          subject: todayTopic.subject,
+          topic:   todayTopic.topic,
+          pts:     todayTopic.pts,
+        }),
       });
       const data = await res.json();
-      if (!data.success) throw new Error("AI error");
-
-      const parsed = parseMCQ(data.answer);
-      if (!parsed) throw new Error("Could not generate question. Please try again.");
-
-      const ch: ChallengeData = { date: todayKey, ...parsed, subject: todayTopic.subject, pts: todayTopic.pts };
-
-      // Save to server
-      await fetch(`${API_URL}/api/user/daily-challenge`, {
-        method: "POST", headers: authHeaders(), body: JSON.stringify({ challenge: ch }),
-      });
-
-      setChallenge(ch);
+      if (!data.success) throw new Error(data.message || "Could not generate question. Please try again.");
+      setChallenge(data.challenge);
     } catch (err: any) {
       setError(err.message || "Something went wrong. Try again.");
     } finally {

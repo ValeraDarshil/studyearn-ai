@@ -24,6 +24,7 @@ import jwt from 'jsonwebtoken';
 import { User } from './models/User.model.js';
 import { Activity } from './models/Activity.model.js';
 import { connectDB } from './config/db.js';
+import { solveText } from './services/aiService.js';
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET!;
@@ -141,7 +142,7 @@ router.get('/activity', authenticate, async (req: any, res) => {
   try {
     await connectDB();
     // 50 activities — enough for 7-day weekly chart + 30-day challenge stats in Analytics
-    const activities = await Activity.find({ userId: req.userId }).sort({ timestamp: -1 }).limit(50).lean();
+    const activities = await Activity.find({ userId: req.userId }).sort({ timestamp: -1 }).limit(200).lean();
     res.json({ success: true, activities });
   } catch (error) {
     console.error('Get activity error:', error);
@@ -405,6 +406,72 @@ router.get('/daily-challenge', authenticate, async (req: any, res) => {
   }
 });
 
+// POST /api/user/daily-challenge/generate  — AI generates challenge (NO quota used)
+router.post('/daily-challenge/generate', authenticate, async (req: any, res) => {
+  try {
+    await connectDB();
+    const todayKey = new Date().toISOString().split('T')[0];
+    const user = await User.findById(req.userId).lean() as any;
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    // If already generated today, return existing (idempotent)
+    const dc = user.dailyChallenge || {};
+    if (dc.date === todayKey && dc.challenge) {
+      return res.json({ success: true, challenge: dc.challenge, cached: true });
+    }
+
+    const { subject, topic, pts } = req.body;
+    if (!subject || !topic) return res.status(400).json({ success: false, message: 'subject and topic required' });
+
+    const prompt = `Generate 1 challenging MCQ about ${topic} for Indian students preparing for competitive exams.
+
+Format EXACTLY:
+[question text - make it genuinely challenging and interesting]
+A) [option]
+B) [option]
+C) [option]
+D) [option]
+Answer: [A/B/C/D]
+Explanation: [clear 1-2 sentence explanation of why the answer is correct]
+
+Make the question thought-provoking, not trivial.`;
+
+    const raw = await solveText(prompt, []);
+
+    // Parse MCQ
+    const lines = raw.split('\n').map((l: string) => l.trim()).filter(Boolean);
+    const qLine = lines[0] || '';
+    const opts  = ['A','B','C','D'].map(l => {
+      const found = lines.find((ln: string) => ln.match(new RegExp(`^${l}[)\.]\s`)));
+      return found ? found.replace(/^[A-D][).]\s*/, '') : '';
+    });
+    const ansLine = lines.find((l: string) => l.toLowerCase().startsWith('answer:')) || '';
+    const ansLetter = ansLine.replace(/answer:\s*/i, '').trim().toUpperCase().charAt(0);
+    const ansIdx = ['A','B','C','D'].indexOf(ansLetter);
+    const expLine = lines.find((l: string) => l.toLowerCase().startsWith('explanation:')) || '';
+    const explanation = expLine.replace(/explanation:\s*/i, '').trim();
+
+    if (!qLine || opts.some((o: string) => !o) || ansIdx === -1) {
+      return res.status(500).json({ success: false, message: 'Could not parse AI response. Try again.' });
+    }
+
+    const challenge = {
+      date: todayKey, question: qLine, options: opts,
+      answer: ansIdx, explanation, subject, pts: pts || 25,
+    };
+
+    // Save challenge to DB (no result yet)
+    const userDoc = await User.findById(req.userId) as any;
+    const existingResult = userDoc.dailyChallenge?.date === todayKey ? (userDoc.dailyChallenge?.result || null) : null;
+    userDoc.dailyChallenge = { date: todayKey, challenge, result: existingResult };
+    await userDoc.save();
+
+    res.json({ success: true, challenge });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message || 'Server error' });
+  }
+});
+
 // POST /api/user/daily-challenge  — save generated question
 router.post('/daily-challenge', authenticate, async (req: any, res) => {
   try {
@@ -467,7 +534,14 @@ router.post('/daily-challenge/result', authenticate, async (req: any, res) => {
     user.points  = (user.points  || 0) + ptsEarned;
     user.totalXP = (user.totalXP || 0) + ptsEarned;
     user.dailyChallenge = { ...dc, result };
-    await user.save();
+
+    // Save challengeHistory for 7-day tracker (single save)
+    const histEntry = { date: todayKey, completed: true, correct };
+    const existingHist: any[] = user.challengeHistory || [];
+    const filteredHist = existingHist.filter((h: any) => h.date !== todayKey);
+    user.challengeHistory = [...filteredHist, histEntry].slice(-30); // keep last 30 days
+
+    await user.save(); // single save — both dailyChallenge + challengeHistory
 
     await Activity.create({
       userId:       req.userId,
@@ -475,13 +549,6 @@ router.post('/daily-challenge/result', authenticate, async (req: any, res) => {
       details:      `Daily Challenge: ${challenge.subject} — ${correct ? 'Correct ✅' : 'Incorrect ❌'}`,
       pointsEarned: ptsEarned,
     });
-
-    // Save to challengeHistory for 7-day tracker
-    const histEntry = { date: todayKey, completed: true, correct };
-    const existingHist: any[] = user.challengeHistory || [];
-    const filteredHist = existingHist.filter((h: any) => h.date !== todayKey);
-    user.challengeHistory = [...filteredHist, histEntry].slice(-30); // keep last 30 days
-    await user.save();
 
     res.json({ success: true, result, ptsEarned });
   } catch (error) {

@@ -487,7 +487,7 @@ router.post('/login', authLimiter, validateLogin, async (req, res) => {
 
       && new Date((user as any).premiumExpiresAt) > new Date();
 
-    const dailyLimit = isPremiumNow ? 10 : 5;
+    const dailyLimit = isPremiumNow ? 30 : 15;
 
 
 
@@ -499,11 +499,11 @@ router.post('/login', authLimiter, validateLogin, async (req, res) => {
 
       await user.save();
 
-    } else if (isPremiumNow && user.questionsLeft < 10 && user.questionsLeft === 5) {
+    } else if (isPremiumNow && user.questionsLeft < 30 && user.questionsLeft === 15) {
 
       // Edge case: user just bought premium today — upgrade their quota immediately
 
-      user.questionsLeft = 10;
+      user.questionsLeft = 30;
 
       await user.save();
 
@@ -677,7 +677,7 @@ router.get('/me', async (req, res) => {
 
     const isPremiumActive = (user as any).isPremium === true;
 
-    const dailyLimit = isPremiumActive ? 10 : 5;
+    const dailyLimit = isPremiumActive ? 30 : 15;
 
 
 
@@ -691,11 +691,11 @@ router.get('/me', async (req, res) => {
 
       user.questionsDate = meToday;
 
-    } else if (isPremiumActive && user.questionsLeft <= 5 && user.questionsLeft === 5) {
+    } else if (isPremiumActive && user.questionsLeft <= 15 && user.questionsLeft === 15) {
 
       // Premium just bought today — bump their quota
 
-      user.questionsLeft = 10;
+      user.questionsLeft = 30;
 
     }
 
