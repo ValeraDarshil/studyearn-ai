@@ -464,6 +464,7 @@ Make the question thought-provoking, not trivial.`;
     const userDoc = await User.findById(req.userId) as any;
     const existingResult = userDoc.dailyChallenge?.date === todayKey ? (userDoc.dailyChallenge?.result || null) : null;
     userDoc.dailyChallenge = { date: todayKey, challenge, result: existingResult };
+    userDoc.markModified('dailyChallenge');
     await userDoc.save();
 
     res.json({ success: true, challenge });
@@ -488,6 +489,7 @@ router.post('/daily-challenge', authenticate, async (req: any, res) => {
     // Keep existing result if already answered today
     const existingResult = user.dailyChallenge?.date === todayKey ? (user.dailyChallenge?.result || null) : null;
     user.dailyChallenge  = { date: todayKey, challenge, result: existingResult };
+    user.markModified('dailyChallenge');
     await user.save();
     res.json({ success: true });
   } catch (error) {
@@ -541,6 +543,9 @@ router.post('/daily-challenge/result', authenticate, async (req: any, res) => {
     const filteredHist = existingHist.filter((h: any) => h.date !== todayKey);
     user.challengeHistory = [...filteredHist, histEntry].slice(-30); // keep last 30 days
 
+    // markModified required for Mongoose Mixed type fields — without this, changes are NOT saved
+    user.markModified('dailyChallenge');
+    user.markModified('challengeHistory');
     await user.save(); // single save — both dailyChallenge + challengeHistory
 
     await Activity.create({
