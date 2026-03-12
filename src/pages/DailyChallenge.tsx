@@ -26,7 +26,12 @@ function getTodaysTopic() {
 }
 
 function getTodayKey(): string {
-  return new Date().toISOString().split("T")[0];
+  // Use local date (IST) not UTC — prevents date mismatch at midnight
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm   = String(d.getMonth() + 1).padStart(2, "0");
+  const dd   = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
 }
 
 function authHeaders() {
@@ -192,7 +197,11 @@ export function DailyChallenge() {
   // ── Past 7 days — from server history ─────────────────────
   const past7 = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(); d.setDate(d.getDate() - (6 - i));
-    const key     = d.toISOString().split("T")[0];
+    // Use local date — consistent with getTodayKey() and server IST handling
+    const yyyy = d.getFullYear();
+    const mm   = String(d.getMonth() + 1).padStart(2, "0");
+    const dd   = String(d.getDate()).padStart(2, "0");
+    const key     = `${yyyy}-${mm}-${dd}`;
     const isToday = key === todayKey;
     // Use server history for past days, local result for today
     const h       = history[key];

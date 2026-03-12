@@ -29,6 +29,15 @@ import { solveText } from './services/aiService.js';
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET!;
 
+// IST-aware date key — avoids UTC midnight mismatch for Indian users
+function getISTDateKey(): string {
+  const now = new Date();
+  // IST = UTC + 5:30
+  const istOffset = 5.5 * 60 * 60 * 1000;
+  const istDate   = new Date(now.getTime() + istOffset);
+  return istDate.toISOString().split('T')[0];
+}
+
 // ─────────────────────────────────────────────────────────────
 // AUTH MIDDLEWARE
 // ─────────────────────────────────────────────────────────────
@@ -383,21 +392,47 @@ router.get('/daily-challenge', authenticate, async (req: any, res) => {
     const user = await User.findById(req.userId).lean() as any;
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
-    const todayKey = new Date().toISOString().split('T')[0];
+    const todayKey = getISTDateKey();
     const dc = user.dailyChallenge || {};
 
     const challenge = dc.date === todayKey ? (dc.challenge || null) : null;
     const result    = dc.date === todayKey ? (dc.result    || null) : null;
 
-    // Build past 7 days history map from challengeHistory array
+    // Build history map: start from challengeHistory array (persisted)
     const history: Record<string, { completed: boolean; correct: boolean }> = {};
+
+    // Layer 1: challengeHistory array (from markModified saves going forward)
     const histArr: any[] = user.challengeHistory || [];
-    // Also include today if completed
-    if (result?.completed) {
-      history[todayKey] = { completed: true, correct: !!result.correct };
-    }
     for (const h of histArr) {
       if (h.date) history[h.date] = { completed: !!h.completed, correct: !!h.correct };
+    }
+
+    // Layer 2: Backfill from Activity records (catches all historical data)
+    // This ensures history works even for challenges done before challengeHistory was tracked
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+    sevenDaysAgo.setHours(0, 0, 0, 0);
+
+    const recentChallenges = await Activity.find({
+      userId:    req.userId,
+      action:    'daily_challenge',
+      timestamp: { $gte: sevenDaysAgo },
+    }).sort({ timestamp: 1 }).lean() as any[];
+
+    for (const act of recentChallenges) {
+      // Convert activity timestamp to IST date key
+      const actTime   = new Date(act.timestamp).getTime() + (5.5 * 60 * 60 * 1000);
+      const dateKey   = new Date(actTime).toISOString().split('T')[0];
+      // Only set if not already in challengeHistory (don't overwrite)
+      if (!history[dateKey]) {
+        const correct = typeof act.details === 'string' && act.details.includes('Correct');
+        history[dateKey] = { completed: true, correct };
+      }
+    }
+
+    // Layer 3: Today's live result (most accurate)
+    if (result?.completed) {
+      history[todayKey] = { completed: true, correct: !!result.correct };
     }
 
     res.json({ success: true, challenge, result, todayKey, history });
@@ -410,7 +445,7 @@ router.get('/daily-challenge', authenticate, async (req: any, res) => {
 router.post('/daily-challenge/generate', authenticate, async (req: any, res) => {
   try {
     await connectDB();
-    const todayKey = new Date().toISOString().split('T')[0];
+    const todayKey = getISTDateKey();
     const user = await User.findById(req.userId).lean() as any;
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
@@ -503,7 +538,7 @@ router.post('/daily-challenge/result', authenticate, async (req: any, res) => {
   try {
     await connectDB();
     const { selectedIdx, challengeDate } = req.body;
-    const todayKey = new Date().toISOString().split('T')[0];
+    const todayKey = getISTDateKey();
 
     if (challengeDate !== todayKey)
       return res.status(400).json({ success: false, message: 'Challenge date mismatch' });
