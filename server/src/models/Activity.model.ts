@@ -15,14 +15,18 @@ const activitySchema = new mongoose.Schema({
       'ask_question',
       'generate_ppt',
       'convert_pdf',
-      'referral',      // ✅ ADDED
-      'streak_bonus',  // ✅ ADDED
-      'daily_login',      // ✅ ADDED
-      'quiz_completed',   // ✅ Quiz generator
-      'study_plan_created', // ✅ Study planner
-      'daily_challenge',  // ✅ Daily challenge
-      'pdf_tool',         // ✅ PDF tools
-      'ppt_generated',    // ✅ PPT generator
+      'referral',
+      'streak_bonus',
+      'daily_login',
+      'quiz_completed',
+      'study_plan_created',
+      'daily_challenge',
+      'pdf_tool',
+      'ppt_generated',
+      'note_created',     // ✅ Collab Notes
+      'note_shared',      // ✅ Collab Notes
+      'improve_notes',    // ✅ Study Tools
+      'analyze_pdf',      // ✅ Study Tools
     ],
   },
   details: {
