@@ -231,13 +231,13 @@ function FlashcardEditor({ cards, onChange, canEdit }: {
         </div>
 
         {/* Nav arrows */}
-        <div className="flex justify-center gap-4 pb-5 relative z-10">
+        <div className="flex justify-center gap-4 px-5 pb-6 pt-2 relative z-10">
           <button onClick={() => navigate('prev')} disabled={studyIdx === 0}
-            className="px-5 py-2 rounded-xl text-xs font-medium border border-white/10 bg-white/5 text-slate-400 disabled:opacity-20 hover:text-white hover:bg-white/10 transition-all">
+            className="px-8 py-2.5 rounded-xl text-sm font-medium border border-white/10 bg-white/5 text-slate-400 disabled:opacity-20 hover:text-white hover:bg-white/10 transition-all">
             ← Prev
           </button>
           <button onClick={() => navigate('next')} disabled={studyIdx === cards.length-1}
-            className="px-5 py-2 rounded-xl text-xs font-medium border border-white/10 bg-white/5 text-slate-400 disabled:opacity-20 hover:text-white hover:bg-white/10 transition-all">
+            className="px-8 py-2.5 rounded-xl text-sm font-medium border border-white/10 bg-white/5 text-slate-400 disabled:opacity-20 hover:text-white hover:bg-white/10 transition-all">
             Next →
           </button>
         </div>
