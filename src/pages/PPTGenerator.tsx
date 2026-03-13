@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import {
   Presentation, ExternalLink, Sparkles, Palette,
   GraduationCap, FileText, ChevronDown, CheckCircle,
-  RotateCcw, Check,
+  RotateCcw, Check, Pencil, Eye, EyeOff, X,
 } from "lucide-react";
 import { useApp } from "../context/AppContext";
 import { API_URL } from "../utils/api";
@@ -220,6 +220,13 @@ export function PPTGenerator() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
+  // ✅ Filename editing + slide preview
+  const [fileName, setFileName]               = useState("");
+  const [editingFileName, setEditingFileName] = useState(false);
+  const fileNameRef = useRef<HTMLInputElement>(null);
+  const [slidePreview, setSlidePreview]       = useState<{title: string; bullets: string[]}[]>([]);
+  const [showPreview, setShowPreview]         = useState(false);
+
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node))
@@ -406,6 +413,13 @@ Output the JSON array now:`;
       setDownloadUrl(url);
       setSlideCount(normalized.length);
       setGenerated(true);
+      // ✅ Set default filename from topic, build slide preview
+      setFileName(topic.trim().replace(/[^a-zA-Z0-9 _-]/g, '').trim() || 'presentation');
+      setShowPreview(false);
+      setSlidePreview(normalized.map((sl: any) => ({
+        title: sl.title.replace(/^[\u{1F000}-\u{1FFFF}\u{2600}-\u{27BF}✅❌💡⚡🌟🎯🔥💫🔬🎨📊📚🤖📈📱🏥🚗🌍🏙️💼🌱🚀🔍🤔]+\s*/gu, '').trim(),
+        bullets: sl.content.split('\n').filter((l: string) => l.trim()).map((l: string) => l.replace(/^[-•*]\s*/, '').trim()).slice(0, 4),
+      })));
       // ✅ Premium users get 1.5x — base 20 → 30 pts
       const pptPts = isPremium ? 40 : 20;
       addPoints(pptPts);
@@ -425,6 +439,7 @@ Output the JSON array now:`;
   const reset = () => {
     setGenerated(false); setTopic(""); setClassLevel("");
     setStyle("detailed"); setDownloadUrl(""); setError("");
+    setFileName(""); setSlidePreview([]); setShowPreview(false); setEditingFileName(false);
   };
 
   return (
@@ -442,33 +457,106 @@ Output the JSON array now:`;
 
       {generated ? (
         /* ── Success State ─────────────────────────────────────────────── */
-        <div className="glass rounded-2xl p-8 text-center space-y-5 border border-green-500/20 animate-slide-up">
-          <div className="relative w-20 h-20 mx-auto">
-            <div className="absolute inset-0 bg-green-500/20 rounded-full animate-pulse" />
-            <div className="relative w-20 h-20 rounded-full bg-green-500/10 border border-green-500/30 flex items-center justify-center">
-              <CheckCircle className="w-10 h-10 text-green-400" />
+        <div className="glass rounded-2xl p-6 border border-green-500/20 animate-slide-up space-y-5">
+
+          {/* Top — icon + title */}
+          <div className="text-center space-y-3 pt-2">
+            <div className="relative w-16 h-16 mx-auto">
+              <div className="absolute inset-0 bg-green-500/20 rounded-full animate-pulse" />
+              <div className="relative w-16 h-16 rounded-full bg-green-500/10 border border-green-500/30 flex items-center justify-center">
+                <CheckCircle className="w-8 h-8 text-green-400" />
+              </div>
+            </div>
+            <div>
+              <h3 className="text-xl font-bold text-white">Presentation Ready! 🎉</h3>
+              <p className="text-sm text-slate-400 mt-1">
+                {slideCount} slides · <span className="capitalize">{style}</span> style · {selectedLabel?.label}
+              </p>
+            </div>
+            <div className="inline-flex items-center gap-1 text-xs text-green-400 bg-green-400/10 px-3 py-1 rounded-full border border-green-400/20">
+              <Sparkles className="w-3 h-3" /> +{isPremium ? "40" : "20"} points earned
             </div>
           </div>
-          <div>
-            <h3 className="text-xl font-bold text-white">Presentation Ready! 🎉</h3>
-            <p className="text-sm text-slate-400 mt-1">
-              {slideCount} slides · <span className="capitalize">{style}</span> style · {selectedLabel?.label}
+
+          {/* ✅ Filename editor */}
+          <div className="glass rounded-xl p-4 border border-white/8">
+            <p className="text-xs font-semibold text-slate-400 mb-2 flex items-center gap-1.5">
+              <Pencil className="w-3 h-3 text-purple-400" /> File Name
             </p>
-            <p className="text-sm text-slate-400">"{topic}"</p>
+            {editingFileName ? (
+              <div className="flex items-center gap-2">
+                <input
+                  ref={fileNameRef}
+                  value={fileName}
+                  onChange={e => setFileName(e.target.value.replace(/[/\\:*?"<>|]/g, ''))}
+                  onKeyDown={e => { if (e.key === 'Enter' || e.key === 'Escape') setEditingFileName(false); }}
+                  onBlur={() => setEditingFileName(false)}
+                  className="flex-1 bg-white/5 border border-purple-500/40 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-400"
+                  placeholder="my-presentation"
+                  autoFocus
+                />
+                <span className="text-xs text-slate-500">.pptx</span>
+                <button onClick={() => setEditingFileName(false)} className="text-slate-500 hover:text-white">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => { setEditingFileName(true); setTimeout(() => fileNameRef.current?.select(), 50); }}
+                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-white/8 hover:border-purple-500/30 hover:bg-white/[0.03] transition-all group text-left"
+              >
+                <span className="flex-1 text-sm text-white font-medium truncate">{fileName || topic}.pptx</span>
+                <Pencil className="w-3.5 h-3.5 text-slate-600 group-hover:text-purple-400 transition-colors" />
+              </button>
+            )}
           </div>
-          <div className="inline-flex items-center gap-1 text-xs text-green-400 bg-green-400/10 px-3 py-1 rounded-full">
-            <Sparkles className="w-3 h-3" /> +25 points earned
+
+          {/* ✅ Slide preview toggle */}
+          <div>
+            <button
+              onClick={() => setShowPreview(v => !v)}
+              className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl border border-white/8 hover:border-white/15 hover:bg-white/[0.02] transition-all text-sm text-slate-400 hover:text-white"
+            >
+              <span className="flex items-center gap-2">
+                {showPreview ? <EyeOff className="w-4 h-4 text-purple-400" /> : <Eye className="w-4 h-4 text-purple-400" />}
+                {showPreview ? "Hide" : "Preview"} slide outline ({slideCount} slides)
+              </span>
+              <ChevronDown className={`w-4 h-4 transition-transform ${showPreview ? "rotate-180" : ""}`} />
+            </button>
+
+            {showPreview && (
+              <div className="mt-2 space-y-1.5 max-h-64 overflow-y-auto pr-1">
+                {slidePreview.map((sl, i) => (
+                  <div key={i} className="glass rounded-lg px-3 py-2.5 border border-white/5">
+                    <p className="text-xs font-bold text-white mb-1 flex items-center gap-2">
+                      <span className="w-5 h-5 rounded-full bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center text-[9px] font-black text-white flex-shrink-0">{i + 1}</span>
+                      {sl.title}
+                    </p>
+                    {sl.bullets.length > 0 && (
+                      <ul className="space-y-0.5 pl-7">
+                        {sl.bullets.map((b, j) => (
+                          <li key={j} className="text-[11px] text-slate-500 truncate">• {b}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
+
+          {/* Action buttons */}
+          <div className="flex flex-col sm:flex-row gap-3 pt-1">
             <a
-              href={downloadUrl} download={`${topic}.pptx`}
-              className="inline-flex items-center justify-center gap-2 px-8 py-3 rounded-xl bg-gradient-to-r from-purple-500 to-blue-600 text-white font-semibold text-sm hover:opacity-90 transition-opacity glow-btn"
+              href={downloadUrl}
+              download={`${(fileName || topic).trim() || 'presentation'}.pptx`}
+              className="flex-1 inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-purple-500 to-blue-600 text-white font-semibold text-sm hover:opacity-90 transition-opacity glow-btn"
             >
               <ExternalLink className="w-4 h-4" /> Download Presentation
             </a>
             <button onClick={reset}
-              className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl border border-white/10 text-slate-300 text-sm hover:bg-white/5 transition-colors">
-              <RotateCcw className="w-4 h-4" /> Generate Another
+              className="inline-flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl border border-white/10 text-slate-300 text-sm hover:bg-white/5 transition-colors">
+              <RotateCcw className="w-4 h-4" /> New Presentation
             </button>
           </div>
         </div>
