@@ -1,16 +1,26 @@
 import { useNavigate } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Sparkles, Brain, FileText, Presentation, Gift, ChevronRight, Star, Zap, Trophy, ArrowRight, Menu, X } from 'lucide-react';
-import { testimonials, leaderboardData } from '../data/mockData';
+import { testimonials } from '../data/mockData';
+
+const API_URL = import.meta.env.VITE_API_URL;
 
 export function LandingPage() {
   const navigate = useNavigate();
   const [mobileMenu, setMobileMenu] = useState(false);
-
+  // ✅ Real leaderboard data from API — no more fake mockData
+  const [liveLeaderboard, setLiveLeaderboard] = useState<any[]>([]);
   // ✅ FIXED: Redirect to signup instead of directly to app
   const handleGetStarted = () => {
     navigate('/signup');
   };
+  // ✅ Fetch real leaderboard data from API on mount
+  useEffect(() => {
+    fetch(`${API_URL}/api/leaderboard/top?limit=5`)
+      .then(r => r.json())
+      .then(d => { if (d.success && d.leaderboard?.length) setLiveLeaderboard(d.leaderboard); })
+      .catch(() => {});
+  }, []);
 
   return (
     <div className="min-h-screen animated-bg grid-bg relative overflow-hidden">
@@ -229,36 +239,51 @@ export function LandingPage() {
           </div>
 
           <div className="glass rounded-2xl p-6 border border-white/5">
-            <div className="space-y-3">
-              {leaderboardData.slice(0, 5).map((user, idx) => (
-                <div
-                  key={user.id}
-                  className={`flex items-center justify-between p-4 rounded-xl ${
-                    idx === 0 ? 'bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-yellow-500/20' :
-                    'bg-white/[0.02] border border-white/5'
-                  }`}
+            {liveLeaderboard.length === 0 ? (
+              // ✅ Empty state — no fake data, encourage signups
+              <div className="text-center py-8 space-y-3">
+                <Trophy className="w-10 h-10 text-yellow-400/40 mx-auto" />
+                <p className="text-slate-400 text-sm">Be the first to top the leaderboard!</p>
+                <button
+                  onClick={handleGetStarted}
+                  className="text-xs text-purple-400 hover:text-purple-300 underline underline-offset-2 transition-colors"
                 >
-                  <div className="flex items-center gap-4">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
-                      idx === 0 ? 'bg-yellow-500 text-black' :
-                      idx === 1 ? 'bg-slate-400 text-black' :
-                      idx === 2 ? 'bg-orange-600 text-white' :
-                      'bg-white/10 text-slate-400'
-                    }`}>
-                      {user.rank}
+                  Sign up and start earning points →
+                </button>
+              </div>
+            ) : (
+              // ✅ Real leaderboard data from API
+              <div className="space-y-3">
+                {liveLeaderboard.map((user, idx) => (
+                  <div
+                    key={user.id}
+                    className={`flex items-center justify-between p-4 rounded-xl ${
+                      idx === 0 ? 'bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-yellow-500/20' :
+                      'bg-white/[0.02] border border-white/5'
+                    }`}
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
+                        idx === 0 ? 'bg-yellow-500 text-black' :
+                        idx === 1 ? 'bg-slate-400 text-black' :
+                        idx === 2 ? 'bg-orange-600 text-white' :
+                        'bg-white/10 text-slate-400'
+                      }`}>
+                        {idx + 1}
+                      </div>
+                      <div>
+                        <div className="font-semibold text-white">{user.name}</div>
+                        <div className="text-xs text-slate-500">{user.streak ?? 0} day streak</div>
+                      </div>
                     </div>
-                    <div>
-                      <div className="font-semibold text-white">{user.name}</div>
-                      <div className="text-xs text-slate-500">{user.streak} day streak</div>
+                    <div className="flex items-center gap-2">
+                      <Zap className="w-4 h-4 text-yellow-400" />
+                      <span className="font-bold text-white">{user.points.toLocaleString()}</span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Zap className="w-4 h-4 text-yellow-400" />
-                    <span className="font-bold text-white">{user.points.toLocaleString()}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </section>

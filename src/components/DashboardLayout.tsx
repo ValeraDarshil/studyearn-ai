@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { Brain, Presentation, FileText, Gift, Trophy, User, LogOut, Sparkles, Zap, Menu, X, Flame as FlameIcon, BookOpen, HelpCircle, BarChart2, FlaskConical, ChevronRight, NotebookPen} from 'lucide-react';
+import { Brain, Presentation, FileText, Gift, Trophy, User, LogOut, Sparkles, Zap, Menu, X, Flame as FlameIcon, BookOpen, HelpCircle, BarChart2, FlaskConical, ChevronRight, NotebookPen, Users } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import Lottie from 'lottie-react';
 import streakAnimation from '../assets/animations/streak-fire.json';
@@ -30,12 +30,14 @@ export function DashboardLayout() {
     { icon: BookOpen,     label: 'Study Planner',   path: '/app/planner' },
     { icon: BarChart2,    label: 'Analytics',       path: '/app/analytics' },
     { icon: FlaskConical, label: 'Formula Sheet',   path: '/app/formulas' },
-    { icon: BookOpen,     label: 'AI Study Tools',        path: '/app/study-tools' },
-  { icon: NotebookPen, label: 'Collab Notes',           path: '/app/notes' },
+    { icon: BookOpen,     label: 'AI Study Tools',  path: '/app/study-tools' },
+    { icon: NotebookPen,  label: 'Collab Notes',    path: '/app/notes' },
     { icon: Presentation, label: 'PPT Generator',   path: '/app/ppt' },
     { icon: FileText,     label: 'PDF Tools',       path: '/app/pdf' },
     { icon: Gift,         label: 'My Points',       path: '/app/rewards' },
     { icon: Trophy,       label: 'Leaderboard',     path: '/app/leaderboard' },
+    // ✅ Refer Friends — now visible in sidebar
+    { icon: Users,        label: 'Refer Friends',   path: '/app/refer', badge: '+100 pts' },
     { icon: User,         label: 'Profile',         path: '/app/profile' },
   ];
 
@@ -80,20 +82,13 @@ export function DashboardLayout() {
           }
         }
 
-        /* Safe tap target size on mobile */
-        @media (max-width: 767px) {
-          button, a {
-            -webkit-tap-highlight-color: transparent;
-          }
-        }
-
         /* Smooth scrolling */
         * {
           -webkit-overflow-scrolling: touch;
         }
       `}</style>
 
-      {/* Mobile Sidebar Overlay — covers everything including bottom nav */}
+      {/* Mobile Sidebar Overlay */}
       {sidebarOpen && (
         <div
           className="fixed inset-0 bg-black/75 z-40 md:hidden"
@@ -164,13 +159,19 @@ export function DashboardLayout() {
                     <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-r-full bg-gradient-to-b from-blue-400 to-purple-500" />
                   )}
                   <item.icon className={`w-4 h-4 flex-shrink-0 transition-all duration-200 ${isActive ? 'text-blue-400' : 'group-hover/nav:text-white'}`} />
-                  <span className="truncate">{item.label}</span>
+                  <span className="truncate flex-1">{item.label}</span>
+                  {/* ✅ Refer Friends badge */}
+                  {'badge' in item && item.badge && !isActive && (
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-green-500/15 text-green-400 border border-green-500/20 flex-shrink-0">
+                      {item.badge}
+                    </span>
+                  )}
                 </>
               )}
             </NavLink>
           ))}
 
-          {/* Sign Out — inside scroll area so it's reachable */}
+          {/* Sign Out */}
           <div className="pt-2 mt-2 border-t border-white/8">
             <button
               onClick={handleLogout}
@@ -181,8 +182,6 @@ export function DashboardLayout() {
             </button>
           </div>
         </nav>
-
-
       </aside>
 
       {/* Main Content */}
@@ -199,7 +198,6 @@ export function DashboardLayout() {
             >
               <Menu className="w-5 h-5" />
             </button>
-            {/* Show brand on mobile topbar */}
             <span className="md:hidden text-sm font-bold text-white">
               StudyEarn <span className="gradient-text">AI</span>
             </span>
@@ -216,13 +214,13 @@ export function DashboardLayout() {
               </span>
             </div>
 
-            {/* Points — hidden on xs, show from sm */}
+            {/* Points */}
             <div className="hidden xs:flex items-center gap-1.5 px-2 py-1.5 rounded-lg glass border border-purple-500/20">
               <Gift className="w-3.5 h-3.5 text-purple-400 flex-shrink-0" />
               <span className="text-[11px] font-semibold text-purple-300 whitespace-nowrap">{points} pts</span>
             </div>
 
-            {/* Premium Badge — only if active */}
+            {/* Premium Badge */}
             {isPremium && (
               <div className="flex items-center gap-1 px-2 py-1.5 rounded-lg border border-yellow-500/40" style={{ background: 'rgba(234,179,8,0.1)' }}>
                 <span className="text-yellow-400 text-[11px]">⚡</span>
@@ -258,7 +256,7 @@ export function DashboardLayout() {
           </div>
         </div>
 
-        {/* Page Content — flex-1, scrollable for normal pages. AskAI uses absolute inset-0 to escape. */}
+        {/* Page Content */}
         <div
           className="flex-1 overflow-y-auto relative"
           style={{ paddingBottom: "calc(5rem + env(safe-area-inset-bottom))" }}
@@ -269,7 +267,7 @@ export function DashboardLayout() {
         </div>
       </main>
 
-      {/* Mobile Bottom Navigation — hidden when sidebar is open */}
+      {/* Mobile Bottom Navigation */}
       <nav
         className={`md:hidden fixed bottom-0 left-0 right-0 z-20 border-t border-white/8 transition-transform duration-300 ${sidebarOpen ? 'translate-y-full pointer-events-none' : 'translate-y-0'}`}
         style={{

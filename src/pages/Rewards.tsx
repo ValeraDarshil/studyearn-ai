@@ -342,7 +342,7 @@ export function Rewards() {
             <div className="rounded-2xl p-4 border border-yellow-500/30 bg-yellow-500/10 text-center animate-pulse">
               <div className="text-2xl mb-1">🎉</div>
               <p className="text-yellow-300 font-bold text-sm">Premium Activated!</p>
-              <p className="text-yellow-400/70 text-xs mt-0.5">Reload the page to see your 10 questions/day & 2× points!</p>
+              <p className="text-yellow-400/70 text-xs mt-0.5">Reload the page to see your 30 questions/day & 2× points!</p>
             </div>
           )}
 
@@ -354,7 +354,7 @@ export function Rewards() {
                 <p className="text-purple-300 font-bold text-sm">Premium Active</p>
                 <p className="text-purple-400/70 text-xs">
                   Expires: {premiumExpiresAt ? new Date(premiumExpiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—"}
-                  {" "}• 10 questions/day • 2× points ⚡
+                  {" "}• 30 questions/day • 2× points ⚡
                 </p>
               </div>
             </div>

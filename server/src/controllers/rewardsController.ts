@@ -15,11 +15,13 @@ import { logger } from '../utils/logger.js';
 // REWARD TIERS — single source of truth
 // ─────────────────────────────────────────────────────────────
 export const REWARD_TIERS = [
-  { id: 'tier_1000',  title: '7-Day Premium',     desc: '10 AI questions/day • 2× points & XP • Premium badge', pointsCost: 1000,  type: 'premium',  icon: '⚡', available: true  },
-  { id: 'tier_2500',  title: '₹10 Paytm Voucher', desc: 'UPI/Paytm cash voucher',                          pointsCost: 2500,  type: 'voucher',  icon: '💳', available: false },
-  { id: 'tier_5000',  title: '₹25 Amazon GC',     desc: 'Amazon India gift card',                           pointsCost: 5000,  type: 'giftcard', icon: '🎁', available: false },
-  { id: 'tier_10000', title: '₹50 Amazon GC',      desc: 'Amazon India gift card',                           pointsCost: 10000, type: 'giftcard', icon: '🎁', available: false },
-  { id: 'tier_25000', title: '₹150 Amazon GC',     desc: 'Amazon India gift card',                           pointsCost: 25000, type: 'giftcard', icon: '💎', available: false },
+  // ✅ tier_1000 — desc fixed: 30/day (premium actual limit), not 10
+  { id: 'tier_1000',  title: '7-Day Premium',       desc: '30 AI questions/day • 2× points & XP • Premium badge',      pointsCost: 1000,  type: 'premium',  icon: '⚡', available: true  },
+  // ✅ New in-app premium rewards — no paise, no external vouchers
+  { id: 'tier_2000',  title: 'Exclusive Avatar Pack', desc: 'Unlock 5 rare animated avatars for your profile',           pointsCost: 2000,  type: 'premium',  icon: '🎭', available: false },
+  { id: 'tier_3000',  title: '30-Day Premium',        desc: '30 AI questions/day • 2× points & XP • Premium badge',      pointsCost: 3000,  type: 'premium',  icon: '👑', available: false },
+  { id: 'tier_500',   title: 'Quiz Boost Day',         desc: 'Unlimited AI quizzes for 24 hours — test prep mode',        pointsCost: 500,   type: 'premium',  icon: '🧪', available: false },
+  { id: 'tier_5000',  title: '90-Day Premium',         desc: '3 months of 30 AI questions/day • 2× points — best value!', pointsCost: 5000,  type: 'premium',  icon: '💎', available: false },
 ];
 
 // ─────────────────────────────────────────────────────────────
@@ -101,13 +103,13 @@ export async function processPendingPremiums(): Promise<void> {
             (u as any).premiumExpiresAt   = expiry;
             (u as any).premiumActivatedAt = new Date();
 
-            // ✅ Turant questionsLeft = 10 kar do — user ko wait nahi karna chahiye
+            // ✅ Turant questionsLeft = 30 kar do (premium limit) — user ko wait nahi karna chahiye
             const today = new Date().toISOString().split('T')[0];
-            u.questionsLeft = 10;
+            u.questionsLeft = 30;
             u.questionsDate = today;
 
             await u.save();
-            logger.info(`Premium ACTIVATED for ${u.email} — expires ${expiry.toISOString()} | questionsLeft set to 10`);
+            logger.info(`Premium ACTIVATED for ${u.email} — expires ${expiry.toISOString()} | questionsLeft set to 30`);
           }
         }
       } catch (err: any) {
