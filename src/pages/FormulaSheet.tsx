@@ -3,12 +3,15 @@
  * Quick reference for Physics, Chemistry, Maths (Class 9–12 / CBSE)
  * Features: Search, Copy formula, Bookmark, Subject filter, Chapter filter
  */
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import {
   BookOpen, Search, Copy, Bookmark, BookmarkCheck,
   ChevronDown, ChevronUp, X, Zap, FlaskConical,
   Calculator, Atom, CheckCircle,
 } from "lucide-react";
+import { useApp } from "../context/AppContext";
+
+const API_URL = import.meta.env.VITE_API_URL;
 
 // ─────────────────────────────────────────────────────────────
 // DATA
@@ -281,6 +284,7 @@ const SUBJECTS: Subject[] = [
 // COMPONENT
 // ─────────────────────────────────────────────────────────────
 export function FormulaSheet() {
+  const { userId } = useApp();
   const [activeSubject, setActiveSubject]   = useState<string>("physics");
   const [activeChapter, setActiveChapter]   = useState<string>("all");
   const [search, setSearch]                 = useState("");
@@ -288,6 +292,39 @@ export function FormulaSheet() {
   const [copiedId, setCopiedId]             = useState<string | null>(null);
   const [expandedId, setExpandedId]         = useState<string | null>(null);
   const [showBookmarksOnly, setShowBookmarksOnly] = useState(false);
+  const [bookmarksLoaded, setBookmarksLoaded] = useState(false);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ── Load bookmarks from server on mount ──────────────────
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    fetch(`${API_URL}/api/user/formula-bookmarks`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(r => r.json())
+      .then(d => {
+        if (d.success && Array.isArray(d.bookmarks)) {
+          setBookmarks(new Set(d.bookmarks));
+        }
+      })
+      .catch(() => {})
+      .finally(() => setBookmarksLoaded(true));
+  }, []); // eslint-disable-line
+
+  // ── Debounced save — fires 600ms after last toggle ───────
+  const saveBookmarks = (next: Set<string>) => {
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      const token = localStorage.getItem("token");
+      if (!token) return;
+      fetch(`${API_URL}/api/user/formula-bookmarks`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ bookmarks: Array.from(next) }),
+      }).catch(() => {});
+    }, 600);
+  };
 
   const subject = SUBJECTS.find(s => s.id === activeSubject)!;
 
@@ -316,6 +353,7 @@ export function FormulaSheet() {
     setBookmarks(prev => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
+      saveBookmarks(next);
       return next;
     });
   };

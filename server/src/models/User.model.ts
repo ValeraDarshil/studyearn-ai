@@ -108,6 +108,10 @@ const userSchema = new mongoose.Schema({
   dailyChallenge:        { type: mongoose.Schema.Types.Mixed, default: null },
   challengeHistory:      { type: [mongoose.Schema.Types.Mixed], default: [] },
 
+  // ── Formula Sheet Bookmarks ───────────────────────────────
+  // Array of formula IDs e.g. ['p1', 'p2', 'c5'] — cross-device sync
+  formulaBookmarks: { type: [String], default: [] },
+
 });
 
 

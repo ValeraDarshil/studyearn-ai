@@ -615,4 +615,34 @@ router.post('/daily-challenge/result', authenticate, async (req: any, res) => {
   }
 });
 
+// ─────────────────────────────────────────────────────────────
+// FORMULA SHEET BOOKMARKS — cross-device sync
+// GET  /api/user/formula-bookmarks  → fetch saved bookmark IDs
+// POST /api/user/formula-bookmarks  → replace entire bookmark list
+// ─────────────────────────────────────────────────────────────
+router.get('/formula-bookmarks', authenticate, async (req: any, res) => {
+  try {
+    const user = await User.findById(req.userId).select('formulaBookmarks').lean() as any;
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+    res.json({ success: true, bookmarks: user.formulaBookmarks || [] });
+  } catch {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+router.post('/formula-bookmarks', authenticate, async (req: any, res) => {
+  try {
+    const { bookmarks } = req.body;
+    if (!Array.isArray(bookmarks)) {
+      return res.status(400).json({ success: false, message: 'bookmarks must be an array' });
+    }
+    // Sanitize: only strings, max 500 bookmarks
+    const clean = bookmarks.filter((b: any) => typeof b === 'string').slice(0, 500);
+    await User.findByIdAndUpdate(req.userId, { formulaBookmarks: clean });
+    res.json({ success: true, count: clean.length });
+  } catch {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 export default router;
