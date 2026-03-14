@@ -40,82 +40,75 @@ const DIFFICULTIES = [
 ];
 
 // ─────────────────────────────────────────────────────────────
-// PARSE AI response → Question[]
-// Strategy 1: JSON array (preferred — structured, reliable)
-// Strategy 2: Regex text parser (fallback)
+// PARSE AI response → Question[]  (bulletproof v2)
 // ─────────────────────────────────────────────────────────────
-
-/** Strategy 1: parse JSON array from AI response */
-function parseQuestionsJSON(text: string): Question[] | null {
-  const attempts = [
-    () => { const c = text.replace(/```json/gi,"").replace(/```/g,"").trim(); return JSON.parse(c); },
-    () => { const s=text.indexOf("["),e=text.lastIndexOf("]"); if(s===-1||e<=s) return null; return JSON.parse(text.slice(s,e+1)); },
-    () => { const f=text.replace(/,\s*]/g,"]").replace(/,\s*}/g,"}"); const s=f.indexOf("["),e=f.lastIndexOf("]"); if(s===-1||e<=s) return null; return JSON.parse(f.slice(s,e+1)); },
-  ];
-  for (const attempt of attempts) {
-    try {
-      const parsed = attempt();
-      if (!Array.isArray(parsed) || parsed.length < 3) continue;
-      const questions: Question[] = [];
-      for (const item of parsed) {
-        if (!item?.q || !Array.isArray(item.options) || item.options.length < 4) continue;
-        const answer = typeof item.answer === "number"
-          ? item.answer
-          : "ABCD".indexOf(String(item.answer ?? "A").toUpperCase().trim()[0] ?? "A");
-        questions.push({
-          q: String(item.q).trim(),
-          options: item.options.slice(0, 4).map((o: any) => String(o).trim()),
-          answer: Math.max(0, Math.min(3, answer)),
-          explanation: String(item.explanation || "See your textbook for details.").trim(),
-        });
-      }
-      if (questions.length >= 3) return questions.slice(0, 10);
-    } catch { continue; }
-  }
-  return null;
-}
-
-/** Strategy 2: regex text parser (fallback) */
-function parseQuestionsRegex(text: string): Question[] {
+function parseQuestions(text: string): Question[] {
   const questions: Question[] = [];
+
+  // Split into blocks on Q1. / Q2. / **1. / 1) patterns
   const blocks = text.split(/\n(?=\*{0,2}Q?\s*\d+[\.)\s])/i).filter(b => b.trim());
+
   for (const block of blocks) {
     try {
       const lines = block.trim().split("\n").map(l => l.trim()).filter(Boolean);
       if (lines.length < 5) continue;
-      const qLine = lines[0].replace(/^\*{0,2}Q?\s*\d+[\.)\s]+\*{0,2}\s*/i,"").replace(/\*+/g,"").trim();
+
+      // ── Question text ──────────────────────────────────────
+      // Remove leading Q1. / 1. / **1. prefixes
+      const qLine = lines[0]
+        .replace(/^\*{0,2}Q?\s*\d+[\.)\s]+\*{0,2}\s*/i, "")
+        .replace(/\*+/g, "")
+        .trim();
       if (!qLine) continue;
-      const optLines: { letter: string; text: string }[] = [];
-      lines.forEach(line => {
-        const m = line.replace(/\*+/g,"").match(/^\(?([A-D])[\.)\-\s]\s*(.+)/i);
-        if (m) optLines.push({ letter: m[1].toUpperCase(), text: m[2].trim() });
+
+      // ── Options A B C D ────────────────────────────────────
+      const opts: string[] = [];
+      const optLines: { letter: string; idx: number; text: string }[] = [];
+
+      lines.forEach((line, idx) => {
+        // Match: A) / A. / (A) / A - / **A)
+        const m = line.replace(/\*+/g, "").match(/^\(?([A-D])[\.)\-\s]\s*(.+)/i);
+        if (m) {
+          optLines.push({ letter: m[1].toUpperCase(), idx, text: m[2].trim() });
+        }
       });
+
       if (optLines.length < 4) continue;
-      optLines.sort((a,b) => "ABCD".indexOf(a.letter)-"ABCD".indexOf(b.letter));
-      const opts = optLines.map(o => o.text);
+      // Sort by A B C D order
+      optLines.sort((a, b) => "ABCD".indexOf(a.letter) - "ABCD".indexOf(b.letter));
+      optLines.forEach(o => opts.push(o.text));
+
+      // ── Answer — look for "Answer: B" or "Correct Answer: B" ──
+      // Find the EXACT answer line, then extract ONLY the letter right after colon
       let answerIdx = 0;
       for (const line of lines) {
-        if (!/^\*{0,2}(correct\s+)?answer\s*[:\-]/i.test(line.replace(/\*+/g,""))) continue;
-        const m = line.replace(/^.*?[:\-]\s*/i,"").trim().match(/^([A-D])/i);
-        if (m) { answerIdx = "ABCD".indexOf(m[1].toUpperCase()); break; }
+        // Must start with "answer" or "correct answer"
+        const isAnswerLine = /^\*{0,2}(correct\s+)?answer\s*[:\-]/i.test(line.replace(/\*+/g, ""));
+        if (!isAnswerLine) continue;
+
+        // Extract letter immediately after the colon/dash
+        const afterColon = line.replace(/^.*?[:\-]\s*/i, "").trim();
+        const letterMatch = afterColon.match(/^([A-D])/i);
+        if (letterMatch) {
+          answerIdx = "ABCD".indexOf(letterMatch[1].toUpperCase());
+          break;
+        }
       }
+
+      // ── Explanation ─────────────────────────────────────────
       let explanation = "See your textbook for details.";
       for (const line of lines) {
-        if (!/^\*{0,2}explanation\s*[:\-]/i.test(line.replace(/\*+/g,""))) continue;
-        const t = line.replace(/^.*?[:\-]\s*/i,"").trim();
-        if (t.length > 5) { explanation = t; break; }
+        const isExplLine = /^\*{0,2}explanation\s*[:\-]/i.test(line.replace(/\*+/g, ""));
+        if (!isExplLine) continue;
+        const text = line.replace(/^.*?[:\-]\s*/i, "").trim();
+        if (text.length > 5) { explanation = text; break; }
       }
+
       questions.push({ q: qLine, options: opts, answer: answerIdx, explanation });
     } catch { continue; }
   }
-  return questions.slice(0, 10);
-}
 
-/** Main parser — tries JSON first, falls back to regex */
-function parseQuestions(text: string): Question[] {
-  const fromJSON = parseQuestionsJSON(text);
-  if (fromJSON && fromJSON.length >= 3) return fromJSON;
-  return parseQuestionsRegex(text);
+  return questions.slice(0, 10);
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -145,49 +138,47 @@ export function QuizGenerator() {
     setState("loading");
 
     const token = localStorage.getItem("token");
-    // JSON prompt — structured, reliable parsing
-    const prompt = `You are a quiz generator. Output ONLY a valid JSON array. No explanation, no markdown, no text before or after. Start with [ and end with ].
+    const prompt = `Generate exactly 10 multiple choice questions about "${finalTopic}" at ${difficulty} difficulty level for Indian students (CBSE/ICSE).
 
-Generate 10 multiple choice questions about "${finalTopic}" at ${difficulty} difficulty for Indian students (CBSE/ICSE).
+STRICT FORMAT — follow this EXACTLY for every question, no deviation:
 
-Required JSON structure (10 objects):
-[
-  {
-    "q": "Question text here?",
-    "options": ["Option A text", "Option B text", "Option C text", "Option D text"],
-    "answer": 0,
-    "explanation": "One sentence explaining why option A is correct."
-  }
-]
+Q1. [question text here]
+A) [option 1]
+B) [option 2]
+C) [option 3]
+D) [option 4]
+Answer: [ONLY the letter A or B or C or D — nothing else on this line]
+Explanation: [one clear sentence explaining why the answer is correct]
 
-Rules:
-- "answer" is the 0-based index of the correct option (0=A, 1=B, 2=C, 3=D)
+Q2. [question text here]
+A) [option 1]
+B) [option 2]
+C) [option 3]
+D) [option 4]
+Answer: [ONLY the letter A or B or C or D]
+Explanation: [one clear sentence]
+
+Continue this EXACT format for Q3 through Q10.
+
+CRITICAL RULES:
+- The Answer line must contain ONLY the letter (A, B, C, or D) after "Answer: "
+- Make sure the correct answer actually matches the right option
+- Questions must be factually accurate — double-check before writing
 - All 4 options must be plausible but only one correct
-- Questions must be factually accurate for ${difficulty} level
-- Explanation must clearly state WHY the answer is correct
-- Output the JSON array now, nothing else`;
+- Do NOT add any text before Q1 or after Q10`;
 
     try {
-      let parsed: Question[] = [];
+      const res = await fetch(`${API_URL}/api/ai/ask`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ prompt }),
+      });
+      const data = await res.json();
 
-      // Up to 2 attempts — if JSON parse fails, retry with regex-friendly prompt
-      for (let attempt = 1; attempt <= 2 && parsed.length < 3; attempt++) {
-        const retryPrompt = attempt === 1 ? prompt : prompt.replace(
-          "Output ONLY a valid JSON array.",
-          "Output ONLY a valid JSON array. This is attempt 2 — ensure valid JSON."
-        );
+      if (!data.success) throw new Error(data.answer || "AI error");
 
-        const res = await fetch(`${API_URL}/api/ai/ask`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ prompt: retryPrompt }),
-        });
-        const data = await res.json();
-        if (!data.success) throw new Error(data.answer || "AI error");
-        parsed = parseQuestions(data.answer);
-      }
-
-      if (parsed.length < 3) throw new Error("Could not generate questions. Please try again.");
+      const parsed = parseQuestions(data.answer);
+      if (parsed.length < 3) throw new Error("Could not parse questions. Please try again.");
 
       useQuestion();
       setQuestions(parsed);
