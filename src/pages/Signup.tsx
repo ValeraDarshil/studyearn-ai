@@ -39,8 +39,13 @@ export function Signup() {
     setError("");
     setLoading(true);
 
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters");
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters");
+      setLoading(false);
+      return;
+    }
+    if (!/\d/.test(password)) {
+      setError("Password must contain at least one number (e.g. abc12345)");
       setLoading(false);
       return;
     }
@@ -94,8 +99,10 @@ export function Signup() {
         <div
           className="fixed top-6 right-4 z-[100] flex items-center gap-3 px-4 py-3 rounded-2xl border border-green-500/40 max-w-xs"
           style={{
-            background: "linear-gradient(135deg, rgba(10,17,40,0.97) 0%, rgba(5,30,20,0.97) 100%)",
-            boxShadow: "0 20px 60px rgba(0,0,0,0.6), 0 0 30px rgba(34,197,94,0.15)",
+            background:
+              "linear-gradient(135deg, rgba(10,17,40,0.97) 0%, rgba(5,30,20,0.97) 100%)",
+            boxShadow:
+              "0 20px 60px rgba(0,0,0,0.6), 0 0 30px rgba(34,197,94,0.15)",
             backdropFilter: "blur(20px)",
             animation: "slideInRight 0.4s cubic-bezier(0.34,1.56,0.64,1)",
           }}
@@ -251,7 +258,10 @@ export function Signup() {
 
           <div className="mt-6 text-center text-sm">
             <span className="text-slate-500">Already have an account? </span>
-            <Link to="/login" className="text-blue-400 hover:text-blue-300 font-medium">
+            <Link
+              to="/login"
+              className="text-blue-400 hover:text-blue-300 font-medium"
+            >
               Login
             </Link>
           </div>
@@ -260,7 +270,8 @@ export function Signup() {
         {/* Welcome Bonus Badge */}
         <div className="mt-4 text-center text-xs text-slate-600">
           <p>
-            🎁 Get {showReferralBonus ? "200" : "100"} points welcome bonus on signup!
+            🎁 Get {showReferralBonus ? "200" : "100"} points welcome bonus on
+            signup!
           </p>
         </div>
       </div>

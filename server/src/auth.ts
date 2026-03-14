@@ -190,11 +190,12 @@ router.post('/signup', authLimiter, validateSignup, async (req, res) => {
 
 
 
-    if (password.length < 6) {
-
-      return res.status(400).json({ success: false, message: 'Password must be 6+ characters' });
-
-    }
+    if (!password || password.length < 8 || !/\d/.test(password)) {
+  return res.status(400).json({
+    success: false,
+    message: 'Password must be at least 8 characters and contain at least one number',
+  });
+}
 
 
 
