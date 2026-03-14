@@ -116,7 +116,7 @@ async function openRouterText(userPrompt: string, history: ChatMessage[] = []): 
         headers: {
           'Content-Type':  'application/json',
           'Authorization': `Bearer ${OPENROUTER_KEY}`,
-          'HTTP-Referer':  process.env.FRONTEND_URL || 'https://studyearn-ai.vercel.app',
+          'HTTP-Referer':  process.env.FRONTEND_URL || "https://studyearnai.tech" ||'https://studyearn-ai.vercel.app',
           'X-Title':       'StudyEarn AI',
         },
         body: JSON.stringify({

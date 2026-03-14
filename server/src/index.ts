@@ -76,6 +76,8 @@ const PORT = process.env.PORT || 5000;
 
 /* ─── 5. CORS ───────────────────────────────────────────── */
 const ALLOWED_ORIGINS = [
+  "https://studyearnai.tech",
+  "https://www.studyearnai.tech",
   'http://localhost:5173',
   'http://localhost:5174',
   'https://studyearn-ai.vercel.app',
