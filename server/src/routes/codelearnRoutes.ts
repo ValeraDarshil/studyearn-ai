@@ -15,6 +15,7 @@ import {
   getAIExplain,
   runCode,
   getCertificate,
+  translateContent,
 } from '../controllers/codelearnController.js';
 
 const router = Router();
@@ -49,5 +50,8 @@ router.post('/run-code', codeRunLimiter, runCode);
 
 // Certificate
 router.get('/certificate/:language', getCertificate);
+
+// Content translation (EN/HI)
+router.post('/translate-content', codelearnAILimiter, translateContent);
 
 export default router;

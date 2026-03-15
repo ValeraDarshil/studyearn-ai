@@ -5,7 +5,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'https://studyearn-backend.onrender.com';
+const API_BASE = import.meta.env.VITE_API_URL || 'https://your-render-backend.onrender.com';
 
 export function useCodeLearn(language) {
   const [progress, setProgress] = useState(null);
@@ -137,6 +137,31 @@ export function useCodeLearn(language) {
     }
   }, [language]);
 
+
+  // Translate content — with localStorage cache
+  const translateContent = useCallback(async (sectionId, rawContent, targetLang) => {
+    if (targetLang === 'hi') return rawContent; // Hinglish is native
+
+    const cacheKey = `cl_trans_${sectionId}_${targetLang}`;
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) return cached; // Cache hit!
+
+    try {
+      const res = await axios.post(
+        `${API_BASE}/api/codelearn/translate-content`,
+        { content: rawContent, targetLang, sectionId },
+        { headers: headers() }
+      );
+      if (res.data.success) {
+        localStorage.setItem(cacheKey, res.data.translated);
+        return res.data.translated;
+      }
+    } catch (err) {
+      console.error('Translation error:', err);
+    }
+    return rawContent; // fallback to original
+  }, []);
+
   return {
     progress,
     loading,
@@ -149,6 +174,7 @@ export function useCodeLearn(language) {
     getExplanation,
     runCode,
     getCertificate,
+    translateContent,
     refresh: fetchProgress,
   };
 }

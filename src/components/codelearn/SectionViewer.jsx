@@ -283,7 +283,9 @@ export default function SectionViewer({
   const [xpToast, setXpToast] = useState(null);
   const [sectionDone, setSectionDone] = useState(isCompleted);
 
-  const { getHint, getExplanation, submitQuiz } = useCodeLearn(language);
+  const { getHint, getExplanation, submitQuiz, translateContent } = useCodeLearn(language);
+  const [translatedContent, setTranslatedContent] = useState(null);
+  const [translating, setTranslating] = useState(false);
 
   // Reset when section changes
   useEffect(() => {
@@ -295,6 +297,25 @@ export default function SectionViewer({
     setActiveTab('learn');
     setSectionDone(isCompleted);
   }, [section.id]);
+
+
+  // Translate content when EN is selected
+  useEffect(() => {
+    let cancelled = false;
+    if (lang === 'hi') {
+      setTranslatedContent(null); // use native
+      return;
+    }
+    // EN selected — translate
+    setTranslating(true);
+    translateContent(section.id, section.content, 'en').then(translated => {
+      if (!cancelled) {
+        setTranslatedContent(translated);
+        setTranslating(false);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [lang, section.id]);
 
   // Preload Skulpt in background when Code tab is opened
   useEffect(() => {
@@ -403,7 +424,14 @@ export default function SectionViewer({
         {/* LEARN TAB */}
         {activeTab === 'learn' && (
           <div className="max-w-3xl">
-            <ContentRenderer markdown={section.content} />
+            {translating ? (
+              <div className="flex items-center gap-2 text-gray-500 text-sm py-4">
+                <div className="w-4 h-4 border-2 border-violet-500/30 border-t-violet-500 rounded-full animate-spin" />
+                Translating to English...
+              </div>
+            ) : (
+              <ContentRenderer markdown={translatedContent || section.content} />
+            )}
             <div className="mt-8 pt-6 border-t border-white/5 flex items-center gap-4 flex-wrap">
               {!sectionDone ? (
                 <button onClick={handleMarkRead}

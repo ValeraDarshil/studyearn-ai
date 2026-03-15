@@ -528,3 +528,58 @@ async function issueCertificate(userId: string, language: string, totalXP: numbe
     logger.error('issueCertificate error:', err.message);
   }
 }
+
+// ─────────────────────────────────────────────────────────────
+// POST /api/codelearn/translate-content
+// Body: { content: string, targetLang: 'en' | 'hi' }
+// Groq se content translate karo (EN only — HI is native)
+// Frontend caches result in localStorage to avoid repeat calls
+// ─────────────────────────────────────────────────────────────
+export async function translateContent(req: Request, res: Response): Promise<Response> {
+  const { content, targetLang, sectionId } = req.body;
+
+  if (!content || !targetLang) {
+    return res.status(400).json({ success: false, message: 'content and targetLang required' });
+  }
+
+  // Hinglish is the native language — no translation needed
+  if (targetLang === 'hi') {
+    return res.json({ success: true, translated: content, cached: false });
+  }
+
+  try {
+    const prompt = `You are a technical content translator. Translate the following Python course content from Hinglish (Hindi-English mix) to clear, simple English.
+
+Rules:
+- Keep all code examples EXACTLY as-is (do not translate code)
+- Keep markdown formatting (##, ###, **, \`, lists) exactly the same
+- Keep all emoji as-is
+- Only translate the explanation text from Hinglish to English
+- Keep it beginner-friendly and clear
+- Do NOT add or remove any sections
+
+Content to translate:
+${content}
+
+Return ONLY the translated content, no preamble.`;
+
+    const response = await groq.chat.completions.create({
+      model: 'llama-3.3-70b-versatile',
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 2000,
+      temperature: 0.3,
+    });
+
+    const translated = response.choices[0]?.message?.content?.trim() || content;
+
+    return res.json({
+      success: true,
+      translated,
+      sectionId: sectionId || null,
+    });
+  } catch (err: any) {
+    logger.error('translateContent error:', err.message);
+    // Fallback: return original content if translation fails
+    return res.json({ success: true, translated: content, error: true });
+  }
+}
