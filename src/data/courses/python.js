@@ -1627,8 +1627,8 @@ print("Phones found:", phones)
   ],
 };
 
-// Import and merge Weeks 5-12
-import { PYTHON_WEEKS_5_TO_12 } from './python_weeks_5_12.js';
-PYTHON_COURSE.weeks = [...PYTHON_COURSE.weeks, ...PYTHON_WEEKS_5_TO_12];
+import { PYTHON_MONTH_2 } from './python_month2.js';
+import { PYTHON_MONTH_3 } from './python_month3.js';
+PYTHON_COURSE.weeks = [...PYTHON_COURSE.weeks, ...PYTHON_MONTH_2, ...PYTHON_MONTH_3];
 
 export default PYTHON_COURSE;
