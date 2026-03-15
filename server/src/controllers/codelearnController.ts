@@ -109,7 +109,11 @@ export async function getProgress(req: Request, res: Response): Promise<Response
       });
     }
 
-    if (!progress.certificateIssued && progress.currentWeek > TOTAL_WEEKS) {
+    // Certificate: issue when all 48 sections (12 weeks × 4 sections) are completed
+    // Count sections with quizScore >= 70 (actually passed)
+    const passedSections = progress.sections.filter((s: any) => s.quizScore !== null && s.quizScore !== undefined && s.quizScore >= 70).length;
+    const TOTAL_SECTIONS = 48; // 12 weeks × 4 sections
+    if (!progress.certificateIssued && passedSections >= TOTAL_SECTIONS) {
       await issueCertificate(userId, language, progress.totalXP);
       progress.certificateIssued   = true;
       progress.certificateIssuedAt = new Date();
@@ -236,8 +240,16 @@ export async function submitQuiz(req: Request, res: Response): Promise<Response>
       section.xpEarned   = (section.xpEarned || 0) + xpEarned;
       progress.totalXP  += xpEarned;
 
-      if (sectionNumber >= progress.currentSection && weekNumber >= progress.currentWeek) {
-        progress.currentSection = sectionNumber + 1;
+      // Advance current position tracking
+      if (weekNumber >= progress.currentWeek) {
+        if (sectionNumber >= progress.currentSection) {
+          progress.currentSection = sectionNumber + 1;
+        }
+        // If section 4 of any week is passed, advance to next week
+        if (sectionNumber >= 4) {
+          progress.currentWeek = Math.max(progress.currentWeek, weekNumber + 1);
+          progress.currentSection = 1;
+        }
       }
     } else if (passed) {
       section.quizScore = Math.max(section.quizScore || 0, percentScore);
@@ -385,12 +397,46 @@ export async function getCertificate(req: Request, res: Response): Promise<Respo
   const language = req.params.language as string;
 
   try {
-    const cert = await CodeCertificate.findOne({ userId, language });
+    // Check if already issued
+    let cert = await CodeCertificate.findOne({ userId, language });
+
+    // Auto-issue: check if student completed all 48 sections
     if (!cert) {
-      return res.status(404).json({
-        success: false,
-        message: 'Certificate not earned yet. Complete the full course!',
-      });
+      const progress = await CodeProgress.findOne({ userId, language });
+      if (progress) {
+        const completedCount = progress.sections.filter((s: any) => s.completed).length;
+        const passedCount    = progress.sections.filter(
+          (s: any) => s.quizScore != null && s.quizScore >= 70
+        ).length;
+
+        // Issue certificate if all 48 sections completed OR all 48 quizzes passed
+        if (completedCount >= 48 || passedCount >= 48) {
+          cert = (await issueCertificate(userId, language, progress.totalXP)) as any;
+          if (cert) {
+            await CodeProgress.updateOne(
+              { userId, language },
+              { certificateIssued: true, certificateIssuedAt: new Date() }
+            );
+          }
+        }
+
+        if (!cert) {
+          return res.status(404).json({
+            success: false,
+            message: 'Certificate not earned yet. Complete the full course!',
+            progress: {
+              sectionsCompleted: completedCount,
+              quizzesPassed:     passedCount,
+              totalNeeded:       48,
+            },
+          });
+        }
+      } else {
+        return res.status(404).json({
+          success: false,
+          message: 'No progress found. Start the course first!',
+        });
+      }
     }
 
     const user = await User.findById(userId).select('name email').lean();

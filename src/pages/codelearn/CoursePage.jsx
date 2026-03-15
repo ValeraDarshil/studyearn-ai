@@ -24,6 +24,12 @@ export default function CoursePage() {
   };
 
   const { progress, loading: progressLoading, isSectionCompleted, isSectionUnlocked, completeSection } = useCodeLearn(language);
+
+  // Check if a section's QUIZ was passed (score >= 70)
+  const isSectionQuizPassed = (sectionId) => {
+    const sec = progress?.sections?.find(s => s.sectionId === sectionId);
+    return sec ? (sec.quizScore !== null && sec.quizScore !== undefined && sec.quizScore >= 70) : false;
+  };
   const courseInfo = COURSE_REGISTRY.find(c => c.id === language);
 
   useEffect(() => {
@@ -241,7 +247,8 @@ export default function CoursePage() {
               courseInfo={courseInfo}
               weekNumber={selectedSection.weekNumber}
               section={selectedSection.section}
-              isCompleted={isSectionCompleted(selectedSection.section.id)}
+              isContentRead={isSectionCompleted(selectedSection.section.id)}
+              isQuizPassed={isSectionQuizPassed(selectedSection.section.id)}
               onComplete={completeSection}
               onNext={() => {
                 // Find and navigate to next section

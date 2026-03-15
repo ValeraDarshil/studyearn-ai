@@ -229,7 +229,10 @@ function XPToast({ xp, message, onClose }) {
 
 // ─── Main SectionViewer ────────────────────────────────────────
 export default function SectionViewer({
-  language, lang = 'en', courseInfo, weekNumber, section, isCompleted, onComplete, onNext
+  language, lang = 'en', courseInfo, weekNumber, section,
+  isContentRead: initContentRead = false,
+  isQuizPassed: initQuizPassed = false,
+  onComplete, onNext
 }) {
   const t = UI_TEXT[lang] || UI_TEXT.en;
 
@@ -250,8 +253,8 @@ export default function SectionViewer({
   // quizPassed: true only after scoring 70%+
   // showQuizModal: controls quiz modal visibility
   // quizResult: stores last quiz attempt result
-  const [contentRead, setContentRead] = useState(isCompleted);
-  const [quizPassed, setQuizPassed] = useState(isCompleted);
+  const [contentRead, setContentRead] = useState(initContentRead);
+  const [quizPassed, setQuizPassed] = useState(initQuizPassed);
   const [showQuizModal, setShowQuizModal] = useState(false);
   const [quizResult, setQuizResult] = useState(null); // null | { passed, percentScore, xpEarned }
 
@@ -265,10 +268,10 @@ export default function SectionViewer({
     setHint('');
     setExplanation('');
     setActiveTab('learn');
-    setContentRead(isCompleted);
-    setQuizPassed(isCompleted);
+    setContentRead(initContentRead);
+    setQuizPassed(initQuizPassed);
     setQuizResult(null);
-  }, [section.id, isCompleted]);
+  }, [section.id, initContentRead, initQuizPassed]);
 
   // Preload Skulpt when Code tab opens
   useEffect(() => {
