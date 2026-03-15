@@ -258,9 +258,13 @@ export default function SectionViewer({
   const [showQuizModal, setShowQuizModal] = useState(false);
   const [quizResult, setQuizResult] = useState(null); // null | { passed, percentScore, xpEarned }
 
-  const { getHint, getExplanation, submitQuiz } = useCodeLearn(language);
+  const { getHint, getExplanation, submitQuiz, isSectionCompleted, isSectionQuizPassed, progress } = useCodeLearn(language);
 
-  // Reset all state when section changes
+  // Derive from live progress — always accurate, no stale props
+  const isReadFromDB   = isSectionCompleted(section.id);
+  const isPassedFromDB = isSectionQuizPassed(section.id);
+
+  // Reset all state when section changes — use live DB values
   useEffect(() => {
     setUserCode(section.codeExample || '');
     setOutput('');
@@ -268,10 +272,15 @@ export default function SectionViewer({
     setHint('');
     setExplanation('');
     setActiveTab('learn');
-    setContentRead(initContentRead);
-    setQuizPassed(initQuizPassed);
     setQuizResult(null);
-  }, [section.id, initContentRead, initQuizPassed]);
+    // Don't reset contentRead/quizPassed here — let the sync effect below handle it
+  }, [section.id]);
+
+  // Sync contentRead + quizPassed from live progress DB whenever section or progress changes
+  useEffect(() => {
+    setContentRead(isReadFromDB);
+    setQuizPassed(isPassedFromDB);
+  }, [section.id, isReadFromDB, isPassedFromDB]);
 
   // Preload Skulpt when Code tab opens
   useEffect(() => {

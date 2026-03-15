@@ -248,13 +248,16 @@ export default function CoursePage() {
               isQuizPassed={isSectionQuizPassed(selectedSection.section.id)}
               onComplete={completeSection}
               onNext={() => {
-                // Find and navigate to next section
                 const currentWeek = courseData.weeks.find(w => w.week === selectedSection.weekNumber);
-                const currentIdx = currentWeek.sections.findIndex(s => s.id === selectedSection.section.id);
+                const currentIdx  = currentWeek.sections.findIndex(s => s.id === selectedSection.section.id);
+
                 if (currentIdx < currentWeek.sections.length - 1) {
-                  setSelectedSection({ weekNumber: currentWeek.week, section: currentWeek.sections[currentIdx + 1] });
+                  // Next section in same week
+                  const nextSection = currentWeek.sections[currentIdx + 1];
+                  setSelectedSection({ weekNumber: currentWeek.week, section: nextSection });
+                  setExpandedWeek(currentWeek.week);
                 } else {
-                  // Next week
+                  // Last section of week → move to next week
                   const nextWeek = courseData.weeks.find(w => w.week === selectedSection.weekNumber + 1);
                   if (nextWeek) {
                     setExpandedWeek(nextWeek.week);
