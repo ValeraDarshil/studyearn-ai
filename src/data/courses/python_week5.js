@@ -213,7 +213,7 @@ for num in test_numbers:
       task: {
         description: 'Email validator banao using regex. Valid email rules: (1) letters/numbers/dots/underscores before @, (2) domain name after @, (3) dot ke baad 2-4 letter extension (like .com, .in, .org). Test karo 5 valid aur 5 invalid emails ke saath!',
         expectedOutput: null,
-        hint: r'Pattern: r"^[\w\.-]+@[\w\.-]+\.[a-zA-Z]{2,4}$" — ^ start, $ end anchors use karo.',
+        hint: 'Pattern: r"^[\w\.-]+@[\w\.-]+\.[a-zA-Z]{2,4}$" — ^ start, $ end anchors use karo.',
       },
       quiz: [
         {
