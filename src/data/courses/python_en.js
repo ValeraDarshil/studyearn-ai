@@ -1630,7 +1630,7 @@ export function applyEnglishTranslations(courseWeeks, translationMap) {
       const trans = translationMap[section.id];
       if (!trans) return section;
 
-      // Patch quiz questions — add _en fields to each question
+      // 1. Patch quiz questions — add _en fields to each question
       let patchedQuiz = section.quiz;
       if (trans.quiz_en && Array.isArray(trans.quiz_en) && section.quiz) {
         patchedQuiz = section.quiz.map((q, i) => {
@@ -1645,13 +1645,24 @@ export function applyEnglishTranslations(courseWeeks, translationMap) {
         });
       }
 
-      // Merge everything — spread trans (gets title_en, content_en, codeExample_en, task_en)
-      // but use patchedQuiz (not quiz_en array directly)
-      const { quiz_en: _removed, ...transWithoutQuizEn } = trans;
+      // 2. Patch task — merge task_en.description and task_en.hint into task object
+      let patchedTask = section.task;
+      if (trans.task_en && section.task) {
+        patchedTask = {
+          ...section.task,
+          description_en: trans.task_en.description,
+          hint_en: trans.task_en.hint,
+        };
+      }
+
+      // 3. Spread all trans fields (title_en, content_en, codeExample_en)
+      // but exclude task_en and quiz_en (already handled above)
+      const { quiz_en: _q, task_en: _t, ...restTrans } = trans;
       return {
         ...section,
-        ...transWithoutQuizEn,
+        ...restTrans,
         quiz: patchedQuiz,
+        task: patchedTask,
       };
     }),
   }));
