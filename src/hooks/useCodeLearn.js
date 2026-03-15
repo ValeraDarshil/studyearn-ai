@@ -36,24 +36,29 @@ export function useCodeLearn(language) {
     return progress?.sections?.some(s => s.sectionId === sectionId && s.completed) || false;
   }, [progress]);
 
-  // Check if a section is unlocked (sequential unlock)
+  // Check if a section's quiz was passed (score >= 70)
+  const isSectionQuizPassed = useCallback((sectionId) => {
+    const sec = progress?.sections?.find(s => s.sectionId === sectionId);
+    return sec ? (sec.quizScore != null && sec.quizScore >= 70) : false;
+  }, [progress]);
+
+  // Check if a section is unlocked — ONLY after previous section's quiz is passed 70%+
   const isSectionUnlocked = useCallback((weekNumber, sectionIndex, sections) => {
     if (weekNumber === 1 && sectionIndex === 0) return true; // First section always unlocked
 
-    // Previous section must be complete
+    // Previous section's quiz must be PASSED (>=70%) to unlock next
     if (sectionIndex > 0) {
       const prevSection = sections[sectionIndex - 1];
-      return isSectionCompleted(prevSection.id);
+      return isSectionQuizPassed(prevSection.id);
     }
 
-    // First section of a new week — last section of prev week must be done
+    // First section of a new week — last section of prev week quiz must be passed
     if (weekNumber > 1) {
-      // Check if prev week's last section quiz was passed
       const prevWeekSections = progress?.sections?.filter(s => s.weekNumber === weekNumber - 1) || [];
-      return prevWeekSections.some(s => s.quizScore >= 70);
+      return prevWeekSections.some(s => s.quizScore != null && s.quizScore >= 70);
     }
     return false;
-  }, [progress, isSectionCompleted]);
+  }, [progress, isSectionQuizPassed]);
 
   // Mark section as complete
   const completeSection = useCallback(async (weekNumber, sectionNumber, sectionId) => {
@@ -167,6 +172,7 @@ export function useCodeLearn(language) {
     loading,
     error,
     isSectionCompleted,
+    isSectionQuizPassed,
     isSectionUnlocked,
     completeSection,
     submitQuiz,

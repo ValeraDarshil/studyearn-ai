@@ -23,13 +23,10 @@ export default function CoursePage() {
     localStorage.setItem('cl_lang', l);
   };
 
-  const { progress, loading: progressLoading, isSectionCompleted, isSectionUnlocked, completeSection } = useCodeLearn(language);
+  const { progress, loading: progressLoading, isSectionCompleted, isSectionQuizPassed: hookQuizPassed, isSectionUnlocked, completeSection } = useCodeLearn(language);
 
-  // Check if a section's QUIZ was passed (score >= 70)
-  const isSectionQuizPassed = (sectionId) => {
-    const sec = progress?.sections?.find(s => s.sectionId === sectionId);
-    return sec ? (sec.quizScore !== null && sec.quizScore !== undefined && sec.quizScore >= 70) : false;
-  };
+  // Use hook's quiz passed check
+  const isSectionQuizPassed = hookQuizPassed;
   const courseInfo = COURSE_REGISTRY.find(c => c.id === language);
 
   useEffect(() => {
@@ -65,7 +62,7 @@ export default function CoursePage() {
   if (!courseData) return null;
 
   const totalSections = courseData.weeks.reduce((sum, w) => sum + w.sections.length, 0);
-  const completedSections = progress?.sections?.filter(s => s.completed)?.length || 0;
+  const completedSections = progress?.sections?.filter(s => s.quizScore != null && s.quizScore >= 70)?.length || 0;
 
   return (
     <div className="min-h-screen bg-[#0a0a0f] text-white flex flex-col">
@@ -134,14 +131,14 @@ export default function CoursePage() {
         <div className="w-72 shrink-0 border-r border-white/5 bg-[#0c0c13] overflow-y-auto max-h-[calc(100vh-100px)] sticky top-0">
           <div className="p-4">
             {courseData.weeks.map(week => {
-              const weekCompleted = week.sections.every(s => isSectionCompleted(s.id));
+              const weekCompleted = week.sections.every(s => isSectionQuizPassed(s.id));
               const weekStarted = week.sections.some(s => isSectionCompleted(s.id));
               const isExpanded = expandedWeek === week.week;
 
               // Week unlock logic
               const weekUnlocked = week.week === 1 || courseData.weeks
                 .find(w => w.week === week.week - 1)
-                ?.sections.every(s => isSectionCompleted(s.id));
+                ?.sections.every(s => isSectionQuizPassed(s.id));
 
               return (
                 <div key={week.week} className="mb-2">
@@ -185,7 +182,7 @@ export default function CoursePage() {
                     <div className="ml-4 mt-1 space-y-0.5">
                       {week.sections.map((section, idx) => {
                         const completed = isSectionCompleted(section.id);
-                        const unlocked = weekUnlocked && (idx === 0 || isSectionCompleted(week.sections[idx - 1].id));
+                        const unlocked = weekUnlocked && (idx === 0 || isSectionQuizPassed(week.sections[idx - 1].id));
                         const isActive = selectedSection?.section?.id === section.id;
 
                         return (
