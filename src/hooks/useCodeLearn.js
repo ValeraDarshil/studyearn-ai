@@ -15,7 +15,7 @@ export function useCodeLearn(language) {
   const getToken = () => localStorage.getItem('token');
   const headers = () => ({ Authorization: `Bearer ${getToken()}` });
 
-  // Fetch progress
+  // Initial fetch (with loading spinner — only on mount)
   const fetchProgress = useCallback(async () => {
     if (!language) return;
     try {
@@ -27,6 +27,15 @@ export function useCodeLearn(language) {
     } finally {
       setLoading(false);
     }
+  }, [language]);
+
+  // Silent refresh — NO loading flash, used after quiz/read actions
+  const silentRefresh = useCallback(async () => {
+    if (!language) return;
+    try {
+      const res = await axios.get(`${API_BASE}/api/codelearn/progress/${language}`, { headers: headers() });
+      if (res.data.success) setProgress(res.data.progress);
+    } catch {}
   }, [language]);
 
   useEffect(() => { fetchProgress(); }, [fetchProgress]);
@@ -68,7 +77,7 @@ export function useCodeLearn(language) {
       }, { headers: headers() });
 
       if (res.data.success) {
-        await fetchProgress();
+        await silentRefresh();
         return res.data;
       }
     } catch (err) {
@@ -85,7 +94,7 @@ export function useCodeLearn(language) {
       }, { headers: headers() });
 
       if (res.data.success) {
-        await fetchProgress();
+        await silentRefresh();
         return res.data;
       }
     } catch (err) {
@@ -176,6 +185,7 @@ export function useCodeLearn(language) {
     isSectionUnlocked,
     completeSection,
     submitQuiz,
+    silentRefresh,
     getHint,
     getExplanation,
     runCode,

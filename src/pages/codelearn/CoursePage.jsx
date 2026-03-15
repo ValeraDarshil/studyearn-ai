@@ -2,7 +2,7 @@
  * StudyEarn AI — Course Page
  * Week → Section navigator + content area + XP tracker
  */
-import { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { loadCourse, COURSE_REGISTRY } from '../../data/courses/index.js';
 import { useCodeLearn } from '../../hooks/useCodeLearn.js';
@@ -35,20 +35,24 @@ export default function CoursePage() {
       .catch(() => navigate('/codelearn'));
   }, [language]);
 
-  // Auto-select current section based on progress
+  // Auto-select current section — ONLY on initial load, never on progress updates
+  // Using a ref to track if we've already done initial selection
+  const initialSelectionDone = React.useRef(false);
   useEffect(() => {
     if (!courseData || !progress) return;
+    if (initialSelectionDone.current) return; // Already selected — don't auto-change
     const currentWeek = courseData.weeks.find(w => w.week === progress.currentWeek);
     if (currentWeek) {
       const currentSec = currentWeek.sections[Math.min(progress.currentSection - 1, currentWeek.sections.length - 1)];
-      if (currentSec && !selectedSection) {
+      if (currentSec) {
         setSelectedSection({ weekNumber: currentWeek.week, section: currentSec });
         setExpandedWeek(currentWeek.week);
+        initialSelectionDone.current = true;
       }
     }
   }, [courseData, progress]);
 
-  if (loadingCourse || progressLoading) {
+  if (loadingCourse || (progressLoading && !progress)) {
     return (
       <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center">
         <div className="text-center">
