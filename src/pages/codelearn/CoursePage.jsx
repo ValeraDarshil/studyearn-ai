@@ -23,7 +23,7 @@ export default function CoursePage() {
     localStorage.setItem('cl_lang', l);
   };
 
-  const { progress, loading: progressLoading, isSectionCompleted, isSectionQuizPassed: hookQuizPassed, isSectionUnlocked, completeSection } = useCodeLearn(language);
+  const { progress, loading: progressLoading, isSectionCompleted, isSectionQuizPassed: hookQuizPassed, isSectionUnlocked, completeSection, submitQuiz, getHint, getExplanation } = useCodeLearn(language);
 
   // Use hook's quiz passed check
   const isSectionQuizPassed = hookQuizPassed;
@@ -247,6 +247,9 @@ export default function CoursePage() {
               isContentRead={isSectionCompleted(selectedSection.section.id)}
               isQuizPassed={isSectionQuizPassed(selectedSection.section.id)}
               onComplete={completeSection}
+              onQuizSubmit={submitQuiz}
+              onGetHint={getHint}
+              onGetExplanation={getExplanation}
               onNext={() => {
                 const currentWeek = courseData.weeks.find(w => w.week === selectedSection.weekNumber);
                 const currentIdx  = currentWeek.sections.findIndex(s => s.id === selectedSection.section.id);
