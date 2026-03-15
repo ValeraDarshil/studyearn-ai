@@ -1630,11 +1630,13 @@ print("Phones found:", phones)
 import { PYTHON_MONTH_2 } from './python_month2.js';
 import { PYTHON_MONTH_3 } from './python_month3.js';
 import { PYTHON_WEEK1_EN, applyEnglishTranslations } from './python_week1_en.js';
+import { PYTHON_WEEKS2_12_EN } from './python_weeks2_12_en.js';
 
 // Merge all weeks
 PYTHON_COURSE.weeks = [...PYTHON_COURSE.weeks, ...PYTHON_MONTH_2, ...PYTHON_MONTH_3];
 
-// Apply English translations to Week 1 sections
-PYTHON_COURSE.weeks = applyEnglishTranslations(PYTHON_COURSE.weeks, PYTHON_WEEK1_EN);
+// Apply English translations — Week 1 (full content) + Weeks 2-12 (titles + tasks)
+const allTranslations = { ...PYTHON_WEEK1_EN, ...PYTHON_WEEKS2_12_EN };
+PYTHON_COURSE.weeks = applyEnglishTranslations(PYTHON_COURSE.weeks, allTranslations);
 
 export default PYTHON_COURSE;
