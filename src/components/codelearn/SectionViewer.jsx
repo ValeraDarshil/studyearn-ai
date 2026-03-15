@@ -1,88 +1,112 @@
 /**
  * StudyEarn AI — SectionViewer Component
- * Pyodide integration — Python runs directly in browser!
- * No API key needed, unlimited runs, zero cost.
+ * Skulpt — Lightweight Python in Browser (300KB, instant load!)
+ * No API key, no server, unlimited runs, fast!
  */
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { CheckCircle, Lightbulb, Play, RotateCcw, ChevronRight, X, Zap, Bot, Loader2 } from 'lucide-react';
 import { useCodeLearn } from '../../hooks/useCodeLearn.js';
 import QuizModal from './QuizModal.jsx';
 
-// ─── Pyodide Singleton ─────────────────────────────────────────
-// Ek baar load karo, baar baar use karo — page pe sirf ek instance
-let pyodideInstance = null;
-let pyodideLoading = false;
-let pyodideLoadCallbacks = [];
+// ─── Skulpt Loader ─────────────────────────────────────────────
+// Skulpt = lightweight Python interpreter for browsers
+// 300KB total — loads in <1 second vs Pyodide's 25MB
+let skulptLoaded = false;
+let skulptLoading = false;
+let skulptCallbacks = [];
 
-async function getPyodide() {
-  if (pyodideInstance) return pyodideInstance;
+function loadSkulptScripts() {
+  return new Promise((resolve, reject) => {
+    if (skulptLoaded) { resolve(); return; }
+    if (skulptLoading) { skulptCallbacks.push({ resolve, reject }); return; }
 
-  if (pyodideLoading) {
-    return new Promise((resolve) => {
-      pyodideLoadCallbacks.push(resolve);
+    skulptLoading = true;
+
+    const loadScript = (src) => new Promise((res, rej) => {
+      const s = document.createElement('script');
+      s.src = src;
+      s.onload = res;
+      s.onerror = () => rej(new Error(`Failed to load: ${src}`));
+      document.head.appendChild(s);
     });
-  }
 
-  pyodideLoading = true;
-
-  // CDN se Pyodide script load karo (sirf ek baar)
-  if (!window.loadPyodide) {
-    await new Promise((resolve, reject) => {
-      const script = document.createElement('script');
-      script.src = 'https://cdn.jsdelivr.net/pyodide/v0.26.2/full/pyodide.js';
-      script.onload = resolve;
-      script.onerror = reject;
-      document.head.appendChild(script);
-    });
-  }
-
-  pyodideInstance = await window.loadPyodide({
-    indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.26.2/full/',
+    // Load Skulpt core + stdlib sequentially
+    loadScript('https://cdn.jsdelivr.net/npm/skulpt@1.2.0/dist/skulpt.min.js')
+      .then(() => loadScript('https://cdn.jsdelivr.net/npm/skulpt@1.2.0/dist/skulpt-stdlib.js'))
+      .then(() => {
+        skulptLoaded = true;
+        skulptLoading = false;
+        resolve();
+        skulptCallbacks.forEach(cb => cb.resolve());
+        skulptCallbacks = [];
+      })
+      .catch((err) => {
+        skulptLoading = false;
+        reject(err);
+        skulptCallbacks.forEach(cb => cb.reject(err));
+        skulptCallbacks = [];
+      });
   });
-
-  pyodideLoading = false;
-  pyodideLoadCallbacks.forEach(cb => cb(pyodideInstance));
-  pyodideLoadCallbacks = [];
-  return pyodideInstance;
 }
 
-// ─── Python Code Run Karo in Browser ──────────────────────────
-async function runPythonCode(code) {
-  const pyodide = await getPyodide();
+// ─── Run Python with Skulpt ────────────────────────────────────
+function runPythonWithSkulpt(code) {
+  return new Promise(async (resolve) => {
+    try {
+      await loadSkulptScripts();
 
-  // stdout aur stderr capture karo
-  const wrappedCode = `
-import sys
-import io
-import traceback
+      let outputLines = [];
+      let errorOutput = '';
 
-_out_buf = io.StringIO()
-_err_buf = io.StringIO()
-sys.stdout = _out_buf
-sys.stderr = _err_buf
+      // input() ko handle karo — "Enter dabo" message dikhao
+      const inputHandler = (prompt) => {
+        const val = window.prompt(prompt || 'Input: ');
+        return val !== null ? val : '';
+      };
 
-try:
-${code.split('\n').map(line => '    ' + line).join('\n')}
-except SystemExit:
-    pass
-except Exception as _e:
-    print(traceback.format_exc(), file=sys.stderr)
-finally:
-    sys.stdout = sys.__stdout__
-    sys.stderr = sys.__stderr__
+      window.Sk.configure({
+        output: (text) => { outputLines.push(text); },
+        read: (x) => {
+          if (window.Sk.builtinFiles?.files[x] !== undefined)
+            return window.Sk.builtinFiles.files[x];
+          throw new Error(`File not found: '${x}'`);
+        },
+        inputfun: inputHandler,
+        inputfunTakesPrompt: true,
+        execLimit: 10000, // 10 second timeout
+        killableWhile: true,
+        killableFor: true,
+      });
 
-_final_out = _out_buf.getvalue()
-_final_err = _err_buf.getvalue()
-`;
+      const promise = window.Sk.misceval.asyncToPromise(() =>
+        window.Sk.importMainWithBody('<stdin>', false, code, true)
+      );
 
-  pyodide.runPython(wrappedCode);
-  const stdout = pyodide.globals.get('_final_out') || '';
-  const stderr = pyodide.globals.get('_final_err') || '';
+      promise.then(() => {
+        const output = outputLines.join('');
+        resolve({
+          output: output || '(No output — koi print() nahi tha)',
+          isError: false,
+        });
+      }).catch((err) => {
+        // Skulpt errors ko clean karo
+        let errorMsg = err.toString();
+        // Remove "skulpt" references from error
+        errorMsg = errorMsg.replace(/skulpt/gi, 'Python');
+        errorMsg = errorMsg.replace(/on line (\d+) of <stdin>/g, '(line $1)');
+        resolve({
+          output: errorMsg,
+          isError: true,
+        });
+      });
 
-  return {
-    output: stdout || stderr || '(No output)',
-    isError: !!stderr && !stdout,
-  };
+    } catch (err) {
+      resolve({
+        output: `Error loading Python: ${err.message}\nPage reload karke try karo.`,
+        isError: true,
+      });
+    }
+  });
 }
 
 // ─── Simple Code Block ─────────────────────────────────────────
@@ -108,7 +132,6 @@ function ContentRenderer({ markdown }) {
     } else if (line.startsWith('### ')) {
       elements.push(<h3 key={i} className="text-base font-semibold text-gray-200 mt-4 mb-2">{line.slice(4)}</h3>);
     } else if (line.startsWith('```')) {
-      const lang = line.slice(3).trim();
       let codeLines = [];
       i++;
       while (i < parts.length && !parts[i].startsWith('```')) {
@@ -184,23 +207,10 @@ function XPToast({ xp, message, onClose }) {
   );
 }
 
-// ─── Pyodide Status Badge ──────────────────────────────────────
-function PyodideStatus({ status }) {
-  if (status === 'ready' || status === 'idle') return null;
-  return (
-    <div className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded-lg
-      ${status === 'loading'
-        ? 'bg-amber-500/10 border border-amber-500/20 text-amber-400'
-        : 'bg-red-500/10 border border-red-500/20 text-red-400'
-      }`}>
-      {status === 'loading' && <Loader2 size={11} className="animate-spin" />}
-      {status === 'loading' ? 'Loading Python...' : 'Python load failed — reload karo'}
-    </div>
-  );
-}
-
 // ─── Main SectionViewer ────────────────────────────────────────
-export default function SectionViewer({ language, courseInfo, weekNumber, section, isCompleted, onComplete, onNext }) {
+export default function SectionViewer({
+  language, courseInfo, weekNumber, section, isCompleted, onComplete, onNext
+}) {
   const [activeTab, setActiveTab] = useState('learn');
   const [userCode, setUserCode] = useState(section.codeExample || '');
   const [output, setOutput] = useState('');
@@ -213,8 +223,6 @@ export default function SectionViewer({ language, courseInfo, weekNumber, sectio
   const [showQuiz, setShowQuiz] = useState(false);
   const [xpToast, setXpToast] = useState(null);
   const [sectionDone, setSectionDone] = useState(isCompleted);
-  const [pyodideStatus, setPyodideStatus] = useState('idle');
-  const [runCount, setRunCount] = useState(0);
 
   const { getHint, getExplanation, submitQuiz } = useCodeLearn(language);
 
@@ -227,18 +235,14 @@ export default function SectionViewer({ language, courseInfo, weekNumber, sectio
     setExplanation('');
     setActiveTab('learn');
     setSectionDone(isCompleted);
-    setRunCount(0);
   }, [section.id]);
 
-  // Preload Pyodide when Code tab opens (Python only)
+  // Preload Skulpt in background when Code tab is opened
   useEffect(() => {
-    if (activeTab === 'code' && language === 'python' && pyodideStatus === 'idle') {
-      setPyodideStatus('loading');
-      getPyodide()
-        .then(() => setPyodideStatus('ready'))
-        .catch(() => setPyodideStatus('error'));
+    if (activeTab === 'code' && language === 'python') {
+      loadSkulptScripts().catch(() => {}); // silent preload
     }
-  }, [activeTab, language, pyodideStatus]);
+  }, [activeTab, language]);
 
   const handleMarkRead = async () => {
     if (sectionDone) return;
@@ -249,51 +253,27 @@ export default function SectionViewer({ language, courseInfo, weekNumber, sectio
     setSectionDone(true);
   };
 
-  // ── Run Code Handler ───────────────────────────────────────
+  // ── Run Code ───────────────────────────────────────────────
   const handleRunCode = useCallback(async () => {
     if (running) return;
     setRunning(true);
-    setOutput('');
+    setOutput('Running...');
     setOutputIsError(false);
 
-    try {
-      if (language === 'python') {
-        if (pyodideStatus === 'loading') {
-          setOutput('Python abhi load ho raha hai... thoda wait karo phir try karo!');
-          setRunning(false);
-          return;
-        }
-        if (pyodideStatus === 'error') {
-          setOutput('Python load nahi hua. Page reload karo aur dobara try karo.');
-          setOutputIsError(true);
-          setRunning(false);
-          return;
-        }
-
-        setOutput('Running...');
-        const result = await runPythonCode(userCode);
-        setOutput(result.output);
-        setOutputIsError(result.isError);
-
-        // First successful run pe XP bonus
-        if (!result.isError && runCount === 0) {
-          setXpToast({ xp: 5, message: 'Code run kiya! Keep going!' });
-        }
-        setRunCount(prev => prev + 1);
-
-      } else if (language === 'html' || language === 'css') {
-        setOutput('HTML/CSS live preview:\nApna code copy karo aur codepen.io pe paste karo preview dekhne ke liye!');
-
-      } else {
-        setOutput(`${language.toUpperCase()} execution coming soon!\n\nAbhi ke liye:\n• JavaScript: Browser console (F12) mein run karo\n• C/C++: onlinegdb.com pe try karo`);
-      }
-    } catch (err) {
-      setOutput(`Error: ${err.message || 'Code run nahi hua. Syntax check karo!'}`);
-      setOutputIsError(true);
-    } finally {
-      setRunning(false);
+    if (language === 'python') {
+      const result = await runPythonWithSkulpt(userCode);
+      setOutput(result.output);
+      setOutputIsError(result.isError);
+    } else if (language === 'html' || language === 'css') {
+      setOutput('HTML/CSS ke liye:\nApna code copy karo aur codepen.io pe paste karo live preview dekhne ke liye!');
+      setOutputIsError(false);
+    } else {
+      setOutput(`${language.toUpperCase()} execution coming soon!\n\n• JavaScript: Browser console (F12) mein directly run karo\n• C/C++: onlinegdb.com pe try karo`);
+      setOutputIsError(false);
     }
-  }, [language, userCode, pyodideStatus, running, runCount]);
+
+    setRunning(false);
+  }, [language, userCode, running]);
 
   const handleGetHint = async () => {
     setLoadingHint(true);
@@ -347,15 +327,11 @@ export default function SectionViewer({ language, courseInfo, weekNumber, sectio
 
         <div className="flex gap-1 mt-4 bg-white/[0.03] border border-white/5 rounded-xl p-1 w-fit">
           {tabs.map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+            <button key={tab.id} onClick={() => setActiveTab(tab.id)}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all
                 ${activeTab === tab.id
                   ? `bg-gradient-to-r ${courseInfo?.color} text-white shadow-sm`
-                  : 'text-gray-500 hover:text-gray-300'
-                }`}
-            >
+                  : 'text-gray-500 hover:text-gray-300'}`}>
               {tab.label}
             </button>
           ))}
@@ -365,7 +341,7 @@ export default function SectionViewer({ language, courseInfo, weekNumber, sectio
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-6">
 
-        {/* LEARN */}
+        {/* LEARN TAB */}
         {activeTab === 'learn' && (
           <div className="max-w-3xl">
             <ContentRenderer markdown={section.content} />
@@ -390,7 +366,7 @@ export default function SectionViewer({ language, courseInfo, weekNumber, sectio
           </div>
         )}
 
-        {/* CODE */}
+        {/* CODE TAB */}
         {activeTab === 'code' && (
           <div className="max-w-4xl">
             {section.task && (
@@ -400,6 +376,7 @@ export default function SectionViewer({ language, courseInfo, weekNumber, sectio
               </div>
             )}
 
+            {/* Code Editor */}
             <div className="bg-[#0d1117] border border-white/10 rounded-xl overflow-hidden">
               <div className="flex items-center justify-between px-4 py-2.5 bg-white/[0.02] border-b border-white/5">
                 <div className="flex items-center gap-2">
@@ -410,14 +387,11 @@ export default function SectionViewer({ language, courseInfo, weekNumber, sectio
                     main.{language === 'javascript' ? 'js' : language === 'python' ? 'py' : language}
                   </span>
                 </div>
-                <div className="flex items-center gap-3">
-                  {language === 'python' && <PyodideStatus status={pyodideStatus} />}
-                  <button
-                    onClick={() => { setUserCode(section.codeExample || ''); setOutput(''); }}
-                    className="text-xs text-gray-600 hover:text-gray-400 flex items-center gap-1 transition-colors">
-                    <RotateCcw size={11} /> Reset
-                  </button>
-                </div>
+                <button
+                  onClick={() => { setUserCode(section.codeExample || ''); setOutput(''); }}
+                  className="text-xs text-gray-600 hover:text-gray-400 flex items-center gap-1 transition-colors">
+                  <RotateCcw size={11} /> Reset
+                </button>
               </div>
 
               <textarea
@@ -433,7 +407,9 @@ export default function SectionViewer({ language, courseInfo, weekNumber, sectio
                     const end = e.target.selectionEnd;
                     const newCode = userCode.substring(0, start) + '    ' + userCode.substring(end);
                     setUserCode(newCode);
-                    setTimeout(() => { e.target.selectionStart = e.target.selectionEnd = start + 4; }, 0);
+                    setTimeout(() => {
+                      e.target.selectionStart = e.target.selectionEnd = start + 4;
+                    }, 0);
                   }
                   if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
                     e.preventDefault();
@@ -443,13 +419,14 @@ export default function SectionViewer({ language, courseInfo, weekNumber, sectio
               />
             </div>
 
+            {/* Action Buttons */}
             <div className="flex items-center gap-3 mt-3 flex-wrap">
-              <button
-                onClick={handleRunCode}
-                disabled={running || (language === 'python' && pyodideStatus === 'loading')}
+              <button onClick={handleRunCode} disabled={running}
                 className={`flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r ${courseInfo?.color} text-white font-medium text-sm hover:opacity-90 transition-all disabled:opacity-50`}>
-                {running ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
-                {running ? 'Running...' : pyodideStatus === 'loading' ? 'Loading Python...' : 'Run Code'}
+                {running
+                  ? <Loader2 size={14} className="animate-spin" />
+                  : <Play size={14} />}
+                {running ? 'Running...' : 'Run Code'}
               </button>
 
               <span className="text-xs text-gray-700 hidden sm:block">Ctrl+Enter to run</span>
@@ -467,22 +444,32 @@ export default function SectionViewer({ language, courseInfo, weekNumber, sectio
               </button>
             </div>
 
-            {output && (
+            {/* Output */}
+            {output && output !== 'Running...' && (
               <div className="mt-4 bg-[#0d1117] border border-white/10 rounded-xl overflow-hidden">
                 <div className="px-4 py-2 bg-white/[0.02] border-b border-white/5 flex items-center justify-between">
                   <span className="text-xs text-gray-600 font-mono">Output</span>
-                  {output !== 'Running...' && (
-                    <span className={`text-xs px-2 py-0.5 rounded ${outputIsError ? 'text-red-400 bg-red-500/10' : 'text-green-400 bg-green-500/10'}`}>
-                      {outputIsError ? 'Error' : '✓ Success'}
-                    </span>
-                  )}
+                  <span className={`text-xs px-2 py-0.5 rounded ${outputIsError
+                    ? 'text-red-400 bg-red-500/10'
+                    : 'text-green-400 bg-green-500/10'}`}>
+                    {outputIsError ? '✗ Error' : '✓ Success'}
+                  </span>
                 </div>
-                <pre className={`p-4 text-sm font-mono whitespace-pre-wrap ${outputIsError ? 'text-red-400' : 'text-gray-300'}`}>
+                <pre className={`p-4 text-sm font-mono whitespace-pre-wrap leading-relaxed ${outputIsError ? 'text-red-400' : 'text-green-300'}`}>
                   {output}
                 </pre>
               </div>
             )}
 
+            {/* Running indicator */}
+            {output === 'Running...' && (
+              <div className="mt-4 flex items-center gap-2 text-gray-500 text-sm">
+                <Loader2 size={14} className="animate-spin" />
+                Running your code...
+              </div>
+            )}
+
+            {/* AI Hint */}
             {hint && (
               <div className="mt-4 bg-amber-500/5 border border-amber-500/20 rounded-xl p-4">
                 <div className="flex items-center gap-2 text-amber-400 text-xs font-medium mb-2">
@@ -492,6 +479,7 @@ export default function SectionViewer({ language, courseInfo, weekNumber, sectio
               </div>
             )}
 
+            {/* Explanation */}
             {explanation && (
               <div className="mt-4 bg-blue-500/5 border border-blue-500/20 rounded-xl p-4">
                 <div className="flex items-center gap-2 text-blue-400 text-xs font-medium mb-2">
@@ -503,21 +491,26 @@ export default function SectionViewer({ language, courseInfo, weekNumber, sectio
           </div>
         )}
 
-        {/* QUIZ */}
+        {/* QUIZ TAB */}
         {activeTab === 'quiz' && (
           <div className="max-w-2xl">
             <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-8 text-center">
               <div className="text-5xl mb-4">🎯</div>
               <h3 className="text-xl font-bold text-white mb-2">Section Quiz</h3>
-              <p className="text-gray-500 mb-2">{section.quiz?.length || 3} questions · 70% se zyada score karo to pass</p>
-              <p className="text-sm text-violet-400 mb-6">Pass karo to +30 XP milega aur next section unlock hoga!</p>
+              <p className="text-gray-500 mb-2">
+                {section.quiz?.length || 3} questions · 70% se zyada score karo to pass
+              </p>
+              <p className="text-sm text-violet-400 mb-6">
+                Pass karo to +30 XP milega aur next section unlock hoga!
+              </p>
               <button onClick={() => setShowQuiz(true)}
                 className={`px-8 py-3 rounded-xl bg-gradient-to-r ${courseInfo?.color} text-white font-medium hover:opacity-90 transition-all`}>
                 Start Quiz →
               </button>
               {sectionDone && (
                 <div className="mt-6 pt-6 border-t border-white/5">
-                  <button onClick={onNext} className="flex items-center gap-2 mx-auto text-gray-400 hover:text-white transition-colors">
+                  <button onClick={onNext}
+                    className="flex items-center gap-2 mx-auto text-gray-400 hover:text-white transition-colors">
                     Next Section <ChevronRight size={16} />
                   </button>
                 </div>
