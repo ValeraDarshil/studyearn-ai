@@ -25,6 +25,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import helmet from 'helmet';
 import compression from 'compression';
+import codelearnRoutes from './routes/codelearnRoutes.js';
 
 dotenv.config();
 
@@ -125,6 +126,7 @@ app.use('/api/rewards', rewardsRoutes);  // GET/POST /api/rewards/*
 app.use('/api/chat',    chatRoutes);     // GET/POST /api/chat/*
 app.use('/api/study',   studyToolsRoutes); // POST /api/study/improve-notes, /api/study/analyze-pdf
 app.use('/api/notes',   notesRoutes);      // CRUD /api/notes/*
+app.use('/api/codelearn', codelearnRoutes);
 
 /* ─── 9. GLOBAL ERROR HANDLER (SABSE LAST) ─────────────── */
 app.use(errorHandler);
