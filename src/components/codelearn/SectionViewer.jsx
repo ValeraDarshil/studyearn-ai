@@ -207,7 +207,8 @@ export default function SectionViewer({
   const t = UI_TEXT[lang] || UI_TEXT.en;
 
   const [activeTab, setActiveTab] = useState('learn');
-  const [userCode, setUserCode] = useState(section.codeExample || '');
+  const displayCodeExample = lang === 'en' && section.codeExample_en ? section.codeExample_en : (section.codeExample || '');
+  const [userCode, setUserCode] = useState(displayCodeExample);
   const [output, setOutput] = useState('');
   const [outputIsError, setOutputIsError] = useState(false);
   const [running, setRunning] = useState(false);
@@ -221,7 +222,8 @@ export default function SectionViewer({
 
   // Reset UI when section changes
   useEffect(() => {
-    setUserCode(section.codeExample || '');
+    const langCode = lang === 'en' && section.codeExample_en ? section.codeExample_en : (section.codeExample || '');
+    setUserCode(langCode);
     setOutput(''); setOutputIsError(false);
     setHint(''); setExplanation('');
     setActiveTab('learn');
@@ -390,7 +392,7 @@ export default function SectionViewer({
                   <div className="w-3 h-3 rounded-full bg-green-500/60" />
                   <span className="text-xs text-gray-600 ml-2 font-mono">main.{language === 'python' ? 'py' : language === 'javascript' ? 'js' : language}</span>
                 </div>
-                <button onClick={() => { setUserCode(section.codeExample || ''); setOutput(''); }}
+                <button onClick={() => { const lc = lang === 'en' && section.codeExample_en ? section.codeExample_en : (section.codeExample || ''); setUserCode(lc); setOutput(''); }}
                   className="text-xs text-gray-600 hover:text-gray-400 flex items-center gap-1 transition-colors">
                   <RotateCcw size={11} />{t.reset}
                 </button>
