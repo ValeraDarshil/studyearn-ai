@@ -7,7 +7,7 @@ import { X, CheckCircle, XCircle, Trophy, Zap, RotateCcw, ChevronRight } from 'l
 
 const QUESTION_TIME = 30; // seconds per question
 
-export default function QuizModal({ questions, sectionTitle, courseInfo, onComplete, onClose }) {
+export default function QuizModal({ questions, sectionTitle, courseInfo, onComplete, onClose, lang = 'en' }) {
   const [currentQ, setCurrentQ] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState(null);
   const [answers, setAnswers] = useState([]); // {selected, correct, isCorrect}[]
@@ -185,12 +185,12 @@ export default function QuizModal({ questions, sectionTitle, courseInfo, onCompl
         {/* Question */}
         <div className="p-6">
           <h3 className="text-white font-semibold text-lg leading-relaxed mb-6">
-            {question.q}
+            {lang === 'en' && question.q_en ? question.q_en : question.q}
           </h3>
 
           {/* Options */}
           <div className="space-y-3 mb-6">
-            {question.options.map((option, idx) => {
+            {(lang === 'en' && question.options_en ? question.options_en : question.options).map((option, idx) => {
               let style = 'border-white/10 text-gray-300 hover:border-violet-500/50 hover:bg-violet-500/5';
               let icon = null;
 
@@ -228,7 +228,7 @@ export default function QuizModal({ questions, sectionTitle, courseInfo, onCompl
           {showExplanation && question.explanation && (
             <div className="bg-blue-500/5 border border-blue-500/20 rounded-xl p-4 mb-4 animate-fade-in">
               <div className="text-xs text-blue-400 font-medium mb-1.5">💡 Explanation:</div>
-              <p className="text-gray-400 text-sm leading-relaxed">{question.explanation}</p>
+              <p className="text-gray-400 text-sm leading-relaxed">{lang === 'en' && question.explanation_en ? question.explanation_en : question.explanation}</p>
             </div>
           )}
 

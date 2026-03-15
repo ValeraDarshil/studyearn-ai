@@ -283,9 +283,7 @@ export default function SectionViewer({
   const [xpToast, setXpToast] = useState(null);
   const [sectionDone, setSectionDone] = useState(isCompleted);
 
-  const { getHint, getExplanation, submitQuiz, translateContent } = useCodeLearn(language);
-  const [translatedContent, setTranslatedContent] = useState(null);
-  const [translating, setTranslating] = useState(false);
+  const { getHint, getExplanation, submitQuiz } = useCodeLearn(language);
 
   // Reset when section changes
   useEffect(() => {
@@ -298,24 +296,6 @@ export default function SectionViewer({
     setSectionDone(isCompleted);
   }, [section.id]);
 
-
-  // Translate content when EN is selected
-  useEffect(() => {
-    let cancelled = false;
-    if (lang === 'hi') {
-      setTranslatedContent(null); // use native
-      return;
-    }
-    // EN selected — translate
-    setTranslating(true);
-    translateContent(section.id, section.content, 'en').then(translated => {
-      if (!cancelled) {
-        setTranslatedContent(translated);
-        setTranslating(false);
-      }
-    });
-    return () => { cancelled = true; };
-  }, [lang, section.id]);
 
   // Preload Skulpt in background when Code tab is opened
   useEffect(() => {
@@ -394,7 +374,7 @@ export default function SectionViewer({
             <div className="text-xs text-gray-600 mb-1">Week {weekNumber} · Section {section.id?.split('-s')[1]}</div>
             <h1 className="text-xl font-bold text-white flex items-center gap-2">
               <span>{section.emoji}</span>
-              {section.title}
+              {lang === 'en' && section.title_en ? section.title_en : section.title}
             </h1>
           </div>
           {sectionDone && (
@@ -424,14 +404,7 @@ export default function SectionViewer({
         {/* LEARN TAB */}
         {activeTab === 'learn' && (
           <div className="max-w-3xl">
-            {translating ? (
-              <div className="flex items-center gap-2 text-gray-500 text-sm py-4">
-                <div className="w-4 h-4 border-2 border-violet-500/30 border-t-violet-500 rounded-full animate-spin" />
-                Translating to English...
-              </div>
-            ) : (
-              <ContentRenderer markdown={translatedContent || section.content} />
-            )}
+            <ContentRenderer markdown={lang === 'en' && section.content_en ? section.content_en : section.content} />
             <div className="mt-8 pt-6 border-t border-white/5 flex items-center gap-4 flex-wrap">
               {!sectionDone ? (
                 <button onClick={handleMarkRead}
@@ -459,7 +432,7 @@ export default function SectionViewer({
             {section.task && (
               <div className="bg-blue-500/5 border border-blue-500/20 rounded-xl p-4 mb-4">
                 <div className="text-xs text-blue-400 font-medium mb-1">🎯 Your Task:</div>
-                <p className="text-gray-300 text-sm leading-relaxed">{section.task.description}</p>
+                <p className="text-gray-300 text-sm leading-relaxed">{lang === 'en' && section.task.description_en ? section.task.description_en : section.task.description}</p>
               </div>
             )}
 
@@ -614,6 +587,7 @@ export default function SectionViewer({
           courseInfo={courseInfo}
           onComplete={handleQuizComplete}
           onClose={() => setShowQuiz(false)}
+          lang={lang}
         />
       )}
 
