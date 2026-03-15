@@ -16,6 +16,12 @@ export default function CoursePage() {
   const [loadingCourse, setLoadingCourse] = useState(true);
   const [selectedSection, setSelectedSection] = useState(null);
   const [expandedWeek, setExpandedWeek] = useState(1);
+  const [lang, setLang] = useState(() => localStorage.getItem('cl_lang') || 'en');
+
+  const switchLang = (l) => {
+    setLang(l);
+    localStorage.setItem('cl_lang', l);
+  };
 
   const { progress, loading: progressLoading, isSectionCompleted, isSectionUnlocked, completeSection } = useCodeLearn(language);
   const courseInfo = COURSE_REGISTRY.find(c => c.id === language);
@@ -75,8 +81,19 @@ export default function CoursePage() {
             <span className="text-gray-600 text-sm hidden md:block">— {courseInfo?.tagline}</span>
           </div>
 
-          {/* Stats row */}
+          {/* Stats row + Lang toggle */}
           <div className="flex items-center gap-4 text-sm">
+            {/* Language toggle */}
+            <div className="flex items-center gap-1 bg-white/5 border border-white/10 rounded-full p-0.5">
+              <button
+                onClick={() => switchLang('en')}
+                className={`px-2.5 py-0.5 rounded-full text-xs font-semibold transition-all ${lang === 'en' ? 'bg-violet-600 text-white' : 'text-gray-400 hover:text-white'}`}
+              >EN</button>
+              <button
+                onClick={() => switchLang('hi')}
+                className={`px-2.5 py-0.5 rounded-full text-xs font-semibold transition-all ${lang === 'hi' ? 'bg-violet-600 text-white' : 'text-gray-400 hover:text-white'}`}
+              >HI</button>
+            </div>
             {/* XP */}
             <div className="flex items-center gap-1.5 bg-violet-500/10 border border-violet-500/20 rounded-full px-3 py-1">
               <Zap size={13} className="text-violet-400" />
@@ -219,6 +236,7 @@ export default function CoursePage() {
         <div className="flex-1 overflow-auto">
           {selectedSection ? (
             <SectionViewer
+              lang={lang}
               language={language}
               courseInfo={courseInfo}
               weekNumber={selectedSection.weekNumber}

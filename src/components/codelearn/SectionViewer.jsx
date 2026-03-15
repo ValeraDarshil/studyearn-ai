@@ -8,6 +8,64 @@ import { CheckCircle, Lightbulb, Play, RotateCcw, ChevronRight, X, Zap, Bot, Loa
 import { useCodeLearn } from '../../hooks/useCodeLearn.js';
 import QuizModal from './QuizModal.jsx';
 
+// ─── UI Text — English / Hinglish ─────────────────────────────
+const UI_TEXT = {
+  en: {
+    yourTask: 'Your Task:',
+    markRead: 'Mark as Read (+20 XP)',
+    practiceCode: 'Practice Code →',
+    takeQuiz: 'Take Quiz 🎯',
+    runCode: 'Running...',
+    runBtn: 'Run Code',
+    ctrlEnter: 'Ctrl+Enter to run',
+    aiHint: 'AI Hint (-5 XP)',
+    gettingHint: 'Getting hint...',
+    explainCode: 'Explain My Code',
+    explaining: 'Explaining...',
+    output: 'Output',
+    success: '✓ Success',
+    error: '✗ Error',
+    aiHintLabel: 'AI Hint',
+    explanationLabel: 'Code Explanation',
+    quizTitle: 'Section Quiz',
+    quizDesc: (n) => `${n} questions · Score 70%+ to pass`,
+    quizXp: 'Pass to earn +30 XP and unlock next section!',
+    startQuiz: 'Start Quiz →',
+    nextSection: 'Next Section',
+    completed: 'Completed',
+    reset: 'Reset',
+    running: 'Running your code...',
+  },
+  hi: {
+    yourTask: 'Tumhara Task:',
+    markRead: 'Padh Liya (+20 XP)',
+    practiceCode: 'Code Practice Karo →',
+    takeQuiz: 'Quiz Do 🎯',
+    runCode: 'Chal raha hai...',
+    runBtn: 'Code Chalao',
+    ctrlEnter: 'Ctrl+Enter se bhi chala sakte ho',
+    aiHint: 'AI Hint (-5 XP)',
+    gettingHint: 'Hint aa rahi hai...',
+    explainCode: 'Mera Code Samjhao',
+    explaining: 'Samjha raha hai...',
+    output: 'Output',
+    success: '✓ Sahi Hai',
+    error: '✗ Error',
+    aiHintLabel: 'AI Hint',
+    explanationLabel: 'Code Explanation',
+    quizTitle: 'Section Quiz',
+    quizDesc: (n) => `${n} sawaal · 70%+ score karo pass hone ke liye`,
+    quizXp: 'Pass karo toh +30 XP milega aur agla section khulega!',
+    startQuiz: 'Quiz Shuru Karo →',
+    nextSection: 'Agla Section',
+    completed: 'Ho Gaya',
+    reset: 'Reset',
+    running: 'Code chal raha hai...',
+  },
+};
+
+
+
 // ─── Skulpt Loader ─────────────────────────────────────────────
 // Skulpt = lightweight Python interpreter for browsers
 // 300KB total — loads in <1 second vs Pyodide's 25MB
@@ -209,8 +267,9 @@ function XPToast({ xp, message, onClose }) {
 
 // ─── Main SectionViewer ────────────────────────────────────────
 export default function SectionViewer({
-  language, courseInfo, weekNumber, section, isCompleted, onComplete, onNext
+  language, lang = 'en', courseInfo, weekNumber, section, isCompleted, onComplete, onNext
 }) {
+  const t = UI_TEXT[lang] || UI_TEXT.en;
   const [activeTab, setActiveTab] = useState('learn');
   const [userCode, setUserCode] = useState(section.codeExample || '');
   const [output, setOutput] = useState('');
@@ -257,7 +316,7 @@ export default function SectionViewer({
   const handleRunCode = useCallback(async () => {
     if (running) return;
     setRunning(true);
-    setOutput('Running...');
+    setOutput(t.runCode);
     setOutputIsError(false);
 
     if (language === 'python') {
@@ -426,7 +485,7 @@ export default function SectionViewer({
                 {running
                   ? <Loader2 size={14} className="animate-spin" />
                   : <Play size={14} />}
-                {running ? 'Running...' : 'Run Code'}
+                {running ? t.runCode : 'Run Code'}
               </button>
 
               <span className="text-xs text-gray-700 hidden sm:block">Ctrl+Enter to run</span>
@@ -434,21 +493,21 @@ export default function SectionViewer({
               <button onClick={handleGetHint} disabled={loadingHint}
                 className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-amber-500/30 text-amber-400 text-sm hover:bg-amber-500/10 transition-all disabled:opacity-50">
                 <Lightbulb size={14} />
-                {loadingHint ? 'Getting hint...' : 'AI Hint (-5 XP)'}
+                {loadingHint ? t.gettingHint : t.aiHint}
               </button>
 
               <button onClick={handleExplainCode} disabled={loadingExplain || !userCode.trim()}
                 className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-blue-500/30 text-blue-400 text-sm hover:bg-blue-500/10 transition-all disabled:opacity-50">
                 <Bot size={14} />
-                {loadingExplain ? 'Explaining...' : 'Explain My Code'}
+                {loadingExplain ? t.explaining : t.explainCode}
               </button>
             </div>
 
             {/* Output */}
-            {output && output !== 'Running...' && (
+            {output && output !== t.runCode && (
               <div className="mt-4 bg-[#0d1117] border border-white/10 rounded-xl overflow-hidden">
                 <div className="px-4 py-2 bg-white/[0.02] border-b border-white/5 flex items-center justify-between">
-                  <span className="text-xs text-gray-600 font-mono">Output</span>
+                  <span className="text-xs text-gray-600 font-mono">{t.output}</span>
                   <span className={`text-xs px-2 py-0.5 rounded ${outputIsError
                     ? 'text-red-400 bg-red-500/10'
                     : 'text-green-400 bg-green-500/10'}`}>
@@ -462,7 +521,7 @@ export default function SectionViewer({
             )}
 
             {/* Running indicator */}
-            {output === 'Running...' && (
+            {output === t.runCode && (
               <div className="mt-4 flex items-center gap-2 text-gray-500 text-sm">
                 <Loader2 size={14} className="animate-spin" />
                 Running your code...
@@ -496,12 +555,12 @@ export default function SectionViewer({
           <div className="max-w-2xl">
             <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-8 text-center">
               <div className="text-5xl mb-4">🎯</div>
-              <h3 className="text-xl font-bold text-white mb-2">Section Quiz</h3>
+              <h3 className="text-xl font-bold text-white mb-2">{t.quizTitle}</h3>
               <p className="text-gray-500 mb-2">
-                {section.quiz?.length || 3} questions · 70% se zyada score karo to pass
+                {t.quizDesc(section.quiz?.length || 3)}
               </p>
               <p className="text-sm text-violet-400 mb-6">
-                Pass karo to +30 XP milega aur next section unlock hoga!
+                {t.quizXp}
               </p>
               <button onClick={() => setShowQuiz(true)}
                 className={`px-8 py-3 rounded-xl bg-gradient-to-r ${courseInfo?.color} text-white font-medium hover:opacity-90 transition-all`}>

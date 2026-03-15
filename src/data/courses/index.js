@@ -1,6 +1,6 @@
 /**
  * StudyEarn AI — CodeLearn Course Registry
- * All 5 languages ka metadata aur lazy loading
+ * Python available, rest coming soon
  */
 
 export const COURSE_REGISTRY = [
@@ -8,7 +8,7 @@ export const COURSE_REGISTRY = [
     id: 'python',
     name: 'Python',
     emoji: '🐍',
-    tagline: 'AI, Web, Data Science — sab kuch',
+    tagline: 'AI, Web, Data Science — everything',
     difficulty: 'Beginner Friendly',
     color: 'from-yellow-500 to-green-500',
     bgClass: 'bg-yellow-500/10 border-yellow-500/30',
@@ -18,7 +18,7 @@ export const COURSE_REGISTRY = [
     totalWeeks: 12,
     totalSections: 48,
     jobRoles: ['Python Developer', 'Data Scientist', 'AI Engineer', 'Backend Developer'],
-    status: 'available', // available | coming_soon
+    status: 'available',
   },
   {
     id: 'c',
@@ -34,7 +34,7 @@ export const COURSE_REGISTRY = [
     totalWeeks: 12,
     totalSections: 48,
     jobRoles: ['System Programmer', 'Embedded Developer', 'Game Developer', 'OS Developer'],
-    status: 'available',
+    status: 'coming_soon',
   },
   {
     id: 'html',
@@ -50,7 +50,7 @@ export const COURSE_REGISTRY = [
     totalWeeks: 12,
     totalSections: 48,
     jobRoles: ['Web Developer', 'Frontend Developer', 'UI Developer'],
-    status: 'available',
+    status: 'coming_soon',
   },
   {
     id: 'css',
@@ -66,7 +66,7 @@ export const COURSE_REGISTRY = [
     totalWeeks: 12,
     totalSections: 48,
     jobRoles: ['Frontend Developer', 'UI Designer', 'CSS Specialist'],
-    status: 'available',
+    status: 'coming_soon',
   },
   {
     id: 'javascript',
@@ -82,20 +82,14 @@ export const COURSE_REGISTRY = [
     totalWeeks: 12,
     totalSections: 48,
     jobRoles: ['Frontend Developer', 'Full Stack Developer', 'React Developer'],
-    status: 'available',
+    status: 'coming_soon',
   },
 ];
 
-// Course loader — data/courses/ se import karo
 export async function loadCourse(languageId) {
   const courseMap = {
     python: () => import('./python.js').then(m => m.PYTHON_COURSE),
-    // c: () => import('./c.js').then(m => m.C_COURSE),
-    // html: () => import('./html.js').then(m => m.HTML_COURSE),
-    // css: () => import('./css.js').then(m => m.CSS_COURSE),
-    // javascript: () => import('./javascript.js').then(m => m.JS_COURSE),
   };
-
   const loader = courseMap[languageId];
   if (!loader) throw new Error(`Course not found: ${languageId}`);
   return loader();
