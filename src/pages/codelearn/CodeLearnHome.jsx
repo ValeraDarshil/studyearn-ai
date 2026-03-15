@@ -111,41 +111,56 @@ export default function CodeLearnHome() {
   return (
     <div className="min-h-screen bg-[#0a0a0f] text-white">
 
+      {/* ── Fixed Top Bar: Back button + Lang toggle ── */}
+      <div className="sticky top-0 z-50 bg-[#0a0a0f]/90 border-b border-white/5 backdrop-blur-md px-4 py-3">
+        <div className="max-w-6xl mx-auto flex items-center justify-between">
+
+          {/* Back to Dashboard */}
+          <button
+            onClick={() => navigate('/app')}
+            className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors text-sm font-medium group"
+          >
+            <span className="group-hover:-translate-x-0.5 transition-transform">←</span>
+            {lang === 'hi' ? 'Dashboard' : 'Dashboard'}
+          </button>
+
+          {/* Lang toggle — top right */}
+          <div className="flex items-center gap-1 bg-white/5 border border-white/10 rounded-full p-1">
+            <button
+              onClick={() => switchLang('en')}
+              className={`px-3 py-1 rounded-full text-xs font-semibold transition-all ${
+                lang === 'en'
+                  ? 'bg-violet-600 text-white shadow-sm'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              English
+            </button>
+            <button
+              onClick={() => switchLang('hi')}
+              className={`px-3 py-1 rounded-full text-xs font-semibold transition-all ${
+                lang === 'hi'
+                  ? 'bg-violet-600 text-white shadow-sm'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              Hinglish
+            </button>
+          </div>
+        </div>
+      </div>
+
       {/* Hero */}
       <div className="relative overflow-hidden">
         <div className="absolute inset-0 bg-[linear-gradient(rgba(139,92,246,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(139,92,246,0.03)_1px,transparent_1px)] bg-[size:50px_50px]" />
 
-        <div className="relative px-4 pt-16 pb-12 text-center max-w-4xl mx-auto">
+        <div className="relative px-4 pt-12 pb-12 text-center max-w-4xl mx-auto">
 
-          {/* Top row: badge + lang toggle */}
-          <div className="flex items-center justify-center gap-4 mb-6 flex-wrap">
+          {/* Badge only */}
+          <div className="flex items-center justify-center mb-6">
             <div className="inline-flex items-center gap-2 bg-violet-500/10 border border-violet-500/30 rounded-full px-4 py-1.5 text-sm text-violet-300">
               <span className="w-2 h-2 bg-violet-400 rounded-full animate-pulse" />
               {t.badge}
-            </div>
-
-            {/* Language toggle */}
-            <div className="flex items-center gap-1 bg-white/5 border border-white/10 rounded-full p-1">
-              <button
-                onClick={() => switchLang('en')}
-                className={`px-3 py-1 rounded-full text-xs font-semibold transition-all ${
-                  lang === 'en'
-                    ? 'bg-violet-600 text-white shadow-sm'
-                    : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                English
-              </button>
-              <button
-                onClick={() => switchLang('hi')}
-                className={`px-3 py-1 rounded-full text-xs font-semibold transition-all ${
-                  lang === 'hi'
-                    ? 'bg-violet-600 text-white shadow-sm'
-                    : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                Hinglish
-              </button>
             </div>
           </div>
 
