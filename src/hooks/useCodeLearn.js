@@ -7,10 +7,26 @@ import axios from 'axios';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://your-render-backend.onrender.com';
 
+// ── Admin emails — bypass all section locks for testing ──────
+const ADMIN_EMAILS = ['manavvalera1@gmail.com'];
+
+function isAdminUser() {
+  try {
+    const token = localStorage.getItem('token');
+    if (!token) return false;
+    // Decode JWT payload (base64) to get email — no library needed
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return ADMIN_EMAILS.includes(payload?.email);
+  } catch {
+    return false;
+  }
+}
+
 export function useCodeLearn(language) {
   const [progress, setProgress] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isAdmin] = useState(() => isAdminUser());
 
   const getToken = () => localStorage.getItem('token');
   const headers = () => ({ Authorization: `Bearer ${getToken()}` });
@@ -42,17 +58,20 @@ export function useCodeLearn(language) {
 
   // Check if a section is completed
   const isSectionCompleted = useCallback((sectionId) => {
+    if (isAdmin) return true; // Admin bypass — all sections accessible
     return progress?.sections?.some(s => s.sectionId === sectionId && s.completed) || false;
-  }, [progress]);
+  }, [progress, isAdmin]);
 
   // Check if a section's quiz was passed (score >= 70)
   const isSectionQuizPassed = useCallback((sectionId) => {
+    if (isAdmin) return true; // Admin bypass — all sections unlocked
     const sec = progress?.sections?.find(s => s.sectionId === sectionId);
     return sec ? (sec.quizScore != null && sec.quizScore >= 70) : false;
-  }, [progress]);
+  }, [progress, isAdmin]);
 
   // Check if a section is unlocked — ONLY after previous section's quiz is passed 70%+
   const isSectionUnlocked = useCallback((weekNumber, sectionIndex, sections) => {
+    if (isAdmin) return true; // Admin bypass — all sections unlocked
     if (weekNumber === 1 && sectionIndex === 0) return true; // First section always unlocked
 
     // Previous section's quiz must be PASSED (>=70%) to unlock next
