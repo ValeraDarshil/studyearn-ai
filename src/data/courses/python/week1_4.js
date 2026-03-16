@@ -1627,14 +1627,9 @@ print("Phones found:", phones)
   ],
 };
 
-import { PYTHON_MONTH_2 } from './python_month2.js';
-import { PYTHON_MONTH_3 } from './python_month3.js';
-import { PYTHON_ALL_EN, applyEnglishTranslations } from './python_en.js';
+// Month 2 weeks imported in index.js
 
-// Merge all weeks (Month 1 already in PYTHON_COURSE.weeks above)
-PYTHON_COURSE.weeks = [...PYTHON_COURSE.weeks, ...PYTHON_MONTH_2, ...PYTHON_MONTH_3];
+// Translations applied in index.js
 
-// Apply English translations to all 48 sections
-PYTHON_COURSE.weeks = applyEnglishTranslations(PYTHON_COURSE.weeks, PYTHON_ALL_EN);
-
-export default PYTHON_COURSE;
+// Weeks 5-12 and translations are merged in python/index.js
+export { PYTHON_COURSE };
