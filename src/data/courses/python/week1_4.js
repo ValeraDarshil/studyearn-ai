@@ -1632,4 +1632,3 @@ print("Phones found:", phones)
 // Translations applied in index.js
 
 // Weeks 5-12 and translations are merged in python/index.js
-export { PYTHON_COURSE };
