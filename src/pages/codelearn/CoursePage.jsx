@@ -139,10 +139,11 @@ export default function CoursePage() {
               const weekStarted = week.sections.some(s => isSectionCompleted(s.id));
               const isExpanded = expandedWeek === week.week;
 
-              // Week unlock logic
-              const weekUnlocked = week.week === 1 || courseData.weeks
-                .find(w => w.week === week.week - 1)
-                ?.sections.every(s => isSectionQuizPassed(s.id));
+              // Week unlock logic — uses isSectionQuizPassed (admin = always true)
+              const weekUnlocked = week.week === 1 || isSectionUnlocked(week.week, 0, week.sections) ||
+                courseData.weeks
+                  .find(w => w.week === week.week - 1)
+                  ?.sections.every(s => isSectionQuizPassed(s.id));
 
               return (
                 <div key={week.week} className="mb-2">
@@ -186,7 +187,7 @@ export default function CoursePage() {
                     <div className="ml-4 mt-1 space-y-0.5">
                       {week.sections.map((section, idx) => {
                         const completed = isSectionCompleted(section.id);
-                        const unlocked = weekUnlocked && (idx === 0 || isSectionQuizPassed(week.sections[idx - 1].id));
+                        const unlocked = weekUnlocked && isSectionUnlocked(week.week, idx, week.sections);
                         const isActive = selectedSection?.section?.id === section.id;
 
                         return (

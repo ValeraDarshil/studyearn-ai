@@ -5,7 +5,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'https://studyearn-backend.onrender.com';
+const API_BASE = import.meta.env.VITE_API_URL || 'https://your-render-backend.onrender.com';
 
 // ── Admin emails — bypass all section locks for testing ──────
 const ADMIN_EMAILS = ['manavvalera1@gmail.com'];
