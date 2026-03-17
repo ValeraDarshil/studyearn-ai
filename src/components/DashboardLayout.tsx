@@ -356,8 +356,7 @@ export function DashboardLayout() {
     { icon: Gift,         label: 'My Points',       path: '/app/rewards' },
     { icon: Trophy,       label: 'Leaderboard',     path: '/app/leaderboard' },
     { icon: Users,        label: 'Refer Friends',   path: '/app/refer', badge: '+100 pts' },
-    // ── CodeLearn — new section ──
-    { icon: Code2,        label: 'Code Learn',      path: '/codelearn', badge: 'NEW', external: true },
+    { icon: Code2,        label: 'Code Learn',      path: '/codelearn', badge: 'NEW' },
     { icon: User,         label: 'Profile',         path: '/app/profile' },
   ];
 
@@ -459,57 +458,40 @@ export function DashboardLayout() {
 
         {/* Nav — scrollable, logout always visible */}
         <nav className="flex-1 overflow-y-auto px-3 pb-6 space-y-0.5" style={{ overscrollBehavior: 'contain' }}>
-          {navItemsFull.map((item) => {
-            // CodeLearn is external — use navigate instead of NavLink
-            if ('external' in item && item.external) {
-              return (
-                <button
-                  key={item.path}
-                  onClick={() => { navigate(item.path); setSidebarOpen(false); }}
-                  className="relative w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 group/nav text-slate-400 hover:text-white hover:bg-white/[0.03] border border-transparent"
-                >
-                  <item.icon className="w-4 h-4 flex-shrink-0 transition-all duration-200 group-hover/nav:text-white" />
+          {navItemsFull.map((item) => (
+            <NavLink
+              key={item.path}
+              to={item.path}
+              end={item.path === '/app'}
+              onClick={() => setSidebarOpen(false)}
+              className={({ isActive }) =>
+                `relative flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 group/nav ${
+                  isActive
+                    ? 'bg-gradient-to-r from-blue-500/10 to-purple-500/10 text-white border border-blue-500/20'
+                    : 'text-slate-400 hover:text-white hover:bg-white/[0.03] border border-transparent'
+                }`
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  {isActive && (
+                    <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-r-full bg-gradient-to-b from-blue-400 to-purple-500" />
+                  )}
+                  <item.icon className={`w-4 h-4 flex-shrink-0 transition-all duration-200 ${isActive ? 'text-blue-400' : 'group-hover/nav:text-white'}`} />
                   <span className="truncate flex-1">{item.label}</span>
-                  {item.badge && (
-                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-violet-500/15 text-violet-400 border border-violet-500/20 flex-shrink-0">
+                  {'badge' in item && item.badge && !isActive && (
+                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0 ${
+                      item.badge === 'NEW'
+                        ? 'bg-violet-500/15 text-violet-400 border border-violet-500/20'
+                        : 'bg-green-500/15 text-green-400 border border-green-500/20'
+                    }`}>
                       {item.badge}
                     </span>
                   )}
-                </button>
-              );
-            }
-
-            return (
-              <NavLink
-                key={item.path}
-                to={item.path}
-                end={item.path === '/app'}
-                onClick={() => setSidebarOpen(false)}
-                className={({ isActive }) =>
-                  `relative flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 group/nav ${
-                    isActive
-                      ? 'bg-gradient-to-r from-blue-500/10 to-purple-500/10 text-white border border-blue-500/20'
-                      : 'text-slate-400 hover:text-white hover:bg-white/[0.03] border border-transparent'
-                  }`
-                }
-              >
-                {({ isActive }) => (
-                  <>
-                    {isActive && (
-                      <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-r-full bg-gradient-to-b from-blue-400 to-purple-500" />
-                    )}
-                    <item.icon className={`w-4 h-4 flex-shrink-0 transition-all duration-200 ${isActive ? 'text-blue-400' : 'group-hover/nav:text-white'}`} />
-                    <span className="truncate flex-1">{item.label}</span>
-                    {'badge' in item && item.badge && !isActive && (
-                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-green-500/15 text-green-400 border border-green-500/20 flex-shrink-0">
-                        {item.badge}
-                      </span>
-                    )}
-                  </>
-                )}
-              </NavLink>
-            );
-          })}
+                </>
+              )}
+            </NavLink>
+          ))}
 
           {/* Sign Out */}
           <div className="pt-2 mt-2 border-t border-white/8">
