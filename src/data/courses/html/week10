@@ -1,0 +1,1348 @@
+/** 
+ *HTML Course — Week 10: JavaScript APIs — Fetch, Promises, Async/Await
+ */
+
+export const HTML_WEEK_10 = {
+  week: 10,
+  title: 'JavaScript APIs — Internet se Data Lao',
+  title_en: 'JavaScript APIs — Fetching Data from the Internet',
+  description: 'Fetch API se real-world data lao aur dynamic webpages banao!',
+  description_en: 'Use the Fetch API to get real-world data and build dynamic webpages!',
+  xpReward: 260,
+  sections: [
+    {
+      id: 'html-w10-s1',
+      title: 'Fetch API aur Promises',
+      title_en: 'Fetch API and Promises',
+      emoji: '🌐',
+      content: `## Fetch API — Internet se Data Lao!
+
+### Basic Fetch
+
+\`\`\`js
+// Promise-based
+fetch('https://api.example.com/data')
+  .then(response => response.json())
+  .then(data => {
+    console.log(data);
+  })
+  .catch(error => {
+    console.error('Error:', error);
+  });
+\`\`\`
+
+### Async/Await (Modern, Readable)
+
+\`\`\`js
+async function getData() {
+  try {
+    const response = await fetch('https://api.example.com/data');
+
+    if (!response.ok) {
+      throw new Error(\`HTTP error! status: \${response.status}\`);
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error:', error);
+  }
+}
+\`\`\`
+
+### Free APIs to Practice
+
+\`\`\`
+JSONPlaceholder (fake data):
+  https://jsonplaceholder.typicode.com/users
+  https://jsonplaceholder.typicode.com/posts
+  https://jsonplaceholder.typicode.com/todos
+
+Random User (fake profiles):
+  https://randomuser.me/api/?results=10
+
+Fun APIs:
+  https://api.chucknorris.io/jokes/random
+  https://official-joke-api.appspot.com/random_joke
+  https://api.adviceslip.com/advice
+
+Open Data:
+  https://restcountries.com/v3.1/all
+  https://api.coindesk.com/v1/bpi/currentprice.json
+\`\`\`
+
+### Fetch with Loading State
+
+\`\`\`js
+async function loadUsers() {
+  const container = document.getElementById('users');
+
+  // Loading state dikhao
+  container.innerHTML = '<div class="loading">Loading... ⏳</div>';
+
+  try {
+    const res  = await fetch('https://jsonplaceholder.typicode.com/users');
+    const data = await res.json();
+
+    // Data render karo
+    container.innerHTML = data.map(user => \`
+      <div class="card">
+        <h3>\${user.name}</h3>
+        <p>📧 \${user.email}</p>
+        <p>🌐 \${user.website}</p>
+      </div>
+    \`).join('');
+
+  } catch (error) {
+    container.innerHTML = \`<div class="error">❌ Data load nahi hua: \${error.message}</div>\`;
+  }
+}
+\`\`\`
+
+### POST Request (Data Bhejno)
+
+\`\`\`js
+async function createPost(title, body) {
+  try {
+    const res = await fetch('https://jsonplaceholder.typicode.com/posts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, body, userId: 1 })
+    });
+
+    const data = await res.json();
+    console.log('Created:', data);  // { id: 101, title: ..., body: ... }
+    return data;
+  } catch (error) {
+    console.error('Error:', error);
+  }
+}
+\`\`\`
+
+### Promise.all — Multiple APIs Ek Saath
+
+\`\`\`js
+async function loadDashboard() {
+  const [users, posts, todos] = await Promise.all([
+    fetch('https://jsonplaceholder.typicode.com/users').then(r => r.json()),
+    fetch('https://jsonplaceholder.typicode.com/posts').then(r => r.json()),
+    fetch('https://jsonplaceholder.typicode.com/todos').then(r => r.json()),
+  ]);
+
+  console.log(users.length, posts.length, todos.length);
+}
+\`\`\``,
+      content_en: `## Fetch API — Get Data from the Internet!
+
+### Basic Fetch
+
+\`\`\`js
+fetch('https://api.example.com/data')
+  .then(response => response.json())
+  .then(data => console.log(data))
+  .catch(error => console.error('Error:', error));
+\`\`\`
+
+### Async/Await (Modern, Readable)
+
+\`\`\`js
+async function getData() {
+  try {
+    const response = await fetch('https://api.example.com/data');
+    if (!response.ok) throw new Error(\`HTTP error! status: \${response.status}\`);
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error:', error);
+  }
+}
+\`\`\`
+
+### Free APIs to Practice
+
+\`\`\`
+JSONPlaceholder:  https://jsonplaceholder.typicode.com/users
+Random User:      https://randomuser.me/api/?results=10
+Jokes:            https://official-joke-api.appspot.com/random_joke
+Countries:        https://restcountries.com/v3.1/all
+\`\`\`
+
+### Fetch with Loading State
+
+\`\`\`js
+async function loadUsers() {
+  const container = document.getElementById('users');
+  container.innerHTML = '<div class="loading">Loading... ⏳</div>';
+
+  try {
+    const res  = await fetch('https://jsonplaceholder.typicode.com/users');
+    const data = await res.json();
+    container.innerHTML = data.map(user => \`
+      <div class="card">
+        <h3>\${user.name}</h3>
+        <p>📧 \${user.email}</p>
+      </div>
+    \`).join('');
+  } catch (error) {
+    container.innerHTML = \`<div class="error">❌ Failed to load: \${error.message}</div>\`;
+  }
+}
+\`\`\`
+
+### POST Request
+
+\`\`\`js
+async function createPost(title, body) {
+  const res = await fetch('https://jsonplaceholder.typicode.com/posts', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title, body, userId: 1 })
+  });
+  return res.json();
+}
+\`\`\`
+
+### Promise.all — Multiple APIs at Once
+
+\`\`\`js
+const [users, posts] = await Promise.all([
+  fetch('https://jsonplaceholder.typicode.com/users').then(r => r.json()),
+  fetch('https://jsonplaceholder.typicode.com/posts').then(r => r.json()),
+]);
+\`\`\``,
+      codeExample: `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Fetch API Demo</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: Arial, sans-serif; background: #0f172a; color: #e2e8f0; padding: 24px 20px; }
+    h1 { font-size: 26px; margin-bottom: 6px; }
+    p  { color: #64748b; margin-bottom: 24px; font-size: 14px; }
+    .tabs { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+    .tab-btn { padding: 8px 20px; background: #1e293b; border: 1px solid rgba(99,102,241,0.2); color: #94a3b8; border-radius: 8px; cursor: pointer; font-size: 14px; transition: all 0.2s; }
+    .tab-btn.active { background: #6366f1; color: white; border-color: #6366f1; }
+    #output { min-height: 200px; }
+    .user-card { background: #1e293b; border: 1px solid rgba(99,102,241,0.15); border-radius: 12px; padding: 16px; margin-bottom: 12px; display: flex; align-items: center; gap: 16px; }
+    .avatar { width: 48px; height: 48px; background: linear-gradient(135deg,#6366f1,#a78bfa); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 800; color: white; flex-shrink: 0; }
+    .user-info h3 { font-size: 15px; margin-bottom: 4px; }
+    .user-info p  { color: #64748b; font-size: 13px; margin: 0; }
+    .joke-card { background: #1e293b; border: 1px solid rgba(99,102,241,0.15); border-radius: 12px; padding: 24px; text-align: center; }
+    .joke-setup { font-size: 18px; margin-bottom: 16px; }
+    .joke-punch { font-size: 22px; font-weight: 700; color: #a78bfa; }
+    .skeleton { background: linear-gradient(90deg,#1e293b 0%,#334155 50%,#1e293b 100%); background-size: 200%; animation: shimmer 1.5s linear infinite; border-radius: 8px; }
+    @keyframes shimmer { 0%{background-position:-200%} 100%{background-position:200%} }
+    .loading-card { height: 76px; border-radius: 12px; margin-bottom: 12px; }
+    .btn { padding: 10px 20px; background: #6366f1; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; transition: all 0.2s; margin-top: 12px; }
+    .btn:hover { background: #4f46e5; transform: translateY(-2px); }
+    .error-msg { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); color: #ef4444; padding: 16px; border-radius: 10px; font-size: 14px; }
+    .post-card { background: #1e293b; border: 1px solid rgba(99,102,241,0.15); border-radius: 10px; padding: 16px; margin-bottom: 10px; }
+    .post-card h3 { font-size: 14px; text-transform: capitalize; margin-bottom: 8px; color: #a78bfa; }
+    .post-card p  { color: #64748b; font-size: 13px; line-height: 1.5; }
+  </style>
+</head>
+<body>
+
+  <h1>🌐 Fetch API Demo</h1>
+  <p>Real APIs se data fetch karo — click karo!</p>
+
+  <div class="tabs">
+    <button class="tab-btn active" onclick="loadTab('users', this)">👥 Users</button>
+    <button class="tab-btn" onclick="loadTab('joke',  this)">😂 Joke</button>
+    <button class="tab-btn" onclick="loadTab('posts', this)">📝 Posts</button>
+  </div>
+
+  <div id="output">
+    <div class="skeleton loading-card"></div>
+    <div class="skeleton loading-card"></div>
+    <div class="skeleton loading-card" style="height:56px"></div>
+  </div>
+
+  <script>
+    function showLoading(count = 3, h = 76) {
+      document.getElementById('output').innerHTML =
+        Array(count).fill(\`<div class="skeleton loading-card" style="height:\${h}px"></div>\`).join('');
+    }
+
+    async function loadTab(tab, btn) {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      if (tab === 'users') await loadUsers();
+      if (tab === 'joke')  await loadJoke();
+      if (tab === 'posts') await loadPosts();
+    }
+
+    async function loadUsers() {
+      showLoading(5);
+      try {
+        const res  = await fetch('https://jsonplaceholder.typicode.com/users');
+        const data = await res.json();
+        document.getElementById('output').innerHTML = data.map(u => \`
+          <div class="user-card">
+            <div class="avatar">\${u.name[0]}</div>
+            <div class="user-info">
+              <h3>\${u.name}</h3>
+              <p>📧 \${u.email} &nbsp;·&nbsp; 🌐 \${u.website}</p>
+              <p>🏙️ \${u.address.city} &nbsp;·&nbsp; 🏢 \${u.company.name}</p>
+            </div>
+          </div>
+        \`).join('');
+      } catch (e) {
+        document.getElementById('output').innerHTML = \`<div class="error-msg">❌ \${e.message}</div>\`;
+      }
+    }
+
+    async function loadJoke() {
+      showLoading(1, 120);
+      try {
+        const res  = await fetch('https://official-joke-api.appspot.com/random_joke');
+        const joke = await res.json();
+        document.getElementById('output').innerHTML = \`
+          <div class="joke-card">
+            <div class="joke-setup">🤔 \${joke.setup}</div>
+            <div class="joke-punch">😂 \${joke.punchline}</div>
+            <button class="btn" onclick="loadJoke(document.querySelector('.tab-btn.active'))">Another Joke 🎲</button>
+          </div>
+        \`;
+      } catch (e) {
+        document.getElementById('output').innerHTML = \`<div class="error-msg">❌ \${e.message}</div>\`;
+      }
+    }
+
+    async function loadPosts() {
+      showLoading(5, 90);
+      try {
+        const res   = await fetch('https://jsonplaceholder.typicode.com/posts?_limit=5');
+        const posts = await res.json();
+        document.getElementById('output').innerHTML = posts.map(p => \`
+          <div class="post-card">
+            <h3>\${p.title}</h3>
+            <p>\${p.body.substring(0, 100)}...</p>
+          </div>
+        \`).join('');
+      } catch (e) {
+        document.getElementById('output').innerHTML = \`<div class="error-msg">❌ \${e.message}</div>\`;
+      }
+    }
+
+    // Load users by default
+    loadUsers();
+  </script>
+
+</body>
+</html>`,
+      codeExample_en: `<!-- Same demo — text labels are already in English. See Hinglish version for the complete working Fetch API demo. -->`,
+      task: {
+        description: 'Ek "Country Explorer" app banao using https://restcountries.com/v3.1/all API. Features: (1) Saare countries load karo on start (loading skeleton show karo), (2) Search box — real-time filter by country name, (3) Region filter — All, Asia, Europe, Africa, Americas, (4) Country card — flag, name, population, capital, region, (5) Card click pe detailed modal — all details, (6) Sort by population (high/low), (7) localStorage mein favourite countries save karo (heart button), (8) Favourites tab.',
+        description_en: 'Build a "Country Explorer" app using https://restcountries.com/v3.1/all. Features: (1) Load all countries on start (show loading skeleton), (2) Search box — real-time filter by country name, (3) Region filter — All, Asia, Europe, Africa, Americas, (4) Country card — flag, name, population, capital, region, (5) Click card for a detailed modal, (6) Sort by population (high/low), (7) Save favourite countries to localStorage (heart button), (8) Favourites tab.',
+        hint: 'restcountries.com/v3.1/all se sab countries milte hain. flag: country.flags.png. population: Intl.NumberFormat().format(num) se formatted number milta hai. Modal: position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:100.',
+        hint_en: 'restcountries.com/v3.1/all returns all countries. Flag: country.flags.png. Population: Intl.NumberFormat().format(num) gives a formatted number. Modal: position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:100.',
+      },
+      quiz: [
+        {
+          q: 'async/await aur .then() mein kya fark hai?',
+          options: ['Koi fark nahi', 'Dono Promises handle karte hain — async/await zyada readable aur synchronous-looking code deta hai', 'async/await faster hai', '.then() deprecated hai'],
+          correct: 1,
+          explanation: 'Dono ka same result hai. async/await code ko synchronous-looking banata hai — nested .then() chains se zyada readable. Error handling: try/catch vs .catch(). Modern code mein async/await prefer karte hain.',
+          q_en: 'What is the difference between async/await and .then()?',
+          options_en: ['No difference', 'Both handle Promises — async/await gives more readable, synchronous-looking code', 'async/await is faster', '.then() is deprecated'],
+          explanation_en: 'Both achieve the same result. async/await makes code look synchronous — more readable than nested .then() chains. Error handling: try/catch vs .catch(). Modern code prefers async/await.',
+        },
+        {
+          q: 'response.json() kya karta hai?',
+          options: ['JSON file save karta hai', 'Response body ko JavaScript object/array mein convert karta hai', 'JSON validate karta hai', 'Response header read karta hai'],
+          correct: 1,
+          explanation: 'fetch() Response object return karta hai. .json() response body ko string se parse karke JavaScript object/array mein convert karta hai. Yeh bhi async hai, isliye await karte hain.',
+          q_en: 'What does response.json() do?',
+          options_en: ['Saves a JSON file', 'Converts the response body into a JavaScript object/array', 'Validates JSON', 'Reads the response header'],
+          explanation_en: 'fetch() returns a Response object. .json() parses the response body from a string into a JavaScript object/array. It is also async, so we await it.',
+        },
+        {
+          q: 'Promise.all() kab use karte hain?',
+          options: ['Ek API call ke liye', 'Multiple async operations parallel mein run karne ke liye — sab complete hone ka intezaar', 'Error handle karne ke liye', 'API cancel karne ke liye'],
+          correct: 1,
+          explanation: 'Promise.all([p1, p2, p3]) — sab Promises parallel mein run karta hai aur sab ke complete hone ka wait karta hai. Sequential await se tez hota hai. Agar koi bhi fail ho toh poora fail.',
+          q_en: 'When do you use Promise.all()?',
+          options_en: ['For a single API call', 'To run multiple async operations in parallel — waiting for all to complete', 'For error handling', 'For cancelling an API call'],
+          explanation_en: 'Promise.all([p1, p2, p3]) — runs all Promises in parallel and waits for all to complete. Faster than sequential awaits. If any one fails, the whole thing fails.',
+        },
+      ],
+    },
+
+    {
+      id: 'html-w10-s2',
+      title: 'JavaScript ES6+ Features',
+      title_en: 'JavaScript ES6+ Features',
+      emoji: '✨',
+      content: `## Modern JavaScript — ES6+ ki Best Features!
+
+### Destructuring
+
+\`\`\`js
+// Array destructuring
+const [first, second, ...rest] = [1, 2, 3, 4, 5];
+// first=1, second=2, rest=[3,4,5]
+
+// Object destructuring
+const { name, age, city = 'Mumbai' } = user;
+// city default value hai agar user.city undefined ho
+
+// Function parameter destructuring
+function greet({ name, age }) {
+  return \`Hello \${name}, tum \${age} saal ke ho!\`;
+}
+
+// Nested destructuring
+const { address: { city, pincode } } = user;
+
+// Rename while destructuring
+const { name: userName, email: userEmail } = user;
+\`\`\`
+
+### Spread aur Rest
+
+\`\`\`js
+// Spread — expand karo
+const arr1 = [1, 2, 3];
+const arr2 = [...arr1, 4, 5, 6]; // [1,2,3,4,5,6]
+
+const obj1 = { a: 1, b: 2 };
+const obj2 = { ...obj1, c: 3 }; // { a:1, b:2, c:3 }
+
+// Array copy
+const copy = [...original];
+
+// Object merge
+const merged = { ...defaults, ...overrides };
+
+// Function call
+Math.max(...arr1);  // Math.max(1, 2, 3)
+
+// Rest in functions
+function sum(...nums) {
+  return nums.reduce((a, b) => a + b, 0);
+}
+\`\`\`
+
+### Array Methods
+
+\`\`\`js
+const users = [
+  { name: 'Rahul', age: 21, score: 85 },
+  { name: 'Priya', age: 19, score: 92 },
+  { name: 'Arjun', age: 23, score: 78 },
+];
+
+// find — first match
+const rahul = users.find(u => u.name === 'Rahul');
+
+// findIndex
+const idx = users.findIndex(u => u.name === 'Arjun');
+
+// some — koi ek match karta hai?
+const hasTopScorer = users.some(u => u.score >= 90);
+
+// every — sab match karte hain?
+const allAdults = users.every(u => u.age >= 18);
+
+// sort
+const sorted = [...users].sort((a, b) => b.score - a.score); // descending
+
+// flat aur flatMap
+const nested = [[1,2], [3,4], [5,6]];
+nested.flat(); // [1,2,3,4,5,6]
+
+// Object.entries, Object.keys, Object.values
+Object.keys(obj);    // ['key1', 'key2']
+Object.values(obj);  // ['val1', 'val2']
+Object.entries(obj); // [['key1','val1'],['key2','val2']]
+\`\`\`
+
+### Modules (Import/Export)
+
+\`\`\`js
+// utils.js — export karo
+export const formatDate = (date) => new Date(date).toLocaleDateString();
+export const formatNumber = (n) => n.toLocaleString('en-IN');
+export default class APIService { ... }
+
+// main.js — import karo
+import APIService, { formatDate, formatNumber } from './utils.js';
+\`\`\`
+
+### Optional Chaining aur Nullish Coalescing
+
+\`\`\`js
+const user = null;
+
+// Bina optional chaining — error!
+// user.address.city → TypeError
+
+// With optional chaining
+const city = user?.address?.city;  // undefined (no error)
+
+// Nullish coalescing
+const name  = user?.name  ?? 'Guest';   // 'Guest'
+const score = user?.score ?? 0;         // 0
+
+// Combine karo
+const display = user?.profile?.avatar ?? '/default-avatar.png';
+\`\`\``,
+      content_en: `## Modern JavaScript — The Best ES6+ Features!
+
+### Destructuring
+
+\`\`\`js
+// Array destructuring
+const [first, second, ...rest] = [1, 2, 3, 4, 5];
+
+// Object destructuring
+const { name, age, city = 'Mumbai' } = user;
+
+// Function parameter destructuring
+function greet({ name, age }) {
+  return \`Hello \${name}, you are \${age} years old!\`;
+}
+
+// Rename while destructuring
+const { name: userName, email: userEmail } = user;
+\`\`\`
+
+### Spread and Rest
+
+\`\`\`js
+const arr2   = [...arr1, 4, 5, 6];
+const obj2   = { ...obj1, c: 3 };
+const copy   = [...original];
+const merged = { ...defaults, ...overrides };
+
+function sum(...nums) {
+  return nums.reduce((a, b) => a + b, 0);
+}
+\`\`\`
+
+### Array Methods
+
+\`\`\`js
+const rahul  = users.find(u => u.name === 'Rahul');
+const hasTop = users.some(u => u.score >= 90);
+const allAd  = users.every(u => u.age >= 18);
+const sorted = [...users].sort((a, b) => b.score - a.score);
+
+Object.keys(obj);    // ['key1', 'key2']
+Object.values(obj);  // ['val1', 'val2']
+Object.entries(obj); // [['key1','val1'], ...]
+\`\`\`
+
+### Modules
+
+\`\`\`js
+// utils.js
+export const formatDate = (d) => new Date(d).toLocaleDateString();
+export default class APIService { ... }
+
+// main.js
+import APIService, { formatDate } from './utils.js';
+\`\`\`
+
+### Optional Chaining and Nullish Coalescing
+
+\`\`\`js
+const city    = user?.address?.city ?? 'Unknown';
+const name    = user?.name          ?? 'Guest';
+const display = user?.profile?.avatar ?? '/default.png';
+\`\`\``,
+      codeExample: `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ES6+ Features Demo</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family: Arial, sans-serif; background: #0f172a; color: #e2e8f0; padding: 24px 20px; }
+    h2 { color: #a78bfa; font-size: 16px; margin: 32px 0 12px; }
+    .box { background: #1e293b; border: 1px solid rgba(99,102,241,0.15); border-radius: 10px; padding: 16px; font-size: 14px; }
+    .tag { display: inline-block; padding: 3px 10px; background: rgba(99,102,241,0.15); color: #a78bfa; border-radius: 12px; font-size: 12px; margin: 2px; }
+    .user-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid rgba(99,102,241,0.1); }
+    .user-row:last-child { border: none; }
+    .rank { width: 28px; height: 28px; background: linear-gradient(135deg,#6366f1,#a78bfa); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; color: white; flex-shrink: 0; }
+    .score-bar { flex: 1; background: rgba(99,102,241,0.1); border-radius: 4px; height: 6px; overflow: hidden; }
+    .score-fill { height: 100%; background: linear-gradient(90deg,#6366f1,#a78bfa); border-radius: 4px; }
+  </style>
+</head>
+<body>
+
+  <h1 style="font-size:26px;margin-bottom:6px">✨ ES6+ Features Demo</h1>
+  <p style="color:#64748b;font-size:14px;margin-bottom:8px">Modern JavaScript features in action!</p>
+
+  <div id="output"></div>
+
+  <script>
+    const users = [
+      { name: 'Rahul Kumar',  age: 21, score: 85, city: 'Mumbai',    skills: ['HTML','CSS','JS'] },
+      { name: 'Priya Sharma', age: 19, score: 92, city: 'Delhi',     skills: ['Python','React'] },
+      { name: 'Arjun Singh',  age: 23, score: 78, city: null,        skills: ['HTML','Python'] },
+      { name: 'Neha Patel',   age: 20, score: 95, city: 'Bangalore', skills: ['CSS','JS','Node'] },
+      { name: 'Vikram Rao',   age: 22, score: 70, city: 'Chennai',   skills: ['Java','SQL'] },
+    ];
+
+    const output = document.getElementById('output');
+
+    // 1. Destructuring
+    output.innerHTML += \`
+      <h2>1. Destructuring</h2>
+      <div class="box">
+        \${users.map(({ name, age, city = 'Unknown', skills }) =>
+          \`<div class="user-row">
+            <div style="flex:1">
+              <strong>\${name}</strong><br>
+              <small style="color:#64748b">Age: \${age} · City: \${city}</small><br>
+              \${skills.map(s => \`<span class="tag">\${s}</span>\`).join('')}
+            </div>
+          </div>\`
+        ).join('')}
+      </div>
+    \`;
+
+    // 2. Sort + Spread (original array unchanged)
+    const sorted = [...users].sort((a, b) => b.score - a.score);
+    output.innerHTML += \`
+      <h2>2. Sort by Score (Spread prevents mutation)</h2>
+      <div class="box">
+        \${sorted.map((u, i) =>
+          \`<div class="user-row">
+            <div class="rank">\${i+1}</div>
+            <div style="flex:1;min-width:0">
+              <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+                <span>\${u.name}</span>
+                <strong style="color:#6366f1">\${u.score}%</strong>
+              </div>
+              <div class="score-bar"><div class="score-fill" style="width:\${u.score}%"></div></div>
+            </div>
+          </div>\`
+        ).join('')}
+      </div>
+    \`;
+
+    // 3. Array methods
+    const topScorer  = users.find(u => u.score === Math.max(...users.map(u => u.score)));
+    const avgScore   = (users.reduce((s, u) => s + u.score, 0) / users.length).toFixed(1);
+    const allAdults  = users.every(u => u.age >= 18);
+    const hasExpert  = users.some(u => u.score >= 90);
+    const allSkills  = [...new Set(users.flatMap(u => u.skills))];
+
+    output.innerHTML += \`
+      <h2>3. Array Methods (find, every, some, flatMap, Set)</h2>
+      <div class="box">
+        <p>🏆 Top Scorer: <strong>\${topScorer.name}</strong> (\${topScorer.score}%)</p>
+        <p>📊 Average: <strong>\${avgScore}%</strong></p>
+        <p>👤 All Adults: <strong>\${allAdults ? '✅ Yes' : '❌ No'}</strong></p>
+        <p>🌟 Expert Scorer (90%+): <strong>\${hasExpert ? '✅ Yes' : '❌ No'}</strong></p>
+        <p style="margin-top:8px">🛠 All Skills: \${allSkills.map(s => \`<span class="tag">\${s}</span>\`).join('')}</p>
+      </div>
+    \`;
+
+    // 4. Optional chaining + nullish coalescing
+    output.innerHTML += \`
+      <h2>4. Optional Chaining + Nullish Coalescing</h2>
+      <div class="box">
+        \${users.map(u =>
+          \`<p>\${u.name}: City = <strong>\${u?.city ?? 'Unknown 🏙️'}</strong></p>\`
+        ).join('')}
+      </div>
+    \`;
+  </script>
+
+</body>
+</html>`,
+      codeExample_en: `<!-- Same demo in English — all JS logic is identical. See Hinglish version for the complete working ES6+ features showcase. -->`,
+      task: {
+        description: 'Ek "StudyEarn Dashboard" page banao ES6+ features use karke. JSONPlaceholder API se data fetch karo. Dashboard show kare: (1) Users list — destructuring se name/email/company nikalo, (2) Posts summary — find karke user ke posts count dikhao, (3) Todo stats — filter karke completed vs pending count, (4) Leaderboard — users ko sort karo algo-generated score se (todos completed / total * 100), (5) Skills cloud — flatMap se all unique company domains nikalo, (6) Search bar — real-time filter users by name.',
+        description_en: 'Build a "StudyEarn Dashboard" page using ES6+ features. Fetch data from JSONPlaceholder API. Dashboard should show: (1) Users list — extract name/email/company using destructuring, (2) Posts summary — find and show post count per user, (3) Todo stats — filter completed vs pending count, (4) Leaderboard — sort users by algo-generated score (todos completed / total * 100), (5) Skills cloud — extract all unique company domains using flatMap, (6) Search bar — real-time filter users by name.',
+        hint: 'Promise.all se users, todos, posts ek saath fetch karo. User posts count: posts.filter(p => p.userId === user.id).length. Spread: [...new Set(arr)] se unique values nikalo. Optional chaining: user?.company?.name ?? "Unknown".',
+        hint_en: 'Fetch users, todos, and posts at once with Promise.all. User post count: posts.filter(p => p.userId === user.id).length. Spread: [...new Set(arr)] for unique values. Optional chaining: user?.company?.name ?? "Unknown".',
+      },
+      quiz: [
+        {
+          q: 'Spread operator (...) array sort karne se pehle kyun use karte hain?',
+          options: ['Performance ke liye', 'Sort original array mutate karta hai — spread se copy pe sort karo', 'Syntax ke liye', 'Sort kaam nahi karta bina spread ke'],
+          correct: 1,
+          explanation: 'Array.sort() original array ko in-place sort karta hai (mutate). [...arr].sort() pehle copy banata hai phir sort karta hai — original array unchanged rehta hai. React mein bhi yahi best practice hai!',
+          q_en: 'Why do you use the spread operator (...) before sorting an array?',
+          options_en: ['For performance', 'sort() mutates the original array — spread to sort a copy instead', 'For syntax', 'sort() does not work without spread'],
+          explanation_en: 'Array.sort() sorts the original array in place (mutates it). [...arr].sort() first creates a copy then sorts it — the original array remains unchanged. This is also best practice in React!',
+        },
+        {
+          q: '[...new Set(array)] kya karta hai?',
+          options: ['Array shuffle karta hai', 'Duplicate values hata ke unique values ka new array deta hai', 'Array reverse karta hai', 'Array khali karta hai'],
+          correct: 1,
+          explanation: 'Set sirf unique values store karta hai. new Set([1,2,2,3]) → Set{1,2,3}. Spread se wapis array mein convert karo: [...new Set([1,2,2,3])] → [1,2,3].',
+          q_en: 'What does [...new Set(array)] do?',
+          options_en: ['Shuffles the array', 'Removes duplicate values and returns a new array of unique values', 'Reverses the array', 'Empties the array'],
+          explanation_en: 'Set only stores unique values. new Set([1,2,2,3]) → Set{1,2,3}. Spread converts it back to an array: [...new Set([1,2,2,3])] → [1,2,3].',
+        },
+        {
+          q: 'Object destructuring mein default value kaise dete hain?',
+          options: ['{ name = "default" } = obj', '{ name: "default" } = obj', '{ name || "default" } = obj', 'name = obj.name || "default"'],
+          correct: 0,
+          explanation: '{ name = "default" } = obj — agar obj.name undefined hai toh name ki value "default" hogi. Colon (:) rename ke liye hota hai: { name: userName } = obj — obj.name ko userName variable mein store karo.',
+          q_en: 'How do you provide a default value in object destructuring?',
+          options_en: ['{ name = "default" } = obj', '{ name: "default" } = obj', '{ name || "default" } = obj', 'name = obj.name || "default"'],
+          explanation_en: '{ name = "default" } = obj — if obj.name is undefined, name will be "default". The colon (:) is for renaming: { name: userName } = obj — stores obj.name in the userName variable.',
+        },
+      ],
+    },
+
+    {
+      id: 'html-w10-s3',
+      title: 'JavaScript Error Handling aur Debugging',
+      title_en: 'JavaScript Error Handling and Debugging',
+      emoji: '🐛',
+      content: `## Error Handling — Robust Code Likhna!
+
+### try/catch/finally
+
+\`\`\`js
+async function fetchData(url) {
+  try {
+    const res = await fetch(url);
+
+    if (!res.ok) {
+      throw new Error(\`HTTP \${res.status}: \${res.statusText}\`);
+    }
+
+    const data = await res.json();
+    return data;
+
+  } catch (error) {
+    if (error.name === 'TypeError') {
+      console.error('Network error — internet connection check karo');
+    } else if (error.message.includes('404')) {
+      console.error('Data nahi mila — URL check karo');
+    } else {
+      console.error('Unknown error:', error.message);
+    }
+    return null;
+
+  } finally {
+    // Hamesha run hoga — loading state hatao
+    hideLoader();
+  }
+}
+\`\`\`
+
+### Custom Errors
+
+\`\`\`js
+class APIError extends Error {
+  constructor(message, status) {
+    super(message);
+    this.name   = 'APIError';
+    this.status = status;
+  }
+}
+
+// Throw karo
+throw new APIError('User not found', 404);
+
+// Catch karo
+try { ... }
+catch (e) {
+  if (e instanceof APIError) {
+    console.error(\`API Error \${e.status}: \${e.message}\`);
+  }
+}
+\`\`\`
+
+### Debugging Tips
+
+\`\`\`js
+// console methods
+console.log('Basic:', value);
+console.error('Error:', error);
+console.warn('Warning:', msg);
+console.table(users);           // Table format mein dikhao
+console.group('API Response');
+  console.log(data);
+console.groupEnd();
+console.time('fetch');
+  await fetchData();
+console.timeEnd('fetch');       // fetch: 245ms
+
+// Debugger statement
+function buggyFunction() {
+  debugger;  // Browser DevTools mein automatically breakpoint
+  return calculation;
+}
+
+// typeof check
+typeof null;       // 'object' (gotcha!)
+typeof undefined;  // 'undefined'
+typeof 42;         // 'number'
+typeof 'hi';       // 'string'
+typeof [];         // 'object'
+Array.isArray([]); // true (better check)
+\`\`\`
+
+### Common JS Bugs aur Fixes
+
+\`\`\`js
+// Bug 1: = vs ==
+if (x = 5) { }    // ❌ assignment (always true!)
+if (x === 5) { }  // ✅ comparison
+
+// Bug 2: Async without await
+const data = fetch(url);    // ❌ Promise object, not data!
+const data = await fetch(url); // ✅
+
+// Bug 3: Array mutation in state
+state.items.push(item);     // ❌ mutates original
+state.items = [...state.items, item]; // ✅ new array
+
+// Bug 4: this in callbacks
+const obj = {
+  name: 'Rahul',
+  greet: function() {
+    setTimeout(function() {
+      console.log(this.name); // ❌ this is undefined
+    }, 1000);
+    setTimeout(() => {
+      console.log(this.name); // ✅ arrow function uses parent this
+    }, 1000);
+  }
+};
+
+// Bug 5: typeof null
+typeof null === 'object' // true — gotcha!
+null === null            // true — correct check
+\`\`\``,
+      content_en: `## Error Handling — Writing Robust Code!
+
+### try/catch/finally
+
+\`\`\`js
+async function fetchData(url) {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(\`HTTP \${res.status}: \${res.statusText}\`);
+    const data = await res.json();
+    return data;
+  } catch (error) {
+    if (error.name === 'TypeError')        console.error('Network error — check connection');
+    else if (error.message.includes('404')) console.error('Not found — check URL');
+    else                                   console.error('Unknown error:', error.message);
+    return null;
+  } finally {
+    hideLoader(); // always runs
+  }
+}
+\`\`\`
+
+### Custom Errors
+
+\`\`\`js
+class APIError extends Error {
+  constructor(message, status) {
+    super(message);
+    this.name   = 'APIError';
+    this.status = status;
+  }
+}
+
+throw new APIError('User not found', 404);
+\`\`\`
+
+### Debugging Tips
+
+\`\`\`js
+console.table(users);    // display as table
+console.time('fetch');
+  await fetchData();
+console.timeEnd('fetch'); // fetch: 245ms
+
+debugger;  // automatic breakpoint in DevTools
+
+Array.isArray([]);  // true (better than typeof)
+\`\`\`
+
+### Common JS Bugs and Fixes
+
+\`\`\`js
+if (x = 5) { }        // ❌ assignment!
+if (x === 5) { }      // ✅
+
+const data = fetch(url);       // ❌ Promise object
+const data = await fetch(url); // ✅
+
+state.items.push(item);                  // ❌ mutation
+state.items = [...state.items, item];    // ✅
+\`\`\``,
+      codeExample: `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Error Handling Demo</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family: Arial, sans-serif; background: #0f172a; color: #e2e8f0; padding: 24px 20px; }
+    .section { background: #1e293b; border: 1px solid rgba(99,102,241,0.15); border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+    h2 { color: #a78bfa; font-size: 15px; margin-bottom: 14px; }
+    .log-line { font-family: monospace; font-size: 13px; padding: 6px 10px; border-radius: 6px; margin-bottom: 4px; }
+    .log-ok    { background: rgba(16,185,129,0.1); color: #10b981; border-left: 3px solid #10b981; }
+    .log-err   { background: rgba(239,68,68,0.1);  color: #ef4444; border-left: 3px solid #ef4444; }
+    .log-warn  { background: rgba(245,158,11,0.1); color: #f59e0b; border-left: 3px solid #f59e0b; }
+    .log-info  { background: rgba(99,102,241,0.1); color: #a78bfa; border-left: 3px solid #6366f1; }
+    .btn { padding: 8px 18px; background: #6366f1; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; margin: 4px 2px; transition: all 0.2s; }
+    .btn:hover { background: #4f46e5; }
+    .btn.red { background: #ef4444; }
+    .btn.red:hover { background: #dc2626; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+    th { background: rgba(99,102,241,0.2); padding: 8px; text-align: left; color: #a78bfa; }
+    td { padding: 8px; border-bottom: 1px solid rgba(99,102,241,0.1); color: #94a3b8; }
+  </style>
+</head>
+<body>
+
+  <h1 style="font-size:26px;margin-bottom:6px">🐛 Error Handling Demo</h1>
+  <p style="color:#64748b;font-size:14px;margin-bottom:24px">Error handling patterns in action</p>
+
+  <!-- 1. try/catch demo -->
+  <div class="section">
+    <h2>1. try/catch — Different Error Types</h2>
+    <button class="btn" onclick="testFetch('good')">✅ Good URL</button>
+    <button class="btn red" onclick="testFetch('bad')">❌ Bad URL</button>
+    <button class="btn red" onclick="testFetch('network')">🔌 Network Error</button>
+    <div id="fetchLog" style="margin-top:12px"></div>
+  </div>
+
+  <!-- 2. console methods -->
+  <div class="section">
+    <h2>2. console.table() — Data kaise dekhe?</h2>
+    <button class="btn" onclick="showTable()">Show Users Table</button>
+    <div id="tableOut"></div>
+  </div>
+
+  <!-- 3. Common bug fixes -->
+  <div class="section">
+    <h2>3. Common JS Bugs — Click to See</h2>
+    <button class="btn" onclick="showBugs()">Show Bug Examples</button>
+    <div id="bugsOut"></div>
+  </div>
+
+  <script>
+    const log = (id, msg, type='info') => {
+      document.getElementById(id).innerHTML +=
+        \`<div class="log-line log-\${type}">\${msg}</div>\`;
+    };
+
+    // 1. Fetch with error handling
+    async function testFetch(type) {
+      document.getElementById('fetchLog').innerHTML = '';
+      log('fetchLog', '⏳ Fetching data...', 'info');
+
+      try {
+        let url;
+        if (type === 'good')    url = 'https://jsonplaceholder.typicode.com/users/1';
+        if (type === 'bad')     url = 'https://jsonplaceholder.typicode.com/users/999999';
+        if (type === 'network') url = 'https://this-domain-does-not-exist-abc123.com/api';
+
+        const res = await fetch(url);
+
+        if (!res.ok) {
+          throw new Error(\`HTTP \${res.status}: \${res.statusText}\`);
+        }
+
+        const data = await res.json();
+        log('fetchLog', \`✅ Success! Got user: \${data.name} (\${data.email})\`, 'ok');
+
+      } catch (error) {
+        if (error.name === 'TypeError') {
+          log('fetchLog', \`🔌 Network Error: Internet ya URL problem. (\${error.message})\`, 'err');
+        } else if (error.message.includes('404')) {
+          log('fetchLog', \`🔍 Not Found (404): URL exist nahi karta\`, 'err');
+        } else {
+          log('fetchLog', \`❌ Error: \${error.message}\`, 'err');
+        }
+      } finally {
+        log('fetchLog', '🏁 finally block: Hamesha run hoga!', 'warn');
+      }
+    }
+
+    // 2. console.table equivalent
+    function showTable() {
+      const users = [
+        { Name: 'Rahul', Score: 85, City: 'Mumbai' },
+        { Name: 'Priya', Score: 92, City: 'Delhi'  },
+        { Name: 'Arjun', Score: 78, City: 'Pune'   },
+      ];
+      document.getElementById('tableOut').innerHTML = \`
+        <table>
+          <thead><tr>\${Object.keys(users[0]).map(k=>\`<th>\${k}</th>\`).join('')}</tr></thead>
+          <tbody>\${users.map(u=>\`<tr>\${Object.values(u).map(v=>\`<td>\${v}</td>\`).join('')}</tr>\`).join('')}</tbody>
+        </table>
+      \`;
+    }
+
+    // 3. Common bugs
+    function showBugs() {
+      const bugs = [
+        { Bug: '= vs ===', Wrong: 'if (x = 5)', Right: 'if (x === 5)', Note: '= is assignment!' },
+        { Bug: 'await missing', Wrong: 'const data = fetch(url)', Right: 'const data = await fetch(url)', Note: 'Gives Promise not data' },
+        { Bug: 'Array mutation', Wrong: 'arr.push(item)', Right: 'arr = [...arr, item]', Note: 'push mutates original' },
+        { Bug: 'typeof null', Wrong: 'typeof null === "object"', Right: 'null === null', Note: 'typeof null bug in JS' },
+      ];
+      document.getElementById('bugsOut').innerHTML = \`
+        <table style="margin-top:12px">
+          <thead><tr><th>Bug</th><th style="color:#ef4444">Wrong</th><th style="color:#10b981">Right</th><th>Note</th></tr></thead>
+          <tbody>\${bugs.map(b=>\`<tr>
+            <td>\${b.Bug}</td>
+            <td style="color:#ef4444;font-family:monospace">\${b.Wrong}</td>
+            <td style="color:#10b981;font-family:monospace">\${b.Right}</td>
+            <td style="color:#64748b">\${b.Note}</td>
+          </tr>\`).join('')}</tbody>
+        </table>
+      \`;
+    }
+
+    // Auto-load table
+    showTable();
+  </script>
+
+</body>
+</html>`,
+      codeExample_en: `<!-- Same demo — all labels are already in English in the code. See Hinglish version for the full working Error Handling demo. -->`,
+      task: {
+        description: 'Apni Country Explorer app mein robust error handling add karo: (1) Network offline hone pe friendly error message, (2) API slow hone pe retry button (3 attempts), (3) Custom APIError class banao, (4) Loading states: shimmer skeleton, (5) Empty states: search result na mile toh friendly message, (6) Error boundary component — ek try/catch wrapper jo kisi bhi error ko gracefully handle kare, (7) console.table() se data DevTools mein dekho, (8) performance timing — console.time() se fetch kitna time le raha hai measure karo.',
+        description_en: 'Add robust error handling to your Country Explorer app: (1) Friendly error message when network is offline, (2) Retry button when API is slow (3 attempts), (3) Build a custom APIError class, (4) Loading states: shimmer skeleton, (5) Empty states: friendly message when search finds nothing, (6) Error boundary — a try/catch wrapper that gracefully handles any error, (7) View data in DevTools with console.table(), (8) Performance timing — measure fetch time with console.time().',
+        hint: 'Network check: navigator.onLine. Retry: for(let i=0;i<3;i++) { try { return await fetch(); } catch(e) { if(i===2) throw e; await sleep(1000); } }. sleep: const sleep = ms => new Promise(r => setTimeout(r, ms)).',
+        hint_en: 'Network check: navigator.onLine. Retry: for(let i=0;i<3;i++) { try { return await fetch(); } catch(e) { if(i===2) throw e; await sleep(1000); } }. sleep: const sleep = ms => new Promise(r => setTimeout(r, ms)).',
+      },
+      quiz: [
+        {
+          q: 'finally block kab run hota hai?',
+          options: ['Sirf success pe', 'Sirf error pe', 'Hamesha — success ya error dono cases mein', 'Kabhi nahi'],
+          correct: 2,
+          explanation: 'finally block hamesha run hota hai — try successful ho ya catch mein error aaye. Loading spinner hide karne, resources cleanup karne, logs lene ke liye perfect!',
+          q_en: 'When does the finally block run?',
+          options_en: ['Only on success', 'Only on error', 'Always — both on success and error', 'Never'],
+          explanation_en: 'The finally block always runs — whether try succeeded or catch caught an error. Perfect for hiding loading spinners, cleaning up resources, and logging!',
+        },
+        {
+          q: '=== (strict equality) aur == (loose equality) mein kya fark hai?',
+          options: ['Koi fark nahi', '=== type aur value dono check karta hai, == sirf value check karta hai (type coercion karta hai)', '== faster hai', '=== sirf numbers ke liye hai'],
+          correct: 1,
+          explanation: '0 == false → true (loose), 0 === false → false (strict). "1" == 1 → true (loose), "1" === 1 → false (strict). Hamesha === use karo unexpected results se bachne ke liye!',
+          q_en: 'What is the difference between === (strict equality) and == (loose equality)?',
+          options_en: ['No difference', '=== checks both type AND value, == only checks value (with type coercion)', '== is faster', '=== is only for numbers'],
+          explanation_en: '0 == false → true (loose), 0 === false → false (strict). "1" == 1 → true (loose), "1" === 1 → false (strict). Always use === to avoid unexpected results!',
+        },
+        {
+          q: 'navigator.onLine kya detect karta hai?',
+          options: ['User logged in hai ya nahi', 'Browser internet se connected hai ya nahi', 'Page online hai ya nahi', 'Server status'],
+          correct: 1,
+          explanation: 'navigator.onLine = true agar browser internet se connected hai. False agar offline. window.addEventListener("offline", handler) se offline event bhi sun sakte ho.',
+          q_en: 'What does navigator.onLine detect?',
+          options_en: ['Whether the user is logged in', 'Whether the browser is connected to the internet', 'Whether the page is online', 'Server status'],
+          explanation_en: 'navigator.onLine = true if the browser is connected to the internet. False if offline. You can also listen to window.addEventListener("offline", handler) for the offline event.',
+        },
+      ],
+    },
+
+    {
+      id: 'html-w10-s4',
+      title: 'Week 10 Project — Weather App',
+      title_en: 'Week 10 Project — Weather App',
+      emoji: '🌤️',
+      content: `## Week 10 Project — Weather App with Real API!
+
+Ab tak JS mein seekha:
+- Fetch API aur async/await
+- ES6+ features
+- Error handling aur debugging
+
+In sab ko combine karke ek **real Weather App** banao!
+
+### Free Weather API — OpenWeatherMap
+
+\`\`\`
+Sign up free: openweathermap.org/api
+Free tier: 1000 calls/day
+
+API URL:
+https://api.openweathermap.org/data/2.5/weather?q={city}&appid={API_KEY}&units=metric
+
+Response:
+{
+  "name": "Mumbai",
+  "main": { "temp": 32, "humidity": 78, "feels_like": 36 },
+  "weather": [{ "main": "Haze", "description": "mist", "icon": "50d" }],
+  "wind": { "speed": 12 },
+  "sys": { "country": "IN", "sunrise": 1234, "sunset": 5678 }
+}
+\`\`\`
+
+### App Features Banao:
+
+\`\`\`
+1. Search Bar
+   - City name input
+   - Enter key ya Search button
+   - Recent searches (localStorage)
+
+2. Current Weather Card
+   - Weather icon (openweathermap.org/img/wn/{icon}@2x.png)
+   - Temperature (Celsius/Fahrenheit toggle)
+   - Humidity, Wind speed, Feels like
+
+3. 5-Day Forecast (Another endpoint)
+   - https://api.openweathermap.org/data/2.5/forecast
+
+4. Error States
+   - City not found
+   - Network error
+   - Loading skeleton
+
+5. Extras (Bonus)
+   - Geolocation — current location ka weather
+   - Background change based on weather
+   - Day/Night mode (sunrise/sunset API data se)
+\`\`\`
+
+### Geolocation API
+
+\`\`\`js
+navigator.geolocation.getCurrentPosition(
+  async (position) => {
+    const { latitude, longitude } = position.coords;
+    const res = await fetch(
+      \`https://api.openweathermap.org/data/2.5/weather?lat=\${latitude}&lon=\${longitude}&appid=YOUR_KEY&units=metric\`
+    );
+    const data = await res.json();
+    displayWeather(data);
+  },
+  (error) => {
+    console.error('Location access denied:', error.message);
+  }
+);
+\`\`\``,
+      content_en: `## Week 10 Project — Weather App with Real API!
+
+JS learned so far:
+- Fetch API and async/await
+- ES6+ features
+- Error handling and debugging
+
+Combine all of these to build a **real Weather App**!
+
+### Free Weather API — OpenWeatherMap
+
+\`\`\`
+Sign up free: openweathermap.org/api
+
+API URL:
+https://api.openweathermap.org/data/2.5/weather?q={city}&appid={API_KEY}&units=metric
+
+Response:
+{
+  "name": "Mumbai",
+  "main": { "temp": 32, "humidity": 78, "feels_like": 36 },
+  "weather": [{ "main": "Haze", "icon": "50d" }],
+  "wind": { "speed": 12 }
+}
+\`\`\`
+
+### App Features:
+
+\`\`\`
+1. Search Bar — city name, Enter key, recent searches
+2. Current Weather Card — icon, temp, humidity, wind
+3. 5-Day Forecast (separate endpoint)
+4. Error States — city not found, network error, loading
+5. Bonus — geolocation, background by weather, day/night mode
+\`\`\``,
+      codeExample: `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Weather App Demo</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:Arial,sans-serif; background:linear-gradient(135deg,#0f172a,#1e1b4b); min-height:100vh; color:#e2e8f0; padding:24px 20px; }
+    h1 { font-size:26px; text-align:center; margin-bottom:6px; }
+    .sub { color:#64748b; text-align:center; font-size:14px; margin-bottom:28px; }
+    .search-row { display:flex; gap:8px; max-width:440px; margin:0 auto 24px; }
+    .search-row input { flex:1; padding:12px 16px; background:#1e293b; border:2px solid rgba(99,102,241,0.3); color:#e2e8f0; border-radius:10px; font-size:15px; outline:none; }
+    .search-row input:focus { border-color:#6366f1; }
+    .search-row button { padding:12px 20px; background:#6366f1; color:white; border:none; border-radius:10px; cursor:pointer; font-weight:700; transition:all 0.2s; }
+    .search-row button:hover { background:#4f46e5; transform:translateY(-2px); }
+    .weather-card { background:rgba(30,41,59,0.8); backdrop-filter:blur(12px); border:1px solid rgba(99,102,241,0.2); border-radius:20px; padding:28px; max-width:440px; margin:0 auto; text-align:center; }
+    .weather-icon { font-size:80px; margin:12px 0; animation:float 3s ease-in-out infinite; }
+    @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
+    .temp { font-size:72px; font-weight:800; margin:8px 0; background:linear-gradient(135deg,#6366f1,#a78bfa); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+    .condition { font-size:18px; color:#94a3b8; margin-bottom:20px; }
+    .city-name { font-size:22px; font-weight:700; margin-bottom:4px; }
+    .date { color:#64748b; font-size:13px; margin-bottom:20px; }
+    .stats { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-top:16px; }
+    .stat { background:rgba(99,102,241,0.1); border-radius:12px; padding:14px 8px; }
+    .stat .val { font-size:20px; font-weight:700; color:#a78bfa; }
+    .stat .lbl { font-size:11px; color:#64748b; margin-top:4px; }
+    .recent { max-width:440px; margin:16px auto 0; }
+    .recent-title { font-size:12px; color:#64748b; margin-bottom:8px; }
+    .recent-tags { display:flex; gap:6px; flex-wrap:wrap; }
+    .recent-tag { padding:4px 12px; background:rgba(99,102,241,0.1); border:1px solid rgba(99,102,241,0.2); border-radius:20px; font-size:12px; cursor:pointer; color:#a78bfa; }
+    .recent-tag:hover { background:rgba(99,102,241,0.2); }
+    .error { background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3); border-radius:12px; padding:16px; text-align:center; color:#ef4444; max-width:440px; margin:0 auto; }
+    .skeleton { background:linear-gradient(90deg,#1e293b 0%,#334155 50%,#1e293b 100%); background-size:200%; animation:shimmer 1.5s linear infinite; border-radius:12px; }
+    @keyframes shimmer { 0%{background-position:-200%} 100%{background-position:200%} }
+  </style>
+</head>
+<body>
+
+  <h1>🌤️ Weather App</h1>
+  <p class="sub">Free JSONPlaceholder data se simulated — real app mein OpenWeatherMap API use karo!</p>
+
+  <div class="search-row">
+    <input type="text" id="cityInput" placeholder="City naam likho... (e.g., Mumbai)" onkeydown="if(event.key==='Enter')search()">
+    <button onclick="search()">Search</button>
+  </div>
+
+  <div id="weatherOut"></div>
+
+  <div class="recent" id="recentSection" style="display:none">
+    <div class="recent-title">🕐 Recent Searches:</div>
+    <div class="recent-tags" id="recentTags"></div>
+  </div>
+
+  <script>
+    // Simulated weather data (real app mein OpenWeatherMap API use karo)
+    const MOCK_WEATHER = {
+      'mumbai':     { temp:32, feels:36, humidity:78, wind:12, condition:'Haze',        icon:'🌫️', country:'IN' },
+      'delhi':      { temp:28, feels:30, humidity:55, wind:20, condition:'Clear',        icon:'☀️', country:'IN' },
+      'bangalore':  { temp:24, feels:25, humidity:65, wind:15, condition:'Partly Cloudy',icon:'⛅', country:'IN' },
+      'chennai':    { temp:34, feels:40, humidity:82, wind:18, condition:'Hot & Humid',  icon:'🌡️', country:'IN' },
+      'kolkata':    { temp:30, feels:35, humidity:70, wind:10, condition:'Thunderstorm', icon:'⛈️', country:'IN' },
+      'pune':       { temp:26, feels:27, humidity:60, wind:14, condition:'Windy',        icon:'💨', country:'IN' },
+      'hyderabad':  { temp:29, feels:32, humidity:58, wind:16, condition:'Sunny',        icon:'☀️', country:'IN' },
+      'london':     { temp: 8, feels: 5, humidity:75, wind:25, condition:'Rainy',        icon:'🌧️', country:'GB' },
+      'new york':   { temp:15, feels:12, humidity:62, wind:22, condition:'Cloudy',       icon:'☁️', country:'US' },
+      'tokyo':      { temp:18, feels:16, humidity:68, wind:8,  condition:'Partly Cloudy',icon:'⛅', country:'JP' },
+    };
+
+    const today = new Date().toLocaleDateString('en-IN', { weekday:'long', day:'numeric', month:'long' });
+    let recent = JSON.parse(localStorage.getItem('recentCities') || '[]');
+
+    function showLoading() {
+      document.getElementById('weatherOut').innerHTML = \`
+        <div class="weather-card" style="padding:40px">
+          <div class="skeleton" style="width:80px;height:80px;border-radius:50%;margin:0 auto 16px"></div>
+          <div class="skeleton" style="width:120px;height:64px;margin:0 auto 12px"></div>
+          <div class="skeleton" style="width:160px;height:20px;margin:0 auto 12px"></div>
+          <div class="stats">
+            <div class="skeleton" style="height:64px"></div>
+            <div class="skeleton" style="height:64px"></div>
+            <div class="skeleton" style="height:64px"></div>
+          </div>
+        </div>
+      \`;
+    }
+
+    function search(city) {
+      const query = (city || document.getElementById('cityInput').value).trim().toLowerCase();
+      if (!query) return;
+      showLoading();
+      // Simulate API delay
+      setTimeout(() => displayWeather(query), 800);
+    }
+
+    function displayWeather(query) {
+      const data = MOCK_WEATHER[query];
+      if (!data) {
+        document.getElementById('weatherOut').innerHTML = \`
+          <div class="error">
+            <div style="font-size:48px;margin-bottom:8px">🏙️</div>
+            <strong>"\${query}" city nahi mila!</strong><br>
+            <small>Try: Mumbai, Delhi, London, Tokyo...</small>
+          </div>
+        \`;
+        return;
+      }
+
+      // Add to recent
+      recent = [query, ...recent.filter(c => c !== query)].slice(0, 5);
+      localStorage.setItem('recentCities', JSON.stringify(recent));
+      renderRecent();
+
+      document.getElementById('weatherOut').innerHTML = \`
+        <div class="weather-card">
+          <div class="city-name">\${query.charAt(0).toUpperCase()+query.slice(1)}, \${data.country}</div>
+          <div class="date">\${today}</div>
+          <div class="weather-icon">\${data.icon}</div>
+          <div class="temp">\${data.temp}°C</div>
+          <div class="condition">\${data.condition}</div>
+          <div class="stats">
+            <div class="stat"><div class="val">💧 \${data.humidity}%</div><div class="lbl">Humidity</div></div>
+            <div class="stat"><div class="val">🌡️ \${data.feels}°C</div><div class="lbl">Feels Like</div></div>
+            <div class="stat"><div class="val">💨 \${data.wind} km/h</div><div class="lbl">Wind Speed</div></div>
+          </div>
+        </div>
+      \`;
+      document.getElementById('cityInput').value = '';
+    }
+
+    function renderRecent() {
+      if (recent.length === 0) { document.getElementById('recentSection').style.display = 'none'; return; }
+      document.getElementById('recentSection').style.display = 'block';
+      document.getElementById('recentTags').innerHTML = recent.map(c =>
+        \`<span class="recent-tag" onclick="search('\${c}')">\${c.charAt(0).toUpperCase()+c.slice(1)}</span>\`
+      ).join('');
+    }
+
+    // Init
+    renderRecent();
+    search('mumbai');
+  </script>
+
+</body>
+</html>`,
+      codeExample_en: `<!-- Same weather app demo — see Hinglish version. For a real app, replace MOCK_WEATHER with actual OpenWeatherMap API calls. -->`,
+      task: {
+        description: 'Real Weather App banao with OpenWeatherMap API (free account banao). Features: (1) City search with recent history (localStorage), (2) Current weather — temp, feels like, humidity, wind, visibility, (3) 5-day forecast cards (https://api.openweathermap.org/data/2.5/forecast), (4) Celsius/Fahrenheit toggle, (5) Geolocation — "Use My Location" button, (6) Background gradient change based on weather condition (sunny=warm, rainy=cool), (7) Loading skeletons, (8) Error handling (city not found, offline, API limit exceeded), (9) Sunrise/Sunset times from API data.',
+        description_en: 'Build a real Weather App with the OpenWeatherMap API (create a free account). Features: (1) City search with recent history (localStorage), (2) Current weather — temp, feels like, humidity, wind, visibility, (3) 5-day forecast cards (https://api.openweathermap.org/data/2.5/forecast), (4) Celsius/Fahrenheit toggle, (5) Geolocation — "Use My Location" button, (6) Background gradient changes based on weather condition (sunny=warm, rainy=cool), (7) Loading skeletons, (8) Error handling (city not found, offline, API limit exceeded), (9) Sunrise/Sunset times from API data.',
+        hint: 'API_KEY environment variable ya direct string mein rakh sakte ho (sirf learning ke liye). Temp toggle: (celsius * 9/5 + 32).toFixed(1). Background: sunny → gradient orange, rainy → gradient blue, etc. Timestamp → time: new Date(unixTimestamp*1000).toLocaleTimeString()',
+        hint_en: 'Store the API_KEY in an env variable or directly as a string (for learning only). Temp toggle: (celsius * 9/5 + 32).toFixed(1). Background: sunny → orange gradient, rainy → blue gradient, etc. Timestamp to time: new Date(unixTimestamp*1000).toLocaleTimeString()',
+      },
+      quiz: [
+        {
+          q: 'API key ko frontend JS mein hardcode karna safe hai kya?',
+          options: ['Haan, completely safe', 'Nahi — source code mein visible hota hai. Public APIs ke liye theek, sensitive ones ke liye backend proxy use karo', 'Haan, browsers encrypt karte hain', 'Koi fark nahi'],
+          correct: 1,
+          explanation: 'Frontend JS mein sab kuch visible hai (Inspect → Sources). Weather API free mein abuse ho sakta hai. Real projects mein: API calls backend se karo, key wahan rakho. Sirf learning/demo ke liye frontend mein rakh sakte ho.',
+          q_en: 'Is it safe to hardcode an API key in frontend JS?',
+          options_en: ['Yes, completely safe', 'No — it is visible in source code. OK for public APIs, use a backend proxy for sensitive ones', 'Yes, browsers encrypt it', 'It makes no difference'],
+          explanation_en: 'Everything in frontend JS is visible (Inspect → Sources). A weather API key could be abused for free. In real projects: make API calls from the backend, store the key there. It is only acceptable in frontend for learning/demos.',
+        },
+        {
+          q: 'navigator.geolocation.getCurrentPosition() kya return karta hai?',
+          options: ['City name', 'Latitude aur Longitude coordinates — phir reverse geocoding se city milti hai', 'IP address', 'Country name'],
+          correct: 1,
+          explanation: 'Geolocation API lat/lon deta hai, city nahi. Coordinates milne ke baad weather API ko lat/lon pass karo directly, ya reverse geocoding API se city name nikalo.',
+          q_en: 'What does navigator.geolocation.getCurrentPosition() return?',
+          options_en: ['City name', 'Latitude and Longitude coordinates — reverse geocoding gives the city', 'IP address', 'Country name'],
+          explanation_en: 'The Geolocation API gives lat/lon, not a city name. Once you have coordinates, pass them directly to the weather API, or use a reverse geocoding API to get the city name.',
+        },
+        {
+          q: 'Unix timestamp ko readable date mein kaise convert karte hain?',
+          options: ['timestamp.toString()', 'new Date(timestamp * 1000).toLocaleDateString()', 'Date.fromUnix(timestamp)', 'timestamp.toDate()'],
+          correct: 1,
+          explanation: 'Unix timestamp = seconds since 1970. JS Date milliseconds use karta hai — isliye 1000 se multiply karo. new Date(1678886400 * 1000) → Date object, phir .toLocaleDateString() se readable format.',
+          q_en: 'How do you convert a Unix timestamp to a readable date?',
+          options_en: ['timestamp.toString()', 'new Date(timestamp * 1000).toLocaleDateString()', 'Date.fromUnix(timestamp)', 'timestamp.toDate()'],
+          explanation_en: 'A Unix timestamp = seconds since 1970. JS Date uses milliseconds — so multiply by 1000. new Date(1678886400 * 1000) → Date object, then .toLocaleDateString() for a readable format.',
+        },
+      ],
+    },
+  ],
+},  

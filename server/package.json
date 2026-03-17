@@ -14,6 +14,8 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/multer": "^2.0.0",
     "@types/node": "^25.3.2",
+    "@logtail/pino": "^0.5.5",
+    "@sentry/node": "^8.54.0",
     "axios": "^1.13.5",
     "bcryptjs": "^3.0.3",
     "compression": "^1.8.1",

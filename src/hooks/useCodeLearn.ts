@@ -1,0 +1,435 @@
+// /**
+//  * StudyEarn AI — useCodeLearn Hook
+//  * Progress management, API calls, section/quiz state
+//  */
+// import { useState, useEffect, useCallback } from 'react';
+// import axios from 'axios';
+
+// const API_BASE = import.meta.env.VITE_API_URL || 'https://your-render-backend.onrender.com';
+
+// // ── Admin emails — bypass all section locks for testing ──────
+// const ADMIN_EMAILS = ['manavvalera1@gmail.com'];
+
+// function isAdminUser() {
+//   try {
+//     const token = localStorage.getItem('token');
+//     if (!token) return false;
+//     // Decode JWT payload (base64) to get email — no library needed
+//     const payload = JSON.parse(atob(token.split('.')[1]));
+//     return ADMIN_EMAILS.includes(payload?.email);
+//   } catch {
+//     return false;
+//   }
+// }
+
+// export function useCodeLearn(language) {
+//   const [progress, setProgress] = useState(null);
+//   const [loading, setLoading] = useState(true);
+//   const [error, setError] = useState(null);
+//   const [isAdmin] = useState(() => isAdminUser());
+
+//   const getToken = () => localStorage.getItem('token');
+//   const headers = () => ({ Authorization: `Bearer ${getToken()}` });
+
+//   // Initial fetch (with loading spinner — only on mount)
+//   const fetchProgress = useCallback(async () => {
+//     if (!language) return;
+//     try {
+//       setLoading(true);
+//       const res = await axios.get(`${API_BASE}/api/codelearn/progress/${language}`, { headers: headers() });
+//       if (res.data.success) setProgress(res.data.progress);
+//     } catch (err) {
+//       setError(err.response?.data?.message || 'Failed to load progress');
+//     } finally {
+//       setLoading(false);
+//     }
+//   }, [language]);
+
+//   // Silent refresh — NO loading flash, used after quiz/read actions
+//   const silentRefresh = useCallback(async () => {
+//     if (!language) return;
+//     try {
+//       const res = await axios.get(`${API_BASE}/api/codelearn/progress/${language}`, { headers: headers() });
+//       if (res.data.success) setProgress(res.data.progress);
+//     } catch {}
+//   }, [language]);
+
+//   useEffect(() => { fetchProgress(); }, [fetchProgress]);
+
+//   // Check if a section is completed
+//   const isSectionCompleted = useCallback((sectionId) => {
+//     if (isAdmin) return true; // Admin bypass — all sections accessible
+//     return progress?.sections?.some(s => s.sectionId === sectionId && s.completed) || false;
+//   }, [progress, isAdmin]);
+
+//   // Check if a section's quiz was passed (score >= 70)
+//   const isSectionQuizPassed = useCallback((sectionId) => {
+//     if (isAdmin) return true; // Admin bypass — all sections unlocked
+//     const sec = progress?.sections?.find(s => s.sectionId === sectionId);
+//     return sec ? (sec.quizScore != null && sec.quizScore >= 70) : false;
+//   }, [progress, isAdmin]);
+
+//   // Check if a section is unlocked — ONLY after previous section's quiz is passed 70%+
+//   const isSectionUnlocked = useCallback((weekNumber, sectionIndex, sections) => {
+//     if (isAdmin) return true; // Admin bypass — all sections unlocked
+//     if (weekNumber === 1 && sectionIndex === 0) return true; // First section always unlocked
+
+//     // Previous section's quiz must be PASSED (>=70%) to unlock next
+//     if (sectionIndex > 0) {
+//       const prevSection = sections[sectionIndex - 1];
+//       return isSectionQuizPassed(prevSection.id);
+//     }
+
+//     // First section of a new week — last section of prev week quiz must be passed
+//     if (weekNumber > 1) {
+//       const prevWeekSections = progress?.sections?.filter(s => s.weekNumber === weekNumber - 1) || [];
+//       return prevWeekSections.some(s => s.quizScore != null && s.quizScore >= 70);
+//     }
+//     return false;
+//   }, [progress, isSectionQuizPassed]);
+
+//   // Mark section as complete
+//   const completeSection = useCallback(async (weekNumber, sectionNumber, sectionId) => {
+//     try {
+//       const res = await axios.post(`${API_BASE}/api/codelearn/complete-section`, {
+//         language, weekNumber, sectionNumber, sectionId,
+//       }, { headers: headers() });
+
+//       if (res.data.success) {
+//         await silentRefresh();
+//         return res.data;
+//       }
+//     } catch (err) {
+//       console.error('completeSection error:', err);
+//       return null;
+//     }
+//   }, [language, fetchProgress]);
+
+//   // Submit quiz
+//   const submitQuiz = useCallback(async (weekNumber, sectionNumber, sectionId, score, totalQuestions) => {
+//     try {
+//       const res = await axios.post(`${API_BASE}/api/codelearn/submit-quiz`, {
+//         language, weekNumber, sectionNumber, sectionId, score, totalQuestions,
+//       }, { headers: headers() });
+
+//       if (res.data.success) {
+//         await silentRefresh();
+//         return res.data;
+//       }
+//     } catch (err) {
+//       console.error('submitQuiz error:', err);
+//       return null;
+//     }
+//   }, [language, fetchProgress]);
+
+//   // Get AI hint
+//   const getHint = useCallback(async (sectionId, code, taskDescription) => {
+//     try {
+//       const res = await axios.post(`${API_BASE}/api/codelearn/ai-hint`, {
+//         language, sectionId, code, taskDescription,
+//       }, { headers: headers() });
+//       return res.data;
+//     } catch (err) {
+//       return { success: false, hint: 'Could not get hint. Try again!' };
+//     }
+//   }, [language]);
+
+//   // Get AI explanation
+//   const getExplanation = useCallback(async (code, concept) => {
+//     try {
+//       const res = await axios.post(`${API_BASE}/api/codelearn/ai-explain`, {
+//         language, code, concept,
+//       }, { headers: headers() });
+//       return res.data;
+//     } catch (err) {
+//       return { success: false, explanation: 'Could not explain. Try again!' };
+//     }
+//   }, [language]);
+
+//   // Run code
+//   const runCode = useCallback(async (code, expectedOutput, sectionId) => {
+//     try {
+//       const res = await axios.post(`${API_BASE}/api/codelearn/run-code`, {
+//         language, code, expectedOutput, sectionId,
+//       }, { headers: headers() });
+//       return res.data;
+//     } catch (err) {
+//       return { success: false, output: 'Execution failed. Try again.' };
+//     }
+//   }, [language]);
+
+//   // Get certificate
+//   const getCertificate = useCallback(async () => {
+//     try {
+//       const res = await axios.get(`${API_BASE}/api/codelearn/certificate/${language}`, {
+//         headers: headers(),
+//       });
+//       return res.data;
+//     } catch (err) {
+//       return { success: false, message: err.response?.data?.message };
+//     }
+//   }, [language]);
+
+
+//   // Translate content — with localStorage cache
+//   const translateContent = useCallback(async (sectionId, rawContent, targetLang) => {
+//     if (targetLang === 'hi') return rawContent; // Hinglish is native
+
+//     const cacheKey = `cl_trans_${sectionId}_${targetLang}`;
+//     const cached = localStorage.getItem(cacheKey);
+//     if (cached) return cached; // Cache hit!
+
+//     try {
+//       const res = await axios.post(
+//         `${API_BASE}/api/codelearn/translate-content`,
+//         { content: rawContent, targetLang, sectionId },
+//         { headers: headers() }
+//       );
+//       if (res.data.success) {
+//         localStorage.setItem(cacheKey, res.data.translated);
+//         return res.data.translated;
+//       }
+//     } catch (err) {
+//       console.error('Translation error:', err);
+//     }
+//     return rawContent; // fallback to original
+//   }, []);
+
+//   return {
+//     progress,
+//     loading,
+//     error,
+//     isSectionCompleted,
+//     isSectionQuizPassed,
+//     isSectionUnlocked,
+//     completeSection,
+//     submitQuiz,
+//     silentRefresh,
+//     getHint,
+//     getExplanation,
+//     runCode,
+//     getCertificate,
+//     translateContent,
+//     refresh: fetchProgress,
+//   };
+// }
+
+
+
+
+// @ts-check — converted from JS. TODO: add return types
+/**
+ * StudyEarn AI — useCodeLearn Hook
+ * Progress management, API calls, section/quiz state
+ */
+import { useState, useEffect, useCallback } from 'react';
+import axios from 'axios';
+
+const API_BASE = import.meta.env.VITE_API_URL || 'https://studyearn-backend.onrender.com';
+
+// ── Admin emails — bypass all section locks for testing ──────
+const ADMIN_EMAILS = ['manavvalera1@gmail.com'];
+
+function isAdminUser() {
+  try {
+    const token = localStorage.getItem('token');
+    if (!token) return false;
+    // Decode JWT payload (base64) to get email — no library needed
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return ADMIN_EMAILS.includes(payload?.email);
+  } catch {
+    return false;
+  }
+}
+
+export function useCodeLearn(language) {
+  const [progress, setProgress] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [isAdmin] = useState(() => isAdminUser());
+
+  const getToken = () => localStorage.getItem('token');
+  const headers = () => ({ Authorization: `Bearer ${getToken()}` });
+
+  // Initial fetch (with loading spinner — only on mount)
+  const fetchProgress = useCallback(async () => {
+    if (!language) return;
+    try {
+      setLoading(true);
+      const res = await axios.get(`${API_BASE}/api/codelearn/progress/${language}`, { headers: headers() });
+      if (res.data.success) setProgress(res.data.progress);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to load progress');
+    } finally {
+      setLoading(false);
+    }
+  }, [language]);
+
+  // Silent refresh — NO loading flash, used after quiz/read actions
+  const silentRefresh = useCallback(async () => {
+    if (!language) return;
+    try {
+      const res = await axios.get(`${API_BASE}/api/codelearn/progress/${language}`, { headers: headers() });
+      if (res.data.success) setProgress(res.data.progress);
+    } catch {}
+  }, [language]);
+
+  useEffect(() => { fetchProgress(); }, [fetchProgress]);
+
+  // Check if a section is completed
+  const isSectionCompleted = useCallback((sectionId) => {
+    if (isAdmin) return true; // Admin bypass — all sections accessible
+    return progress?.sections?.some(s => s.sectionId === sectionId && s.completed) || false;
+  }, [progress, isAdmin]);
+
+  // Check if a section's quiz was passed (score >= 70)
+  const isSectionQuizPassed = useCallback((sectionId) => {
+    if (isAdmin) return true; // Admin bypass — all sections unlocked
+    const sec = progress?.sections?.find(s => s.sectionId === sectionId);
+    return sec ? (sec.quizScore != null && sec.quizScore >= 70) : false;
+  }, [progress, isAdmin]);
+
+  // Check if a section is unlocked — ONLY after previous section's quiz is passed 70%+
+  const isSectionUnlocked = useCallback((weekNumber, sectionIndex, sections) => {
+    if (isAdmin) return true; // Admin bypass — all sections unlocked
+    if (weekNumber === 1 && sectionIndex === 0) return true; // First section always unlocked
+
+    // Previous section's quiz must be PASSED (>=70%) to unlock next
+    if (sectionIndex > 0) {
+      const prevSection = sections[sectionIndex - 1];
+      return isSectionQuizPassed(prevSection.id);
+    }
+
+    // First section of a new week — last section of prev week quiz must be passed
+    if (weekNumber > 1) {
+      const prevWeekSections = progress?.sections?.filter(s => s.weekNumber === weekNumber - 1) || [];
+      return prevWeekSections.some(s => s.quizScore != null && s.quizScore >= 70);
+    }
+    return false;
+  }, [progress, isSectionQuizPassed]);
+
+  // Mark section as complete
+  const completeSection = useCallback(async (weekNumber, sectionNumber, sectionId) => {
+    try {
+      const res = await axios.post(`${API_BASE}/api/codelearn/complete-section`, {
+        language, weekNumber, sectionNumber, sectionId,
+      }, { headers: headers() });
+
+      if (res.data.success) {
+        await silentRefresh();
+        return res.data;
+      }
+    } catch (err) {
+      console.error('completeSection error:', err);
+      return null;
+    }
+  }, [language, fetchProgress]);
+
+  // Submit quiz
+  const submitQuiz = useCallback(async (weekNumber, sectionNumber, sectionId, score, totalQuestions) => {
+    try {
+      const res = await axios.post(`${API_BASE}/api/codelearn/submit-quiz`, {
+        language, weekNumber, sectionNumber, sectionId, score, totalQuestions,
+      }, { headers: headers() });
+
+      if (res.data.success) {
+        await silentRefresh();
+        return res.data;
+      }
+    } catch (err) {
+      console.error('submitQuiz error:', err);
+      return null;
+    }
+  }, [language, fetchProgress]);
+
+  // Get AI hint
+  const getHint = useCallback(async (sectionId, code, taskDescription) => {
+    try {
+      const res = await axios.post(`${API_BASE}/api/codelearn/ai-hint`, {
+        language, sectionId, code, taskDescription,
+      }, { headers: headers() });
+      return res.data;
+    } catch (err) {
+      return { success: false, hint: 'Could not get hint. Try again!' };
+    }
+  }, [language]);
+
+  // Get AI explanation
+  const getExplanation = useCallback(async (code, concept) => {
+    try {
+      const res = await axios.post(`${API_BASE}/api/codelearn/ai-explain`, {
+        language, code, concept,
+      }, { headers: headers() });
+      return res.data;
+    } catch (err) {
+      return { success: false, explanation: 'Could not explain. Try again!' };
+    }
+  }, [language]);
+
+  // Run code
+  const runCode = useCallback(async (code, expectedOutput, sectionId) => {
+    try {
+      const res = await axios.post(`${API_BASE}/api/codelearn/run-code`, {
+        language, code, expectedOutput, sectionId,
+      }, { headers: headers() });
+      return res.data;
+    } catch (err) {
+      return { success: false, output: 'Execution failed. Try again.' };
+    }
+  }, [language]);
+
+  // Get certificate
+  const getCertificate = useCallback(async () => {
+    try {
+      const res = await axios.get(`${API_BASE}/api/codelearn/certificate/${language}`, {
+        headers: headers(),
+      });
+      return res.data;
+    } catch (err) {
+      return { success: false, message: err.response?.data?.message };
+    }
+  }, [language]);
+
+
+  // Translate content — with localStorage cache
+  const translateContent = useCallback(async (sectionId, rawContent, targetLang) => {
+    if (targetLang === 'hi') return rawContent; // Hinglish is native
+
+    const cacheKey = `cl_trans_${sectionId}_${targetLang}`;
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) return cached; // Cache hit!
+
+    try {
+      const res = await axios.post(
+        `${API_BASE}/api/codelearn/translate-content`,
+        { content: rawContent, targetLang, sectionId },
+        { headers: headers() }
+      );
+      if (res.data.success) {
+        localStorage.setItem(cacheKey, res.data.translated);
+        return res.data.translated;
+      }
+    } catch (err) {
+      console.error('Translation error:', err);
+    }
+    return rawContent; // fallback to original
+  }, []);
+
+  return {
+    progress,
+    loading,
+    error,
+    isSectionCompleted,
+    isSectionQuizPassed,
+    isSectionUnlocked,
+    completeSection,
+    submitQuiz,
+    silentRefresh,
+    getHint,
+    getExplanation,
+    runCode,
+    getCertificate,
+    translateContent,
+    refresh: fetchProgress,
+  };
+}

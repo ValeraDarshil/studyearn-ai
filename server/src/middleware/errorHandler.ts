@@ -45,6 +45,7 @@
 
 import { Request, Response, NextFunction } from 'express';
 import { logger } from '../utils/logger.js';
+import * as Sentry from '@sentry/node';
 
 export function errorHandler(
   err: any,
@@ -52,20 +53,32 @@ export function errorHandler(
   res: Response,
   next: NextFunction
 ) {
+  // CORS aur 429 errors Sentry mein nahi bhejne — noise badhata hai
+  const isCors       = err.message?.startsWith('CORS:');
+  const isRateLimit  = err.status === 429;
+
+  // Sirf real 500 errors Sentry ko bhejo
+  if (!isCors && !isRateLimit) {
+    Sentry.captureException(err, {
+      extra: {
+        url:    req.originalUrl,
+        method: req.method,
+        userId: (req as any).userId ?? 'unauthenticated',
+      },
+    });
+  }
+
   logger.error({ err: err.message }, 'Unhandled error');
   logger.error({ stack: err.stack }, 'Error stack trace');
 
-  // CORS error
-  if (err.message?.startsWith('CORS:')) {
+  if (isCors) {
     return res.status(403).json({ success: false, message: 'Not allowed by CORS policy.' });
   }
 
-  // Rate limit
-  if (err.status === 429) {
+  if (isRateLimit) {
     return res.status(429).json({ success: false, message: 'Too many requests. Please slow down.' });
   }
 
-  // Default 500
   res.status(500).json({
     success: false,
     message: 'An internal server error occurred. Please try again.',

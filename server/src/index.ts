@@ -171,6 +171,32 @@
  *   utils/       → logger aur shared helpers
  */
 
+// ─── SENTRY: Must be first import — before everything else ───
+import './instrument.js';
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * StudyEarn AI — Server Entry Point
+ * ─────────────────────────────────────────────────────────────
+ * Yeh file SIRF yeh kaam karti hai:
+ *   1. ENV validation
+ *   2. Express setup + middleware
+ *   3. Routes mount karna
+ *   4. DB connect karna
+ *   5. Server start karna
+ *   6. Background jobs (premium polling)
+ *
+ * Business logic KABHI yahan nahi hogi.
+ * Saari logic in folders mein hai:
+ *   controllers/ → request/response handle karna
+ *   services/    → AI, PPT, PDF operations
+ *   routes/      → URL to controller mapping
+ *   middleware/  → auth, rate limit, validation, error
+ *   models/      → MongoDB schemas
+ *   config/      → DB connection
+ *   utils/       → logger aur shared helpers
+ */
+
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
