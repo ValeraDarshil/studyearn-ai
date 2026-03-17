@@ -117,11 +117,7 @@ const userSchema = new mongoose.Schema({
 
 
 // Indexes for fast queries
-
-userSchema.index({ email: 1 });
-
-userSchema.index({ referralCode: 1 });
-
+// email + referralCode already indexed via unique:true in schema
 userSchema.index({ points: -1 }); // Leaderboard sorting
 
 

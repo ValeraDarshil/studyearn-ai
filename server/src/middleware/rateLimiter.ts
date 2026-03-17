@@ -153,7 +153,7 @@
  * Uses: express-rate-limit (already installed in root package.json)
  */
 
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 
 // ─────────────────────────────────────────────────────────────
 // HELPER — Standard rate limit response format
@@ -168,16 +168,14 @@ function rateLimitHandler(req: any, res: any) {
 
 // ─────────────────────────────────────────────────────────────
 // KEY GENERATOR — Per user (if logged in) else per IP
-// This prevents a single user from spamming across multiple IPs
-// and prevents shared IPs (college wifi, VPN) from hurting others
+// ipKeyGenerator: express-rate-limit v8 ka required helper
+// IPv4 aur IPv6 dono correctly handle karta hai
 // ─────────────────────────────────────────────────────────────
 function perUserKey(req: any): string {
-  // req.userId is set by authenticate middleware (authMiddleware.ts)
-  // If user is authenticated, limit per userId — much more accurate
-  // If not authenticated, fall back to IP (for public endpoints)
-  return req.userId
-    ? `user_${req.userId}`
-    : (req.ip ?? req.headers['x-forwarded-for'] ?? 'unknown');
+  // Agar user logged in hai → userId se limit karo (most accurate)
+  if (req.userId) return `user_${req.userId}`;
+  // Bina login ke → ipKeyGenerator use karo (IPv6 safe)
+  return ipKeyGenerator(req);
 }
 
 // ─────────────────────────────────────────────────────────────
