@@ -1624,4 +1624,4 @@ Use all of these to make your portfolio website **fully interactive**!
       ],
     },
   ],
-};  
+};
