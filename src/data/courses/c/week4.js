@@ -163,55 +163,150 @@ int *arr;
 allocate(&arr, 10);  // arr mein memory allocate hogi
 \`\`\``,
 
-      content_en: `## Pointers — The Most Powerful Feature of C!
+      content_en: `## Pointers — C ka Most Powerful Feature!
 
-A pointer = a variable that stores the **memory address** of another variable.
+Pointer = ek variable jo kisi DOOSRE variable ka **memory address** store karta hai.
+
+Understand: Apne ghar ka address kisi ko diya — woh seedha aa sakta hai, sab kuch change kar sakta hai. Yahi pointer karta hai!
+
+### Memory Model — How It Works
+
+\`\`\`
+Computer Memory (RAM):
+Address | Value
+───────────────
+1000    |  25     ← int x = 25
+1004    |  1000   ← int *p = &x (p stores address of x)
+1008    |  ...
+\`\`\`
 
 ### Pointer Basics
 
 \`\`\`c
 int x = 25;
-int *p = &x;   // p stores the address of x
 
-printf("%p\\n", (void*)p);  // address of x
-printf("%d\\n", *p);         // 25 — value at that address
+// & operator = address of
+printf("x ka address: %p\\n", (void*)&x);  // e.g. 0x7fff1234
 
-*p = 100;  // x is now 100 — changed through pointer!
+// Pointer declare and use do
+int *p;      // p = int ka pointer (int ke address store karega)
+p = &x;      // p in x ka address store do
+
+printf("p ki value (address): %p\\n", (void*)p);   // x ka address
+printf("*p (value at address): %d\\n", *p);          // 25 — x ki value!
+
+// * = dereference operator — address pe jaake value lo
+*p = 100;    // x ki value 25 → 100
+printf("x ab: %d\\n", x);  // 100!
+
+// Ek likhna mein
+int *q = &x;  // declare + initialize together
+\`\`\`
+
+### Pointer Types — Har Type ka Alag Pointer
+
+\`\`\`c
+int    x = 10;    int    *pi = &x;  // int pointer
+float  f = 3.14f; float  *pf = &f;  // float pointer
+double d = 9.99;  double *pd = &d;  // double pointer
+char   c = 'A';   char   *pc = &c;  // char pointer
+
+// void pointer — any type point kar sakta hai
+void *vp = &x;   // generic pointer
+vp = &f;          // type change kar sakte hain
+// *vp nahi kar sakte directly — pehle cast do
+int val = *(int*)vp;
+
+// NULL pointer — kisi ko point nahi karta
+int *null_p = NULL;   // initialize safely
+if (null_p == NULL) printf("Pointer is NULL\\n");
+// *null_p access mat do — SEGFAULT!
 \`\`\`
 
 ### Pointer Arithmetic
 
 \`\`\`c
-int arr[] = {10,20,30,40,50};
-int *p = arr;
+int arr[] = {10, 20, 30, 40, 50};
+int *p = arr;  // arr ka naam = address of first element
 
-*(p+0); // 10    *(p+1); // 20    *(p+2); // 30
-p++;    // now points to arr[1]
+printf("%d\\n", *p);       // 10 — arr[0]
+printf("%d\\n", *(p+1));   // 20 — arr[1]
+printf("%d\\n", *(p+2));   // 30 — arr[2]
 
-for(int *ptr=arr; ptr<arr+5; ptr++) printf("%d ", *ptr);
-\`\`\`
+p++;           // p ab arr[1] point karta hai
+printf("%d\\n", *p);  // 20
 
-### Pass by Pointer — Modify Originals
+// p+1 = p ka address + sizeof(int) = next int ka address
+// int: +1 = +4 bytes
+// char: +1 = +1 byte
+// double: +1 = +8 bytes
 
-\`\`\`c
-void swap(int *a, int *b) {
-    int t=*a; *a=*b; *b=t;
+// Array traversal with pointer
+for (int *ptr = arr; ptr < arr+5; ptr++) {
+    printf("%d ", *ptr);  // 10 20 30 40 50
 }
 
-void minMax(int a[], int n, int *min, int *max) {
-    *min=*max=a[0];
-    for(int i=1;i<n;i++){
-        if(a[i]<*min)*min=a[i];
-        if(a[i]>*max)*max=a[i];
+// Difference between pointers
+int *start = arr;
+int *end   = arr + 4;
+printf("Elements between: %ld\\n", end - start);  // 4
+\`\`\`
+
+### Pointers and Functions — Pass by Reference!
+
+\`\`\`c
+// ❌ Pass by value — original change nahi hoga
+void swapWrong(int a, int b) {
+    int temp = a; a = b; b = temp;
+    // only copies swap hote hain
+}
+
+// ✅ Pass by pointer — original change HOGA
+void swapCorrect(int *a, int *b) {
+    int temp = *a;
+    *a = *b;
+    *b = temp;
+}
+
+// ✅ Multiple return values via pointers!
+void minMax(int arr[], int n, int *min, int *max) {
+    *min = *max = arr[0];
+    for (int i = 1; i < n; i++) {
+        if (arr[i] < *min) *min = arr[i];
+        if (arr[i] > *max) *max = arr[i];
     }
 }
+
+int main() {
+    int a = 5, b = 10;
+    printf("Before: a=%d b=%d\\n", a, b);
+    swapCorrect(&a, &b);
+    printf("After:  a=%d b=%d\\n", a, b);  // a=10 b=5
+
+    int arr[] = {3,1,4,1,5,9,2,6};
+    int mn, mx;
+    minMax(arr, 8, &mn, &mx);
+    printf("Min=%d Max=%d\\n", mn, mx);
+}
 \`\`\`
 
-### Double Pointer
+### Double Pointer — Pointer ka Pointer
 
 \`\`\`c
-int x=42, *p=&x, **pp=&p;
-printf("%d\\n", **pp);  // 42
+int x   = 42;
+int *p  = &x;    // p points to x
+int **pp = &p;   // pp points to p
+
+printf("%d\\n", x);    // 42
+printf("%d\\n", *p);   // 42
+printf("%d\\n", **pp); // 42 — dereference twice!
+
+// Use: 2D dynamic arrays, function in pointer modify karna
+void allocate(int **p, int size) {
+    *p = (int*)malloc(size * sizeof(int));
+}
+int *arr;
+allocate(&arr, 10);  // arr in memory allocate hogi
 \`\`\``,
 
       codeExample: `#include <stdio.h>
@@ -557,47 +652,172 @@ valgrind --leak-check=full ./program
 # "Invalid read of size 4" → out of bounds access
 \`\`\``,
 
-      content_en: `## Dynamic Memory Allocation — Allocate Memory at Runtime!
+      content_en: `## Dynamic Memory Allocation — Runtime pe Memory Lo!
+
+Static allocation: compile time pe decide hota hai (int arr[100])
+Dynamic allocation: runtime pe decide do — exactly kitna chahiye!
 
 ### Stack vs Heap
 
 \`\`\`
-Stack: fast, auto-managed, limited (~1–8 MB), local variables
-Heap:  manual, large (GBs), malloc/calloc memory goes here
+MEMORY LAYOUT:
+───────────────────────
+   Stack (top)          ← Local variables, function calls
+   ↓ grows down
+   
+   (free space)
+   
+   ↑ grows up
+   Heap                 ← malloc/calloc se memory yahan aati hai
+───────────────────────
+   Data Segment         ← Global, static variables
+   Text Segment         ← Program code
+───────────────────────
+
+Stack: fast, auto-managed, limited (~1-8MB)
+Heap:  slower, manual management, large (GBs available)
 \`\`\`
 
-### malloc, calloc, realloc, free
+### malloc — Memory Allocate Do
 
 \`\`\`c
-// malloc — allocate raw memory (garbage values)
+#include <stdlib.h>
+
+// malloc(size_in_bytes) → void pointer or NULL (failure pe)
 int *arr = (int*)malloc(5 * sizeof(int));
-if(!arr) { puts("failed"); return 1; }
-// use... then:
-free(arr); arr = NULL;
 
-// calloc — allocate + zero-initialise
-int *scores = (int*)calloc(100, sizeof(int));
+if (arr == NULL) {
+    printf("Memory allocation failed!\\n");
+    return 1;
+}
 
-// realloc — resize existing allocation
-int *temp = (int*)realloc(arr, 10*sizeof(int));
-if(!temp){ free(arr); return 1; }  // safe pattern
-arr = temp;
+// Use do
+for (int i = 0; i < 5; i++) arr[i] = (i+1) * 10;
+for (int i = 0; i < 5; i++) printf("%d ", arr[i]);
+
+// FREE karna ZARURI hai! Memory leak nahi chahiye!
+free(arr);
+arr = NULL;  // dangling pointer avoid karne ke liye
+
+// ❌ malloc ke baad value garbage hoti hai!
+int *p = (int*)malloc(sizeof(int));
+printf("%d\\n", *p);  // garbage value!
+
+// ✅ Initialize do
+*p = 0;
 \`\`\`
 
-### Common Errors
+### calloc — Zeroed Memory
 
 \`\`\`c
-// Memory leak — forgot to free
-void leaky() { int *p=(int*)malloc(100*4); /* no free */ }
+// calloc(count, size_per_element) → allocate + ZERO initialize
+int *arr = (int*)calloc(5, sizeof(int));
+// Sab 0 se initialize ho jaayenge
 
-// Dangling pointer — using freed memory
-free(p); *p=42;    // UNDEFINED BEHAVIOR
+// malloc vs calloc:
+// malloc: faster, garbage values
+// calloc: slightly slower (zeroing), clean values
 
-// Double free
-free(p); free(p);  // CRASH
+// Use case
+int *scoreBoard = (int*)calloc(100, sizeof(int));
+// 100 scores, sab 0 se start — perfect!
+\`\`\`
 
-// Buffer overflow
-int *a=(int*)malloc(5*4); a[5]=1; // heap corruption!
+### realloc — Memory Resize Do
+
+\`\`\`c
+int *arr = (int*)malloc(3 * sizeof(int));
+arr[0]=1; arr[1]=2; arr[2]=3;
+
+// Aur bada chahiye!
+arr = (int*)realloc(arr, 6 * sizeof(int));
+if (arr == NULL) { /* handle error */ }
+arr[3]=4; arr[4]=5; arr[5]=6;
+
+// Chota do (rare but possible)
+arr = (int*)realloc(arr, 2 * sizeof(int));
+
+free(arr);  // always!
+
+// ✅ Safe realloc pattern
+int *temp = (int*)realloc(arr, new_size * sizeof(int));
+if (temp == NULL) {
+    free(arr);  // original free do
+    return NULL;
+}
+arr = temp;  // ab safe hai reassign karna
+\`\`\`
+
+### Dynamic String
+
+\`\`\`c
+#include <string.h>
+
+// String ka exact size allocate do
+char *name = "Rahul Sharma";
+char *copy = (char*)malloc(strlen(name) + 1);  // +1 for null
+strcpy(copy, name);
+printf("%s\\n", copy);
+free(copy);
+
+// strdup — malloc + strcpy ek saath (POSIX)
+char *dup = strdup(name);  // allocates + copies
+// free(dup) important!
+\`\`\`
+
+### Memory Errors — Common Mistakes
+
+\`\`\`c
+// ❌ 1. Memory Leak — free nahi kiya!
+void leaky() {
+    int *p = (int*)malloc(100 * sizeof(int));
+    // use do...
+    // free(p); ← bhool gaye! memory wasted forever
+}
+
+// ❌ 2. Dangling Pointer — freed memory use karna
+int *p = (int*)malloc(sizeof(int));
+*p = 42;
+free(p);
+printf("%d\\n", *p);  // UNDEFINED BEHAVIOR!
+
+// ✅ Fix: NULL set do after free
+free(p);
+p = NULL;
+
+// ❌ 3. Double Free — ek memory do baar free karna
+free(p);
+free(p);  // CRASH — undefined behavior
+
+// ❌ 4. Buffer Overflow
+int *arr = (int*)malloc(5 * sizeof(int));
+arr[5] = 10;  // out of bounds! heap corruption
+
+// ❌ 5. Stack overflow — too much local
+void bad() {
+    int huge[1000000];  // ~4MB on stack → Stack Overflow!
+}
+
+// ✅ Use heap instead
+void good() {
+    int *huge = (int*)malloc(1000000 * sizeof(int));
+    // use...
+    free(huge);
+}
+\`\`\`
+
+### Valgrind — Memory Errors Detect Do
+
+\`\`\`bash
+# Compile
+gcc -g program.c -o program
+
+# Run with Valgrind (Linux/Mac)
+valgrind --leak-check=full ./program
+
+# Output in dikheha:
+# "definitely lost: 40 bytes in 1 blocks" → memory leak
+# "Invalid read of size 4" → out of bounds access
 \`\`\``,
 
       codeExample: `#include <stdio.h>
@@ -947,48 +1167,149 @@ sp->age = 21;
 sp->gpa = 9.0f;
 \`\`\``,
 
-      content_en: `## Function Pointers — Functions Can Be Pointers Too!
+      content_en: `## Function Pointers — Functions bhi Pointer ho Sakte Hain!
 
-### Basics
+C in functions bhi memory in hote hain — unka address le sakte ho and pointer se call kar sakte ho!
+
+### Function Pointer Basics
 
 \`\`\`c
+// Syntax: return_type (*pointer_name)(param_types)
+int add(int a, int b) { return a + b; }
+int sub(int a, int b) { return a - b; }
+int mul(int a, int b) { return a * b; }
+
+// Function pointer declare
+int (*operation)(int, int);
+
+// Assign
+operation = add;          // function ka naam = address
+operation = &add;         // same — & optional
+
+// Call
+int result = operation(10, 5);   // add(10,5) = 15
+result = (*operation)(10, 5);    // same — explicit dereference
+\`\`\`
+
+### Function Pointer Array — Dispatch Table
+
+\`\`\`c
+// Calculator using function pointer array
 int add(int a, int b) { return a+b; }
 int sub(int a, int b) { return a-b; }
+int mul(int a, int b) { return a*b; }
+int dvd(int a, int b) { return b ? a/b : 0; }
 
-int (*op)(int, int) = add;
-printf("%d\\n", op(10, 5));  // 15
+int (*ops[4])(int, int) = {add, sub, mul, dvd};
+char *opNames[] = {"Add", "Sub", "Mul", "Div"};
 
-// Array of function pointers
-int (*ops[])(int,int) = {add, sub};
-ops[0](10,5);  // 15     ops[1](10,5);  // 5
+for (int i = 0; i < 4; i++) {
+    printf("%s(10, 3) = %d\\n", opNames[i], ops[i](10, 3));
+}
 \`\`\`
 
-### qsort with Function Pointer
+### qsort — stdlib ka Powerful Sort (Function Pointer!)
 
 \`\`\`c
-int cmpAsc(const void *a, const void *b) {
-    return *(int*)a - *(int*)b;
+#include <stdlib.h>
+
+// Comparator function
+int compareInt(const void *a, const void *b) {
+    return (*(int*)a - *(int*)b);   // ascending
+    // return (*(int*)b - *(int*)a); // descending
 }
-qsort(arr, n, sizeof(int), cmpAsc);
+
+int compareStr(const void *a, const void *b) {
+    return strcmp(*(char**)a, *(char**)b);
+}
+
+int arr[] = {64, 34, 25, 12, 22, 11, 90};
+int n = sizeof(arr)/sizeof(arr[0]);
+
+qsort(arr, n, sizeof(int), compareInt);
+// Now arr is sorted!
 \`\`\`
 
-### Callbacks (Higher-Order Functions)
+### Callbacks — Higher-Order Functions
 
 \`\`\`c
-void forEach(int *a, int n, void (*cb)(int)) {
-    for(int i=0;i<n;i++) cb(a[i]);
-}
-int* map(int *a, int n, int (*f)(int)) {
-    int *r=(int*)malloc(n*4);
-    for(int i=0;i<n;i++) r[i]=f(a[i]);
-    return r;
+// apply function to each element
+void forEach(int *arr, int n, void (*callback)(int)) {
+    for (int i = 0; i < n; i++) callback(arr[i]);
 }
 
-void print(int x) { printf("%d ",x); }
-int  sq(int x)    { return x*x; }
+// filter function — return new array
+int* filter(int *arr, int n, int (*predicate)(int), int *outSize) {
+    int *result = (int*)malloc(n * sizeof(int));
+    *outSize = 0;
+    for (int i = 0; i < n; i++) {
+        if (predicate(arr[i])) result[(*outSize)++] = arr[i];
+    }
+    return result;
+}
 
-forEach(arr, n, print);
-int *squares = map(arr, n, sq);
+// map function — transform each element
+int* map(int *arr, int n, int (*transform)(int)) {
+    int *result = (int*)malloc(n * sizeof(int));
+    for (int i = 0; i < n; i++) result[i] = transform(arr[i]);
+    return result;
+}
+
+// Usage
+void printVal(int x)  { printf("%d ", x); }
+int  isEven(int x)    { return x % 2 == 0; }
+int  square(int x)    { return x * x; }
+int  doubleIt(int x)  { return x * 2; }
+
+int arr[] = {1,2,3,4,5,6,7,8};
+int n = 8;
+
+printf("All: ");     forEach(arr, n, printVal);
+int sz;
+int *evens = filter(arr, n, isEven, &sz);
+printf("\\nEvens: "); forEach(evens, sz, printVal);
+int *squares = map(arr, n, square);
+printf("\\nSquares: "); forEach(squares, n, printVal);
+free(evens); free(squares);
+\`\`\`
+
+### typedef — Function Pointer Names Clean Do
+
+\`\`\`c
+// Without typedef — ugly!
+int (*op)(int, int);
+void apply(int (*func)(int, int), int a, int b) { }
+
+// With typedef — clean!
+typedef int (*BinaryOp)(int, int);
+typedef void (*Callback)(int);
+
+BinaryOp op = add;
+void apply(BinaryOp func, int a, int b) {
+    printf("Result: %d\\n", func(a, b));
+}
+\`\`\`
+
+### Pointer to Struct (Preview — Week 5 in detail mein)
+
+\`\`\`c
+typedef struct {
+    char name[50];
+    int age;
+    float gpa;
+} Student;
+
+Student s = {"Rahul", 20, 8.5f};
+Student *sp = &s;
+
+// Access members
+printf("%s\\n", s.name);     // dot notation
+printf("%s\\n", sp->name);   // arrow notation (pointer ke liye)
+printf("%s\\n", (*sp).name); // same as above
+
+// Arrow operator sp->name = (*sp).name
+sp->age = 21;
+sp->gpa = 9.0f;
 \`\`\``,
 
       codeExample: `#include <stdio.h>
@@ -1318,43 +1639,133 @@ Month 3 (Weeks 9-12):
   Week 12: Final Project — Complete System
 \`\`\``,
 
-      content_en: `## Month 1 Complete! — Everything in One Project!
+      content_en: `## Month 1 Complete! — Sab Kuch Ek Project In!
 
-### Three-Week Summary:
-- **Week 1:** Variables, data types, printf/scanf, operators
-- **Week 2:** Control flow — if/else, switch, for/while/do-while
-- **Week 3:** Functions, recursion, arrays, strings
-- **Week 4:** Pointers, dynamic memory, function pointers
+### Teen Hafte ka Summary:
+
+\`\`\`
+Week 1: C basics, variables, data types, printf/scanf, operators
+Week 2: Control flow — if/else, switch, for/while/do-while loops
+Week 3: Functions, recursion, arrays, strings
+Week 4: Pointers, dynamic memory, function pointers
+
+Ab yeh sab combine do ek COMPLETE SYSTEM mein!
+\`\`\`
 
 ### Capstone: Student Management System
 
 \`\`\`c
+// Features:
+// 1. Add students (dynamic array — grows as needed)
+// 2. Display all students
+// 3. Search by name or roll number
+// 4. Sort by name / marks / roll number
+// 5. Calculate statistics (avg, max, min, pass/fail)
+// 6. Delete student
+// 7. Update marks
+// 8. Save to file (basic)
+
+// Core structures and functions:
 typedef struct {
-    int rollNo; char name[50];
-    float marks[5], total, percentage;
-    char grade;
+    int    rollNo;
+    char   name[50];
+    float  marks[5];    // 5 subjects
+    float  total;
+    float  percentage;
+    char   grade;
 } Student;
 
 typedef struct {
-    Student *students;
-    int count, capacity;
+    Student *students;  // dynamic array
+    int      count;
+    int      capacity;
 } Database;
+
+// Functions needed:
+Database* createDB(int initial);
+void      addStudent(Database *db, Student s);
+void      displayAll(Database *db);
+Student*  searchByRoll(Database *db, int roll);
+Student*  searchByName(Database *db, char *name);
+void      sortBy(Database *db, char *field);
+void      calcStats(Database *db);
+void      deleteStudent(Database *db, int roll);
+void      freeDB(Database *db);
+
+// Grade calculation
+char calcGrade(float pct) {
+    if (pct >= 90) return 'A';
+    if (pct >= 75) return 'B';
+    if (pct >= 60) return 'C';
+    if (pct >= 45) return 'D';
+    return 'F';
+}
+
+// Total and percentage
+void calcTotals(Student *s, int subjects) {
+    s->total = 0;
+    for (int i = 0; i < subjects; i++) s->total += s->marks[i];
+    s->percentage = s->total / subjects;
+    s->grade = calcGrade(s->percentage);
+}
 \`\`\`
 
 ### Month 1 Quick Reference
 
 \`\`\`c
-// Pointers
-int *p=&x; *p=100; p++;
-int *d=(int*)malloc(n*4); free(d); d=NULL;
+// ── Basics ──
+printf("%-10s %5.2f\\n", name, value);  // formatted output
+scanf(" %c", &ch);   // char input (space to flush)
 
-// Strings
-fgets(buf,sizeof(buf),stdin);
-buf[strcspn(buf,"\\n")]='\\0';
+// ── Control Flow ──
+if(c1&&c2) {} else if(c3||c4) {} else {}
+switch(x){case 1: break; default:}
+for(int i=0;i<n;i++) {}
+while(cond) { if(exit_cond) break; if(skip) continue; }
 
-// qsort
-int cmp(const void*a,const void*b){return *(int*)a-*(int*)b;}
-qsort(arr,n,sizeof(int),cmp);
+// ── Functions ──
+int func(int a, int *b) { *b = 10; return a; }  // modify via pointer
+void arr_func(int arr[], int n) {}  // array = pointer
+
+// ── Pointers ──
+int *p = &x;     // point to x
+*p = 100;        // dereference — change x
+p++;             // next int in memory
+int **pp = &p;   // double pointer
+
+// ── Memory ──
+int *d = (int*)malloc(n*sizeof(int));
+if(!d) { /* error */ }
+// use d[i] or *(d+i)
+free(d); d = NULL;
+
+// ── Recursion ──
+int fact(int n) { return n<=1 ? 1 : n*fact(n-1); }
+
+// ── String ──
+strlen, strcpy, strcat, strcmp, strstr, sprintf, sscanf
+fgets(buf, sizeof(buf), stdin);
+buf[strcspn(buf,"\\n")] = '\\0';  // remove newline
+
+// ── qsort ──
+int cmp(const void *a, const void *b){ return *(int*)a-*(int*)b; }
+qsort(arr, n, sizeof(int), cmp);
+\`\`\`
+
+### Month 2 Preview — Structures, Files, and aur!
+
+\`\`\`
+Month 2 (Weeks 5-8):
+  Week 5: Structures and Unions — Custom Data Types
+  Week 6: File I/O — Disk pe Data Save/Load do
+  Week 7: Preprocessor, Enums, Bitfields
+  Week 8: Linked Lists — Dynamic Data Structure
+
+Month 3 (Weeks 9-12):
+  Week 9:  Stacks and Queues
+  Week 10: Trees and Graphs
+  Week 11: Sorting and Searching Algorithms
+  Week 12: Final Project — Complete System
 \`\`\``,
 
       codeExample: `#include <stdio.h>

@@ -196,60 +196,179 @@ int main() {
 
       content_en: `## Functions — Reusable Code Blocks!
 
-### Basic Structure
+Imagine do: agar calculator in addition code 10 jagah likhna pade — ek jagah bug aaya, 10 jagah fix do! Function se: ek baar likho, kahin se bhi call do.
+
+### Function ka Basic Structure
 
 \`\`\`c
-return_type function_name(type param1, type param2) {
+// Function Declaration (prototype) — ऊपर declare do
+return_type function_name(parameter_type param1, ...);
+
+// Function Definition — actual code
+return_type function_name(parameter_type param1, ...) {
     // body
-    return value;
+    return value;  // agar return_type void nahi hai
 }
 
-int add(int a, int b)           { return a + b; }
-float celsiusToF(float c)       { return (c*9.0/5.0)+32; }
-void greet(char name[])         { printf("Hello, %s!\\n", name); }
+// Function Call
+result = function_name(argument1, ...);
+\`\`\`
+
+### Pehla Function
+
+\`\`\`c
+#include <stdio.h>
+
+// ── Function declarations (prototypes) — main() se pehle ──
+int add(int a, int b);
+float average(float arr[], int n);
+void printLine(char ch, int count);
+int isEven(int n);
+
+int main() {
+    int sum = add(10, 20);
+    printf("Sum: %d\\n", sum);  // 30
+
+    printLine('-', 20);
+    printf("Is 4 even? %s\\n", isEven(4) ? "Yes" : "No");
+
+    return 0;
+}
+
+// ── Function Definitions ──
+int add(int a, int b) {
+    return a + b;
+}
+
+// void = kuch return nahi
+void printLine(char ch, int count) {
+    for (int i = 0; i < count; i++) printf("%c", ch);
+    printf("\\n");
+}
+
+int isEven(int n) {
+    return n % 2 == 0;  // 1 (true) or 0 (false)
+}
+\`\`\`
+
+### Return Types — Kya Return Hoga?
+
+\`\`\`c
+// int return do
+int square(int n) {
+    return n * n;
+}
+
+// float return do
+float celsiusToFahrenheit(float c) {
+    return (c * 9.0 / 5.0) + 32;
+}
+
+// Multiple return points — early return
+int absoluteValue(int n) {
+    if (n < 0) return -n;  // negative → positive
+    return n;              // already positive
+}
+
+// void — kuch return nahi
+void greet(char name[]) {
+    printf("Hello, %s!\\n", name);
+    // no return needed (or just 'return;')
+}
+
+// char return
 char getGrade(int marks) {
     if (marks >= 90) return 'A';
     if (marks >= 75) return 'B';
     if (marks >= 60) return 'C';
+    if (marks >= 45) return 'D';
     return 'F';
 }
 \`\`\`
 
-### Pass by Value
+### Pass by Value — C ka Default
 
 \`\`\`c
-void tryToChange(int x) { x = 100; }  // only copy changes!
+// C in function ko value ki COPY milti hai — original change nahi hoti!
+void tryToChange(int x) {
+    x = 100;  // only local copy change hoti hai
+    printf("Inside function: x = %d\\n", x);  // 100
+}
 
 int main() {
     int num = 5;
     tryToChange(num);
-    printf("%d\\n", num);  // still 5 — original unchanged
+    printf("After function: num = %d\\n", num);  // 5 — unchanged!
+    return 0;
 }
-// Use pointers for pass-by-reference (Week 5)
+// Pass by reference ke liye pointers use karte hain (Week 5 mein)
 \`\`\`
 
-### Scope
+### Function Overloading — C in NAHI hai!
 
 \`\`\`c
-int global = 100;       // whole program
+// ❌ C in function overloading nahi hoti (C++ in hoti hai)
+// Alag naam use do
+int    addInt(int a, int b)       { return a + b; }
+float  addFloat(float a, float b) { return a + b; }
+double addDouble(double a, double b) { return a + b; }
 
-void func() {
-    int local = 10;     // only inside func
+// Ya generic approach: _Generic (C11)
+#define add(a, b) _Generic((a), \\
+    int:    addInt,           \\
+    float:  addFloat,         \\
+    double: addDouble         \\
+)(a, b)
+\`\`\`
+
+### Scope — Variable Kahan Visible Hai?
+
+\`\`\`c
+int globalVar = 100;   // Global — poore program in visible
+
+void func1() {
+    int localVar = 10;  // Local — only func1 mein
+    globalVar = 200;    // Global change kar sakte hain
+    printf("%d %d\\n", globalVar, localVar);
+}
+
+void func2() {
+    // localVar yahan accessible NAHI
+    printf("%d\\n", globalVar);  // global = accessible
+}
+
+int main() {
     {
-        int block = 5;  // only inside {}
+        int blockVar = 5;  // Block scope — only {} ke andar
+        printf("%d\\n", blockVar);
     }
-    // block not accessible here
+    // blockVar yahan accessible NAHI — compile error!
+
+    for (int i = 0; i < 3; i++) {
+        // i only loop ke andar
+    }
+    // i yahan accessible NAHI (C99+)
+
+    return 0;
 }
 \`\`\`
 
-### Static Variables
+### Static Variables — Value Yaad Rahti Hai
 
 \`\`\`c
 void counter() {
-    static int count = 0;  // initialised only once, retains value
-    printf("Called %d times\\n", ++count);
+    static int count = 0;  // only pehli baar initialize hota hai!
+    count++;
+    printf("Called %d times\\n", count);
 }
-// counter() → 1, counter() → 2, counter() → 3
+
+int main() {
+    counter();  // Called 1 times
+    counter();  // Called 2 times
+    counter();  // Called 3 times
+    return 0;
+}
+// Static variable function calls ke beech value retain karta hai
 \`\`\``,
 
       codeExample: `#include <stdio.h>
@@ -576,58 +695,145 @@ int fibMemo(int n) {
 
       content_en: `## Recursion — Magic of Self-Calling Functions!
 
-### Two Required Parts
+Recursion = function jo khud ko call kare. Bahut powerful technique hai — kuch problems iterative se zyada elegant solve hoti hain recursion se.
+
+### Recursion ke 2 Must-Have Parts
 
 \`\`\`c
+// 1. Base Case    — recursion stop karne ki condition (ZARURI!)
+// 2. Recursive Case — problem ko chhota karke khud ko call do
+
 int factorial(int n) {
-    if (n <= 1) return 1;              // Base case — stop here
-    return n * factorial(n - 1);       // Recursive case
+    // Base case — stop condition
+    if (n <= 1) return 1;
+
+    // Recursive case — problem chhoti do
+    return n * factorial(n - 1);
 }
-// factorial(4): 4 * 3 * 2 * 1 = 24
+
+// factorial(4) how it works:
+// factorial(4) = 4 * factorial(3)
+//              = 4 * 3 * factorial(2)
+//              = 4 * 3 * 2 * factorial(1)
+//              = 4 * 3 * 2 * 1
+//              = 24
 \`\`\`
 
-### Classic Examples
+### Classic Recursion Examples
 
 \`\`\`c
+// ── 1. Fibonacci ──
 int fibonacci(int n) {
-    if (n <= 0) return 0;
-    if (n == 1) return 1;
+    if (n <= 0) return 0;   // base case 1
+    if (n == 1) return 1;   // base case 2
     return fibonacci(n-1) + fibonacci(n-2);
 }
+// fib(5) = fib(4) + fib(3)
+//        = (fib(3)+fib(2)) + (fib(2)+fib(1))
+//        = 5
 
+// ── 2. Sum of Natural Numbers ──
+int sumN(int n) {
+    if (n <= 0) return 0;
+    return n + sumN(n - 1);
+}
+// sumN(5) = 5 + 4 + 3 + 2 + 1 + 0 = 15
+
+// ── 3. Power ──
+double power(double base, int exp) {
+    if (exp == 0) return 1;      // base case: anything^0 = 1
+    if (exp < 0) return 1.0 / power(base, -exp);  // negative exponent
+    return base * power(base, exp - 1);
+}
+// power(2, 4) = 2 * power(2,3) = 2*2*2*2*1 = 16
+
+// ── 4. GCD — Euclidean (elegant!) ──
 int gcd(int a, int b) {
-    return b == 0 ? a : gcd(b, a % b);
+    if (b == 0) return a;  // base case
+    return gcd(b, a % b);  // recursive: gcd(18,12) → gcd(12,6) → gcd(6,0) → 6
 }
 
-int binarySearch(int arr[], int lo, int hi, int t) {
-    if (lo > hi) return -1;
-    int mid = (lo+hi)/2;
-    if (arr[mid] == t)   return mid;
-    if (arr[mid] > t)    return binarySearch(arr, lo, mid-1, t);
-    return binarySearch(arr, mid+1, hi, t);
-}
-\`\`\`
+// ── 5. Binary Search ──
+int binarySearch(int arr[], int low, int high, int target) {
+    if (low > high) return -1;  // base case: not found
 
-### Tower of Hanoi
-
-\`\`\`c
-void hanoi(int n, char from, char to, char via) {
-    if (n == 1) { printf("Disk 1: %c→%c\\n", from, to); return; }
-    hanoi(n-1, from, via, to);
-    printf("Disk %d: %c→%c\\n", n, from, to);
-    hanoi(n-1, via, to, from);
+    int mid = (low + high) / 2;
+    if (arr[mid] == target) return mid;        // found!
+    if (arr[mid] > target)  return binarySearch(arr, low, mid-1, target);
+    return binarySearch(arr, mid+1, high, target);
 }
 \`\`\`
 
-### Memoization — Speed up Recursion
+### Tower of Hanoi — Recursion ka Classic Problem
 
 \`\`\`c
-int memo[100];
-int fibFast(int n) {
+// n disks ko A se C pe move do, B helper hai
+// Rule: bada disk chhote pe nahi aayega
+void hanoi(int n, char from, char to, char helper) {
+    if (n == 1) {
+        printf("Move disk 1: %c → %c\\n", from, to);
+        return;
+    }
+    hanoi(n-1, from, helper, to);   // n-1 disks A se B pe
+    printf("Move disk %d: %c → %c\\n", n, from, to);
+    hanoi(n-1, helper, to, from);   // n-1 disks B se C pe
+}
+
+// hanoi(3, 'A', 'C', 'B') output:
+// Move disk 1: A → C
+// Move disk 2: A → B
+// Move disk 1: C → B
+// Move disk 3: A → C
+// Move disk 1: B → A
+// Move disk 2: B → C
+// Move disk 1: A → C
+\`\`\`
+
+### Recursion vs Iteration — When to Use Which?
+
+\`\`\`c
+// Factorial — Iteration (usually better for simple cases)
+int factIter(int n) {
+    int result = 1;
+    for (int i = 2; i <= n; i++) result *= i;
+    return result;
+}
+
+// Factorial — Recursion (cleaner for some, but function call overhead)
+int factRecur(int n) {
+    return (n <= 1) ? 1 : n * factRecur(n-1);
+}
+
+// Tree traversal, divide and conquer → Recursion natural
+// Simple loops, performance critical → Iteration better
+
+/*
+Recursion ke drawbacks:
+1. Function call overhead (stack frame har call pe)
+2. Stack overflow — too deep recursion
+3. Fibonacci naive recursion: O(2^n) — very slow!
+   fib(40) = 102334155 function calls!
+*/
+\`\`\`
+
+### Memoization — Recursion ko Fast Build
+
+\`\`\`c
+// Naive fibonacci: O(2^n) — SLOW
+// Memoized fibonacci: O(n) — FAST
+
+#define MAX 100
+int memo[MAX];  // -1 = not computed yet
+
+int fibMemo(int n) {
     if (n <= 1) return n;
-    if (memo[n] != -1) return memo[n];
-    return memo[n] = fibFast(n-1) + fibFast(n-2);
+    if (memo[n] != -1) return memo[n];  // already computed!
+    memo[n] = fibMemo(n-1) + fibMemo(n-2);
+    return memo[n];
 }
+
+// Initialize:
+// for(int i = 0; i < MAX; i++) memo[i] = -1;
 \`\`\``,
 
       codeExample: `#include <stdio.h>
@@ -990,50 +1196,170 @@ int main() {
 }
 \`\`\``,
 
-      content_en: `## Arrays — Store Large Amounts of Data at Once!
+      content_en: `## Arrays — Same Type ka Collection!
 
-### 1D Arrays
+100 students ke marks store karne hain? 100 variables? NO! 1 array = done.
+
+### 1D Arrays — Basic
 
 \`\`\`c
+// Declaration
+int marks[5];              // 5 integers (garbage values initially!)
+float prices[10];          // 10 floats
+char vowels[5];            // 5 characters
+
+// Declaration + Initialization
 int scores[5] = {85, 92, 78, 96, 88};
-float prices[] = {9.99, 14.5, 3.0};  // size auto-calculated
-int zeros[10] = {0};                  // all zeros
+float pi_digits[] = {3, 1, 4, 1, 5};  // size auto-calculated = 5
+int zeros[10] = {0};    // sab 0 ho jaayenge (first 0, rest auto 0)
+int all5[5] = {5,5,5,5,5};
 
-scores[0]; // 85 (first)    scores[4]; // 88 (last)
-scores[5]; // ❌ UNDEFINED BEHAVIOR!
+// Access — 0-indexed!
+printf("%d\\n", scores[0]);  // 85 (first)
+printf("%d\\n", scores[4]);  // 88 (last)
+printf("%d\\n", scores[5]);  // ❌ UNDEFINED BEHAVIOR! out of bounds
 
-int size = sizeof(arr) / sizeof(arr[0]);  // safe size
+// Modify
+scores[2] = 100;
+\`\`\`
+
+### Array Traversal — Loop se Do
+
+\`\`\`c
+int arr[] = {10, 20, 30, 40, 50};
+int n = 5;  // or sizeof(arr)/sizeof(arr[0])
+
+// Forward
+for (int i = 0; i < n; i++) {
+    printf("arr[%d] = %d\\n", i, arr[i]);
+}
+
+// Backward
+for (int i = n-1; i >= 0; i--) {
+    printf("%d ", arr[i]);  // 50 40 30 20 10
+}
+
+// ✅ Safer — compute size
+int size = sizeof(arr) / sizeof(arr[0]);  // = 5
+for (int i = 0; i < size; i++) {
+    printf("%d ", arr[i]);
+}
 \`\`\`
 
 ### Array Operations
 
 \`\`\`c
-// Sum, max, min, linear search, reverse, bubble sort
-int sum=0; for(int i=0;i<n;i++) sum+=arr[i];
-int max=arr[0]; for(int i=1;i<n;i++) if(arr[i]>max) max=arr[i];
+int arr[] = {64, 34, 25, 12, 22, 11, 90};
+int n = sizeof(arr)/sizeof(arr[0]);
 
-// Reverse
-for(int i=0;i<n/2;i++) { int t=arr[i];arr[i]=arr[n-1-i];arr[n-1-i]=t; }
+// ── Sum and Average ──
+int sum = 0;
+for (int i = 0; i < n; i++) sum += arr[i];
+float avg = (float)sum / n;
+
+// ── Min and Max ──
+int min = arr[0], max = arr[0];
+for (int i = 1; i < n; i++) {
+    if (arr[i] < min) min = arr[i];
+    if (arr[i] > max) max = arr[i];
+}
+
+// ── Linear Search ──
+int target = 25, found = -1;
+for (int i = 0; i < n; i++) {
+    if (arr[i] == target) { found = i; break; }
+}
+printf(found != -1 ? "Found at %d\\n" : "Not found\\n", found);
+
+// ── Reverse Array ──
+for (int i = 0; i < n/2; i++) {
+    int temp  = arr[i];
+    arr[i]    = arr[n-1-i];
+    arr[n-1-i] = temp;
+}
+
+// ── Bubble Sort ──
+for (int i = 0; i < n-1; i++) {
+    for (int j = 0; j < n-i-1; j++) {
+        if (arr[j] > arr[j+1]) {
+            int temp = arr[j]; arr[j] = arr[j+1]; arr[j+1] = temp;
+        }
+    }
+}
 \`\`\`
 
-### 2D Arrays (Matrix)
+### 2D Arrays — Matrix!
 
 \`\`\`c
-int grid[3][3] = {{1,2,3},{4,5,6},{7,8,9}};
-grid[1][2]; // 6
+// Declaration
+int matrix[3][4];  // 3 rows, 4 columns
 
-for(int i=0;i<3;i++) {
-    for(int j=0;j<3;j++) printf("%d ",grid[i][j]);
+// Declaration + Init
+int grid[3][3] = {
+    {1, 2, 3},
+    {4, 5, 6},
+    {7, 8, 9}
+};
+
+// Access
+printf("%d\\n", grid[1][2]);  // 6 (row 1, col 2)
+
+// Traverse 2D array
+for (int i = 0; i < 3; i++) {
+    for (int j = 0; j < 3; j++) {
+        printf("%d ", grid[i][j]);
+    }
     printf("\\n");
 }
+
+// Matrix Addition
+int A[2][2] = {{1,2},{3,4}};
+int B[2][2] = {{5,6},{7,8}};
+int C[2][2];
+
+for (int i = 0; i < 2; i++)
+    for (int j = 0; j < 2; j++)
+        C[i][j] = A[i][j] + B[i][j];
+
+// Matrix Multiplication
+int result[2][2] = {{0,0},{0,0}};
+for (int i = 0; i < 2; i++)
+    for (int j = 0; j < 2; j++)
+        for (int k = 0; k < 2; k++)
+            result[i][j] += A[i][k] * B[k][j];
 \`\`\`
 
 ### Arrays and Functions
 
 \`\`\`c
-// Arrays pass by reference automatically!
+// Array function ko pass karte waqt — pointer as argument!
+// (Arrays automatically decay to pointer)
+void printArray(int arr[], int n) {  // int arr[] = int *arr same!
+    for (int i = 0; i < n; i++)
+        printf("%d ", arr[i]);
+    printf("\\n");
+}
+
+int findMax(int arr[], int n) {
+    int max = arr[0];
+    for (int i = 1; i < n; i++)
+        if (arr[i] > max) max = arr[i];
+    return max;
+}
+
+// IMPORTANT: Arrays pass by reference hote hain!
 void doubleAll(int arr[], int n) {
-    for(int i=0;i<n;i++) arr[i]*=2;  // changes ORIGINAL
+    for (int i = 0; i < n; i++) arr[i] *= 2;  // ORIGINAL change hoga!
+}
+
+int main() {
+    int nums[] = {3, 1, 4, 1, 5, 9, 2};
+    int n = sizeof(nums)/sizeof(nums[0]);
+
+    printArray(nums, n);           // 3 1 4 1 5 9 2
+    printf("Max: %d\\n", findMax(nums, n));  // 9
+    doubleAll(nums, n);
+    printArray(nums, n);           // 6 2 8 2 10 18 4 (CHANGED!)
 }
 \`\`\``,
 
@@ -1376,48 +1702,173 @@ int isAnagram(char a[], char b[]) {
 }
 \`\`\``,
 
-      content_en: `## Strings — Text Processing in C
+      content_en: `## Strings — C in Text Handle Karna
 
-In C there is no built-in string type! A string = char array + null terminator '\\0'.
+C in koi built-in string type nahi! String = char array + null terminator '\\0'.
 
 ### String Basics
 
 \`\`\`c
-char name[] = "Rahul";  // ['R','a','h','u','l','\\0'] — 6 chars
-strlen(name);           // 5 (null not counted)
+// String = char array ending with '\\0' (null)
+char name[] = "Rahul";        // Compiler auto-adds '\\0'
+// Internally: ['R','a','h','u','l','\\0'] — 6 chars!
 
-// ❌ Cannot assign directly
+char name2[10] = "Rahul";     // size 10, rest is garbage/zeros
+char name3[6]  = {'R','a','h','u','l','\\0'};  // manual
+
+// String and char array ka fark
+char str[] = "Hello";  // string — null terminated
+char arr[] = {'H','e','l','l','o'};  // char array — NOT a string!
+
+// Print
+printf("%s\\n", name);           // Rahul
+printf("Length: %lu\\n", sizeof(name)-1);  // 5 (minus null)
+
+// ❌ GALAT — string directly assign nahi kar sakte
+char s[20] = "Hello";
 s = "World";  // COMPILE ERROR!
 
-// ✅ Use strcpy
+// ✅ SAHI — strcpy use do
+#include <string.h>
 strcpy(s, "World");
 \`\`\`
 
-### string.h Functions
+### string.h — Important Functions
 
 \`\`\`c
-strlen(s);          // length
-strcpy(d, s);       // copy s into d
-strcat(d, s);       // append s to d
-strcmp(a, b);       // compare: 0=equal, <0=a<b, >0=a>b
-strstr(s, "ll");    // find substring, returns pointer or NULL
-atoi("123");        // "123" → 123
-sprintf(buf, "%d", 42);  // int → string
+#include <string.h>
+#include <ctype.h>
+
+char s1[50] = "Hello";
+char s2[50] = "World";
+char s3[100];
+
+// ── Length ──
+int len = strlen(s1);           // 5 (null count nahi)
+
+// ── Copy ──
+strcpy(s3, s1);                  // s3 = "Hello"
+strncpy(s3, s1, 3);             // s3 = "Hel" (safer — max 3 chars)
+
+// ── Concatenate (join) ──
+strcat(s3, s2);                  // s3 = "HelloWorld"
+strncat(s3, s2, 3);             // safer — max 3 chars of s2
+
+// ── Compare ──
+int cmp = strcmp(s1, s2);
+// < 0: s1 < s2 alphabetically
+// 0:   s1 == s2
+// > 0: s1 > s2
+
+if (strcmp(s1, s2) == 0) printf("Equal\\n");
+else printf("Not equal\\n");
+
+// Case-insensitive compare (non-standard but common)
+// strcasecmp(s1, s2);  // Linux
+// _stricmp(s1, s2);    // Windows
+
+// ── Search ──
+char *pos = strstr(s1, "ll");    // pointer to "ll" in s1, or NULL
+char *ch  = strchr(s1, 'l');    // first 'l', or NULL
+char *last = strrchr(s1, 'l');  // last 'l', or NULL
+
+// ── Convert ──
+int n = atoi("123");            // "123" → 123 (int)
+float f = atof("3.14");        // "3.14" → 3.14
+char buf[20];
+sprintf(buf, "%d", 42);         // int → string "42"
+int x; sscanf("100", "%d", &x); // string → int
+
+// ── Case conversion ──
+for (int i=0; s1[i]; i++) s1[i] = toupper(s1[i]);  // HELLO
+for (int i=0; s1[i]; i++) s1[i] = tolower(s1[i]);  // hello
 \`\`\`
 
-### Common Pitfalls
+### String Character-by-Character Processing
 
 \`\`\`c
-// ❌ Buffer overflow
-char small[5]; strcpy(small, "Hello World!");  // CRASH!
+char str[] = "Hello, World! 123";
 
-// ❌ Wrong string comparison
-if (a == b) { }   // compares addresses, not content!
-if (strcmp(a, b) == 0) { }  // ✅ correct
+int letters=0, digits=0, spaces=0, special=0;
+
+for (int i = 0; str[i] != '\\0'; i++) {  // or while(str[i])
+    if (isalpha(str[i]))      letters++;
+    else if (isdigit(str[i])) digits++;
+    else if (isspace(str[i])) spaces++;
+    else                       special++;
+}
+
+// Check character type — ctype.h
+isalpha('A');   // 1 (letter)
+isdigit('5');   // 1 (digit)
+isalnum('a');   // 1 (letter or digit)
+isspace(' ');   // 1 (space, tab, newline)
+isupper('A');   // 1 (uppercase)
+islower('a');   // 1 (lowercase)
+ispunct('!');   // 1 (punctuation)
+\`\`\`
+
+### Common String Pitfalls
+
+\`\`\`c
+// ❌ Buffer Overflow — DANGEROUS
+char small[5];
+strcpy(small, "Hello World!");  // 12 chars in 5-char buffer → CRASH!
+
+// ✅ Safe
+char safe[50];
+strncpy(safe, "Hello World!", sizeof(safe)-1);
+safe[sizeof(safe)-1] = '\\0';  // ensure null termination
+
+// ❌ String comparison with ==
+char a[] = "hello";
+char b[] = "hello";
+if (a == b) { }   // WRONG! Compares addresses, not content!
+
+// ✅ Correct
+if (strcmp(a, b) == 0) { }  // compares content
 
 // ❌ Modifying string literal
-char *lit = "hello"; lit[0]='H';  // CRASH (read-only memory)
-char arr[] = "hello"; arr[0]='H'; // ✅ OK
+char *lit = "hello";  // string literal (read-only memory!)
+lit[0] = 'H';         // CRASH — segmentation fault!
+
+// ✅ Correct
+char arr[] = "hello";  // copy on stack — modifiable
+arr[0] = 'H';          // OK!
+\`\`\`
+
+### String Algorithms
+
+\`\`\`c
+// Word count
+int countWords(char s[]) {
+    int count = 0, inWord = 0;
+    for (int i = 0; s[i]; i++) {
+        if (!isspace(s[i]) && !inWord) { count++; inWord = 1; }
+        else if (isspace(s[i]))          inWord = 0;
+    }
+    return count;
+}
+
+// String is palindrome?
+int isPalindromeStr(char s[]) {
+    int n = strlen(s);
+    for (int i = 0; i < n/2; i++)
+        if (s[i] != s[n-1-i]) return 0;
+    return 1;
+}
+
+// Anagram check
+int isAnagram(char a[], char b[]) {
+    if (strlen(a) != strlen(b)) return 0;
+    int freq[256] = {0};
+    for (int i=0; a[i]; i++) freq[(unsigned char)a[i]]++;
+    for (int i=0; b[i]; i++) {
+        if (!freq[(unsigned char)b[i]]) return 0;
+        freq[(unsigned char)b[i]]--;
+    }
+    return 1;
+}
 \`\`\``,
 
       codeExample: `#include <stdio.h>

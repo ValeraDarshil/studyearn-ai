@@ -254,39 +254,240 @@ int bfsShortestPath(Graph *g, int src, int dst, int *path) {
 }
 \`\`\``,
 
-      content_en: `## Graph — Network of Nodes and Edges!
+      content_en: `## Graph — Nodes and Edges ka Network!
 
-### Adjacency List (Preferred)
+Tree = special graph (no cycles, connected). Graph = general — cycles ho sakti hain, disconnected bhi ho sakta hai.
 
-\`\`\`c
-typedef struct Node { int v,w; struct Node*n; } Node;
-typedef struct { Node*head[100]; int V,E,dir; } Graph;
-
-Graph* newGraph(int V,int dir){
-    Graph*g=calloc(1,sizeof(Graph));g->V=V;g->dir=dir;return g;
-}
-void addEdge(Graph*g,int u,int v,int w){
-    Node*n=malloc(sizeof*n);n->v=v;n->w=w;n->n=g->head[u];g->head[u]=n;
-    if(!g->dir){Node*m=malloc(sizeof*m);m->v=u;m->w=w;m->n=g->head[v];g->head[v]=m;}
-}
+### Real-World Graph Examples
+\`\`\`
+Social Network     ← users = nodes, friendships = edges
+Google Maps        ← cities = nodes, roads = edges (weighted)
+Internet           ← computers = nodes, cables = edges
+Flight Routes      ← airports = nodes, flights = edges
+Dependency Graph   ← tasks = nodes, dependencies = edges
+Circuit Board      ← components = nodes, wires = edges
 \`\`\`
 
-### DFS and BFS
+### Graph Types
+\`\`\`
+Directed (Digraph):   edges have direction (A → B ≠ B → A)
+Undirected:           edges bidirectional (A — B = B — A)
+Weighted:             edges have cost/distance
+Unweighted:           all edges equal
+Cyclic:               has cycles
+Acyclic (DAG):        Directed Acyclic Graph — no cycles
+Connected:            path exists between every pair
+Disconnected:         some nodes unreachable from others
+\`\`\`
+
+### Representation 1: Adjacency Matrix
 
 \`\`\`c
-int vis[100];
+#define V 6  // number of vertices
 
-void dfs(Graph*g,int v){
-    vis[v]=1; printf("%d ",v);
-    for(Node*n=g->head[v];n;n=n->n) if(!vis[n->v]) dfs(g,n->v);
+// matrix[i][j] = 1 if edge from i to j
+int matrix[V][V] = {0};
+
+void addEdge(int matrix[][V], int u, int v) {
+    matrix[u][v] = 1;
+    matrix[v][u] = 1;  // undirected — both directions
 }
 
-void bfs(Graph*g,int s){
-    int q[100],f=0,r=0; memset(vis,0,sizeof(vis));
-    vis[s]=1;q[r++]=s;
-    while(f<r){int v=q[f++];printf("%d ",v);
-        for(Node*n=g->head[v];n;n=n->n) if(!vis[n->v]){vis[n->v]=1;q[r++]=n->v;}
+// Weighted graph
+int wMatrix[V][V];
+void addWeightedEdge(int m[][V], int u, int v, int w) {
+    m[u][v] = w;
+    m[v][u] = w;  // undirected
+}
+
+// Print matrix
+void printMatrix(int m[][V]) {
+    printf("   ");
+    for (int i = 0; i < V; i++) printf("%3d", i);
+    printf("\\n");
+    for (int i = 0; i < V; i++) {
+        printf("%2d:", i);
+        for (int j = 0; j < V; j++)
+            printf("%3d", m[i][j]);
+        printf("\\n");
     }
+}
+
+// Complexity:
+// Space: O(V²) — dense graphs ke liye OK
+// addEdge: O(1)
+// Check edge (u,v): O(1) — matrix[u][v]
+// Get all neighbors: O(V) — scan row
+// Bad for sparse graphs (many zeros wasted)
+\`\`\`
+
+### Representation 2: Adjacency List (Preferred!)
+
+\`\`\`c
+// Each vertex ka linked list — only stores actual edges!
+#define MAXV 100
+
+typedef struct Node {
+    int           vertex;
+    int           weight;   // for weighted graphs
+    struct Node  *next;
+} Node;
+
+typedef struct {
+    Node  *head[MAXV];  // array of linked lists
+    int    V;            // number of vertices
+    int    E;            // number of edges
+    int    directed;     // 0=undirected, 1=directed
+} Graph;
+
+Graph* createGraph(int V, int directed) {
+    Graph *g = (Graph*)malloc(sizeof(Graph));
+    g->V = V; g->E = 0; g->directed = directed;
+    for (int i = 0; i < V; i++) g->head[i] = NULL;
+    return g;
+}
+
+void addEdge(Graph *g, int u, int v, int w) {
+    // Add u → v
+    Node *n = (Node*)malloc(sizeof(Node));
+    n->vertex = v; n->weight = w;
+    n->next = g->head[u];
+    g->head[u] = n;
+    g->E++;
+
+    if (!g->directed) {
+        // Add v → u (undirected)
+        Node *m = (Node*)malloc(sizeof(Node));
+        m->vertex = u; m->weight = w;
+        m->next = g->head[v];
+        g->head[v] = m;
+    }
+}
+
+void printGraph(Graph *g) {
+    for (int i = 0; i < g->V; i++) {
+        printf("%d: ", i);
+        for (Node *n = g->head[i]; n; n = n->next)
+            printf("→%d(%d) ", n->vertex, n->weight);
+        printf("\\n");
+    }
+}
+
+void freeGraph(Graph *g) {
+    for (int i = 0; i < g->V; i++) {
+        Node *curr = g->head[i];
+        while (curr) { Node *t = curr->next; free(curr); curr = t; }
+    }
+    free(g);
+}
+
+// Complexity:
+// Space: O(V + E) — much better for sparse graphs!
+// addEdge: O(1)
+// Check edge (u,v): O(degree(u))
+// Get all neighbors: O(degree(v))
+\`\`\`
+
+### DFS — Depth First Search
+
+\`\`\`c
+// Explore as deep as possible before backtracking
+// Uses recursion (implicit stack) or explicit stack
+
+int visited[MAXV];
+
+void dfs(Graph *g, int v) {
+    visited[v] = 1;
+    printf("%d ", v);
+
+    for (Node *n = g->head[v]; n; n = n->next) {
+        if (!visited[n->vertex])
+            dfs(g, n->vertex);
+    }
+}
+
+// Iterative DFS — explicit stack
+void dfsIter(Graph *g, int start) {
+    int stack[MAXV], top = -1;
+    memset(visited, 0, sizeof(visited));
+
+    stack[++top] = start;
+    while (top >= 0) {
+        int v = stack[top--];
+        if (visited[v]) continue;
+        visited[v] = 1;
+        printf("%d ", v);
+        // Push all unvisited neighbors
+        for (Node *n = g->head[v]; n; n = n->next)
+            if (!visited[n->vertex])
+                stack[++top] = n->vertex;
+    }
+}
+
+// DFS Applications:
+// - Detect cycles
+// - Find connected components
+// - Topological sort
+// - Path finding
+// - Maze solving
+\`\`\`
+
+### BFS — Breadth First Search
+
+\`\`\`c
+// Explore level by level — shortest path (unweighted)!
+void bfs(Graph *g, int start) {
+    int queue[MAXV], front = 0, rear = 0;
+    memset(visited, 0, sizeof(visited));
+
+    visited[start] = 1;
+    queue[rear++] = start;
+
+    while (front < rear) {
+        int v = queue[front++];
+        printf("%d ", v);
+
+        for (Node *n = g->head[v]; n; n = n->next) {
+            if (!visited[n->vertex]) {
+                visited[n->vertex] = 1;
+                queue[rear++] = n->vertex;
+            }
+        }
+    }
+}
+
+// BFS Shortest Path (unweighted)
+int bfsShortestPath(Graph *g, int src, int dst, int *path) {
+    int queue[MAXV], front = 0, rear = 0;
+    int dist[MAXV], parent[MAXV];
+    memset(dist, -1, sizeof(dist));
+    memset(parent, -1, sizeof(parent));
+
+    dist[src] = 0;
+    queue[rear++] = src;
+
+    while (front < rear) {
+        int v = queue[front++];
+        if (v == dst) break;
+        for (Node *n = g->head[v]; n; n = n->next) {
+            if (dist[n->vertex] == -1) {
+                dist[n->vertex] = dist[v] + 1;
+                parent[n->vertex] = v;
+                queue[rear++] = n->vertex;
+            }
+        }
+    }
+
+    if (dist[dst] == -1) return -1;  // no path
+
+    // Reconstruct path
+    int pathLen = 0, curr = dst;
+    while (curr != -1) { path[pathLen++] = curr; curr = parent[curr]; }
+    // Reverse path
+    for (int i=0; i<pathLen/2; i++) {
+        int t = path[i]; path[i] = path[pathLen-1-i]; path[pathLen-1-i] = t;
+    }
+    return pathLen;
 }
 \`\`\``,
 
@@ -665,29 +866,177 @@ For negative weights: Bellman-Ford O(VE)
 For all-pairs shortest paths: Floyd-Warshall O(V³)
 \`\`\``,
 
-      content_en: `## Dijkstra's Shortest Path
+      content_en: `## Dijkstra's Shortest Path — GPS ka Algorithm!
 
-### Core Algorithm
+Weighted graph in shortest path kaise nikaalein? Dijkstra's algorithm!
+
+### Algorithm Logic
+
+\`\`\`
+Greedy approach:
+1. Start node ka distance = 0, sab others = ∞
+2. Min-distance unvisited node lo
+3. Uske saare neighbors update do:
+   if dist[u] + weight(u,v) < dist[v]:
+       dist[v] = dist[u] + weight(u,v)
+       parent[v] = u
+4. Node ko "visited" mark do
+5. Repeat jab tak sab nodes visited
+\`\`\`
+
+### Implementation
 
 \`\`\`c
 #define INF 999999
+#define MAXV 100
 
-void dijkstra(int g[][100], int V, int src, int *dist, int *par) {
-    int vis[100]={0};
-    for(int i=0;i<V;i++){dist[i]=INF;par[i]=-1;}
-    dist[src]=0;
-    for(int c=0;c<V-1;c++){
-        // Find min dist unvisited
-        int u=-1;
-        for(int i=0;i<V;i++) if(!vis[i]&&(u==-1||dist[i]<dist[u]))u=i;
-        if(u==-1||dist[u]==INF)break;
-        vis[u]=1;
-        for(int v=0;v<V;v++)
-            if(g[u][v]&&!vis[v]&&dist[u]+g[u][v]<dist[v]){
-                dist[v]=dist[u]+g[u][v]; par[v]=u;
+typedef struct {
+    int  dist[MAXV];    // shortest distance from src
+    int  parent[MAXV];  // previous node in shortest path
+    int  visited[MAXV];
+    int  V;
+} DijkResult;
+
+// Find unvisited node with minimum distance — O(V)
+int minDist(int dist[], int visited[], int V) {
+    int min = INF, minIdx = -1;
+    for (int v = 0; v < V; v++) {
+        if (!visited[v] && dist[v] <= min) {
+            min = dist[v]; minIdx = v;
+        }
+    }
+    return minIdx;
+}
+
+// Dijkstra on adjacency matrix — O(V²)
+DijkResult dijkstra(int graph[][MAXV], int V, int src) {
+    DijkResult r;
+    r.V = V;
+    for (int i = 0; i < V; i++) {
+        r.dist[i]    = INF;
+        r.visited[i] = 0;
+        r.parent[i]  = -1;
+    }
+    r.dist[src] = 0;
+
+    for (int count = 0; count < V - 1; count++) {
+        int u = minDist(r.dist, r.visited, V);
+        if (u == -1) break;  // disconnected graph
+        r.visited[u] = 1;
+
+        for (int v = 0; v < V; v++) {
+            if (!r.visited[v] &&
+                graph[u][v] &&
+                r.dist[u] + graph[u][v] < r.dist[v]) {
+                r.dist[v]   = r.dist[u] + graph[u][v];
+                r.parent[v] = u;
             }
+        }
+    }
+    return r;
+}
+
+// Print shortest path from src to dst
+void printPath(DijkResult *r, int src, int dst) {
+    if (r->dist[dst] == INF) {
+        printf("No path from %d to %d\\n", src, dst);
+        return;
+    }
+    // Reconstruct path
+    int path[MAXV], len = 0, curr = dst;
+    while (curr != -1) { path[len++] = curr; curr = r->parent[curr]; }
+    printf("Path %d→%d (dist=%d): ", src, dst, r->dist[dst]);
+    for (int i = len-1; i >= 0; i--)
+        printf("%d%s", path[i], i > 0 ? "→" : "\\n");
+}
+\`\`\`
+
+### Optimized Dijkstra with Min-Heap — O((V+E) log V)
+
+\`\`\`c
+// Min-heap based priority queue for Dijkstra
+typedef struct {
+    int dist;
+    int vertex;
+} HeapNode;
+
+typedef struct {
+    HeapNode *data;
+    int       size;
+    int       capacity;
+} MinHeap;
+
+MinHeap* createMinHeap(int cap) {
+    MinHeap *h = malloc(sizeof(MinHeap));
+    h->data = malloc(cap * sizeof(HeapNode));
+    h->size = 0; h->capacity = cap;
+    return h;
+}
+
+void swap(HeapNode *a, HeapNode *b) { HeapNode t=*a; *a=*b; *b=t; }
+
+void heapifyUp(MinHeap *h, int i) {
+    while (i > 0) {
+        int p = (i-1)/2;
+        if (h->data[i].dist < h->data[p].dist) { swap(&h->data[i], &h->data[p]); i=p; }
+        else break;
     }
 }
+
+void heapifyDown(MinHeap *h, int i) {
+    int smallest = i, l = 2*i+1, r = 2*i+2;
+    if (l < h->size && h->data[l].dist < h->data[smallest].dist) smallest = l;
+    if (r < h->size && h->data[r].dist < h->data[smallest].dist) smallest = r;
+    if (smallest != i) { swap(&h->data[i], &h->data[smallest]); heapifyDown(h, smallest); }
+}
+
+void push(MinHeap *h, int dist, int v) {
+    h->data[h->size] = (HeapNode){dist, v};
+    heapifyUp(h, h->size++);
+}
+
+HeapNode pop(MinHeap *h) {
+    HeapNode top = h->data[0];
+    h->data[0] = h->data[--h->size];
+    heapifyDown(h, 0);
+    return top;
+}
+
+// O((V+E) log V) — much faster for sparse graphs!
+void dijkstraFast(Graph *g, int src, int *dist, int *parent) {
+    for (int i = 0; i < g->V; i++) { dist[i] = INF; parent[i] = -1; }
+    dist[src] = 0;
+
+    MinHeap *h = createMinHeap(g->V * g->V);
+    push(h, 0, src);
+
+    while (h->size > 0) {
+        HeapNode curr = pop(h);
+        int u = curr.vertex;
+        if (curr.dist > dist[u]) continue;  // stale entry
+
+        for (Node *n = g->head[u]; n; n = n->next) {
+            int v = n->vertex, w = n->weight;
+            if (dist[u] + w < dist[v]) {
+                dist[v] = dist[u] + w;
+                parent[v] = u;
+                push(h, dist[v], v);
+            }
+        }
+    }
+    free(h->data); free(h);
+}
+\`\`\`
+
+### Dijkstra Limitations
+
+\`\`\`
+✅ Works: Non-negative edge weights
+❌ Fails: Negative edge weights → use Bellman-Ford
+❌ Fails: Negative cycles → undefined (infinite negative loop)
+
+For negative weights: Bellman-Ford O(VE)
+For all-pairs shortest paths: Floyd-Warshall O(V³)
 \`\`\``,
 
       codeExample: `#include <stdio.h>
@@ -1044,34 +1393,165 @@ int kosarajuSCC(Graph *g) {
 
       content_en: `## Topological Sort — Task Scheduling!
 
-### DFS-based Topological Sort
+DAG (Directed Acyclic Graph) in nodes ko aise order in arrange do ki har edge u→v in u, v se pehle aaye.
+
+### Real-World Uses
+\`\`\`
+Build systems      ← compile A before B (A depends on B)
+Course prerequisites ← Math pehle, then Physics
+Package manager   ← npm/pip install order
+Task scheduling   ← dependency-respecting order
+\`\`\`
+
+### Topological Sort — DFS Based (Kahn's Algorithm variant)
 
 \`\`\`c
-int stk[100],top=-1,vis[100];
-void topoDFS(Graph*g,int v){
-    vis[v]=1;
-    for(Node*n=g->head[v];n;n=n->next) if(!vis[n->v]) topoDFS(g,n->v);
-    stk[++top]=v;
+// Method 1: DFS + finish time stack
+int topoStack[MAXV], topoTop = -1;
+int visited[MAXV];
+
+void topoDFS(Graph *g, int v) {
+    visited[v] = 1;
+    for (Node *n = g->head[v]; n; n = n->next)
+        if (!visited[n->vertex])
+            topoDFS(g, n->vertex);
+    topoStack[++topoTop] = v;  // push after all descendants
 }
-void topoSort(Graph*g){
-    memset(vis,0,sizeof(vis));top=-1;
-    for(int v=0;v<g->V;v++) if(!vis[v]) topoDFS(g,v);
-    while(top>=0) printf("%d ",stk[top--]);
+
+void topologicalSort(Graph *g) {
+    memset(visited, 0, sizeof(visited));
+    topoTop = -1;
+    for (int v = 0; v < g->V; v++)
+        if (!visited[v]) topoDFS(g, v);
+
+    printf("Topological Order: ");
+    while (topoTop >= 0) printf("%d ", topoStack[topoTop--]);
+    printf("\\n");
+}
+
+// Method 2: Kahn's BFS (in-degree based)
+void kahnTopSort(Graph *g) {
+    int inDegree[MAXV] = {0};
+    // Calculate in-degrees
+    for (int v = 0; v < g->V; v++)
+        for (Node *n = g->head[v]; n; n = n->next)
+            inDegree[n->vertex]++;
+
+    // Queue: all nodes with in-degree 0
+    int queue[MAXV], front = 0, rear = 0;
+    for (int v = 0; v < g->V; v++)
+        if (inDegree[v] == 0) queue[rear++] = v;
+
+    int count = 0;
+    printf("Kahn's Topological Order: ");
+    while (front < rear) {
+        int u = queue[front++];
+        printf("%d ", u);
+        count++;
+        for (Node *n = g->head[u]; n; n = n->next) {
+            if (--inDegree[n->vertex] == 0)
+                queue[rear++] = n->vertex;
+        }
+    }
+    printf("\\n");
+    if (count != g->V) printf("CYCLE DETECTED! Not a DAG.\\n");
 }
 \`\`\`
 
-### Kahn's BFS Topological Sort
+### Minimum Spanning Tree — Prim's Algorithm
 
 \`\`\`c
-void kahn(Graph*g){
-    int ind[100]={0},q[100],f=0,r=0,cnt=0;
-    for(int v=0;v<g->V;v++) for(Node*n=g->head[v];n;n=n->next) ind[n->v]++;
-    for(int v=0;v<g->V;v++) if(!ind[v]) q[r++]=v;
-    while(f<r){
-        int u=q[f++];printf("%d ",u);cnt++;
-        for(Node*n=g->head[u];n;n=n->next) if(!--ind[n->v]) q[r++]=n->v;
+// MST: minimum weight tree that connects all vertices
+// Use case: cheapest way to connect all cities with roads
+
+void primMST(int graph[][MAXV], int V) {
+    int parent[MAXV];   // MST parent
+    int key[MAXV];      // minimum weight edge for each vertex
+    int inMST[MAXV];    // is vertex in MST?
+
+    for (int i = 0; i < V; i++) {
+        key[i] = INF; inMST[i] = 0;
     }
-    if(cnt!=g->V) printf("\\nCYCLE!");
+    key[0] = 0; parent[0] = -1;
+
+    for (int count = 0; count < V - 1; count++) {
+        // Find min key vertex not in MST
+        int u = -1;
+        for (int v = 0; v < V; v++)
+            if (!inMST[v] && (u == -1 || key[v] < key[u]))
+                u = v;
+
+        inMST[u] = 1;
+
+        // Update adjacent vertices
+        for (int v = 0; v < V; v++) {
+            if (graph[u][v] && !inMST[v] && graph[u][v] < key[v]) {
+                parent[v] = u;
+                key[v]    = graph[u][v];
+            }
+        }
+    }
+
+    // Print MST
+    int totalCost = 0;
+    printf("MST edges:\\n");
+    for (int i = 1; i < V; i++) {
+        printf("  %d - %d (weight: %d)\\n", parent[i], i, graph[parent[i]][i]);
+        totalCost += graph[parent[i]][i];
+    }
+    printf("Total MST cost: %d\\n", totalCost);
+}
+\`\`\`
+
+### Strongly Connected Components (Kosaraju's)
+
+\`\`\`c
+// SCC: maximal set where every node reachable from every other
+// Kosaraju's: 2-pass DFS
+
+// Pass 1: DFS on original graph, push finish order to stack
+// Pass 2: DFS on TRANSPOSE graph in reverse finish order
+// Each DFS in pass 2 = one SCC
+
+void dfsFinish(Graph *g, int v, int *finish, int *finTop) {
+    visited[v] = 1;
+    for (Node *n = g->head[v]; n; n = n->next)
+        if (!visited[n->vertex])
+            dfsFinish(g, n->vertex, finish, finTop);
+    finish[++(*finTop)] = v;
+}
+
+Graph* transposeGraph(Graph *g) {
+    Graph *t = createGraph(g->V, 1);  // directed
+    for (int v = 0; v < g->V; v++)
+        for (Node *n = g->head[v]; n; n = n->next)
+            addEdge(t, n->vertex, v, 1);  // reverse edge
+    return t;
+}
+
+int kosarajuSCC(Graph *g) {
+    int finish[MAXV], finTop = -1;
+    memset(visited, 0, sizeof(visited));
+    // Pass 1
+    for (int v = 0; v < g->V; v++)
+        if (!visited[v]) dfsFinish(g, v, finish, &finTop);
+
+    // Pass 2 on transpose
+    Graph *tr = transposeGraph(g);
+    memset(visited, 0, sizeof(visited));
+    int sccCount = 0;
+    while (finTop >= 0) {
+        int v = finish[finTop--];
+        if (!visited[v]) {
+            printf("SCC %d: ", ++sccCount);
+            // DFS on transpose
+            // (simplified — print component)
+            dfsFinish(tr, v, finish, &finTop);  // reuse for printing
+            printf("\\n");
+        }
+    }
+    freeGraph(tr);
+    return sccCount;
 }
 \`\`\``,
 
@@ -1351,7 +1831,77 @@ Total C Course:
   📚 Week 12:         Final Project + Certificate
 \`\`\``,
 
-      content_en: `## Week 11 Project — Real-World Graph Applications!`,
+      content_en: `## Week 11 Project — Real-World Graph Applications!
+
+### Project: StudyEarn Social + Route System
+
+\`\`\`c
+// ── Unified Graph System ──
+// 1. Social Network Analysis
+//    - Friend recommendations (BFS 2-hop)
+//    - Influencer detection (degree centrality)
+//    - Community detection (connected components)
+//
+// 2. Route Finder (Dijkstra)
+//    - Shortest distance path
+//    - Fastest time path (different weights)
+//    - Alternative routes
+//
+// 3. Task Scheduler (Topological Sort)
+//    - Build system simulation
+//    - Course planner
+//    - Project timeline
+//
+// 4. Network Reliability (MST)
+//    - Minimum cost to connect all nodes
+//    - Critical edges (bridge detection)
+\`\`\`
+
+### Graph Complete API
+
+\`\`\`c
+// graph.h — complete graph library interface
+typedef struct Graph Graph;
+
+// Creation
+Graph* graph_create(int vertices, int directed, int weighted);
+void   graph_destroy(Graph *g);
+void   graph_add_edge(Graph *g, int u, int v, int weight);
+void   graph_remove_edge(Graph *g, int u, int v);
+
+// Traversal
+void graph_dfs(Graph *g, int start, void (*visit)(int));
+void graph_bfs(Graph *g, int start, void (*visit)(int));
+
+// Algorithms
+int*  graph_dijkstra(Graph *g, int src);     // shortest distances
+int*  graph_topo_sort(Graph *g);              // topological order (NULL if cycle)
+int** graph_mst_prim(Graph *g);              // MST edge list
+int   graph_components(Graph *g);            // count of connected components
+int   graph_has_cycle(Graph *g);             // 0 or 1
+int   graph_is_bipartite(Graph *g);          // 0 or 1
+
+// Analysis
+int   graph_degree(Graph *g, int v);         // degree of vertex
+int   graph_diameter(Graph *g);              // longest shortest path
+int   graph_is_connected(Graph *g);
+\`\`\`
+
+### Month 3 Near-Completion!
+
+\`\`\`
+Month 3 (Weeks 9-12):
+  ✅ Week 9:  Binary Trees, BST, AVL
+  ✅ Week 10: Sorting Algorithms Master Class
+  ✅ Week 11: Graphs — DFS, BFS, Dijkstra, MST, Topo Sort
+  📚 Week 12: Final Capstone + CERTIFICATE! 🎓
+
+Total C Course:
+  ✅ Month 1 (W1-4):  C Foundation — syntax, functions, pointers, memory
+  ✅ Month 2 (W5-8):  Data Structures — struct, files, macros, DS
+  ✅ Month 3 (W9-11): Advanced DS — trees, sorting, graphs
+  📚 Week 12:         Final Project + Certificate
+\`\`\``,
 
       codeExample: `#include <stdio.h>
 #include <stdlib.h>

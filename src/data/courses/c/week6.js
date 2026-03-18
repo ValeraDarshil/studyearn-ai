@@ -189,47 +189,176 @@ fprintf(stderr, "Error!\\n"); // stderr — not redirected with >
 // program < input.txt > output.txt
 \`\`\``,
 
-      content_en: `## File I/O — Data Persists After Program Exits!
+      content_en: `## File I/O — Program ke baad bhi Data Zinda Rahe!
 
-### fopen Modes
+Abhi tak: program band hua, sab data gone!
+File I/O ke saath: disk pe save do — always ke liye!
 
-\`\`\`c
-FILE *fp;
-fp = fopen("file.txt", "r");  // read
-fp = fopen("file.txt", "w");  // write (create/overwrite)
-fp = fopen("file.txt", "a");  // append
-fp = fopen("file.bin", "rb"); // binary read
-if (!fp) { perror("fopen"); return 1; }
+### File What It Is?
+
+\`\`\`
+Computer Storage:
+┌─────────────────────────────────────────┐
+│  RAM (volatile — power off = data gone) │
+│  ┌─────────────────────────────────┐    │
+│  │  Your C Program runs here       │    │
+│  │  Variables, arrays, pointers    │    │
+│  └─────────────────────────────────┘    │
+├─────────────────────────────────────────┤
+│  Disk (non-volatile — permanent!)       │
+│  ┌──────────────┐  ┌──────────────┐    │
+│  │  students.txt │  │  data.bin    │    │
+│  └──────────────┘  └──────────────┘    │
+└─────────────────────────────────────────┘
 \`\`\`
 
-### Write
+### fopen — File Kholo
 
 \`\`\`c
-FILE *fp = fopen("out.txt","w");
-fprintf(fp, "%d,%s,%.1f\\n", 101, "Rahul", 85.5f);
-fputs("line\\n", fp);
-fputc('A', fp);
-fclose(fp);  // always!
-\`\`\`
+#include <stdio.h>
 
-### Read
+FILE *fp;  // FILE = opaque struct, file pointer
 
-\`\`\`c
-FILE *fp = fopen("out.txt","r");
-char line[256];
-while(fgets(line, sizeof(line), fp)) {
-    line[strcspn(line,"\\n")] = '\\0';
-    printf("%s\\n", line);
+// fopen(filename, mode) → FILE* or NULL on error
+fp = fopen("data.txt", "r");   // read only
+fp = fopen("data.txt", "w");   // write (create/overwrite)
+fp = fopen("data.txt", "a");   // append (add to end)
+fp = fopen("data.txt", "r+");  // read + write (file must exist)
+fp = fopen("data.txt", "w+");  // read + write (create/overwrite)
+fp = fopen("data.txt", "a+");  // read + append
+
+// Binary modes
+fp = fopen("data.bin", "rb");  // read binary
+fp = fopen("data.bin", "wb");  // write binary
+fp = fopen("data.bin", "ab");  // append binary
+
+// ALWAYS check for NULL!
+if (fp == NULL) {
+    perror("File open karne in error");  // prints OS error message
+    return 1;
 }
+\`\`\`
+
+### File Modes Table
+
+\`\`\`
+Mode  | Read | Write | Create | Truncate | Position
+──────────────────────────────────────────────────────
+"r"   |  ✅  |  ❌   |  ❌    |    ❌    | Beginning
+"w"   |  ❌  |  ✅   |  ✅    |    ✅    | Beginning
+"a"   |  ❌  |  ✅   |  ✅    |    ❌    | End always
+"r+"  |  ✅  |  ✅   |  ❌    |    ❌    | Beginning
+"w+"  |  ✅  |  ✅   |  ✅    |    ✅    | Beginning
+"a+"  |  ✅  |  ✅   |  ✅    |    ❌    | Read:free, Write:end
+\`\`\`
+
+### Text File Write — fprintf and fputs
+
+\`\`\`c
+FILE *fp = fopen("students.txt", "w");
+if (!fp) { perror("fopen"); return 1; }
+
+// fprintf — printf jaisa, but file mein
+fprintf(fp, "Roll,Name,Marks\\n");
+fprintf(fp, "%d,%s,%.1f\\n", 101, "Rahul", 85.5f);
+fprintf(fp, "%d,%s,%.1f\\n", 102, "Priya", 92.0f);
+
+// fputs — string write
+fputs("Hello, File!\\n", fp);
+
+// fputc — single char write
+fputc('A', fp);
+fputc('\\n', fp);
+
+fclose(fp);  // ALWAYS close! Flush buffer to disk
+fp = NULL;   // good practice
+\`\`\`
+
+### Text File Read — fscanf and fgets
+
+\`\`\`c
+FILE *fp = fopen("students.txt", "r");
+if (!fp) { perror("fopen"); return 1; }
+
+// Method 1: fscanf — formatted read
+int roll; char name[50]; float marks;
+while (fscanf(fp, "%d,%49[^,],%f\\n", &roll, name, &marks) == 3) {
+    printf("Roll: %d, Name: %s, Marks: %.1f\\n", roll, name, marks);
+}
+
+// Method 2: fgets — line by line (safer!)
+char line[256];
+while (fgets(line, sizeof(line), fp) != NULL) {
+    line[strcspn(line, "\\n")] = '\\0';  // remove newline
+    printf("Line: %s\\n", line);
+}
+
+// Method 3: fgetc — char by char
+int c;
+while ((c = fgetc(fp)) != EOF) {
+    putchar(c);  // print to stdout
+}
+
 fclose(fp);
 \`\`\`
 
-### Seek and Tell
+### EOF and Error Checking
 
 \`\`\`c
-fseek(fp, 0, SEEK_END);  long size = ftell(fp);  // file size
+FILE *fp = fopen("data.txt", "r");
+
+// Check EOF
+while (!feof(fp)) {        // feof = end of file reached?
+    char ch = fgetc(fp);
+    if (ferror(fp)) {      // ferror = read/write error?
+        printf("Error reading file!\\n");
+        clearerr(fp);      // clear error flags
+        break;
+    }
+    if (ch != EOF) putchar(ch);
+}
+
+// Better pattern — check return value
+char buf[256];
+while (fgets(buf, sizeof(buf), fp)) {  // NULL = EOF or error
+    // process buf
+}
+if (ferror(fp)) { printf("Read error!\\n"); }
+
+fclose(fp);
+
+// ftell — current position
+long pos = ftell(fp);    // returns byte offset from start
+
+// fseek — move to position
 fseek(fp, 0, SEEK_SET);  // go to beginning
-rewind(fp);               // same as above
+fseek(fp, 0, SEEK_END);  // go to end
+fseek(fp, -10, SEEK_CUR); // 10 bytes back from current
+
+// File size
+fseek(fp, 0, SEEK_END);
+long size = ftell(fp);
+fseek(fp, 0, SEEK_SET);  // rewind
+
+// rewind — go to beginning
+rewind(fp);  // same as fseek(fp, 0, SEEK_SET)
+\`\`\`
+
+### Standard Streams
+
+\`\`\`c
+// 3 pre-opened FILE* streams
+FILE *stdin  // keyboard (read)
+FILE *stdout // screen   (write)
+FILE *stderr // screen   (error output — unbuffered)
+
+// printf = fprintf(stdout, ...)
+// scanf  = fscanf(stdin, ...)
+printf("Hello\\n");           // stdout
+fprintf(stderr, "Error!\\n"); // stderr — not redirected with >
+
+// Redirect file to/from stdin/stdout
+// program < input.txt > output.txt
 \`\`\``,
 
       codeExample: `#include <stdio.h>
@@ -682,51 +811,192 @@ int readStudentFile(const char *path, Student *arr, int maxN) {
 
       content_en: `## Binary Files — Raw Memory to Disk!
 
+Text file: human readable, bigger size, slower parse.
+Binary file: exact memory copy, compact, instant read/write — perfect for structs!
+
 ### fwrite and fread
 
 \`\`\`c
-// Write struct directly
+// fwrite(ptr, size_per_element, count, file)
+// fread (ptr, size_per_element, count, file)
+
+typedef struct {
+    int   id;
+    char  name[50];
+    float marks;
+} Student;
+
+// ── Write binary ──
 Student s = {101, "Rahul", 85.5f};
-FILE *fp = fopen("data.bin", "wb");
-fwrite(&s, sizeof(Student), 1, fp);
+FILE *fp = fopen("data.bin", "wb");  // 'b' = binary!
+if (!fp) { perror("fopen"); return 1; }
+
+fwrite(&s, sizeof(Student), 1, fp);   // write 1 Student
 fclose(fp);
 
-// Write array of structs
-Student batch[3] = {{101,"Rahul",85},{102,"Priya",92},{103,"Aryan",78}};
-fwrite(batch, sizeof(Student), 3, fp);  // all at once!
-
-// Read back
+// ── Read binary ──
 Student loaded;
-fp = fopen("data.bin","rb");
+fp = fopen("data.bin", "rb");
 fread(&loaded, sizeof(Student), 1, fp);
+printf("ID:%d Name:%s Marks:%.1f\\n", loaded.id, loaded.name, loaded.marks);
+fclose(fp);
+
+// ── Write array of structs ──
+Student batch[3] = {
+    {101, "Rahul", 85.5f},
+    {102, "Priya", 92.0f},
+    {103, "Aryan", 78.5f},
+};
+fp = fopen("batch.bin", "wb");
+fwrite(batch, sizeof(Student), 3, fp);  // write 3 students at once!
+fclose(fp);
+
+// ── Read array ──
+Student readBatch[10];
+fp = fopen("batch.bin", "rb");
+int count = fread(readBatch, sizeof(Student), 10, fp);  // returns elements read
+printf("Read %d students\\n", count);  // 3
+fclose(fp);
 \`\`\`
 
-### Random Access — O(1)!
+### Random Access in Binary Files
 
 \`\`\`c
-void readRecord(FILE *fp, int idx, Student *s) {
-    fseek(fp, idx * sizeof(Student), SEEK_SET);
+// Seek to specific record — O(1) access!
+void readRecord(FILE *fp, int index, Student *s) {
+    fseek(fp, index * sizeof(Student), SEEK_SET);
     fread(s, sizeof(Student), 1, fp);
 }
-void updateRecord(FILE *fp, int idx, const Student *s) {
-    fseek(fp, idx * sizeof(Student), SEEK_SET);
+
+void updateRecord(FILE *fp, int index, const Student *s) {
+    fseek(fp, index * sizeof(Student), SEEK_SET);
     fwrite(s, sizeof(Student), 1, fp);
 }
-int count(FILE *fp) {
+
+int getRecordCount(FILE *fp) {
     fseek(fp, 0, SEEK_END);
-    return ftell(fp) / sizeof(Student);
+    long size = ftell(fp);
+    return size / sizeof(Student);
 }
+
+// Usage
+FILE *fp = fopen("students.bin", "r+b");  // read+write binary
+
+Student s;
+readRecord(fp, 2, &s);  // read 3rd student (index 2)
+printf("Student 2: %s\\n", s.name);
+
+s.marks = 95.0f;
+updateRecord(fp, 2, &s);  // update in place!
+
+int total = getRecordCount(fp);
+printf("Total records: %d\\n", total);
+fclose(fp);
 \`\`\`
 
-### File Header — Custom Format
+### Text vs Binary — Comparison
 
 \`\`\`c
+// ── Write same data both ways ──
+Student s = {101, "Rahul Sharma", 87.5f};
+
+// Text — human readable, larger
+FILE *t = fopen("student.txt", "w");
+fprintf(t, "%d,%s,%.1f\\n", s.id, s.name, s.marks);
+// File size: ~25 bytes
+// Content: "101,Rahul Sharma,87.5\\n"
+fclose(t);
+
+// Binary — compact, not human readable
+FILE *b = fopen("student.bin", "wb");
+fwrite(&s, sizeof(Student), 1, b);
+// File size: sizeof(Student) = ~58 bytes (with padding)
+// But: instant read/write! No parsing needed!
+fclose(b);
+
+// Real comparison for 100,000 records:
+// Text write: ~150ms (formatting + string conversion)
+// Binary write: ~10ms (direct memory copy)
+// Text read: ~200ms (parsing)
+// Binary read: ~15ms (direct memory copy)
+\`\`\`
+
+### Endianness and Portability
+
+\`\`\`c
+// Binary files are NOT portable by default!
+// x86 (little-endian) vs ARM/Network (big-endian)
+
+// int 0x01020304:
+// Little-endian: 04 03 02 01 (least significant byte first)
+// Big-endian:    01 02 03 04 (most significant byte first)
+
+// Portable write: convert to network byte order
+#include <arpa/inet.h>  // Linux/Mac
+uint32_t hostVal = 12345;
+uint32_t netVal  = htonl(hostVal);  // host to network long
+fwrite(&netVal, sizeof(netVal), 1, fp);
+
+// Read back
+uint32_t readNet;
+fread(&readNet, sizeof(readNet), 1, fp);
+uint32_t readHost = ntohl(readNet);  // network to host
+\`\`\`
+
+### File Header — Custom File Format
+
+\`\`\`c
+// Professional way: header with magic bytes + version + metadata
+
+#define MAGIC   0x5354444E  // "STDN" — our custom format
+#define VERSION 1
+
 typedef struct {
-    uint32_t magic;    // 0x5354444E "STDN"
-    uint16_t version;  // format version
-    uint32_t count;    // record count
-} FileHeader;
-// Always write header first — validate before reading!
+    uint32_t magic;     // identify file type
+    uint16_t version;   // format version
+    uint32_t count;     // number of records
+    uint64_t timestamp; // creation time
+    uint8_t  reserved[12]; // future use — padding
+} FileHeader;  // 32 bytes exactly
+
+// Write file with header
+void writeStudentFile(const char *path, Student *arr, int n) {
+    FILE *fp = fopen(path, "wb");
+    if (!fp) { perror("fopen"); return; }
+
+    FileHeader hdr = {
+        .magic     = MAGIC,
+        .version   = VERSION,
+        .count     = n,
+        .timestamp = (uint64_t)time(NULL),
+    };
+    fwrite(&hdr, sizeof(FileHeader), 1, fp);
+    fwrite(arr, sizeof(Student), n, fp);
+    fclose(fp);
+}
+
+// Read with validation
+int readStudentFile(const char *path, Student *arr, int maxN) {
+    FILE *fp = fopen(path, "rb");
+    if (!fp) return -1;
+
+    FileHeader hdr;
+    fread(&hdr, sizeof(FileHeader), 1, fp);
+
+    if (hdr.magic != MAGIC) {
+        printf("Not a valid student file!\\n");
+        fclose(fp); return -1;
+    }
+    if (hdr.version != VERSION) {
+        printf("Incompatible version: %d\\n", hdr.version);
+        fclose(fp); return -1;
+    }
+
+    int toRead = hdr.count < maxN ? hdr.count : maxN;
+    fread(arr, sizeof(Student), toRead, fp);
+    fclose(fp);
+    return toRead;
+}
 \`\`\``,
 
       codeExample: `#include <stdio.h>
@@ -1182,48 +1452,181 @@ cleanup:
 
       content_en: `## Error Handling — Production-Ready C Code!
 
-### errno
+Beginner ka code: assume do sab kuch work karega.
+Professional ka code: assume do kuch bhi fail ho sakta hai!
+
+### errno — C ka Error System
 
 \`\`\`c
 #include <errno.h>
-FILE *fp = fopen("nofile.txt","r");
+#include <string.h>
+
+FILE *fp = fopen("nonexistent.txt", "r");
 if (!fp) {
-    perror("fopen");          // prints OS error
-    printf("%s\\n", strerror(errno));  // "No such file or directory"
+    // errno = OS error code
+    printf("Error code: %d\\n",    errno);         // e.g. 2
+    printf("Error string: %s\\n",  strerror(errno)); // "No such file or directory"
+    perror("Custom prefix");  // "Custom prefix: No such file or directory\\n"
 }
+
+// Common errno values
+// ENOENT  = 2  — No such file or directory
+// EACCES  = 13 — Permission denied
+// ENOMEM  = 12 — Out of memory
+// EEXIST  = 17 — File exists
+// EINVAL  = 22 — Invalid argument
+// ERANGE  = 34 — Result out of range
 \`\`\`
 
-### Custom Error Codes
+### Custom Error Codes and Return Values
 
 \`\`\`c
+// Method 1: Return codes (C standard approach)
 typedef enum {
-    OK=0, ERR_NULL=-1, ERR_MEM=-2, ERR_FILE=-3, ERR_INPUT=-4
-} Err;
+    ERR_OK       = 0,
+    ERR_NULL_PTR = -1,
+    ERR_NO_MEMORY = -2,
+    ERR_FILE_NOT_FOUND = -3,
+    ERR_INVALID_INPUT  = -4,
+    ERR_OVERFLOW       = -5,
+} ErrorCode;
 
-Err processFile(const char *path, int *out) {
-    if (!path||!out) return ERR_NULL;
-    FILE *f=fopen(path,"r"); if(!f) return ERR_FILE;
-    *out=0; char buf[256];
-    while(fgets(buf,sizeof(buf),f)) (*out)++;
-    fclose(f); return OK;
+const char* errStr(ErrorCode e) {
+    switch (e) {
+        case ERR_OK:             return "Success";
+        case ERR_NULL_PTR:       return "Null pointer";
+        case ERR_NO_MEMORY:      return "Out of memory";
+        case ERR_FILE_NOT_FOUND: return "File not found";
+        case ERR_INVALID_INPUT:  return "Invalid input";
+        case ERR_OVERFLOW:       return "Overflow";
+        default:                 return "Unknown error";
+    }
+}
+
+ErrorCode processFile(const char *path, int *outCount) {
+    if (!path || !outCount) return ERR_NULL_PTR;
+
+    FILE *fp = fopen(path, "r");
+    if (!fp) return ERR_FILE_NOT_FOUND;
+
+    *outCount = 0;
+    char line[256];
+    while (fgets(line, sizeof(line), fp)) (*outCount)++;
+
+    fclose(fp);
+    return ERR_OK;
+}
+
+// Usage
+int count;
+ErrorCode err = processFile("data.txt", &count);
+if (err != ERR_OK) {
+    fprintf(stderr, "Error: %s\\n", errStr(err));
+    return err;  // propagate up
+}
+printf("Lines: %d\\n", count);
+\`\`\`
+
+### Defensive Programming Patterns
+
+\`\`\`c
+// ── 1. NULL checks ──
+Student* createStudent(const char *name, float marks) {
+    if (!name) {
+        fprintf(stderr, "createStudent: name is NULL\\n");
+        return NULL;
+    }
+    if (marks < 0 || marks > 100) {
+        fprintf(stderr, "createStudent: invalid marks %.1f\\n", marks);
+        return NULL;
+    }
+
+    Student *s = (Student*)malloc(sizeof(Student));
+    if (!s) {
+        fprintf(stderr, "createStudent: malloc failed\\n");
+        return NULL;
+    }
+
+    strncpy(s->name, name, sizeof(s->name)-1);
+    s->name[sizeof(s->name)-1] = '\\0';  // ensure null termination
+    s->marks = marks;
+    return s;
+}
+
+// ── 2. Array bounds ──
+int safeGet(int *arr, int size, int index, int *out) {
+    if (!arr || !out)      return ERR_NULL_PTR;
+    if (index < 0 || index >= size) return ERR_INVALID_INPUT;
+    *out = arr[index];
+    return ERR_OK;
+}
+
+// ── 3. Integer overflow check ──
+int safeAdd(int a, int b, int *result) {
+    // check if a + b would overflow
+    if (b > 0 && a > INT_MAX - b) return ERR_OVERFLOW;
+    if (b < 0 && a < INT_MIN - b) return ERR_OVERFLOW;
+    *result = a + b;
+    return ERR_OK;
+}
+
+// ── 4. String safety ──
+int safeCopy(char *dst, size_t dstSize, const char *src) {
+    if (!dst || !src || dstSize == 0) return ERR_NULL_PTR;
+    strncpy(dst, src, dstSize - 1);
+    dst[dstSize - 1] = '\\0';  // ALWAYS null-terminate
+    return ERR_OK;
 }
 \`\`\`
 
-### Defensive Patterns
+### assert — Debug-time Checks
 
 \`\`\`c
-// NULL checks, bounds checks, overflow checks
-if (!ptr)        return ERR_NULL;
-if (i<0||i>=n)   return ERR_INPUT;
-if (a>INT_MAX-b) return ERR_OVERFLOW;
+#include <assert.h>
 
-// Always null-terminate strings
-strncpy(dst, src, size-1); dst[size-1]='\\0';
+// assert aborts program agar condition false ho
+// (ONLY in debug builds — NDEBUG macro se disable hoti hai)
+void divideArray(int *arr, int n, int divisor) {
+    assert(arr != NULL);    // should never be null
+    assert(n > 0);          // need at least 1 element
+    assert(divisor != 0);   // no division by zero!
 
-// Cleanup with goto (accepted C idiom)
+    for (int i = 0; i < n; i++) arr[i] /= divisor;
+}
+
+// Compile with: gcc -DNDEBUG prog.c  → asserts disabled (release)
+// Compile with: gcc prog.c           → asserts enabled (debug)
+\`\`\`
+
+### Cleanup Patterns — goto for Error Handling!
+
+\`\`\`c
+// C in proper cleanup using goto (NOT bad style for error handling!)
+int processData(const char *inputPath, const char *outputPath) {
+    int result = ERR_OK;
+    FILE *in = NULL, *out = NULL;
+    char *buffer = NULL;
+
+    in = fopen(inputPath, "r");
+    if (!in) { result = ERR_FILE_NOT_FOUND; goto cleanup; }
+
+    out = fopen(outputPath, "w");
+    if (!out) { result = ERR_FILE_NOT_FOUND; goto cleanup; }
+
+    buffer = (char*)malloc(1024);
+    if (!buffer) { result = ERR_NO_MEMORY; goto cleanup; }
+
+    // ... actual processing ...
+    while (fgets(buffer, 1024, in)) {
+        fputs(buffer, out);
+    }
+
 cleanup:
-    free(buf); if(fp) fclose(fp);
+    free(buffer);    // free(NULL) is safe!
+    if (in)  fclose(in);
+    if (out) fclose(out);
     return result;
+}
 \`\`\``,
 
       codeExample: `#include <stdio.h>
@@ -1556,25 +1959,101 @@ Month 2 (Weeks 5-8) — Current:
     - Basic Graph representation
 \`\`\``,
 
-      content_en: `## Week 6 Project — Everything in One Robust System!
+      content_en: `## Week 6 Project — Sab Kuch Ek Robust System In!
 
-### Database Architecture
+Is hafte seekha:
+- Text files (fopen, fclose, fprintf, fgets, fscanf)
+- Binary files (fread, fwrite, random access, file header)
+- Error handling (errno, custom codes, defensive programming)
+
+Ab ek **Complete File-Based Database System** build!
+
+### Project Architecture
 
 \`\`\`
-studyearn.hdr  ← Binary header (magic, version, count)
-studyearn.dat  ← Binary data (fixed-size records)
-studyearn.idx  ← Binary index (id → file offset)
-studyearn.log  ← Text operation log
+Database Files:
+├── studyearn.hdr    ← Binary header (magic, version, record count)
+├── studyearn.dat    ← Binary data (fixed-size records)
+├── studyearn.idx    ← Binary index (id → file offset mapping)
+└── studyearn.log    ← Text log (all operations)
+
+Features:
+1. CREATE — new student record add do
+2. READ   — by ID or name search do
+3. UPDATE — marks, city update do
+4. DELETE — soft delete (active flag = 0)
+5. LIST   — sab active records print do
+6. STATS  — analytics (avg, top, dept breakdown)
+7. BACKUP — .dat file copy do .bak mein
+8. IMPORT — CSV file se records load do
+9. EXPORT — records ko CSV in save do
 \`\`\`
 
-### Index for Fast Lookup
+### Index Structure — Fast Lookup
 
 \`\`\`c
-typedef struct { int id; long offset; int active; } IdxEntry;
+typedef struct {
+    int   id;      // student ID
+    long  offset;  // byte offset in .dat file
+    int   active;  // 1=valid, 0=deleted
+} IndexEntry;
 
-// Build on startup by scanning .dat
-// Lookup: scan index (small) instead of data (large)
-// Future: B-tree or hash for O(log n) / O(1)
+// Index file operations
+void buildIndex(const char *datPath, const char *idxPath);
+long lookupOffset(const char *idxPath, int id);
+void addToIndex(const char *idxPath, int id, long offset);
+void deleteFromIndex(const char *idxPath, int id);
+
+// Lookup by ID: O(n) scan of index (small) vs O(n) scan of data (large)
+// For large databases: B-tree or hash index
+\`\`\`
+
+### CSV Import/Export
+
+\`\`\`c
+// Import from CSV
+int importCSV(Database *db, const char *csvPath) {
+    FILE *fp = fopen(csvPath, "r");
+    if (!fp) return ERR_FILE;
+
+    char line[256];
+    fgets(line, sizeof(line), fp);  // skip header
+
+    int imported = 0;
+    while (fgets(line, sizeof(line), fp)) {
+        Student s = {0};
+        // Parse CSV line: id,name,dept,marks,city
+        int parsed = sscanf(line,
+            "%d,\"%49[^\"]\",\"%19[^\"]\",\"%19[^\"]\",%.1f,\"%29[^\"]\"",
+            &s.id, s.name, s.dept, s.section, &s.marks, s.city);
+        if (parsed == 6) {
+            addStudent(db, s);
+            imported++;
+        }
+    }
+    fclose(fp);
+    return imported;
+}
+\`\`\`
+
+### Month 2 Preview
+
+\`\`\`
+Month 2 (Weeks 5-8) — Current:
+  ✅ Week 5: Structures, Unions, Enums, Linked Lists
+  ✅ Week 6: File I/O, Binary files, Error Handling
+
+  Week 7 (coming): Preprocessor, Macros, Advanced C
+    - #define, #ifdef, #pragma
+    - Variadic functions (printf-like)
+    - Bitwise operations deep dive
+    - inline functions, restrict keyword
+
+  Week 8 (coming): Stack, Queue, Hash Table
+    - Stack implementation (array + linked list)
+    - Queue (circular buffer)
+    - Hash table (chaining + open addressing)
+    - Basic Graph representation
 \`\`\``,
 
       codeExample: `#include <stdio.h>

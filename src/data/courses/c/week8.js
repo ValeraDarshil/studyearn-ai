@@ -191,46 +191,174 @@ int evalPostfix(const char *expr) {
 
       content_en: `## Stack — Last In, First Out!
 
-### Array Stack
+Stack = plates ka stack. Jo plate pehle rakhi — woh last in nikalti hai!
+Last In, First Out (LIFO).
 
-\`\`\`c
-typedef struct { int data[1000]; int top, size; } Stack;
-void init(Stack *s)  { s->top=-1; s->size=0; }
-int  push(Stack *s, int v) { if(s->top==999) return 0; s->data[++s->top]=v; s->size++; return 1; }
-int  pop (Stack *s, int *o){ if(s->top<0) return 0; *o=s->data[s->top--]; s->size--; return 1; }
-int  peek(const Stack *s)  { return s->top>=0 ? s->data[s->top] : -1; }
+### Real-World Uses
+\`\`\`
+Function call stack   ← main() → func1() → func2() — yahi stack hai!
+Undo/Redo systems     ← text editor in Ctrl+Z
+Browser back button   ← visited pages history
+Expression evaluation ← 3 + 4 * 2 calculate karna
+Balanced parentheses  ← ({[]}) check
+Depth-First Search    ← graph traversal
+Backtracking          ← maze solving
 \`\`\`
 
-### Linked List Stack
+### Stack — Array Implementation
 
 \`\`\`c
-typedef struct N { int d; struct N *n; } Node;
-typedef struct { Node *top; int sz; } DynStack;
+#define STACK_MAX 1000
 
-void push(DynStack *s, int d) {
-    Node *n=malloc(sizeof(*n)); n->d=d; n->n=s->top; s->top=n; s->sz++;
+typedef struct {
+    int  data[STACK_MAX];
+    int  top;     // index of top element (-1 = empty)
+    int  size;    // current number of elements
+} Stack;
+
+void   stack_init  (Stack *s)          { s->top = -1; s->size = 0; }
+int    stack_empty (const Stack *s)    { return s->top == -1; }
+int    stack_full  (const Stack *s)    { return s->top == STACK_MAX - 1; }
+int    stack_size  (const Stack *s)    { return s->size; }
+int    stack_peek  (const Stack *s)    { return s->top >= 0 ? s->data[s->top] : -1; }
+
+int stack_push(Stack *s, int val) {
+    if (stack_full(s)) return 0;  // overflow!
+    s->data[++s->top] = val;
+    s->size++;
+    return 1;
 }
-int pop(DynStack *s) {
-    if(!s->top) return -1;
-    int d=s->top->d; Node *t=s->top; s->top=t->n; free(t); s->sz--; return d;
+
+int stack_pop(Stack *s, int *out) {
+    if (stack_empty(s)) return 0;  // underflow!
+    *out = s->data[s->top--];
+    s->size--;
+    return 1;
+}
+
+// Usage
+Stack s;
+stack_init(&s);
+stack_push(&s, 10);
+stack_push(&s, 20);
+stack_push(&s, 30);
+// Stack: bottom [10, 20, 30] top
+
+int val;
+stack_pop(&s, &val);   // val = 30 (LIFO!)
+stack_pop(&s, &val);   // val = 20
+printf("Peek: %d\\n",  stack_peek(&s));  // 10
+\`\`\`
+
+### Dynamic Stack (Linked List)
+
+\`\`\`c
+typedef struct StackNode {
+    int              data;
+    struct StackNode *next;
+} StackNode;
+
+typedef struct {
+    StackNode *top;
+    int        size;
+} DynStack;
+
+void dynstack_init(DynStack *s) { s->top = NULL; s->size = 0; }
+
+int dynstack_push(DynStack *s, int val) {
+    StackNode *node = (StackNode*)malloc(sizeof(StackNode));
+    if (!node) return 0;
+    node->data  = val;
+    node->next  = s->top;
+    s->top      = node;
+    s->size++;
+    return 1;
+}
+
+int dynstack_pop(DynStack *s, int *out) {
+    if (!s->top) return 0;
+    *out     = s->top->data;
+    StackNode *temp = s->top;
+    s->top   = s->top->next;
+    free(temp);
+    s->size--;
+    return 1;
+}
+
+void dynstack_free(DynStack *s) {
+    int dummy;
+    while (dynstack_pop(s, &dummy));
 }
 \`\`\`
 
-### Applications
+### Stack Applications
 
 \`\`\`c
-// Balanced parentheses
-int isBalanced(const char *e) {
-    Stack s; init(&s);
-    for(int i=0;e[i];i++){
-        if(e[i]=='('||e[i]=='['||e[i]=='{') push(&s,e[i]);
-        else if(e[i]==')'||e[i]==']'||e[i]=='}'){
-            int t; if(!pop(&s,&t)) return 0;
-            if((e[i]==')'&&t!='(')||(e[i]==']'&&t!='[')||(e[i]=='}'&&t!='{')) return 0;
+// ── 1. Balanced Parentheses Check ──
+int isBalanced(const char *expr) {
+    Stack s;
+    stack_init(&s);
+
+    for (int i = 0; expr[i]; i++) {
+        char c = expr[i];
+        if (c == '(' || c == '[' || c == '{') {
+            stack_push(&s, c);
+        } else if (c == ')' || c == ']' || c == '}') {
+            if (stack_empty(&s)) return 0;
+            int top;
+            stack_pop(&s, &top);
+            if ((c == ')' && top != '(') ||
+                (c == ']' && top != '[') ||
+                (c == '}' && top != '{')) return 0;
         }
     }
-    return s.top<0;
+    return stack_empty(&s);
 }
+
+// isBalanced("([]{})")  → 1 (balanced)
+// isBalanced("([)]")    → 0 (not balanced)
+// isBalanced("{[}")     → 0 (not balanced)
+
+// ── 2. Infix to Postfix Conversion ──
+// Infix:   3 + 4 * 2       = 11 (standard)
+// Postfix: 3 4 2 * +       = 11 (no precedence needed!)
+// Prefix:  + 3 * 4 2       = 11
+
+// Shunting-yard algorithm uses stack
+int precedence(char op) {
+    if (op == '*' || op == '/') return 2;
+    if (op == '+' || op == '-') return 1;
+    return 0;
+}
+
+// ── 3. Evaluate Postfix Expression ──
+int evalPostfix(const char *expr) {
+    Stack s;
+    stack_init(&s);
+
+    for (int i = 0; expr[i]; i++) {
+        if (isdigit(expr[i])) {
+            stack_push(&s, expr[i] - '0');
+        } else if (expr[i] != ' ') {
+            int b, a;
+            stack_pop(&s, &b);
+            stack_pop(&s, &a);
+            int result;
+            switch (expr[i]) {
+                case '+': result = a + b; break;
+                case '-': result = a - b; break;
+                case '*': result = a * b; break;
+                case '/': result = a / b; break;
+                default:  result = 0;
+            }
+            stack_push(&s, result);
+        }
+    }
+    int result;
+    stack_pop(&s, &result);
+    return result;
+}
+// evalPostfix("3 4 2 * +") → 3 + 4*2 = 11
 \`\`\``,
 
       codeExample: `#include <stdio.h>
@@ -647,39 +775,190 @@ int heap_pop(MinHeap *h) {
 
       content_en: `## Queue — First In, First Out!
 
-### Circular Queue
+Queue = line in khade log. Jo pehle aaya, pehle gaya — FIFO!
 
-\`\`\`c
-#define CAP 8
-typedef struct { int d[CAP]; int front,rear,sz; } CQ;
-void init(CQ*q){q->front=q->rear=q->sz=0;}
-int  enq(CQ*q,int v){if(q->sz==CAP)return 0;q->d[q->rear]=v;q->rear=(q->rear+1)%CAP;q->sz++;return 1;}
-int  deq(CQ*q,int*o){if(!q->sz)return 0;*o=q->d[q->front];q->front=(q->front+1)%CAP;q->sz--;return 1;}
+### Real-World Uses
+\`\`\`
+CPU Task Scheduling    ← OS process queue
+Print Queue           ← printer in jobs
+BFS Graph Traversal   ← shortest path
+Message Queue         ← RabbitMQ, Kafka
+Keyboard Input Buffer ← keys pressed
+Network Packet Queue  ← router buffers
+Bank/Hospital Queue   ← service systems
 \`\`\`
 
-### Linked List Queue
+### Circular Queue — Array se Efficient!
 
 \`\`\`c
-typedef struct N{int d;struct N*n;}N;
-typedef struct{N*front,*rear;int sz;}Q;
-void enqueue(Q*q,int v){
-    N*n=malloc(sizeof*n);n->d=v;n->n=NULL;
-    if(q->rear)q->rear->n=n;else q->front=n;
-    q->rear=n;q->sz++;
+#define QUEUE_CAP 8
+
+typedef struct {
+    int  data[QUEUE_CAP];
+    int  front;   // dequeue position
+    int  rear;    // enqueue position
+    int  size;
+} CircularQueue;
+
+void  queue_init   (CircularQueue *q) { q->front = 0; q->rear = 0; q->size = 0; }
+int   queue_empty  (const CircularQueue *q) { return q->size == 0; }
+int   queue_full   (const CircularQueue *q) { return q->size == QUEUE_CAP; }
+int   queue_size   (const CircularQueue *q) { return q->size; }
+int   queue_front  (const CircularQueue *q) { return q->size > 0 ? q->data[q->front] : -1; }
+int   queue_back   (const CircularQueue *q) { return q->size > 0 ? q->data[(q->rear-1+QUEUE_CAP)%QUEUE_CAP] : -1; }
+
+int queue_enqueue(CircularQueue *q, int val) {
+    if (queue_full(q)) return 0;          // overflow!
+    q->data[q->rear] = val;
+    q->rear = (q->rear + 1) % QUEUE_CAP;  // wrap around!
+    q->size++;
+    return 1;
 }
-int dequeue(Q*q){
-    if(!q->front)return-1;
-    int d=q->front->d;N*t=q->front;
-    q->front=t->n;if(!q->front)q->rear=NULL;
-    free(t);q->sz--;return d;
+
+int queue_dequeue(CircularQueue *q, int *out) {
+    if (queue_empty(q)) return 0;         // underflow!
+    *out = q->data[q->front];
+    q->front = (q->front + 1) % QUEUE_CAP; // wrap around!
+    q->size--;
+    return 1;
+}
+
+// Why circular? Linear queue se:
+// enqueue: rear++
+// dequeue: front++
+// Problem: rear reaches end but front moved — wasted space!
+// Circular: (rear+1) % CAPACITY — wrap around, reuse space!
+\`\`\`
+
+### Dynamic Queue — Linked List
+
+\`\`\`c
+typedef struct QNode {
+    int          data;
+    struct QNode *next;
+} QNode;
+
+typedef struct {
+    QNode *front;  // dequeue end
+    QNode *rear;   // enqueue end
+    int    size;
+} DynQueue;
+
+void dynq_init(DynQueue *q) { q->front = q->rear = NULL; q->size = 0; }
+
+int dynq_enqueue(DynQueue *q, int val) {
+    QNode *n = (QNode*)malloc(sizeof(QNode));
+    if (!n) return 0;
+    n->data = val;
+    n->next = NULL;
+
+    if (!q->rear) {          // empty queue
+        q->front = q->rear = n;
+    } else {
+        q->rear->next = n;   // append to rear
+        q->rear = n;
+    }
+    q->size++;
+    return 1;
+}
+
+int dynq_dequeue(DynQueue *q, int *out) {
+    if (!q->front) return 0;
+    *out = q->front->data;
+    QNode *temp = q->front;
+    q->front = q->front->next;
+    if (!q->front) q->rear = NULL;  // queue became empty
+    free(temp);
+    q->size--;
+    return 1;
+}
+
+void dynq_free(DynQueue *q) {
+    int dummy;
+    while (dynq_dequeue(q, &dummy));
 }
 \`\`\`
 
-### Min-Heap (Priority Queue)
+### Deque — Double-Ended Queue
 
 \`\`\`c
-// push: append + bubble up   O(log n)
-// pop:  return min + bubble down O(log n)
+// Deque = insert/delete from BOTH ends!
+// Doubly linked list = perfect for deque
+
+typedef struct DNode {
+    int           data;
+    struct DNode *prev, *next;
+} DNode;
+
+typedef struct {
+    DNode *front, *rear;
+    int    size;
+} Deque;
+
+// pushFront, pushBack, popFront, popBack — all O(1)
+void deque_pushFront(Deque *d, int val) {
+    DNode *n = (DNode*)malloc(sizeof(DNode));
+    n->data = val;
+    n->prev = NULL;
+    n->next = d->front;
+    if (d->front) d->front->prev = n;
+    else          d->rear = n;
+    d->front = n;
+    d->size++;
+}
+void deque_pushBack(Deque *d, int val) {
+    DNode *n = (DNode*)malloc(sizeof(DNode));
+    n->data = val;
+    n->next = NULL;
+    n->prev = d->rear;
+    if (d->rear) d->rear->next = n;
+    else         d->front = n;
+    d->rear = n;
+    d->size++;
+}
+\`\`\`
+
+### Priority Queue (Min-Heap based)
+
+\`\`\`c
+// Priority Queue: highest priority element first!
+// Min-heap: smallest element = highest priority
+#define HEAP_MAX 256
+
+typedef struct {
+    int  data[HEAP_MAX];
+    int  size;
+} MinHeap;
+
+void heap_push(MinHeap *h, int val) {
+    int i = h->size++;
+    h->data[i] = val;
+    // Bubble up
+    while (i > 0) {
+        int parent = (i - 1) / 2;
+        if (h->data[i] < h->data[parent]) {
+            int temp = h->data[i]; h->data[i] = h->data[parent]; h->data[parent] = temp;
+            i = parent;
+        } else break;
+    }
+}
+
+int heap_pop(MinHeap *h) {
+    if (h->size == 0) return -1;
+    int min = h->data[0];
+    h->data[0] = h->data[--h->size];  // move last to root
+    // Bubble down
+    int i = 0;
+    while (1) {
+        int l = 2*i+1, r = 2*i+2, smallest = i;
+        if (l < h->size && h->data[l] < h->data[smallest]) smallest = l;
+        if (r < h->size && h->data[r] < h->data[smallest]) smallest = r;
+        if (smallest == i) break;
+        int temp = h->data[i]; h->data[i] = h->data[smallest]; h->data[smallest] = temp;
+        i = smallest;
+    }
+    return min;
+}
 \`\`\``,
 
       codeExample: `#include <stdio.h>
@@ -1103,36 +1382,173 @@ Load factor: count/capacity — keep < 0.7 for good performance
 Rehashing: when load factor too high, create bigger table + reinsert all
 \`\`\``,
 
-      content_en: `## Hash Table — The C Version of a Dictionary!
+      content_en: `## Hash Table — Dictionary ka C Version!
 
-### Hash Function
+Python in dict, Java in HashMap, C in — khud build!
+Average case: O(1) insert, delete, lookup. Blazing fast!
+
+### Hash Function — Key to Index!
 
 \`\`\`c
-// djb2 — popular, good distribution
-unsigned long djb2(const char *s) {
-    unsigned long h=5381; int c;
-    while((c=*s++)) h=h*33+c;
-    return h;
+// Simple hash: string → array index
+unsigned int hash(const char *key, int tableSize) {
+    unsigned int h = 0;
+    while (*key) {
+        h = h * 31 + *key++;
+    }
+    return h % tableSize;
+}
+
+// Better: djb2 hash (popular, good distribution)
+unsigned long djb2(const char *str) {
+    unsigned long hash = 5381;
+    int c;
+    while ((c = *str++)) {
+        hash = ((hash << 5) + hash) + c;  // hash * 33 + c
+    }
+    return hash;
+}
+
+// FNV-1a hash (fast, good distribution)
+uint32_t fnv1a(const char *str) {
+    uint32_t hash = 2166136261u;
+    while (*str) {
+        hash ^= (uint8_t)*str++;
+        hash *= 16777619u;
+    }
+    return hash;
 }
 \`\`\`
 
-### Chaining HashMap
+### Collision Handling — Chaining
 
 \`\`\`c
-#define SZ 64
-typedef struct E{char k[64];int v;struct E*n;}E;
-typedef struct{E*b[SZ];int cnt;}HM;
+#define TABLE_SIZE 64  // power of 2 for efficiency
 
-void hm_set(HM*m,const char*k,int v){
-    int i=djb2(k)%SZ; E*e=m->b[i];
-    while(e){if(!strcmp(e->k,k)){e->v=v;return;}e=e->n;}
-    E*n=malloc(sizeof*n);strncpy(n->k,k,63);n->v=v;n->n=m->b[i];m->b[i]=n;m->cnt++;
+typedef struct Entry {
+    char         key[64];
+    int          value;
+    struct Entry *next;  // chaining for collisions
+} Entry;
+
+typedef struct {
+    Entry   *buckets[TABLE_SIZE];
+    int      count;
+    float    loadFactor;  // count / TABLE_SIZE
+} HashMap;
+
+void   hm_init  (HashMap *hm) { memset(hm->buckets, 0, sizeof(hm->buckets)); hm->count = 0; }
+
+// Hash function
+int hm_hash(const char *key) {
+    unsigned long h = 5381;
+    while (*key) h = h*33 + *key++;
+    return h % TABLE_SIZE;
 }
-int* hm_get(HM*m,const char*k){
-    E*e=m->b[djb2(k)%SZ];
-    while(e){if(!strcmp(e->k,k))return&e->v;e=e->n;}
-    return NULL;
+
+// Insert or update — O(1) average
+void hm_set(HashMap *hm, const char *key, int value) {
+    int idx = hm_hash(key);
+    Entry *e = hm->buckets[idx];
+
+    // Update if exists
+    while (e) {
+        if (strcmp(e->key, key) == 0) { e->value = value; return; }
+        e = e->next;
+    }
+
+    // Insert new entry
+    Entry *new_e = (Entry*)malloc(sizeof(Entry));
+    strncpy(new_e->key, key, 63);
+    new_e->value = value;
+    new_e->next  = hm->buckets[idx];  // prepend to chain
+    hm->buckets[idx] = new_e;
+    hm->count++;
+    hm->loadFactor = (float)hm->count / TABLE_SIZE;
 }
+
+// Lookup — O(1) average
+int* hm_get(HashMap *hm, const char *key) {
+    int idx = hm_hash(key);
+    Entry *e = hm->buckets[idx];
+    while (e) {
+        if (strcmp(e->key, key) == 0) return &e->value;
+        e = e->next;
+    }
+    return NULL;  // not found
+}
+
+// Delete — O(1) average
+int hm_delete(HashMap *hm, const char *key) {
+    int idx = hm_hash(key);
+    Entry **ep = &hm->buckets[idx];
+    while (*ep) {
+        if (strcmp((*ep)->key, key) == 0) {
+            Entry *del = *ep;
+            *ep = del->next;
+            free(del);
+            hm->count--;
+            return 1;
+        }
+        ep = &(*ep)->next;
+    }
+    return 0;  // not found
+}
+
+void hm_free(HashMap *hm) {
+    for (int i = 0; i < TABLE_SIZE; i++) {
+        Entry *e = hm->buckets[i];
+        while (e) { Entry *next = e->next; free(e); e = next; }
+        hm->buckets[i] = NULL;
+    }
+    hm->count = 0;
+}
+\`\`\`
+
+### Open Addressing — Linear Probing
+
+\`\`\`c
+// No linked list — collision pe next empty slot dhundo!
+#define OA_SIZE 16
+
+typedef struct {
+    char key[64];
+    int  value;
+    int  occupied;  // 1=valid, 0=empty, -1=deleted
+} OAEntry;
+
+typedef struct {
+    OAEntry slots[OA_SIZE];
+    int     count;
+} OAHashMap;
+
+int oa_find_slot(OAHashMap *m, const char *key) {
+    int idx = djb2(key) % OA_SIZE;
+    int start = idx;
+    do {
+        if (!m->slots[idx].occupied)      return idx;   // empty slot
+        if (m->slots[idx].occupied == 1 &&
+            strcmp(m->slots[idx].key, key) == 0)
+                                          return idx;   // found!
+        idx = (idx + 1) % OA_SIZE;        // linear probe
+    } while (idx != start);
+    return -1;  // table full
+}
+\`\`\`
+
+### Hash Table Analysis
+
+\`\`\`
+Operation    Average   Worst Case
+──────────────────────────────────
+Insert        O(1)       O(n)
+Delete        O(1)       O(n)
+Search        O(1)       O(n)
+Space         O(n)       O(n)
+
+Worst case: all keys hash to same bucket = linked list scan
+Load factor: count/capacity — keep < 0.7 for good performance
+Rehashing: when load factor too high, create bigger table + reinsert all
 \`\`\``,
 
       codeExample: `#include <stdio.h>
@@ -1507,27 +1923,143 @@ Month 3 (Weeks 9-12):
     - Certificate! 🎓
 \`\`\``,
 
-      content_en: `## Month 2 Capstone — Build a Complete DS Library!
+      content_en: `## Month 2 Capstone — Ek Complete DS Library Build!
 
-### Generic Data Structures with void*
+### Month 2 Summary:
+\`\`\`
+✅ Week 5: struct, union, enum, linked list
+✅ Week 6: File I/O, binary files, error handling
+✅ Week 7: Preprocessor, macros, bitwise
+✅ Week 8: Stack, queue, hash table, priority queue
+\`\`\`
+
+### Capstone: studyearn_ds.h — Complete DS Library
 
 \`\`\`c
-// Type-agnostic stack
-typedef struct { void**data; int top,cap; size_t esz; } GenStack;
+// ── studyearn_ds.h ──
+#pragma once
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
-GenStack* gs_new(int cap, size_t esz){
-    GenStack*s=malloc(sizeof*s);
-    s->data=malloc(cap*sizeof(void*));s->top=-1;s->cap=cap;s->esz=esz;
+// ════════════════════════════════════════════════
+// GENERICS using void* pointers
+// ════════════════════════════════════════════════
+
+// Generic stack (any type)
+typedef struct {
+    void  **data;      // array of void pointers
+    int     top;
+    int     capacity;
+    size_t  elemSize;  // size of each element
+} GenStack;
+
+GenStack* gs_create(int cap, size_t elemSize) {
+    GenStack *s = (GenStack*)malloc(sizeof(GenStack));
+    s->data     = (void**)malloc(cap * sizeof(void*));
+    s->top      = -1;
+    s->capacity = cap;
+    s->elemSize = elemSize;
     return s;
 }
-void gs_push(GenStack*s,const void*e){
-    if(s->top>=s->cap-1){s->cap*=2;s->data=realloc(s->data,s->cap*sizeof(void*));}
-    void*c=malloc(s->esz);memcpy(c,e,s->esz);s->data[++s->top]=c;
+
+int gs_push(GenStack *s, const void *elem) {
+    if (s->top >= s->capacity-1) {
+        // Auto-resize!
+        s->capacity *= 2;
+        s->data = (void**)realloc(s->data, s->capacity * sizeof(void*));
+    }
+    void *copy = malloc(s->elemSize);
+    memcpy(copy, elem, s->elemSize);
+    s->data[++s->top] = copy;
+    return 1;
 }
-int gs_pop(GenStack*s,void*o){
-    if(s->top<0)return 0;
-    memcpy(o,s->data[s->top],s->esz);free(s->data[s->top--]);return 1;
+
+int gs_pop(GenStack *s, void *out) {
+    if (s->top < 0) return 0;
+    memcpy(out, s->data[s->top], s->elemSize);
+    free(s->data[s->top--]);
+    return 1;
 }
+
+void gs_free(GenStack *s) {
+    for (int i = 0; i <= s->top; i++) free(s->data[i]);
+    free(s->data);
+    free(s);
+}
+\`\`\`
+
+### Generic Queue
+
+\`\`\`c
+typedef struct QNode {
+    void        *data;
+    struct QNode *next;
+} QNode;
+
+typedef struct {
+    QNode  *front, *rear;
+    int     size;
+    size_t  elemSize;
+} GenQueue;
+
+GenQueue* gq_create(size_t elemSize) {
+    GenQueue *q = (GenQueue*)calloc(1, sizeof(GenQueue));
+    q->elemSize = elemSize;
+    return q;
+}
+
+int gq_enqueue(GenQueue *q, const void *elem) {
+    QNode *n = (QNode*)malloc(sizeof(QNode));
+    n->data   = malloc(q->elemSize);
+    memcpy(n->data, elem, q->elemSize);
+    n->next   = NULL;
+    if (!q->rear) q->front = q->rear = n;
+    else { q->rear->next = n; q->rear = n; }
+    q->size++;
+    return 1;
+}
+
+int gq_dequeue(GenQueue *q, void *out) {
+    if (!q->front) return 0;
+    memcpy(out, q->front->data, q->elemSize);
+    QNode *t = q->front;
+    q->front = t->next;
+    if (!q->front) q->rear = NULL;
+    free(t->data); free(t);
+    q->size--;
+    return 1;
+}
+\`\`\`
+
+### Month 3 Preview — Trees and Algorithms!
+
+\`\`\`
+Month 3 (Weeks 9-12):
+
+  Week 9:  Binary Search Tree (BST)
+    - BST insert, delete, search
+    - Inorder, preorder, postorder traversal
+    - BST validation, height
+    - AVL Tree basics (self-balancing)
+
+  Week 10: Sorting Algorithms (Master Class)
+    - Bubble, Selection, Insertion (O(n²))
+    - Merge Sort, Quick Sort (O(n log n))
+    - Heap Sort, Radix Sort
+    - When to use what
+
+  Week 11: Graphs + Advanced Topics
+    - Graph representation (adjacency matrix/list)
+    - DFS + BFS implementation
+    - Dijkstra's shortest path
+    - Topological sort
+
+  Week 12: Final Project + Certificate
+    - Complete system combining all DS
+    - Performance benchmarking
+    - Memory profiling
+    - Certificate! 🎓
 \`\`\``,
 
       codeExample: `#include <stdio.h>

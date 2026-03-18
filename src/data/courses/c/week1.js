@@ -1036,53 +1036,129 @@ int result2 = (2 + 3) * 4;    // 20 — parentheses first
 int result3 = 10 > 5 && 3 < 7; // 1 (true)
 \`\`\``,
 
-      content_en: `## Operators — C's Calculation Tools!
+      content_en: `## Operators — C ke Calculation Tools!
 
 ### Arithmetic Operators
 
 \`\`\`c
 int a = 17, b = 5;
-printf("%d\\n", a + b);  // 22
-printf("%d\\n", a / b);  // 3  (integer division — decimal dropped!)
-printf("%d\\n", a % b);  // 2  (remainder)
 
+printf("%d\\n", a + b);   // 22  — Addition
+printf("%d\\n", a - b);   // 12  — Subtraction
+printf("%d\\n", a * b);   // 85  — Multiplication
+printf("%d\\n", a / b);   // 3   — Division (integer — decimal drops!)
+printf("%d\\n", a % b);   // 2   — Modulo (remainder)
+
+// Float division
 float x = 17.0f, y = 5.0f;
-printf("%.2f\\n", x / y); // 3.40
+printf("%.2f\\n", x / y); // 3.40 — float division preserves decimal
 
+// Power (C in ** operator nahi) — math.h use do
 #include <math.h>
-double result = pow(2, 10);  // 1024
-double sq     = sqrt(144);   // 12
+double result = pow(2, 10);  // 2^10 = 1024
+double sqrtVal = sqrt(144);  // √144 = 12
 \`\`\`
 
-### Relational, Logical, Assignment
+### Relational (Comparison) Operators
 
 \`\`\`c
-// Relational — result is 0 (false) or 1 (true)
-a == b;  a != b;  a > b;  a < b;  a >= b;  a <= b;
+int a = 10, b = 20;
 
-// Logical
-age >= 18 && marks >= 60  // AND — both must be true
-marks >= 90 || age <= 16  // OR  — either can be true
-!isLoggedIn               // NOT — opposite
+printf("%d\\n", a == b);  // 0 (false) — equal?
+printf("%d\\n", a != b);  // 1 (true)  — not equal?
+printf("%d\\n", a > b);   // 0 (false) — greater?
+printf("%d\\n", a < b);   // 1 (true)  — less?
+printf("%d\\n", a >= 10); // 1 (true)  — greater or equal?
+printf("%d\\n", a <= 9);  // 0 (false) — less or equal?
 
-// Assignment shorthand
-x += 5;  x -= 3;  x *= 2;  x /= 4;  x %= 4;
+// C in true = 1, false = 0
+// (Python ki tarah True/False nahi — stdbool.h ke bina)
+\`\`\`
+
+### Logical Operators
+
+\`\`\`c
+int age = 20, marks = 75;
+
+// && = AND (dono true ho tab true)
+if (age >= 18 && marks >= 60) {
+    printf("Eligible for admission\\n");
+}
+
+// || = OR (koi bhi ek true ho tab true)
+if (marks >= 90 || age <= 16) {
+    printf("Special scholarship eligible\\n");
+}
+
+// ! = NOT (opposite)
+int isLoggedIn = 0;
+if (!isLoggedIn) {
+    printf("Please login first\\n");
+}
+\`\`\`
+
+### Assignment Operators
+
+\`\`\`c
+int x = 10;
+
+x += 5;   // x = x + 5 = 15  (same as x = x + 5)
+x -= 3;   // x = x - 3 = 12
+x *= 2;   // x = x * 2 = 24
+x /= 4;   // x = x / 4 = 6
+x %= 4;   // x = x % 4 = 2
 \`\`\`
 
 ### Increment / Decrement
 
 \`\`\`c
+int i = 5;
+
+i++;     // Post-increment: i becomes 6
+++i;     // Pre-increment:  i becomes 7
+i--;     // Post-decrement: i becomes 6
+--i;     // Pre-decrement:  i becomes 5
+
+// IMPORTANT difference:
 int a = 5;
 int b = a++;  // b = 5 (old value), THEN a = 6
 int c = ++a;  // a = 7 FIRST, then c = 7
-// a=7, b=5, c=7
+
+printf("a=%d b=%d c=%d\\n", a, b, c);  // a=7 b=5 c=7
 \`\`\`
 
-### Operator Precedence
+### Bitwise Operators (Advanced)
 
 \`\`\`c
-2 + 3 * 4      // = 14 (not 20 — * before +)
-(2 + 3) * 4    // = 20 (parentheses first)
+// Used in embedded systems, low-level programming
+int a = 12;  // binary: 1100
+int b = 10;  // binary: 1010
+
+printf("%d\\n", a & b);   // 8  = 1000 (AND)
+printf("%d\\n", a | b);   // 14 = 1110 (OR)
+printf("%d\\n", a ^ b);   // 6  = 0110 (XOR)
+printf("%d\\n", ~a);      // -13 (NOT — flips all bits)
+printf("%d\\n", a << 1);  // 24 = 11000 (left shift = *2)
+printf("%d\\n", a >> 1);  // 6  = 0110  (right shift = /2)
+\`\`\`
+
+### Operator Precedence (BODMAS jaisa)
+
+\`\`\`c
+// Precedence (high to low):
+// 1. ()  parentheses
+// 2. ++, --  increment/decrement
+// 3. *, /, %  multiplication, division, modulo
+// 4. +, -  addition, subtraction
+// 5. <, >, <=, >=  relational
+// 6. ==, !=  equality
+// 7. &&  logical AND
+// 8. ||  logical OR
+// 9. =, +=, -= etc  assignment
+
+int result = 2 + 3 * 4;       // 14 (not 20!)
+int result2 = (2 + 3) * 4;    // 20 — parentheses first
+int result3 = 10 > 5 && 3 < 7; // 1 (true)
 \`\`\``,
 
       codeExample: `#include <stdio.h>
