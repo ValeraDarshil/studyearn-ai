@@ -13,6 +13,8 @@ import { C_WEEK_3 } from './week3.js';
 import { C_WEEK_4 } from './week4.js';
 import { C_WEEK_5 } from './week5.js';
 import { C_WEEK_6 } from './week6.js';
+import { C_WEEK_7 } from './week7.js';
+import { C_WEEK_8 } from './week8.js';
 
 export const C_COURSE = {
   language: 'c',
@@ -32,7 +34,9 @@ C_COURSE.weeks = [
   C_WEEK_4,
   C_WEEK_5,
   C_WEEK_6,
-  // Weeks 7-12 coming soon
+  C_WEEK_7,
+  C_WEEK_8,
+  // Weeks 9-12 coming soon
 ];
 
 export default C_COURSE;
