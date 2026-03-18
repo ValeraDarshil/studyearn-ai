@@ -266,7 +266,7 @@ export default function SectionViewer({
     if (running) return;
     setRunning(true); setOutput(t.running); setOutputIsError(false);
 
-    // ── Python: run in-browser with Skulpt ──
+    // ── Python: run in-browser with Skulpt (no network needed) ──
     if (language === 'python') {
       const r = await runPythonWithSkulpt(userCode);
       setOutput(r.output); setOutputIsError(r.isError);
@@ -276,73 +276,119 @@ export default function SectionViewer({
 
     // ── HTML preview ──
     if (language === 'html') {
-      setOutput('HTML: Open browser DevTools (F12) → Console tab to test JS.\nFor live preview, copy code to: codepen.io or jsfiddle.net');
+      setOutput('HTML Preview: Copy code → paste at codepen.io for live preview!');
       setRunning(false);
       return;
     }
 
-    // ── C, JavaScript → Piston API (free, no key needed) ──
-    const langMap = {
-      c:          { language: 'c',          version: '10.2.0' },
-      javascript: { language: 'javascript', version: '18.15.0' },
-      cpp:        { language: 'c++',        version: '10.2.0' },
+    // ── C / C++ / JavaScript → Piston API (free, no API key) ──
+    const langMap: Record<string, { language: string; version: string; ext: string }> = {
+      c:          { language: 'c',          version: '10.2.0',  ext: 'c'  },
+      cpp:        { language: 'c++',        version: '10.2.0',  ext: 'cpp'},
+      javascript: { language: 'javascript', version: '18.15.0', ext: 'js' },
     };
 
     const pistonLang = langMap[language];
     if (!pistonLang) {
-      setOutput(`${language.toUpperCase()}: Browser mein directly run nahi ho sakta.\nTry: onlinegdb.com ya replit.com`);
+      setOutput(`${language.toUpperCase()}: Not supported for in-browser execution.\nTry onlinegdb.com`);
       setRunning(false);
       return;
     }
 
-    // stdin simulation — auto-fill with sample inputs to avoid hangs
-    const stdinMap = {
-      c:          '5\n10\n3\nRahul\n20\n',
-      javascript: '',
-      cpp:        '5\n10\n3\nRahul\n20\n',
+    // ── Smart stdin: scan code for scanf/input patterns and auto-generate inputs ──
+    const generateStdin = (code: string, lang: string): string => {
+      if (lang === 'javascript') return '';
+
+      // Count how many scanf/fgets calls exist
+      const scanfMatches = (code.match(/scanf\s*\(/g) || []).length;
+      const fgetsMatches = (code.match(/fgets\s*\(/g) || []).length;
+      const totalInputs  = scanfMatches + fgetsMatches;
+
+      if (totalInputs === 0) return ''; // no input needed
+
+      // Detect input types from format strings
+      const inputs: string[] = [];
+      const fmtRegex = /scanf\s*\(\s*["'](.*?)["']/g;
+      let match;
+      while ((match = fmtRegex.exec(code)) !== null) {
+        const fmt = match[1];
+        // Generate appropriate sample value per format specifier
+        if (fmt.includes('%d') || fmt.includes('%i')) inputs.push('10');
+        else if (fmt.includes('%f') || fmt.includes('%lf')) inputs.push('3.14');
+        else if (fmt.includes('%c')) inputs.push('A');
+        else if (fmt.includes('%s')) inputs.push('Rahul');
+        else inputs.push('5');
+      }
+
+      // fgets → provide a full line
+      for (let i = 0; i < fgetsMatches; i++) inputs.push('Rahul Sharma');
+
+      // Special patterns: ATM PIN → use correct pin from code
+      if (code.includes('1234') && code.includes('scanf') && code.includes('pin')) {
+        return '1234\n5000\n';
+      }
+      // Menu-driven program → choice + two numbers
+      if (code.includes('choice') && code.includes('scanf')) {
+        return '1\n10\n5\n0\n';
+      }
+      // Guessing game → guess the secret
+      if (code.includes('secret') && code.includes('guess')) {
+        return '42\n';
+      }
+
+      return inputs.slice(0, 10).join('\n') + '\n';
     };
+
+    const stdin = generateStdin(userCode, language);
 
     try {
       const resp = await fetch('https://emkc.org/api/v2/piston/execute', {
-        method: 'POST',
+        method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          language: pistonLang.language,
-          version:  pistonLang.version,
-          files: [{ name: `main.${language === 'javascript' ? 'js' : language}`, content: userCode }],
-          stdin:   stdinMap[language] || '',
-          run_timeout: 10000,
-          compile_timeout: 30000,
+          language:        pistonLang.language,
+          version:         pistonLang.version,
+          files:           [{ name: `main.${pistonLang.ext}`, content: userCode }],
+          stdin:           stdin,
+          run_timeout:     8000,
+          compile_timeout: 15000,
         }),
       });
 
-      if (!resp.ok) throw new Error(`Server error: ${resp.status}`);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const data = await resp.json();
 
-      // Combine compile + run output
-      const compileOut = data.compile?.stderr || '';
-      const runOut     = data.run?.stdout     || '';
-      const runErr     = data.run?.stderr      || '';
-      const runCode    = data.run?.code;
+      const compileErr = data.compile?.stderr?.trim() || '';
+      const runStdout  = data.run?.stdout?.trim()    || '';
+      const runStderr  = data.run?.stderr?.trim()    || '';
+      const exitCode   = data.run?.code ?? 0;
 
-      let finalOut = '';
-      if (compileOut) finalOut += `Compile:\n${compileOut}\n`;
-      if (runOut)     finalOut += runOut;
-      if (runErr)     finalOut += runErr;
-      if (!finalOut)  finalOut = '(No output)';
+      // Build clean output
+      let out = '';
+      if (compileErr) {
+        // Clean up gcc error paths
+        out = '❌ Compile Error:\n' + compileErr.replace(/\/tmp\/[^:]+:/g, 'line ').replace(/\/piston\/jobs\/[^:]+:/g, '');
+      } else {
+        out = runStdout;
+        if (runStderr) out += (out ? '\n' : '') + runStderr;
+        if (!out)      out = '(No output — check if printf/cout is present)';
+        if (exitCode !== 0 && exitCode !== null) {
+          out += `\n\n[Exit code: ${exitCode}]`;
+        }
+      }
 
-      const isError = !!compileOut || !!runErr || runCode !== 0;
-      setOutput(finalOut.trim());
-      setOutputIsError(isError);
+      setOutput(out);
+      setOutputIsError(!!compileErr || (exitCode !== 0 && exitCode !== null && !runStdout));
 
-    } catch (err) {
-      // Piston offline fallback — show helpful message
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
       setOutput(
-        `⚠️ Compiler temporarily unavailable.\n\nFree alternatives:\n` +
-        `• onlinegdb.com  (C/C++ — best)\n` +
-        `• replit.com     (all languages)\n` +
-        `• godbolt.org    (C — advanced)\n\n` +
-        `Error: ${err.message}`
+        `⚠️ Compiler service unavailable.\n\n` +
+        `Free online compilers:\n` +
+        `• onlinegdb.com  ← Best for C/C++\n` +
+        `• godbolt.org    ← See assembly too\n` +
+        `• replit.com     ← All languages\n\n` +
+        `Error: ${msg}`
       );
       setOutputIsError(true);
     }
