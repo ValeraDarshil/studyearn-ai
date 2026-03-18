@@ -473,8 +473,7 @@ export default function SectionViewer({
               </div>
               <textarea value={userCode} onChange={e => setUserCode(e.target.value)}
                 className="w-full bg-transparent text-gray-200 font-mono text-sm p-4 outline-none resize-none min-h-[280px] leading-relaxed"
-                placeholder={language === 'python' ? '# Write your Python code here...' : language === 'c' ? '// Write C code here...
-#include <stdio.h>' : } spellCheck={false}
+                placeholder={language === 'python' ? '# Write Python code here...' : (language === 'c' || language === 'cpp') ? '// Write C code here...' : '// Write code here...'} spellCheck={false}
                 onKeyDown={e => {
                   if (e.key === 'Tab') {
                     e.preventDefault();
