@@ -1,10 +1,10 @@
 /**
- * StudyEarn AI — HTML Course (HTML + CSS + JavaScript)
+ * StudyEarn AI — Web Development Bootcamp
  * src/data/courses/html/index.js
  *
- * Month 1 (W1-4):  Pure HTML
- * Month 2 (W5-8):  CSS
- * Month 3 (W9-12): JavaScript
+ * Month 1 (W1-4):  HTML — Structure, Forms, Semantics
+ * Month 2 (W5-8):  CSS — Flexbox, Grid, Animations, Variables
+ * Month 3 (W9-12): JavaScript — DOM, APIs, OOP, Portfolio
  */
 
 import { HTML_WEEK_1  } from './week1.js';
@@ -23,12 +23,12 @@ import { HTML_ALL_EN, applyEnglishTranslations } from './translations_en.js';
 
 export const HTML_COURSE = {
   language: 'html',
-  languageName: 'HTML + CSS + JS',
-  emoji: '🌐',
-  tagline: 'Web ka Skeleton, Style aur Brain — Zero se Full Frontend Dev',
+  languageName: 'Web Dev Bootcamp',
+  emoji: '🚀',
+  tagline: 'HTML + CSS + JS — Zero se Frontend Developer in 3 Months!',
   totalWeeks: 12,
   difficulty: 'Absolute Beginner',
-  description: 'HTML structure deta hai, CSS beauty deta hai, JavaScript life deta hai! Teen mahine mein zero se frontend developer bano. Certificate included! 🎓',
+  description: 'Teen mahine mein poora web development seekho! Month 1: HTML structure, Month 2: CSS styling & animations, Month 3: JavaScript interactivity. Real projects + Certificate! 🎓',
   weeks: [],
 };
 
