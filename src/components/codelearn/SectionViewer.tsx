@@ -265,14 +265,88 @@ export default function SectionViewer({
   const handleRunCode = useCallback(async () => {
     if (running) return;
     setRunning(true); setOutput(t.running); setOutputIsError(false);
+
+    // ── Python: run in-browser with Skulpt ──
     if (language === 'python') {
       const r = await runPythonWithSkulpt(userCode);
       setOutput(r.output); setOutputIsError(r.isError);
-    } else if (language === 'html' || language === 'css') {
-      setOutput('HTML/CSS: Copy your code and paste at codepen.io for live preview!');
-    } else {
-      setOutput(`${language.toUpperCase()}: Coming soon!\n• JS: Use browser console (F12)\n• C/C++: Try onlinegdb.com`);
+      setRunning(false);
+      return;
     }
+
+    // ── HTML preview ──
+    if (language === 'html') {
+      setOutput('HTML: Open browser DevTools (F12) → Console tab to test JS.\nFor live preview, copy code to: codepen.io or jsfiddle.net');
+      setRunning(false);
+      return;
+    }
+
+    // ── C, JavaScript → Piston API (free, no key needed) ──
+    const langMap = {
+      c:          { language: 'c',          version: '10.2.0' },
+      javascript: { language: 'javascript', version: '18.15.0' },
+      cpp:        { language: 'c++',        version: '10.2.0' },
+    };
+
+    const pistonLang = langMap[language];
+    if (!pistonLang) {
+      setOutput(`${language.toUpperCase()}: Browser mein directly run nahi ho sakta.\nTry: onlinegdb.com ya replit.com`);
+      setRunning(false);
+      return;
+    }
+
+    // stdin simulation — auto-fill with sample inputs to avoid hangs
+    const stdinMap = {
+      c:          '5\n10\n3\nRahul\n20\n',
+      javascript: '',
+      cpp:        '5\n10\n3\nRahul\n20\n',
+    };
+
+    try {
+      const resp = await fetch('https://emkc.org/api/v2/piston/execute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          language: pistonLang.language,
+          version:  pistonLang.version,
+          files: [{ name: `main.${language === 'javascript' ? 'js' : language}`, content: userCode }],
+          stdin:   stdinMap[language] || '',
+          run_timeout: 10000,
+          compile_timeout: 30000,
+        }),
+      });
+
+      if (!resp.ok) throw new Error(`Server error: ${resp.status}`);
+      const data = await resp.json();
+
+      // Combine compile + run output
+      const compileOut = data.compile?.stderr || '';
+      const runOut     = data.run?.stdout     || '';
+      const runErr     = data.run?.stderr      || '';
+      const runCode    = data.run?.code;
+
+      let finalOut = '';
+      if (compileOut) finalOut += `Compile:\n${compileOut}\n`;
+      if (runOut)     finalOut += runOut;
+      if (runErr)     finalOut += runErr;
+      if (!finalOut)  finalOut = '(No output)';
+
+      const isError = !!compileOut || !!runErr || runCode !== 0;
+      setOutput(finalOut.trim());
+      setOutputIsError(isError);
+
+    } catch (err) {
+      // Piston offline fallback — show helpful message
+      setOutput(
+        `⚠️ Compiler temporarily unavailable.\n\nFree alternatives:\n` +
+        `• onlinegdb.com  (C/C++ — best)\n` +
+        `• replit.com     (all languages)\n` +
+        `• godbolt.org    (C — advanced)\n\n` +
+        `Error: ${err.message}`
+      );
+      setOutputIsError(true);
+    }
+
     setRunning(false);
   }, [language, userCode, running, t]);
 
@@ -399,7 +473,8 @@ export default function SectionViewer({
               </div>
               <textarea value={userCode} onChange={e => setUserCode(e.target.value)}
                 className="w-full bg-transparent text-gray-200 font-mono text-sm p-4 outline-none resize-none min-h-[280px] leading-relaxed"
-                placeholder={`# Write your ${language} code here...`} spellCheck={false}
+                placeholder={language === 'python' ? '# Write your Python code here...' : language === 'c' ? '// Write C code here...
+#include <stdio.h>' : } spellCheck={false}
                 onKeyDown={e => {
                   if (e.key === 'Tab') {
                     e.preventDefault();
