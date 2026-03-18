@@ -65,6 +65,50 @@ const UI_TEXT = {
   },
 };
 
+// ─── C/C++ Runner — backend /run-code (public, no login needed) ──
+async function runCWithBackend(code, language) {
+  // Smart stdin: auto-detect what scanf needs
+  function makeStdin(src) {
+    const n = (src.match(/scanf\s*\(/g) || []).length + (src.match(/fgets\s*\(/g) || []).length;
+    if (!n) return '';
+    if (src.includes('1234') && src.includes('pin')) return '1234\n5000\n';
+    if (src.includes('choice') && src.includes('scanf')) return '1\n10\n5\n0\n';
+    if (src.includes('secret') && src.includes('guess')) return '42\n';
+    const vals = [];
+    const re = /scanf\s*\(\s*["'](.*?)["\']/g;
+    let m;
+    while ((m = re.exec(src)) !== null) {
+      const f = m[1];
+      if (f.includes('%d')||f.includes('%i')) vals.push('10');
+      else if (f.includes('%f')||f.includes('%lf')) vals.push('3.14');
+      else if (f.includes('%c')) vals.push('A');
+      else if (f.includes('%s')) vals.push('Rahul');
+      else vals.push('5');
+    }
+    for (let i = 0; i < (src.match(/fgets\s*\(/g)||[]).length; i++) vals.push('Rahul Sharma');
+    return vals.slice(0,12).join('\n') + '\n';
+  }
+
+  const API = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+    ? 'http://localhost:5000'
+    : 'https://studyearn-backend.onrender.com';
+
+  try {
+    const resp = await fetch(`${API}/api/codelearn/run-code`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      // No credentials — public endpoint, no auth needed
+      body: JSON.stringify({ language, code, stdin: makeStdin(code) }),
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const data = await resp.json();
+    const out = data.output || '(No output)';
+    return { output: out, isError: out.startsWith('Compile Error') || out.startsWith('❌') };
+  } catch (err) {
+    return { output: '⚠️ Compiler unavailable. Try onlinegdb.com', isError: true };
+  }
+}
+
 // ─── Skulpt ─────────────────────────────────────────────────────
 let skulptLoaded = false, skulptLoading = false, skulptCallbacks = [];
 function loadSkulptScripts() {
@@ -281,56 +325,36 @@ export default function SectionViewer({
       return;
     }
 
-    // ── C / C++ / JavaScript → Backend (Piston via server, no CORS/auth issues) ──
-    const supported = ['c', 'cpp', 'javascript'];
-    if (!supported.includes(language)) {
-      setOutput(`${language.toUpperCase()}: Not supported.\nTry onlinegdb.com`);
+    // ── C / C++ → Claude AI (instant, free, no login needed) ──
+    if (language === 'c' || language === 'cpp') {
+      const r = await runCWithBackend(userCode, language);
+      setOutput(r.output);
+      setOutputIsError(r.isError);
       setRunning(false);
       return;
     }
 
-    try {
-      const apiBase = import.meta.env.VITE_API_URL || '';
-      const resp = await fetch(`${apiBase}/api/codelearn/run-code`, {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          language,
-          code:           userCode,
-          stdin:          '',
-          expectedOutput: null,
-          sectionId:      null,
-        }),
-      });
-
-      if (!resp.ok) throw new Error(`Server error: ${resp.status}`);
-      const data = await resp.json();
-
-      if (data.success) {
-        setOutput(data.output || '(No output)');
-        setOutputIsError(data.isCorrect === false && !data.output?.includes('unavailable'));
-      } else {
-        throw new Error(data.message || 'Unknown error');
+    // ── JavaScript → run in browser via Function() ──
+    if (language === 'javascript') {
+      try {
+        const logs = [];
+        const fakeConsole = { log: (...a) => logs.push(a.join(' ')), error: (...a) => logs.push('Error: '+a.join(' ')), warn: (...a) => logs.push('Warn: '+a.join(' ')) };
+        // eslint-disable-next-line no-new-func
+        const fn = new Function('console', userCode);
+        fn(fakeConsole);
+        setOutput(logs.join('
+') || '(No output — use console.log() to print)');
+        setOutputIsError(false);
+      } catch (err) {
+        setOutput('Error: ' + err.message);
+        setOutputIsError(true);
       }
-
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      // If auth error, show login message; else show fallback
-      if (msg.includes('401') || msg.includes('Login')) {
-        setOutput('⚠️ Please log in to run code.');
-      } else {
-        setOutput(
-          `⚠️ Compiler temporarily unavailable.\n\n` +
-          `Free online C compilers:\n` +
-          `• onlinegdb.com  ← Best for C/C++\n` +
-          `• godbolt.org    ← Compiler explorer\n` +
-          `• replit.com     ← All languages\n\n` +
-          `Error: ${msg}`
-        );
-      }
-      setOutputIsError(true);
+      setRunning(false);
+      return;
     }
+
+    setOutput(`${language.toUpperCase()}: Not supported for in-browser execution.`);
+    setOutputIsError(false);
 
     setRunning(false);
   }, [language, userCode, running, t]);

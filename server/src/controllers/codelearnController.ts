@@ -463,8 +463,8 @@ export async function getCertificate(req: Request, res: Response): Promise<Respo
 // POST /api/codelearn/run-code
 // ─────────────────────────────────────────────────────────────
 export async function runCode(req: Request, res: Response): Promise<Response> {
+  // Auth optional — anyone can run code (no XP awarded if not logged in)
   const userId = getUserIdFromToken(req);
-  if (!userId) return res.status(401).json({ success: false, message: 'Login required' });
 
   const { language, code, stdin = '', expectedOutput, sectionId } = req.body;
   if (!language || !code) {
@@ -558,7 +558,7 @@ export async function runCode(req: Request, res: Response): Promise<Response> {
         : !compileErr && exitCode === 0;
 
       let xpEarned = 0;
-      if (isCorrect && sectionId) {
+      if (isCorrect && sectionId && userId) {
         xpEarned = await awardXPtoUser(userId, XP_CODE_CORRECT, 'codelearn_code', `Correct code in ${language}`);
         await CodeSubmission.create({ userId, language, sectionId, code, isCorrect: true, aiHintUsed: false, xpEarned });
       }
