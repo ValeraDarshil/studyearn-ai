@@ -513,10 +513,15 @@ export async function runCode(req: Request, res: Response): Promise<Response> {
     return inputs.slice(0, 10).join('\n') + '\n';
   })();
 
+  // Try Piston first (fast, real compiler), fallback to AI simulation
   const PISTON_URLS = [
     'https://emkc.org/api/v2/piston/execute',
     'https://piston.harfan.me/api/v2/execute',
   ];
+
+  let pistonOutput: string | null = null;
+  let pistonError  = false;
+  let pistonCorrect = false;
 
   for (const pistonUrl of PISTON_URLS) {
     try {
@@ -533,7 +538,7 @@ export async function runCode(req: Request, res: Response): Promise<Response> {
         }),
       });
 
-      if (!pistonRes.ok) continue; // Try next URL
+      if (!pistonRes.ok) continue;
 
       const data = await pistonRes.json() as any;
       const compileErr = data.compile?.stderr?.trim() || '';
@@ -541,43 +546,68 @@ export async function runCode(req: Request, res: Response): Promise<Response> {
       const runErr     = data.run?.stderr?.trim()    || '';
       const exitCode   = data.run?.code ?? 0;
 
-      let output = '';
       if (compileErr) {
-        output = 'Compile Error:\n' + compileErr
+        pistonOutput = 'Compile Error:\n' + compileErr
           .replace(/\/tmp\/[^:]+:/g, 'line ')
           .replace(/\/piston\/jobs\/[^:]+:/g, '');
+        pistonError = true;
       } else {
-        output = runOut;
-        if (runErr) output += (output ? '\n' : '') + runErr;
-        if (!output) output = '(No output — check if printf is present)';
-        if (exitCode !== 0 && exitCode !== null) output += `\n[Exit code: ${exitCode}]`;
+        pistonOutput = runOut;
+        if (runErr) pistonOutput += (pistonOutput ? '\n' : '') + runErr;
+        if (!pistonOutput) pistonOutput = '(No output — check if printf is present)';
+        if (exitCode !== 0 && exitCode !== null) pistonOutput += `\n[Exit code: ${exitCode}]`;
+        pistonCorrect = !compileErr && exitCode === 0;
       }
-
-      const isCorrect = expectedOutput
-        ? output.trim() === expectedOutput.trim()
-        : !compileErr && exitCode === 0;
-
-      let xpEarned = 0;
-      if (isCorrect && sectionId && userId) {
-        xpEarned = await awardXPtoUser(userId, XP_CODE_CORRECT, 'codelearn_code', `Correct code in ${language}`);
-        await CodeSubmission.create({ userId, language, sectionId, code, isCorrect: true, aiHintUsed: false, xpEarned });
-      }
-
-      return res.json({ success: true, output, isCorrect, xpEarned });
+      break; // Piston worked!
     } catch (err: any) {
       logger.warn({ pistonUrl, err: err.message }, 'Piston URL failed, trying next');
       continue;
     }
   }
 
-  // All Piston URLs failed — return helpful message
-  logger.error('All Piston URLs failed');
-  return res.json({
-    success: true,
-    output: 'Compiler temporarily unavailable.\n\nFree alternatives:\n- onlinegdb.com  (C/C++)\n- godbolt.org    (C)\n- replit.com     (All languages)',
-    isCorrect: null,
-    xpEarned: 0,
-  });
+  // If Piston worked, return result
+  if (pistonOutput !== null) {
+    const isCorrect = expectedOutput ? pistonOutput.trim() === expectedOutput.trim() : pistonCorrect;
+    let xpEarned = 0;
+    if (isCorrect && sectionId && userId) {
+      xpEarned = await awardXPtoUser(userId, XP_CODE_CORRECT, 'codelearn_code', `Correct code in ${language}`);
+      await CodeSubmission.create({ userId, language, sectionId, code, isCorrect: true, aiHintUsed: false, xpEarned });
+    }
+    return res.json({ success: true, output: pistonOutput, isCorrect, xpEarned });
+  }
+
+  // Piston failed — use Groq AI to simulate execution
+  logger.warn('All Piston URLs failed, using Groq AI fallback for code execution');
+  try {
+    const prompt = `You are a ${language.toUpperCase()} compiler and runtime simulator. Execute the following code and output ONLY what the program would print to stdout.\n\nRules:\n- Output EXACTLY what printf/puts/cout would print — no extra text\n- For scanf/input: use these sample inputs in order: 10, 3.14, A, Rahul, 5, 20, 100\n- Special: if code has "1234" + "pin" use pin=1234 amount=5000; if "choice" use choice=1; if "secret"/"guess" use 42\n- If compile error, output: "Compile Error:" then the error\n- No explanations, no markdown — raw output only\n\n${language.toUpperCase()} Code:\n${code}`;
+
+    const aiData  = await groq.chat.completions.create({
+      model:       'llama-3.3-70b-versatile',
+      max_tokens:  500,
+      temperature: 0,
+      messages: [{ role: 'user', content: prompt }],
+    });
+    const aiOut   = aiData.choices?.[0]?.message?.content?.trim() || '(No output)';
+    const isError = aiOut.startsWith('Compile Error') || aiOut.startsWith('Error:');
+
+    const isCorrect = expectedOutput ? aiOut.trim() === expectedOutput.trim() : !isError;
+    let xpEarned = 0;
+    if (isCorrect && sectionId && userId) {
+      xpEarned = await awardXPtoUser(userId, XP_CODE_CORRECT, 'codelearn_code', `Correct code in ${language}`);
+      await CodeSubmission.create({ userId, language, sectionId, code, isCorrect: true, aiHintUsed: false, xpEarned });
+    }
+
+    return res.json({ success: true, output: aiOut, isCorrect, xpEarned });
+
+  } catch (aiErr: any) {
+    logger.error({ err: aiErr.message }, 'Groq AI fallback also failed');
+    return res.json({
+      success: true,
+      output: 'Compiler temporarily unavailable.\nFree alternatives: onlinegdb.com / godbolt.org',
+      isCorrect: null,
+      xpEarned: 0,
+    });
+  }
 }
 
 // ─────────────────────────────────────────────────────────────
