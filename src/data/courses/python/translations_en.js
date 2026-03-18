@@ -948,6 +948,74 @@ for week, topic in month2.items():
 const W5_12 = {
   'py-w5-s1': {
     title_en: 'Regex Basics — Writing Patterns',
+    content_en: `## Regular Expressions — Superpower Text Search!
+
+Regex is a mini-language that finds patterns in text. Like searching on Google — but far more powerful!
+
+### Why Learn Regex?
+- Validate phone numbers
+- Check emails (correct format or not)
+- Find special characters in passwords
+- Extract data from log files
+
+### The re module
+\`\`\`python
+import re
+
+# Different re functions
+text = "Hello! My name is Rahul. I am 20 years old. Email: rahul@gmail.com"
+
+# findall — list of all matches
+words = re.findall(r'\\b[A-Z][a-z]+\\b', text)
+print("Capitalized words:", words)
+
+# search — first match
+email = re.search(r'[\\w.-]+@[\\w.-]+\\.[a-zA-Z]{2,}', text)
+if email:
+    print("Email found:", email.group())
+
+# match — from start of string
+if re.match(r'Hello', text):
+    print("Starts with Hello!")
+
+# fullmatch — entire string must match
+print(re.fullmatch(r'\\d{10}', "9876543210"))  # valid phone
+\`\`\`
+
+### Common Regex Patterns
+\`\`\`
+Pattern     Matches
+.           Any single character
+\\d          A digit (0-9)
+\\w          A word character (a-z, A-Z, 0-9, _)
+\\s          Whitespace (space, tab)
++           One or more
+*           Zero or more
+?           Zero or one (optional)
+{3}         Exactly 3 times
+{2,5}       2 to 5 times
+^           Start of string
+$           End of string
+[aeiou]     Any vowel
+[^0-9]      Not a digit
+\`\`\`
+
+### Practical: Phone + Email Extraction
+\`\`\`python
+import re
+
+text = """Contact us:
+- Support: support@company.com
+- Sales: 9876543210
+- HR: hr@company.org or 8765432109
+"""
+
+emails = re.findall(r'[\\w.-]+@[\\w.-]+\\.[a-zA-Z]{2,4}', text)
+phones = re.findall(r'[6-9]\\d{9}', text)
+
+print("Emails found:", emails)
+print("Phones found:", phones)
+\`\`\``,
     codeExample_en: `import re
 
 text = "Contact: john@email.com, phone: 9876543210, code: ABC-123"
@@ -977,6 +1045,60 @@ if match:
   },
   'py-w5-s2': {
     title_en: 'Character Classes and Groups',
+    content_en: `## Character Classes — Custom Patterns!
+
+### [ ] — Custom Character Set
+\`\`\`python
+import re
+
+# [abc] = a or b or c (any one)
+# [a-z] = lowercase a to z
+# [A-Z] = uppercase A to Z
+# [0-9] = digits (same as \\d)
+# [^abc] = NOT a, b, or c
+
+text = "Hello World 123"
+
+print(re.findall(r'[aeiou]', text))      # vowels only
+print(re.findall(r'[A-Z][a-z]+', text))  # Capitalized words
+print(re.findall(r'[^a-zA-Z ]', text))   # non-alpha, non-space
+\`\`\`
+
+### Groups — ( ) — Extract Parts
+\`\`\`python
+import re
+
+# Groups extract different parts separately
+date_text = "My birthday is 15-08-1998"
+match = re.search(r'(\\d{2})-(\\d{2})-(\\d{4})', date_text)
+
+if match:
+    day   = match.group(1)
+    month = match.group(2)
+    year  = match.group(3)
+    print(f"Day: {day}, Month: {month}, Year: {year}")
+\`\`\`
+
+### Named Groups
+\`\`\`python
+import re
+
+log = "2024-01-15 09:23:45 ERROR Database timeout"
+pattern = r'(?P<date>\\d{4}-\\d{2}-\\d{2}) (?P<time>\\d{2}:\\d{2}:\\d{2}) (?P<level>\\w+)'
+
+match = re.search(pattern, log)
+if match:
+    print("Date:", match.group('date'))
+    print("Level:", match.group('level'))
+\`\`\`
+
+### Alternation — | — OR
+\`\`\`python
+# Match multiple patterns
+pattern = r'dog|cat|bird'
+text = "I have a cat and a dog"
+print(re.findall(pattern, text))  # ['cat', 'dog']
+\`\`\``,
     codeExample_en: `import re
 
 # Character classes
@@ -1009,6 +1131,65 @@ if m: print(f"IP parts: {m.group('a')}, {m.group('b')}")`,
   },
   'py-w5-s3': {
     title_en: 're.sub() and re.split() — Modifying Text',
+    content_en: `## re.sub() — Replace Patterns in Text!
+
+### re.sub() — Find & Replace on Steroids
+\`\`\`python
+import re
+
+# Basic replace
+text = "Hello   World   Python"
+clean = re.sub(r'\\s+', ' ', text)  # Multiple spaces → single space
+print(clean)  # "Hello World Python"
+
+# Hide sensitive data
+phone_text = "Call me at 9876543210 or 8765432109"
+hidden = re.sub(r'[6-9]\\d{9}', 'XXXXX', phone_text)
+print(hidden)  # "Call me at XXXXX or XXXXX"
+
+# Replace with function
+def censor_word(match):
+    word = match.group()
+    return word[0] + '*' * (len(word)-2) + word[-1]
+
+text = "I love Python and Python loves me"
+result = re.sub(r'Python', censor_word, text)
+print(result)
+\`\`\`
+
+### re.split() — Split by Pattern
+\`\`\`python
+import re
+
+# Split by multiple delimiters
+text = "apple,banana;cherry|grape mango"
+fruits = re.split(r'[,;| ]+', text)
+print(fruits)  # ['apple', 'banana', 'cherry', 'grape', 'mango']
+
+# Split sentence into sentences
+paragraph = "Hello! How are you? I am fine. Good."
+sentences = re.split(r'[.!?]+', paragraph)
+print([s.strip() for s in sentences if s.strip()])
+\`\`\`
+
+### re.compile() — Reuse Patterns
+\`\`\`python
+import re
+
+# Compile once, use many times — faster!
+phone_pattern = re.compile(r'[6-9]\\d{9}')
+
+texts = [
+    "Call Rahul at 9876543210",
+    "Email only — no phone",
+    "Priya: 8765432109",
+]
+
+for text in texts:
+    phones = phone_pattern.findall(text)
+    if phones:
+        print(f"Found: {phones}")
+\`\`\``,
     codeExample_en: `import re
 
 # re.sub() — find and replace
@@ -1039,6 +1220,46 @@ print("Normalized:", normalized)`,
   },
   'py-w5-s4': {
     title_en: 'Week 5 Project — Form Validator',
+    content_en: `## Week 5 Project — Complete Form Validator!
+
+Build a form validator like real websites use — powered by regex!
+
+### What to Validate:
+1. **Name** — letters and spaces only, 2–50 chars
+2. **Email** — valid format (user@domain.com)
+3. **Phone** — Indian mobile (starts 6–9, 10 digits)
+4. **Password** — 8+ chars, uppercase, digit, special char
+5. **Date of Birth** — DD/MM/YYYY format, must be 18+
+6. **Pin Code** — Indian 6-digit pin
+
+### Architecture:
+\`\`\`python
+class FormValidator:
+    def validate_name(self, name) → (bool, message)
+    def validate_email(self, email) → (bool, message)
+    def validate_phone(self, phone) → (bool, message)
+    def validate_password(self, pwd) → (bool, strength_score)
+    def validate_dob(self, dob) → (bool, message)
+    def validate_all(self, form_data) → {field: (valid, msg)}
+\`\`\`
+
+### Password Strength Scoring:
+\`\`\`python
+def check_strength(password):
+    score = 0
+    checks = {
+        "8+ characters":      len(password) >= 8,
+        "Uppercase letter":   bool(re.search(r'[A-Z]', password)),
+        "Lowercase letter":   bool(re.search(r'[a-z]', password)),
+        "Digit":              bool(re.search(r'\\d', password)),
+        "Special character":  bool(re.search(r'[!@#$%^&*]', password)),
+    }
+    for check, passed in checks.items():
+        if passed:
+            score += 1
+        print(f"  {'✅' if passed else '❌'} {check}")
+    return score
+\`\`\``,
     codeExample_en: `import re
 
 def validate_form(data):
@@ -1079,6 +1300,72 @@ else:
   },
   'py-w6-s1': {
     title_en: 'requests Library — Sending HTTP Requests',
+    content_en: `## requests — Use the Internet from Python!
+
+The \`requests\` library lets Python talk directly to the internet — fetch data from any website!
+
+### Install:
+\`\`\`bash
+pip install requests
+\`\`\`
+
+### Basic GET Request
+\`\`\`python
+import requests
+
+# Fetch data from a website
+response = requests.get("https://api.github.com")
+print("Status:", response.status_code)  # 200 = success!
+print("Content-Type:", response.headers['content-type'])
+
+# JSON data
+data = response.json()
+print("GitHub API:", data['current_user_url'])
+\`\`\`
+
+### Response Object
+\`\`\`python
+response = requests.get("https://httpbin.org/get")
+
+print(response.status_code)  # 200
+print(response.ok)            # True if 200-299
+print(response.text)          # Raw HTML/text
+print(response.json())        # Parse JSON
+print(response.headers)       # Response headers
+print(response.url)           # Final URL
+\`\`\`
+
+### Query Parameters
+\`\`\`python
+import requests
+
+# Pass parameters in URL
+params = {
+    'q':    'Python tutorial',
+    'lang': 'en',
+    'page': 1,
+}
+# Becomes: https://httpbin.org/get?q=Python+tutorial&lang=en&page=1
+response = requests.get("https://httpbin.org/get", params=params)
+print(response.url)
+\`\`\`
+
+### Error Handling
+\`\`\`python
+import requests
+
+try:
+    response = requests.get("https://api.example.com/data", timeout=5)
+    response.raise_for_status()  # Raises error for 4xx/5xx
+    data = response.json()
+    print("Success:", data)
+except requests.Timeout:
+    print("❌ Request timed out!")
+except requests.HTTPError as e:
+    print(f"❌ HTTP Error: {e}")
+except requests.ConnectionError:
+    print("❌ No internet connection!")
+\`\`\``,
     codeExample_en: `import requests
 
 # Simple GET request
@@ -1113,6 +1400,70 @@ except requests.exceptions.HTTPError as e:
   },
   'py-w6-s2': {
     title_en: 'BeautifulSoup — Parsing HTML',
+    content_en: `## BeautifulSoup — Extract Meaning from HTML!
+
+Use \`requests\` to fetch HTML, then \`BeautifulSoup\` to extract data from it!
+
+### Install:
+\`\`\`bash
+pip install beautifulsoup4 lxml
+\`\`\`
+
+### Basic HTML Parsing
+\`\`\`python
+from bs4 import BeautifulSoup
+
+html = """
+<html>
+<body>
+  <h1 id="title">StudyEarn</h1>
+  <p class="desc">Learn Python!</p>
+  <a href="https://studyearnai.tech">Visit us</a>
+  <ul>
+    <li>Python</li>
+    <li>JavaScript</li>
+    <li>C Programming</li>
+  </ul>
+</body>
+</html>
+"""
+
+soup = BeautifulSoup(html, 'lxml')
+
+# Find elements
+print(soup.find('h1').text)                  # StudyEarn
+print(soup.find('p', class_='desc').text)    # Learn Python!
+print(soup.find('a')['href'])                # URL
+print([li.text for li in soup.find_all('li')])
+\`\`\`
+
+### Real Page Scraping
+\`\`\`python
+import requests
+from bs4 import BeautifulSoup
+
+response = requests.get("https://quotes.toscrape.com")
+soup = BeautifulSoup(response.text, 'lxml')
+
+# Extract all quotes
+quotes = soup.find_all('div', class_='quote')
+for quote in quotes[:3]:
+    text   = quote.find('span', class_='text').text
+    author = quote.find('small', class_='author').text
+    tags   = [t.text for t in quote.find_all('a', class_='tag')]
+    print(f'"{text}" — {author}')
+    print(f"Tags: {tags}\\n")
+\`\`\`
+
+### CSS Selectors
+\`\`\`python
+# select() uses CSS selectors — more flexible
+soup.select('div.quote')           # class
+soup.select('#main-content')       # id
+soup.select('ul > li')             # direct child
+soup.select('a[href]')             # has attribute
+soup.select('h2 + p')              # adjacent sibling
+\`\`\``,
     codeExample_en: `import requests
 from bs4 import BeautifulSoup
 
@@ -1140,6 +1491,83 @@ for book in books[:3]:
   },
   'py-w6-s3': {
     title_en: 'Scraping Ethics and Pagination',
+    content_en: `## Responsible Scraping — Do it the Right Way!
+
+### robots.txt — Check the Rules
+\`\`\`python
+import requests
+
+# Always check robots.txt first
+response = requests.get("https://books.toscrape.com/robots.txt")
+print(response.text)
+# If "Disallow: /" — do not scrape!
+\`\`\`
+
+### Rate Limiting — Do Not Overload Servers
+\`\`\`python
+import time
+import requests
+from bs4 import BeautifulSoup
+
+def scrape_with_respect(urls, delay=1.0):
+    """Scrape with polite delay between requests"""
+    results = []
+    for i, url in enumerate(urls):
+        print(f"Scraping {i+1}/{len(urls)}: {url}")
+        try:
+            response = requests.get(url, timeout=10)
+            results.append(response.text)
+        except Exception as e:
+            print(f"Error: {e}")
+        time.sleep(delay)  # Wait between requests!
+    return results
+\`\`\`
+
+### Headers — Identify Yourself
+\`\`\`python
+headers = {
+    'User-Agent': 'MyBot/1.0 (educational project; contact@email.com)',
+    'Accept-Language': 'en-US,en;q=0.9',
+}
+response = requests.get(url, headers=headers)
+\`\`\`
+
+### Advanced — Handling Pagination
+\`\`\`python
+import requests
+from bs4 import BeautifulSoup
+import time
+
+def scrape_all_pages(base_url, max_pages=5):
+    all_items = []
+    
+    for page in range(1, max_pages + 1):
+        url = f"{base_url}/page/{page}"
+        response = requests.get(url)
+        
+        if response.status_code != 200:
+            break
+            
+        soup = BeautifulSoup(response.text, 'lxml')
+        items = soup.find_all('article')
+        
+        if not items:
+            break
+            
+        all_items.extend(items)
+        print(f"Page {page}: {len(items)} items found")
+        time.sleep(0.5)
+    
+    return all_items
+\`\`\`
+
+### Ethical Scraping Checklist ✅
+1. Check \`robots.txt\`
+2. Add delay between requests (min 0.5s)
+3. Use descriptive User-Agent
+4. Do not scrape private data
+5. Cache data — don't repeat requests
+6. Respect the site's terms of service`,
     codeExample_en: `import requests, time
 from bs4 import BeautifulSoup
 
@@ -1176,6 +1604,49 @@ print(f"\\nTotal books scraped: {len(all_books)}")`,
   },
   'py-w6-s4': {
     title_en: 'Week 6 Project — Price Tracker',
+    content_en: `## Week 6 Project — Price Comparison Tool!
+
+Build a real price tracking tool like e-commerce apps!
+
+### Target Site: books.toscrape.com
+(Use this for practice — real sites require permission to scrape)
+
+### Features:
+1. Search books by category
+2. Price comparison (top 10 cheapest)
+3. Rating filter (4+ stars only)
+4. Save results to CSV
+5. Price history tracking (run daily)
+
+### Project Structure:
+\`\`\`python
+class BookPriceTracker:
+    def __init__(self):
+        self.base_url = "https://books.toscrape.com"
+        self.session  = requests.Session()
+        self.session.headers.update({
+            'User-Agent': 'BookTracker/1.0 (educational)'
+        })
+    
+    def get_categories(self) → dict
+    def scrape_category(self, category_url) → list[dict]
+    def filter_by_rating(self, books, min_rating=4) → list
+    def sort_by_price(self, books) → list
+    def save_to_csv(self, books, filename) → None
+    def track_prices(self) → None  # Save with timestamp
+\`\`\`
+
+### Data Structure per Book:
+\`\`\`python
+book = {
+    "title":       "A Light in the Attic",
+    "price":       51.77,
+    "rating":      3,
+    "available":   True,
+    "url":         "https://...",
+    "scraped_at":  "2024-01-15 09:30:00",
+}
+\`\`\``,
     codeExample_en: `import requests, csv, time
 from bs4 import BeautifulSoup
 from datetime import datetime
@@ -1213,6 +1684,78 @@ print(f"Average: £{sum(prices)/len(prices):.2f}")`,
   },
   'py-w7-s1': {
     title_en: 'What are APIs — REST API Basics',
+    content_en: `## APIs — The Internet's Power Socket!
+
+API = Application Programming Interface. It is a website or service's "backdoor" that provides data directly to your code!
+
+### Real Life Analogy
+A restaurant waiter works like an API:
+- You (client) place an order
+- The waiter (API) takes your request to the kitchen (server)
+- The kitchen (server) prepares your food (data)
+- The waiter (API) brings it back to you
+
+### HTTP Methods
+\`\`\`
+GET    — Retrieve data (read)
+POST   — Send data (create)
+PUT    — Replace data (update)
+PATCH  — Partially update
+DELETE — Delete data
+\`\`\`
+
+### REST API Structure
+\`\`\`
+https://api.example.com/v1/users/123
+         └── base URL  version resource id
+\`\`\`
+
+### First API Call
+\`\`\`python
+import requests
+
+# Free API — no key needed!
+response = requests.get("https://api.agify.io?name=Rahul")
+data = response.json()
+print(data)
+# {"name": "Rahul", "age": 35, "count": 12345}
+
+# Another free API
+joke = requests.get("https://official-joke-api.appspot.com/random_joke")
+j = joke.json()
+print(f"{j['setup']}\\n{j['punchline']}")
+\`\`\`
+
+### API Keys
+Most APIs need authentication:
+\`\`\`python
+import requests
+
+API_KEY = "your_key_here"
+
+# Option 1: Query parameter
+response = requests.get(
+    "https://api.example.com/data",
+    params={"apikey": API_KEY}
+)
+
+# Option 2: Header (more secure)
+response = requests.get(
+    "https://api.example.com/data",
+    headers={"Authorization": f"Bearer {API_KEY}"}
+)
+\`\`\`
+
+### Status Codes
+\`\`\`
+200 OK          — Success!
+201 Created     — Resource created
+400 Bad Request — Your request has an error
+401 Unauthorized— API key missing/wrong
+404 Not Found   — Resource doesn't exist
+429 Too Many    — Rate limit exceeded
+500 Server Error— Their problem, not yours
+\`\`\``,
     codeExample_en: `import requests
 
 def get_country_info(country_name):
@@ -1241,6 +1784,77 @@ get_country_info("Japan")`,
   },
   'py-w7-s2': {
     title_en: 'JSON Deep Dive — Handling Complex Data',
+    content_en: `## JSON — The Language of APIs!
+
+Almost all modern APIs send data in JSON format. Understand it deeply!
+
+### Nested JSON Navigation
+\`\`\`python
+import requests
+
+response = requests.get("https://api.github.com/repos/python/cpython")
+repo = response.json()
+
+# Nested data access
+print("Name:",        repo['name'])
+print("Stars:",       repo['stargazers_count'])
+print("Language:",    repo['language'])
+print("Owner login:", repo['owner']['login'])  # Nested!
+print("Topics:",      repo.get('topics', []))  # Safe access
+\`\`\`
+
+### Working with Lists in JSON
+\`\`\`python
+import requests
+
+# GitHub — list of repositories
+response = requests.get("https://api.github.com/users/torvalds/repos")
+repos = response.json()
+
+print(f"Found {len(repos)} repos\\n")
+for repo in repos[:5]:
+    name        = repo['name']
+    stars       = repo['stargazers_count']
+    description = repo.get('description', 'No description')
+    print(f"★{stars:5d}  {name}")
+    print(f"         {description[:60]}\\n")
+\`\`\`
+
+### Saving JSON to File
+\`\`\`python
+import requests
+import json
+from datetime import datetime
+
+def fetch_and_save(url, filename):
+    response = requests.get(url)
+    data     = response.json()
+    
+    # Add metadata
+    data['_fetched_at'] = datetime.now().isoformat()
+    
+    with open(filename, 'w') as f:
+        json.dump(data, f, indent=2)
+    print(f"✅ Saved to {filename}")
+
+# Load later
+with open(filename) as f:
+    data = json.load(f)
+\`\`\`
+
+### JSON Flattening
+\`\`\`python
+# Deeply nested → flat dictionary
+def flatten(obj, prefix=''):
+    result = {}
+    for key, val in obj.items():
+        full_key = f"{prefix}.{key}" if prefix else key
+        if isinstance(val, dict):
+            result.update(flatten(val, full_key))
+        else:
+            result[full_key] = val
+    return result
+\`\`\``,
     codeExample_en: `import requests, json
 
 # Fetch users from JSONPlaceholder
@@ -1271,6 +1885,83 @@ print(f"Loaded {len(loaded)} users from file")`,
   },
   'py-w7-s3': {
     title_en: 'POST Requests — Sending Data to APIs',
+    content_en: `## POST Requests — Send Data to APIs!
+
+GET fetches data. POST sends data (to create something).
+
+### Basic POST Request
+\`\`\`python
+import requests
+
+# httpbin.org is a testing API
+response = requests.post(
+    "https://httpbin.org/post",
+    json={                      # Python dict → JSON automatically
+        "name":    "Rahul",
+        "course":  "Python",
+        "score":   95,
+    }
+)
+data = response.json()
+print("Sent:", data['json'])    # Echo back what we sent
+\`\`\`
+
+### POST with Form Data
+\`\`\`python
+import requests
+
+# Old-style form submission (not JSON)
+response = requests.post(
+    "https://httpbin.org/post",
+    data={                      # Form data — not json=
+        "username": "rahul",
+        "password": "secret123",
+    }
+)
+print(response.json()['form'])
+\`\`\`
+
+### REST API — Full CRUD
+\`\`\`python
+import requests
+
+BASE = "https://jsonplaceholder.typicode.com"
+
+# CREATE — POST
+new_post = {
+    "title":  "My First Post",
+    "body":   "Python is amazing!",
+    "userId": 1,
+}
+r = requests.post(f"{BASE}/posts", json=new_post)
+print("Created:", r.json())
+
+# READ — GET
+r = requests.get(f"{BASE}/posts/1")
+print("Post:", r.json()['title'])
+
+# UPDATE — PUT
+r = requests.put(f"{BASE}/posts/1", json={"title": "Updated Title"})
+print("Updated:", r.json())
+
+# DELETE
+r = requests.delete(f"{BASE}/posts/1")
+print("Deleted, status:", r.status_code)  # 200
+\`\`\`
+
+### Session — Maintain Login
+\`\`\`python
+import requests
+
+session = requests.Session()
+
+# Login once
+session.post("https://httpbin.org/post", data={"user": "me"})
+
+# All subsequent requests keep the session
+r1 = session.get("https://httpbin.org/cookies")
+r2 = session.get("https://httpbin.org/headers")
+\`\`\``,
     codeExample_en: `import requests
 
 BASE = "https://jsonplaceholder.typicode.com"
@@ -1302,6 +1993,44 @@ print(f"\\nDeleted: {r.status_code}")`,
   },
   'py-w7-s4': {
     title_en: 'Week 7 Project — News Aggregator',
+    content_en: `## Week 7 Project — Multi-Source News Aggregator!
+
+Fetch data from real news APIs and build an aggregator!
+
+### Free News APIs:
+1. **NewsAPI.org** — Free tier: 100 requests/day, account required
+2. **GNews API** — Free: 10 requests/day
+3. **Hacker News** — Completely free, no key!
+
+### Project Features:
+1. Fetch top stories from Hacker News API
+2. Filter by keyword / category
+3. Display with title, score, comments
+4. Save favourites to JSON
+5. CLI interface with search
+
+### Hacker News API (Free, No Key):
+\`\`\`
+Base URL: https://hacker-news.firebaseio.com/v0
+
+Endpoints:
+  /topstories.json    — IDs of top 500 stories
+  /item/{id}.json     — Full story details
+  /user/{id}.json     — User info
+  /newstories.json    — Latest stories
+  /askstories.json    — Ask HN posts
+\`\`\`
+
+### Expected Output:
+\`\`\`
+🔥 Top 10 HN Stories — Python
+────────────────────────────────────────
+1. ★ 342  Ask HN: What Python projects did you build?
+         💬 127 comments | 2 hours ago
+
+2. ★ 287  Python 3.13 Released — New Features Overview
+         💬 89 comments  | 5 hours ago
+\`\`\``,
     codeExample_en: `import requests
 
 BASE = "https://hacker-news.firebaseio.com/v0"
@@ -1334,6 +2063,68 @@ for i, s in enumerate(stories, 1):
   },
   'py-w8-s1': {
     title_en: 'Pandas Basics — Understanding DataFrames',
+    content_en: `## Pandas — Python's Excel on Steroids!
+
+Pandas is the most powerful library for data analysis. Used everywhere in Data Science and AI!
+
+### Install:
+\`\`\`bash
+pip install pandas openpyxl
+\`\`\`
+
+### Creating a DataFrame
+\`\`\`python
+import pandas as pd
+
+# From a dictionary
+data = {
+    'name':    ['Rahul', 'Priya', 'Arjun', 'Neha'],
+    'class':   [10, 11, 10, 12],
+    'math':    [85, 92, 78, 95],
+    'science': [90, 88, 82, 97],
+}
+df = pd.DataFrame(data)
+print(df)
+\`\`\`
+
+### Basic Operations
+\`\`\`python
+# Explore
+print(df.shape)       # (4, 4) — rows × columns
+print(df.dtypes)      # column types
+print(df.describe())  # statistics
+print(df.head(2))     # first 2 rows
+print(df.tail(2))     # last 2 rows
+
+# Access
+print(df['name'])              # column
+print(df[['name', 'math']])    # multiple columns
+print(df.iloc[0])              # row by index
+print(df.loc[0, 'name'])       # specific cell
+
+# Filter
+toppers = df[df['math'] >= 90]
+class10 = df[df['class'] == 10]
+print(toppers[['name', 'math']])
+\`\`\`
+
+### Aggregation
+\`\`\`python
+print(df['math'].mean())   # Average
+print(df['math'].max())    # Maximum
+print(df['math'].min())    # Minimum
+print(df['math'].sum())    # Total
+print(df.groupby('class')['math'].mean())  # Average by class
+\`\`\`
+
+### Adding Columns
+\`\`\`python
+df['total']   = df['math'] + df['science']
+df['average'] = df['total'] / 2
+df['grade']   = df['average'].apply(
+    lambda x: 'A+' if x >= 90 else 'A' if x >= 80 else 'B'
+)
+\`\`\``,
     codeExample_en: `import pandas as pd
 import numpy as np
 
@@ -1366,6 +2157,60 @@ print(city_avg)`,
   },
   'py-w8-s2': {
     title_en: 'Data Cleaning — Fixing Messy Data',
+    content_en: `## Data Cleaning — The Most Important Skill in Real Data!
+
+Real data is ALWAYS messy — null values, duplicates, wrong formats, typos. Cleaning it is essential!
+
+### Handling Missing Values
+\`\`\`python
+import pandas as pd
+import numpy as np
+
+df = pd.DataFrame({
+    'name':  ['Rahul', 'Priya', None, 'Neha'],
+    'score': [85, np.nan, 78, 92],
+    'city':  ['Mumbai', 'Delhi', 'Mumbai', None],
+})
+
+print(df.isnull().sum())    # Count nulls per column
+print(df.isnull().any())    # Which columns have nulls
+
+# Options:
+df['score'].fillna(df['score'].mean(), inplace=True)  # Fill with mean
+df['city'].fillna('Unknown', inplace=True)            # Fill with default
+df.dropna(subset=['name'], inplace=True)              # Drop rows where name is null
+\`\`\`
+
+### Removing Duplicates
+\`\`\`python
+df = pd.DataFrame({
+    'name':  ['Rahul', 'Priya', 'Rahul', 'Arjun'],
+    'score': [85, 92, 85, 78],
+})
+
+print(df.duplicated())           # Which rows are duplicate?
+df.drop_duplicates(inplace=True) # Remove duplicates
+\`\`\`
+
+### Fixing Data Types
+\`\`\`python
+df['score']   = pd.to_numeric(df['score'], errors='coerce')
+df['date']    = pd.to_datetime(df['date'], format='%d/%m/%Y')
+df['name']    = df['name'].str.strip().str.title()    # clean whitespace, title case
+df['email']   = df['email'].str.lower()              # lowercase
+\`\`\`
+
+### Outlier Detection
+\`\`\`python
+# Using IQR method
+Q1  = df['score'].quantile(0.25)
+Q3  = df['score'].quantile(0.75)
+IQR = Q3 - Q1
+
+outliers = df[(df['score'] < Q1 - 1.5*IQR) | (df['score'] > Q3 + 1.5*IQR)]
+print(f"Outliers found: {len(outliers)}")
+clean_df = df[~df.index.isin(outliers.index)]
+\`\`\``,
     codeExample_en: `import pandas as pd
 import numpy as np
 
@@ -1400,6 +2245,64 @@ print(df)`,
   },
   'py-w8-s3': {
     title_en: 'Data Visualization — Creating Graphs with Matplotlib',
+    content_en: `## Matplotlib — Visualise Your Data!
+
+### Install:
+\`\`\`bash
+pip install matplotlib seaborn
+\`\`\`
+
+### Basic Plots
+\`\`\`python
+import matplotlib.pyplot as plt
+import pandas as pd
+
+subjects = ['Math', 'Science', 'English', 'Hindi', 'CS']
+scores   = [85, 92, 78, 88, 95]
+
+# Bar chart
+plt.figure(figsize=(10, 6))
+plt.bar(subjects, scores, color=['#4CAF50', '#2196F3', '#FF5722', '#9C27B0', '#FF9800'])
+plt.title('Student Subject Scores', fontsize=14, fontweight='bold')
+plt.ylabel('Marks')
+plt.ylim(0, 100)
+for i, score in enumerate(scores):
+    plt.text(i, score + 1, str(score), ha='center', fontweight='bold')
+plt.tight_layout()
+plt.savefig('scores.png', dpi=150)
+plt.show()
+\`\`\`
+
+### Multiple Plot Types
+\`\`\`python
+import matplotlib.pyplot as plt
+import numpy as np
+
+fig, axes = plt.subplots(2, 2, figsize=(12, 10))
+
+# 1. Line chart
+x = range(1, 13)
+axes[0,0].plot(x, np.random.randint(50, 100, 12), 'b-o', linewidth=2)
+axes[0,0].set_title('Monthly Performance')
+
+# 2. Pie chart
+axes[0,1].pie([30, 25, 20, 15, 10], labels=['Python','JS','C','Java','Other'],
+              autopct='%1.0f%%', startangle=90)
+axes[0,1].set_title('Language Popularity')
+
+# 3. Scatter plot
+axes[1,0].scatter(np.random.rand(50)*100, np.random.rand(50)*100,
+                  c='purple', alpha=0.6, s=100)
+axes[1,0].set_title('Study Time vs Score')
+
+# 4. Histogram
+axes[1,1].hist(np.random.normal(70, 15, 200), bins=20, color='orange', edgecolor='black')
+axes[1,1].set_title('Score Distribution')
+
+plt.tight_layout()
+plt.savefig('dashboard.png', dpi=150, bbox_inches='tight')
+plt.show()
+\`\`\``,
     codeExample_en: `import matplotlib.pyplot as plt
 import numpy as np
 
@@ -1436,6 +2339,47 @@ plt.show()`,
   },
   'py-w8-s4': {
     title_en: 'Month 2 Capstone — Sales Data Dashboard',
+    content_en: `## Month 2 Capstone Project — Complete Data Analytics!
+
+Month 2 grand finale — build a real data analytics project worthy of your portfolio!
+
+### Project: E-Commerce Sales Analyser
+
+**Generate or download a dataset:**
+- 1000+ orders
+- Multiple products
+- Multiple customers
+- 6+ months of data
+
+### Analysis Requirements:
+1. **Sales trends** — monthly, weekly patterns
+2. **Top products** — by revenue and by units sold
+3. **Customer segments** — high/mid/low value
+4. **Geographic analysis** — sales by region
+5. **Profitability** — revenue vs cost
+6. **Predictive** — simple forecast for next month
+
+### Dashboard Output:
+\`\`\`
+📊 E-Commerce Analytics Dashboard
+══════════════════════════════════
+Period: Jan–Jun 2024
+
+💰 Revenue Summary:
+  Total Revenue:  ₹45,23,450
+  Total Orders:   1,247
+  Avg Order Value:₹3,627
+
+📦 Top 5 Products:
+  1. Laptop    ₹18,45,000  (41 units)
+  2. Phone     ₹12,30,000  (82 units)
+  ...
+
+📈 Monthly Trend:
+  Jan: ████████  ₹6.2L
+  Feb: ██████    ₹4.8L
+  ...
+\`\`\``,
     codeExample_en: `import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -1471,6 +2415,108 @@ print(region_perf)`,
   },
   'py-w9-s1': {
     title_en: 'Django Setup and First Project',
+    content_en: `## Django — Python's #1 Web Framework!
+
+Instagram, Pinterest, Disqus — all built with Django. Learn how!
+
+### Install:
+\`\`\`bash
+pip install django
+django-admin --version  # Check version
+\`\`\`
+
+### Create a New Project:
+\`\`\`bash
+django-admin startproject myblog
+cd myblog
+python manage.py startapp posts   # Create an app
+python manage.py runserver        # Start dev server → http://127.0.0.1:8000
+\`\`\`
+
+### Project Structure:
+\`\`\`
+myblog/
+├── manage.py          ← Command-line tool
+├── myblog/
+│   ├── settings.py    ← Configuration
+│   ├── urls.py        ← URL routing
+│   └── wsgi.py        ← Production server
+└── posts/             ← Your app
+    ├── models.py      ← Database tables
+    ├── views.py       ← Business logic
+    ├── urls.py        ← App URLs
+    └── templates/     ← HTML files
+\`\`\`
+
+### Django MVT Pattern:
+\`\`\`
+Browser → URL Router → View → Model (DB) → Template → Browser
+            urls.py   views.py models.py   .html
+\`\`\`
+
+### Your First View:
+\`\`\`python
+# posts/views.py
+from django.http import HttpResponse
+from django.shortcuts import render
+
+def home(request):
+    return HttpResponse("<h1>Welcome to My Blog! 🎉</h1>")
+
+def about(request):
+    context = {'title': 'About Us', 'author': 'StudyEarn'}
+    return render(request, 'about.html', context)
+\`\`\`
+
+### Connect URLs:
+\`\`\`python
+# posts/urls.py
+from django.urls import path
+from . import views
+
+urlpatterns = [
+    path('',       views.home,  name='home'),
+    path('about/', views.about, name='about'),
+]
+
+# myblog/urls.py (main)
+from django.urls import path, include
+urlpatterns = [
+    path('', include('posts.urls')),
+]
+\`\`\``,
+    codeExample_en: `# posts/views.py — Create the first view
+from django.http import HttpResponse
+from django.shortcuts import render
+
+def home(request):
+    return HttpResponse("<h1>Welcome to My Blog! 🎉</h1>")
+
+def about(request):
+    context = {
+        'name': 'Rahul Kumar',
+        'skills': ['Python', 'Django', 'React'],
+        'experience': 2,
+    }
+    return render(request, 'posts/about.html', context)
+
+# posts/urls.py — URL routing
+from django.urls import path
+from . import views
+
+urlpatterns = [
+    path('', views.home, name='home'),
+    path('about/', views.about, name='about'),
+]
+
+# myblog/urls.py — Main URL file mein include karo
+from django.contrib import admin
+from django.urls import path, include
+
+urlpatterns = [
+    path('admin/', admin.site.urls),
+    path('', include('posts.urls')),  # posts app ke URLs
+]`,
     task_en: { description: 'Create Django project "mystudysite" with "pages" app. Build 3 pages: home (welcome + your name), about (your info), contact (contact form HTML). Configure all URLs.', hint: 'django-admin startproject → startapp → add to INSTALLED_APPS → views.py functions → urls.py routes' },
     quiz_en: [
       { q: 'What command creates a new Django app?', options: ['django-admin createapp', 'python manage.py startapp', 'django new app', 'pip install app'], correct: 1, explanation: 'python manage.py startapp appname creates a new app with models, views, urls files.' },
@@ -1480,6 +2526,121 @@ print(region_perf)`,
   },
   'py-w9-s2': {
     title_en: 'Django Models — Database Tables with Python',
+    content_en: `## Models — Use a Database Without Writing SQL!
+
+In Django you write Python classes — Django generates the SQL automatically!
+
+### Defining a Model:
+\`\`\`python
+# posts/models.py
+from django.db import models
+
+class Post(models.Model):
+    title      = models.CharField(max_length=200)
+    content    = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    author     = models.CharField(max_length=100, default='Admin')
+    published  = models.BooleanField(default=False)
+
+    def __str__(self):
+        return self.title
+
+    class Meta:
+        ordering = ['-created_at']
+\`\`\`
+
+### Run Migrations:
+\`\`\`bash
+python manage.py makemigrations   # Generate SQL
+python manage.py migrate          # Apply to database
+\`\`\`
+
+### Django ORM — Query the Database:
+\`\`\`python
+# Create
+Post.objects.create(title="Hello World", content="My first post!")
+
+# Read
+all_posts      = Post.objects.all()
+published      = Post.objects.filter(published=True)
+recent_5       = Post.objects.order_by('-created_at')[:5]
+post           = Post.objects.get(id=1)
+
+# Update
+post.title = "Updated Title"
+post.save()
+Post.objects.filter(published=False).update(published=True)
+
+# Delete
+post.delete()
+Post.objects.filter(title="Old").delete()
+
+# Complex queries
+from django.db.models import Q
+results = Post.objects.filter(
+    Q(title__icontains='python') | Q(content__icontains='python')
+)
+\`\`\`
+
+### Relationships:
+\`\`\`python
+class Comment(models.Model):
+    post    = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='comments')
+    author  = models.CharField(max_length=100)
+    content = models.TextField()
+
+# Usage
+post = Post.objects.get(id=1)
+post.comments.all()   # All comments for this post
+\`\`\``,
+    codeExample_en: `# posts/models.py — Blog models
+from django.db import models
+
+class Category(models.Model):
+    name = models.CharField(max_length=100)
+    slug = models.SlugField(unique=True)
+
+    def __str__(self):
+        return self.name
+
+class Post(models.Model):
+    title = models.CharField(max_length=200)
+    content = models.TextField()
+    author = models.CharField(max_length=100)
+    category = models.ForeignKey(
+        Category,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='posts'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_published = models.BooleanField(default=False)
+    views = models.IntegerField(default=0)
+
+    def __str__(self):
+        return self.title
+
+    class Meta:
+        ordering = ['-created_at']
+
+# posts/views.py — ORM use karo
+from django.shortcuts import render
+from .models import Post, Category
+
+def post_list(request):
+    posts = Post.objects.filter(is_published=True)
+    categories = Category.objects.all()
+    return render(request, 'posts/list.html', {
+        'posts': posts,
+        'categories': categories,
+    })
+
+def post_detail(request, pk):
+    post = Post.objects.get(pk=pk)
+    post.views += 1
+    post.save()
+    return render(request, 'posts/detail.html', {'post': post})`,
     task_en: { description: 'Create 3 models: Category, Post (FK to Category), Comment (FK to Post). Run migrations. Use Django shell to create data and practice ORM queries.', hint: 'makemigrations → migrate → shell. from posts.models import Post → Post.objects.create(...)' },
     quiz_en: [
       { q: 'What does makemigrations do?', options: ['Updates database', 'Creates migration files detecting model changes', 'Runs the server', 'Tests models'], correct: 1, explanation: 'makemigrations detects changes in models.py and creates migration files. migrate applies them to DB.' },
@@ -1489,6 +2650,127 @@ print(region_perf)`,
   },
   'py-w9-s3': {
     title_en: 'Django Templates and Admin Panel',
+    content_en: `## Templates — Django's HTML Engine!
+
+### Template Setup:
+\`\`\`python
+# In settings.py — TEMPLATES config:
+TEMPLATES = [{
+    'BACKEND': 'django.template.backends.django.DjangoTemplates',
+    'DIRS': [BASE_DIR / 'templates'],  # Global templates folder
+    'APP_DIRS': True,                  # Also look in app/templates/
+    ...
+}]
+\`\`\`
+
+### Base Template (templates/base.html):
+\`\`\`html
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{% block title %}My Blog{% endblock %}</title>
+</head>
+<body>
+    <nav>
+        <a href="{% url 'home' %}">Home</a>
+        <a href="{% url 'about' %}">About</a>
+    </nav>
+
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>
+\`\`\`
+
+### Child Template (templates/home.html):
+\`\`\`html
+{% extends 'base.html' %}
+
+{% block title %}Home — My Blog{% endblock %}
+
+{% block content %}
+<h1>Latest Posts</h1>
+
+{% for post in posts %}
+    <article>
+        <h2>{{ post.title }}</h2>
+        <p>{{ post.content|truncatewords:30 }}</p>
+        <small>{{ post.created_at|date:"d M Y" }}</small>
+        <a href="{% url 'post_detail' post.id %}">Read More →</a>
+    </article>
+{% empty %}
+    <p>No posts yet!</p>
+{% endfor %}
+{% endblock %}
+\`\`\`
+
+### Template Tags & Filters:
+\`\`\`
+{{ variable }}              — Output a variable
+{{ text|truncatewords:20 }} — Filter
+{% for item in list %}      — Loop
+{% if condition %}          — Condition
+{% url 'name' %}            — Reverse URL
+{% extends 'base.html' %}   — Inheritance
+{% block name %}{% endblock %}— Block
+{% include 'nav.html' %}    — Include partial
+\`\`\`
+
+### Django Admin:
+\`\`\`python
+# posts/admin.py
+from django.contrib import admin
+from .models import Post
+
+@admin.register(Post)
+class PostAdmin(admin.ModelAdmin):
+    list_display  = ['title', 'author', 'published', 'created_at']
+    list_filter   = ['published', 'created_at']
+    search_fields = ['title', 'content']
+\`\`\`
+\`\`\`bash
+python manage.py createsuperuser  # Create admin account
+# Visit: http://127.0.0.1:8000/admin/
+\`\`\``,
+    codeExample_en: `# Complete blog app with templates
+
+# posts/views.py
+from django.shortcuts import render, get_object_or_404
+from .models import Post, Category
+
+def post_list(request):
+    category_slug = request.GET.get('category')
+    posts = Post.objects.filter(is_published=True)
+    if category_slug:
+        posts = posts.filter(category__slug=category_slug)
+    return render(request, 'posts/list.html', {
+        'posts': posts,
+        'categories': Category.objects.all(),
+        'current_category': category_slug,
+    })
+
+def post_detail(request, pk):
+    post = get_object_or_404(Post, pk=pk, is_published=True)
+    post.views += 1
+    post.save()
+    related = Post.objects.filter(
+        category=post.category,
+        is_published=True
+    ).exclude(pk=pk)[:3]
+    return render(request, 'posts/detail.html', {
+        'post': post,
+        'related_posts': related,
+    })
+
+# posts/urls.py
+from django.urls import path
+from . import views
+
+urlpatterns = [
+    path('', views.post_list, name='post_list'),
+    path('post/<int:pk>/', views.post_detail, name='post_detail'),
+]`,
     task_en: { description: 'Build blog with templates: base.html (navbar), list.html (posts as cards with category filter), detail.html (full post + related posts). Register models in admin.', hint: 'templates/ at project root. Add to DIRS in settings.py. {% block content %}{% endblock %} in base.html.' },
     quiz_en: [
       { q: 'How do you use a URL in Django templates?', options: ['"http://localhost/post/1"', '{% url "post_detail" post.pk %}', '{{ url post_detail }}', 'href="/post/1"'], correct: 1, explanation: '{% url "view_name" args %} generates URLs by view name — if URL changes, templates update automatically.' },
@@ -1498,6 +2780,107 @@ print(region_perf)`,
   },
   'py-w9-s4': {
     title_en: 'Week 9 Project — Full Blog with Forms',
+    content_en: `## Week 9 Project — Full Featured Blog!
+
+Now build a complete blog with forms, user input, database — everything!
+
+### Django Forms:
+\`\`\`python
+# posts/forms.py
+from django import forms
+from .models import Post, Comment
+
+class PostForm(forms.ModelForm):
+    class Meta:
+        model  = Post
+        fields = ['title', 'content', 'published']
+        widgets = {
+            'title':   forms.TextInput(attrs={'class': 'form-control'}),
+            'content': forms.Textarea(attrs={'rows': 10}),
+        }
+
+class CommentForm(forms.ModelForm):
+    class Meta:
+        model  = Comment
+        fields = ['author', 'content']
+\`\`\`
+
+### View with Form Handling:
+\`\`\`python
+def create_post(request):
+    if request.method == 'POST':
+        form = PostForm(request.POST)
+        if form.is_valid():
+            post = form.save()
+            return redirect('post_detail', pk=post.id)
+    else:
+        form = PostForm()
+    return render(request, 'create_post.html', {'form': form})
+\`\`\`
+
+### Search Functionality:
+\`\`\`python
+def post_list(request):
+    query = request.GET.get('q', '')
+    posts = Post.objects.filter(published=True)
+    
+    if query:
+        from django.db.models import Q
+        posts = posts.filter(
+            Q(title__icontains=query) | Q(content__icontains=query)
+        )
+    
+    return render(request, 'home.html', {
+        'posts': posts,
+        'query': query,
+    })
+\`\`\``,
+    codeExample_en: `# Complete blog views
+from django.shortcuts import render, redirect, get_object_or_404
+from django.db.models import Q
+from .models import Post, Category, Comment
+from .forms import PostForm, CommentForm
+
+def post_list(request):
+    query = request.GET.get('q', '')
+    category_slug = request.GET.get('category', '')
+    posts = Post.objects.filter(is_published=True)
+    if query:
+        posts = posts.filter(Q(title__icontains=query) | Q(content__icontains=query))
+    if category_slug:
+        posts = posts.filter(category__slug=category_slug)
+    return render(request, 'posts/list.html', {
+        'posts': posts,
+        'categories': Category.objects.all(),
+        'query': query,
+    })
+
+def post_detail(request, pk):
+    post = get_object_or_404(Post, pk=pk)
+    post.views += 1
+    post.save()
+    comments = post.comments.all()
+    if request.method == 'POST':
+        form = CommentForm(request.POST)
+        if form.is_valid():
+            Comment.objects.create(
+                post=post,
+                author_name=form.cleaned_data['author_name'],
+                text=form.cleaned_data['text'],
+            )
+            return redirect('post_detail', pk=pk)
+    else:
+        form = CommentForm()
+    return render(request, 'posts/detail.html', {
+        'post': post, 'comments': comments, 'form': form
+    })
+
+def create_post(request):
+    form = PostForm(request.POST or None)
+    if form.is_valid():
+        post = form.save()
+        return redirect('post_detail', pk=post.pk)
+    return render(request, 'posts/create.html', {'form': form})`,
     task_en: { description: 'Complete blog: post list with search + category filter, post detail with comment form, create post form. Add 5 real posts. Test all features.', hint: 'Q objects: Q(title__icontains=q) | Q(content__icontains=q). Add related_name="comments" to Comment FK.' },
     quiz_en: [
       { q: 'Why is {% csrf_token %} required in forms?', options: ['For styling', 'Protects against Cross-Site Request Forgery attacks', 'For form validation', 'For database connection'], correct: 1, explanation: 'CSRF token prevents malicious sites from making requests on behalf of your users.' },
@@ -1507,6 +2890,107 @@ print(region_perf)`,
   },
   'py-w10-s1': {
     title_en: 'What is ML — Types and Concepts',
+    content_en: `## Machine Learning — Teach Computers to Learn!
+
+ML means teaching a computer using examples — without explicit programming!
+
+### 3 Types of ML:
+\`\`\`
+1. Supervised Learning    → Learn from Data + Labels
+   Examples: Spam detection, price prediction
+
+2. Unsupervised Learning  → Data only, find patterns yourself
+   Examples: Customer clustering, anomaly detection
+
+3. Reinforcement Learning → Learn by trial and error (reward/punishment)
+   Examples: Game-playing AI, robotics
+\`\`\`
+
+### The ML Workflow:
+\`\`\`
+Data → Clean → Features → Split → Train → Evaluate → Deploy
+\`\`\`
+
+### scikit-learn — Python's ML Library
+\`\`\`bash
+pip install scikit-learn
+\`\`\`
+
+\`\`\`python
+from sklearn.datasets import load_iris
+from sklearn.model_selection import train_test_split
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.metrics import accuracy_score
+
+# 1. Load data
+iris = load_iris()
+X, y = iris.data, iris.target
+
+# 2. Split (80% train, 20% test)
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42
+)
+
+# 3. Train model
+model = KNeighborsClassifier(n_neighbors=3)
+model.fit(X_train, y_train)
+
+# 4. Evaluate
+predictions = model.predict(X_test)
+accuracy = accuracy_score(y_test, predictions)
+print(f"Accuracy: {accuracy*100:.1f}%")
+\`\`\`
+
+### Classification vs Regression:
+\`\`\`
+Classification  → Predict a CATEGORY  (spam/not spam, iris species)
+Regression      → Predict a NUMBER    (house price, temperature)
+\`\`\``,
+    codeExample_en: `from sklearn.datasets import load_iris, load_wine
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.metrics import accuracy_score
+import pandas as pd
+
+def compare_models(dataset_name='iris'):
+    # Dataset load karo
+    if dataset_name == 'iris':
+        data = load_iris()
+    else:
+        data = load_wine()
+
+    X, y = data.data, data.target
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+    scaler = StandardScaler()
+    X_train_s = scaler.fit_transform(X_train)
+    X_test_s = scaler.transform(X_test)
+
+    # Multiple models compare karo
+    models = {
+        'KNN (k=3)': KNeighborsClassifier(n_neighbors=3),
+        'KNN (k=5)': KNeighborsClassifier(n_neighbors=5),
+        'KNN (k=7)': KNeighborsClassifier(n_neighbors=7),
+        'Decision Tree': DecisionTreeClassifier(random_state=42),
+    }
+
+    print(f"\\\\nDataset: {dataset_name} | {len(X)} samples | {X.shape[1]} features")
+    print(f"Classes: {data.target_names}")
+    print(f"Train: {len(X_train)}, Test: {len(X_test)}")
+    print("\\\\n" + "="*45)
+    print(f"{'Model':<20} {'Accuracy':>10} {'Result':>10}")
+    print("="*45)
+
+    for name, model in models.items():
+        model.fit(X_train_s, y_train)
+        acc = accuracy_score(y_test, model.predict(X_test_s))
+        bar = "█" * int(acc * 20)
+        print(f"{name:<20} {acc*100:>9.1f}% {bar}")
+
+compare_models('iris')
+compare_models('wine')`,
     task_en: { description: 'Build a survival predictor (200 passengers: age, fare, class, gender → survived). Use RandomForestClassifier. Show accuracy, feature importance, predict 5 new passengers.', hint: 'from sklearn.ensemble import RandomForestClassifier. pd.get_dummies() for gender. model.feature_importances_' },
     quiz_en: [
       { q: 'What is Supervised Learning?', options: ['Learning without labels', 'Learning from labeled data (input-output pairs)', 'Learning by trial and error', 'Unsupervised clustering'], correct: 1, explanation: 'Supervised learning uses labeled data — you provide both features (X) and correct answers (y) for training.' },
@@ -1516,6 +3000,115 @@ print(region_perf)`,
   },
   'py-w10-s2': {
     title_en: 'Regression — Predicting Numbers',
+    content_en: `## Regression — Predict Continuous Values!
+
+Classification predicts a category (spam/not spam). Regression predicts a number (price, temperature).
+
+### Linear Regression:
+\`\`\`python
+import numpy as np
+import pandas as pd
+from sklearn.linear_model import LinearRegression
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_squared_error, r2_score
+
+# Simple example: study hours → exam score
+np.random.seed(42)
+hours = np.random.uniform(1, 10, 100)
+scores = 6 * hours + 20 + np.random.normal(0, 5, 100)  # with noise
+
+X = hours.reshape(-1, 1)  # Must be 2D
+y = scores
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
+
+model = LinearRegression()
+model.fit(X_train, y_train)
+
+y_pred = model.predict(X_test)
+print(f"R² Score: {r2_score(y_test, y_pred):.3f}")  # 1.0 = perfect
+print(f"RMSE:     {mean_squared_error(y_test, y_pred)**0.5:.2f}")
+
+# Predict new value
+new_hours = np.array([[7.5]])
+print(f"7.5 hours study → predicted score: {model.predict(new_hours)[0]:.1f}")
+\`\`\`
+
+### Multiple Features:
+\`\`\`python
+# Predict house price from multiple features
+data = {
+    'size_sqft': [800, 1200, 1500, 2000, 2500],
+    'bedrooms':  [2,   3,    3,    4,    5   ],
+    'location':  [1,   2,    1,    3,    2   ],  # 1=suburb, 2=city, 3=prime
+    'price_lakh':[45,  75,   80,   120,  150 ],
+}
+df = pd.DataFrame(data)
+
+X = df[['size_sqft', 'bedrooms', 'location']]
+y = df['price_lakh']
+
+model = LinearRegression()
+model.fit(X, y)
+
+# Predict
+new_house = [[1800, 3, 2]]
+print(f"Predicted price: ₹{model.predict(new_house)[0]:.1f} lakhs")
+\`\`\``,
+    codeExample_en: `import numpy as np
+import pandas as pd
+from sklearn.linear_model import LinearRegression, Ridge
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import r2_score, mean_absolute_error
+from sklearn.preprocessing import StandardScaler
+
+# Student score predictor
+np.random.seed(42)
+n = 300
+
+df = pd.DataFrame({
+    'study_hours': np.random.uniform(1, 10, n),
+    'sleep_hours': np.random.uniform(4, 10, n),
+    'prev_score': np.random.uniform(40, 100, n),
+    'attendance_pct': np.random.uniform(50, 100, n),
+    'tuition': np.random.choice([0, 1], n),
+})
+
+df['final_score'] = (
+    df['study_hours'] * 5 +
+    df['sleep_hours'] * 2 +
+    df['prev_score'] * 0.4 +
+    df['attendance_pct'] * 0.2 +
+    df['tuition'] * 8 +
+    np.random.normal(0, 3, n)
+).clip(0, 100).round(1)
+
+X = df.drop('final_score', axis=1)
+y = df['final_score']
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+scaler = StandardScaler()
+X_tr = scaler.fit_transform(X_train)
+X_te = scaler.transform(X_test)
+
+models = {
+    'Linear Regression': LinearRegression(),
+    'Ridge Regression': Ridge(alpha=1.0),
+    'Random Forest': RandomForestRegressor(n_estimators=100, random_state=42),
+}
+
+print("Student Score Prediction Models\\\\n" + "="*50)
+for name, model in models.items():
+    model.fit(X_tr, y_train)
+    preds = model.predict(X_te)
+    print(f"{name:<22} R²={r2_score(y_test, preds):.3f}  MAE={mean_absolute_error(y_test, preds):.2f}")
+
+# Predict new student
+new_student = scaler.transform([[7, 8, 75, 90, 1]])
+rf = models['Random Forest']
+pred = rf.predict(new_student)[0]
+print(f"\\\\nNew student prediction: {pred:.1f}/100")`,
     task_en: { description: 'Build a house price predictor with: area, bedrooms, bathrooms, age, floors, distance, amenities. Use RandomForestRegressor. Show R², top 3 features, actual vs predicted.', hint: 'rf.feature_importances_ for importance. pd.DataFrame({"Actual": y_test[:10].values, "Predicted": preds[:10].round(1)})' },
     quiz_en: [
       { q: 'What does an R² score of 0.85 mean?', options: ['85% errors', '85% data points correct', 'Model explains 85% of variance', '85% accuracy'], correct: 2, explanation: 'R² = variance explained. 0.85 = model explains 85% of the variation in the target. 1.0 = perfect.' },
@@ -1525,6 +3118,120 @@ print(region_perf)`,
   },
   'py-w10-s3': {
     title_en: 'Clustering and Model Saving',
+    content_en: `## Clustering and Model Saving!
+
+Labels are not available — the model finds groups on its own.
+
+### K-Means Clustering:
+\`\`\`python
+import numpy as np
+import pandas as pd
+from sklearn.cluster import KMeans
+from sklearn.preprocessing import StandardScaler
+
+# Customer segmentation
+data = {
+    'age':            [25, 35, 45, 22, 50, 28, 38, 52, 23, 42],
+    'annual_income':  [40, 80, 120, 30, 90, 55, 95, 110, 35, 85],
+    'spending_score': [70, 60, 30, 80, 40, 65, 50, 20, 85, 55],
+}
+df = pd.DataFrame(data)
+
+# Standardise features
+scaler = StandardScaler()
+X      = scaler.fit_transform(df)
+
+# Find optimal K using the Elbow method
+inertias = []
+for k in range(1, 8):
+    km = KMeans(n_clusters=k, random_state=42, n_init=10)
+    km.fit(X)
+    inertias.append(km.inertia_)
+# Plot inertias to find the "elbow"
+
+# Train with optimal K
+kmeans = KMeans(n_clusters=3, random_state=42, n_init=10)
+df['cluster'] = kmeans.fit_predict(X)
+
+print(df.groupby('cluster').mean().round(1))
+\`\`\`
+
+### Saving and Loading Models:
+\`\`\`python
+import joblib
+from sklearn.ensemble import RandomForestClassifier
+
+# Train
+model = RandomForestClassifier(n_estimators=100, random_state=42)
+model.fit(X_train, y_train)
+
+# Save model to file
+joblib.dump(model, 'my_model.pkl')
+joblib.dump(scaler, 'scaler.pkl')
+print("✅ Model saved!")
+
+# Load and use later — no retraining needed
+loaded_model  = joblib.load('my_model.pkl')
+loaded_scaler = joblib.load('scaler.pkl')
+
+new_data    = [[25, 5, 3, 2]]
+scaled_data = loaded_scaler.transform(new_data)
+prediction  = loaded_model.predict(scaled_data)
+print(f"Prediction: {prediction[0]}")
+\`\`\``,
+    codeExample_en: `import numpy as np
+import pandas as pd
+from sklearn.cluster import KMeans
+from sklearn.preprocessing import StandardScaler
+import joblib
+
+# Mall customer segmentation
+np.random.seed(42)
+n = 300
+
+df = pd.DataFrame({
+    'age': np.random.randint(18, 70, n),
+    'income_k': np.random.randint(15, 150, n),
+    'spending_score': np.random.randint(1, 100, n),
+    'visits_per_month': np.random.randint(1, 20, n),
+})
+
+scaler = StandardScaler()
+X = scaler.fit_transform(df)
+
+# Optimal clusters
+print("Finding optimal clusters...")
+inertias = []
+for k in range(2, 9):
+    km = KMeans(n_clusters=k, random_state=42, n_init=10)
+    km.fit(X)
+    inertias.append((k, km.inertia_))
+    print(f"  k={k}: inertia={km.inertia_:.0f}")
+
+# Use k=4
+kmeans = KMeans(n_clusters=4, random_state=42, n_init=10)
+df['segment'] = kmeans.fit_predict(X)
+
+# Segment names assign karo based on profile
+segment_profiles = df.groupby('segment').mean().round(1)
+print("\\\\nCluster Profiles:")
+print(segment_profiles)
+
+# Name them
+names = {0: "Young Budget", 1: "High Earner VIP", 2: "Senior Casual", 3: "Young Spender"}
+df['segment_name'] = df['segment'].map(names)
+print("\\\\nSegment Distribution:")
+print(df['segment_name'].value_counts())
+
+# Save model
+joblib.dump(kmeans, 'customer_segmentation.pkl')
+joblib.dump(scaler, 'customer_scaler.pkl')
+print("\\\\nModel saved!")
+
+# Predict new customer
+new_customer = scaler.transform([[25, 80, 75, 15]])
+segment = kmeans.predict(new_customer)[0]
+print(f"New customer segment: {names[segment]}")`,
     task_en: { description: 'Cluster students by performance. Use K=3. Name each cluster meaningfully (e.g., "Achiever", "Average", "At Risk"). Save the model. Predict 3 new students.', hint: 'Name clusters based on groupby mean profiles. joblib.dump(model, "cluster.pkl"). scaler.transform() before predict.' },
     quiz_en: [
       { q: 'What type of learning is K-Means?', options: ['Supervised', 'Unsupervised', 'Reinforcement', 'Semi-supervised'], correct: 1, explanation: 'K-Means is unsupervised — no labels needed. It finds patterns and groups in data on its own.' },
@@ -1534,6 +3241,116 @@ print(region_perf)`,
   },
   'py-w10-s4': {
     title_en: 'Week 10 Project — Complete ML Pipeline',
+    content_en: `## Week 10 Project — End-to-End ML Pipeline!
+
+In the real world, ML is not just training a model — you build an entire pipeline!
+
+### Complete Pipeline Steps:
+\`\`\`python
+from sklearn.pipeline import Pipeline
+from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import cross_val_score
+
+# 1. Column-specific preprocessing
+numeric_features     = ['age', 'income', 'score']
+categorical_features = ['city', 'education']
+
+preprocessor = ColumnTransformer([
+    ('num', StandardScaler(),    numeric_features),
+    ('cat', OneHotEncoder(), categorical_features),
+])
+
+# 2. Build pipeline (preprocessing + model)
+pipeline = Pipeline([
+    ('prep',  preprocessor),
+    ('model', RandomForestClassifier(n_estimators=100)),
+])
+
+# 3. Cross-validate (5-fold)
+scores = cross_val_score(pipeline, X, y, cv=5, scoring='accuracy')
+print(f"CV Accuracy: {scores.mean()*100:.1f}% ± {scores.std()*100:.1f}%")
+
+# 4. Train final model
+pipeline.fit(X_train, y_train)
+
+# 5. Save complete pipeline
+import joblib
+joblib.dump(pipeline, 'full_pipeline.pkl')
+\`\`\`
+
+### Project: Student Performance Predictor
+Build a model that predicts whether a student will pass or fail based on:
+- Attendance percentage
+- Assignment scores
+- Previous exam scores
+- Study hours per week
+- Extracurricular activities`,
+    codeExample_en: `import numpy as np
+import pandas as pd
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler, LabelEncoder
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from sklearn.model_selection import train_test_split, cross_val_score
+from sklearn.metrics import classification_report
+import joblib
+
+np.random.seed(42)
+n = 500
+
+# Loan dataset
+df = pd.DataFrame({
+    'age': np.random.randint(21, 65, n),
+    'income': np.random.randint(200000, 2000000, n),
+    'loan_amount': np.random.randint(100000, 5000000, n),
+    'credit_score': np.random.randint(300, 900, n),
+    'employment_years': np.random.randint(0, 30, n),
+    'existing_loans': np.random.randint(0, 5, n),
+    'assets': np.random.randint(0, 10000000, n),
+})
+
+# Approval logic (business rules)
+df['approved'] = (
+    (df['credit_score'] >= 650) &
+    (df['income'] >= df['loan_amount'] * 0.4) &
+    (df['existing_loans'] <= 2) &
+    (df['employment_years'] >= 1)
+).astype(int)
+
+# Add noise (real world mein sab rules nahi hote)
+noise_idx = np.random.choice(n, int(n*0.1), replace=False)
+df.loc[noise_idx, 'approved'] = 1 - df.loc[noise_idx, 'approved']
+
+X = df.drop('approved', axis=1)
+y = df['approved']
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Pipeline with preprocessing
+pipeline = Pipeline([
+    ('scaler', StandardScaler()),
+    ('model', RandomForestClassifier(n_estimators=100, random_state=42))
+])
+
+pipeline.fit(X_train, y_train)
+preds = pipeline.predict(X_test)
+print("Classification Report:")
+print(classification_report(y_test, preds, target_names=['Rejected', 'Approved']))
+
+# Save
+joblib.dump(pipeline, 'loan_predictor.pkl')
+
+# Predict new applicant
+def predict_loan(age, income, loan, credit, emp_years, loans, assets):
+    pipeline = joblib.load('loan_predictor.pkl')
+    data = pd.DataFrame([[age, income, loan, credit, emp_years, loans, assets]],
+                         columns=X.columns)
+    result = pipeline.predict(data)[0]
+    prob = pipeline.predict_proba(data)[0][1]
+    print(f"Decision: {'APPROVED ✅' if result else 'REJECTED ❌'}")
+    print(f"Approval probability: {prob*100:.1f}%")
+
+predict_loan(35, 800000, 1500000, 720, 8, 1, 2000000)`,
     task_en: { description: 'Loan predictor CLI: accept inputs (age, income, loan, credit score, employment, loans, assets), predict Approved/Rejected, show probability %, explain rejection reason.', hint: 'predict_proba() for probability. Check individual thresholds manually and collect reasons list.' },
     quiz_en: [
       { q: 'What is the main benefit of sklearn Pipeline?', options: ['Faster training', 'Chains preprocessing + model, prevents data leakage', 'Better accuracy', 'Handles missing values'], correct: 1, explanation: 'Pipeline ensures preprocessing is applied consistently in training and prediction, preventing leakage.' },
@@ -1543,6 +3360,130 @@ print(region_perf)`,
   },
   'py-w11-s1': {
     title_en: 'File System Automation',
+    content_en: `## os and shutil — Full Control of the File System!
+
+### os module — File System Operations:
+\`\`\`python
+import os
+import shutil
+from pathlib import Path
+
+# Current directory
+print(os.getcwd())
+
+# List files
+files = os.listdir('.')
+print(files)
+
+# Path operations
+print(os.path.exists('myfile.txt'))
+print(os.path.isfile('myfile.txt'))
+print(os.path.isdir('myfolder'))
+print(os.path.getsize('myfile.txt'))   # bytes
+print(os.path.splitext('photo.jpg'))   # ('photo', '.jpg')
+\`\`\`
+
+### Creating and Deleting:
+\`\`\`python
+os.makedirs('parent/child/grandchild', exist_ok=True)  # Create nested dirs
+os.remove('file.txt')           # Delete file
+os.rmdir('empty_folder')        # Delete empty folder
+shutil.rmtree('full_folder')    # Delete folder with contents!
+\`\`\`
+
+### Copying and Moving:
+\`\`\`python
+shutil.copy('source.txt', 'dest.txt')       # Copy file
+shutil.copy2('source.txt', 'dest.txt')      # Copy with metadata
+shutil.copytree('src_folder', 'dst_folder') # Copy entire folder
+shutil.move('old_path', 'new_path')         # Move or rename
+\`\`\`
+
+### pathlib — Modern File Paths:
+\`\`\`python
+from pathlib import Path
+
+p = Path('.')
+print(list(p.glob('*.py')))         # All Python files
+print(list(p.rglob('*.txt')))       # All .txt files recursively
+
+file = Path('data/report.csv')
+print(file.parent)    # data
+print(file.stem)      # report
+print(file.suffix)    # .csv
+print(file.exists())  # True/False
+\`\`\`
+
+### Walking a Directory Tree:
+\`\`\`python
+import os
+
+for root, dirs, files in os.walk('.'):
+    level = root.replace('.', '').count(os.sep)
+    indent = ' ' * 2 * level
+    print(f'{indent}{os.path.basename(root)}/')
+    for file in files:
+        print(f'{indent}  {file}')
+\`\`\``,
+    codeExample_en: `import os
+import shutil
+from pathlib import Path
+from datetime import datetime
+
+def smart_file_organizer(source_dir='.', dest_dir='organized'):
+    """Organise files by type and date"""
+    source = Path(source_dir)
+    dest = Path(dest_dir)
+    
+    categories = {
+        'images': ['.jpg', '.jpeg', '.png', '.gif', '.webp'],
+        'documents': ['.pdf', '.docx', '.txt', '.xlsx'],
+        'code': ['.py', '.js', '.html', '.css', '.ts'],
+        'videos': ['.mp4', '.avi', '.mkv'],
+        'others': [],
+    }
+    
+    stats = {cat: 0 for cat in categories}
+    
+    for file in source.iterdir():
+        if file.is_dir() or file.name.startswith('.'):
+            continue
+        
+        ext = file.suffix.lower()
+        category = 'others'
+        
+        for cat, exts in categories.items():
+            if ext in exts:
+                category = cat
+                break
+        
+        # Date-based subfolder (YYYY-MM)
+        mod_time = datetime.fromtimestamp(file.stat().st_mtime)
+        month_folder = mod_time.strftime('%Y-%m')
+        
+        target_dir = dest / category / month_folder
+        target_dir.mkdir(parents=True, exist_ok=True)
+        
+        target = target_dir / file.name
+        # Duplicate handle karo
+        counter = 1
+        while target.exists():
+            target = target_dir / f"{file.stem}_{counter}{file.suffix}"
+            counter += 1
+        
+        shutil.copy2(str(file), str(target))
+        stats[category] += 1
+        print(f"  Moved: {file.name} → {category}/{month_folder}/")
+    
+    print("\\\\n=== Organization Complete ===")
+    for cat, count in stats.items():
+        if count > 0:
+            print(f"  {cat}: {count} files")
+
+# Demo run
+print("File Organizer Demo")
+print("(Real use mein apna downloads folder path dena)")
+smart_file_organizer('.', 'demo_organized')`,
     task_en: { description: 'Build a duplicate file finder using MD5 hashing. Show: duplicates found, space wasted, offer to delete or move to "duplicates" folder.', hint: 'hashlib.md5(f.read()).hexdigest(). Store as {hash: [file_paths]}. More than 1 path = duplicate.' },
     quiz_en: [
       { q: 'What does Path.rglob("*.pdf") do?', options: ['Finds PDFs in current folder only', 'Finds PDFs recursively in all subfolders', 'Deletes PDF files', 'Counts PDF files'], correct: 1, explanation: 'rglob = recursive glob. Searches current directory AND all nested subdirectories.' },
@@ -1552,6 +3493,120 @@ print(region_perf)`,
   },
   'py-w11-s2': {
     title_en: 'Excel Automation — Reports with openpyxl',
+    content_en: `## Excel Automation — Create and Edit Excel Files with Python!
+
+### Install:
+\`\`\`bash
+pip install openpyxl pandas xlsxwriter
+\`\`\`
+
+### Create an Excel File:
+\`\`\`python
+import openpyxl
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
+
+wb = openpyxl.Workbook()
+ws = wb.active
+ws.title = "Student Report"
+
+# Write data
+ws['A1'] = "Student Report"
+ws['A2'] = "Name"
+ws['B2'] = "Score"
+ws['C2'] = "Grade"
+
+data = [
+    ("Rahul Kumar", 87, "A"),
+    ("Priya Patel", 95, "A+"),
+    ("Arjun Singh", 72, "B"),
+]
+
+for row, (name, score, grade) in enumerate(data, start=3):
+    ws[f'A{row}'] = name
+    ws[f'B{row}'] = score
+    ws[f'C{row}'] = grade
+
+# Style the header
+header_font = Font(bold=True, size=12, color="FFFFFF")
+header_fill = PatternFill("solid", fgColor="4472C4")
+
+for cell in ws['2:2']:
+    cell.font = header_font
+    cell.fill = header_fill
+    cell.alignment = Alignment(horizontal='center')
+
+# Column width
+ws.column_dimensions['A'].width = 20
+ws.column_dimensions['B'].width = 10
+
+wb.save("student_report.xlsx")
+print("✅ Excel file created!")
+\`\`\`
+
+### Read Excel with pandas:
+\`\`\`python
+import pandas as pd
+
+df = pd.read_excel('report.xlsx', sheet_name='Student Report')
+print(df.head())
+print(df.describe())
+df.to_excel('cleaned_report.xlsx', index=False)
+\`\`\``,
+    codeExample_en: `import openpyxl
+from openpyxl.styles import Font, PatternFill, Alignment, numbers
+from openpyxl.utils import get_column_letter
+from openpyxl.chart import BarChart, Reference
+import random
+
+def create_sales_report():
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Monthly Sales"
+
+    # Title
+    ws.merge_cells('A1:F1')
+    title_cell = ws['A1']
+    title_cell.value = "MONTHLY SALES REPORT — Q1 2024"
+    title_cell.font = Font(bold=True, size=14, color='FFFFFF')
+    title_cell.fill = PatternFill(fill_type='solid', fgColor='1F4E79')
+    title_cell.alignment = Alignment(horizontal='center', vertical='center')
+    ws.row_dimensions[1].height = 30
+
+    # Headers
+    headers = ['Product', 'Jan', 'Feb', 'Mar', 'Q1 Total', 'Growth %']
+    products = ['Laptop', 'Phone', 'Tablet', 'Earbuds', 'Watch', 'Camera']
+
+    for col, header in enumerate(headers, 1):
+        cell = ws.cell(row=2, column=col, value=header)
+        cell.font = Font(bold=True, color='FFFFFF')
+        cell.fill = PatternFill(fill_type='solid', fgColor='2E75B6')
+        cell.alignment = Alignment(horizontal='center')
+
+    # Data
+    for r, product in enumerate(products, 3):
+        jan = random.randint(50, 200)
+        feb = random.randint(50, 200)
+        mar = random.randint(50, 200)
+        total = jan + feb + mar
+        growth = round(((mar - jan) / jan) * 100, 1)
+
+        row_data = [product, jan, feb, mar, total, growth]
+        for col, val in enumerate(row_data, 1):
+            cell = ws.cell(row=r, column=col, value=val)
+            cell.alignment = Alignment(horizontal='center')
+            if r % 2 == 0:
+                cell.fill = PatternFill(fill_type='solid', fgColor='DEEAF1')
+
+    # Column widths
+    widths = [15, 10, 10, 10, 12, 12]
+    for i, width in enumerate(widths, 1):
+        ws.column_dimensions[get_column_letter(i)].width = width
+
+    wb.save('sales_report.xlsx')
+    print("Sales report created: sales_report.xlsx ✅")
+
+create_sales_report()`,
     task_en: { description: 'Build an attendance register: 30 students, 20 days. Calculate percentage per student, highlight <75% in red, add daily summary sheet, include a chart.', hint: 'cell.fill = PatternFill(fgColor="FF0000"). ws2 = wb.create_sheet("Summary"). percentage = present_count/20*100' },
     quiz_en: [
       { q: 'When should you use openpyxl vs pandas for Excel?', options: ['Always pandas', 'openpyxl for formatting/charts; pandas for data analysis', 'Always openpyxl', 'No difference'], correct: 1, explanation: 'Use openpyxl for rich formatting, charts, cell styles. Use pandas for analysis, then openpyxl for final formatting.' },
@@ -1561,6 +3616,119 @@ print(region_perf)`,
   },
   'py-w11-s3': {
     title_en: 'Email Automation — Sending Emails with Python',
+    content_en: `## Email Automation — Send Emails with Python!
+
+### smtplib — Built-in Email Library:
+\`\`\`python
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+
+def send_email(to_email, subject, body, from_email, password):
+    msg = MIMEMultipart()
+    msg['From']    = from_email
+    msg['To']      = to_email
+    msg['Subject'] = subject
+    msg.attach(MIMEText(body, 'html'))
+    
+    with smtplib.SMTP('smtp.gmail.com', 587) as smtp:
+        smtp.starttls()
+        smtp.login(from_email, password)
+        smtp.send_message(msg)
+    
+    print(f"✅ Email sent to {to_email}")
+\`\`\`
+
+### Gmail Setup:
+1. Enable 2-factor authentication on Gmail
+2. Generate an App Password (Google Account → Security → App Passwords)
+3. Use App Password instead of your actual password
+
+### HTML Email:
+\`\`\`python
+html_body = """
+<html>
+<body>
+  <h2 style="color: #4472C4;">Monthly Report</h2>
+  <p>Dear <strong>{name}</strong>,</p>
+  <p>Your score this month: <strong style="color: green;">{score}%</strong></p>
+  <table border="1" style="border-collapse: collapse;">
+    <tr><th>Subject</th><th>Score</th></tr>
+    {rows}
+  </table>
+</body>
+</html>
+"""
+\`\`\`
+
+### Bulk Email with Personalisation:
+\`\`\`python
+students = [
+    {"name": "Rahul", "email": "rahul@gmail.com", "score": 87},
+    {"name": "Priya", "email": "priya@gmail.com", "score": 95},
+]
+
+for student in students:
+    body = f"""
+    <h3>Hello {student['name']}!</h3>
+    <p>Your score: {student['score']}%</p>
+    """
+    send_email(
+        to_email=student['email'],
+        subject=f"Report — {student['name']}",
+        body=body,
+        from_email=YOUR_EMAIL,
+        password=APP_PASSWORD,
+    )
+    time.sleep(1)  # Avoid spam detection
+\`\`\``,
+    codeExample_en: `import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+import os
+
+# DEMO MODE: Actually send nahi karega — structure dikhayega
+def demo_email_automation():
+    
+    students = [
+        {'name': 'Rahul Kumar', 'email': 'rahul@example.com', 'math': 85, 'science': 90, 'english': 78},
+        {'name': 'Priya Sharma', 'email': 'priya@example.com', 'math': 92, 'science': 88, 'english': 95},
+        {'name': 'Arjun Singh', 'email': 'arjun@example.com', 'math': 65, 'science': 70, 'english': 60},
+    ]
+    
+    for student in students:
+        total = student['math'] + student['science'] + student['english']
+        pct = round(total / 300 * 100, 1)
+        grade = 'A+' if pct >= 90 else 'A' if pct >= 80 else 'B' if pct >= 70 else 'C' if pct >= 60 else 'F'
+        
+        html_body = f"""
+        <html><body style="font-family:Arial;max-width:500px;margin:auto;padding:20px">
+        <div style="background:#6366f1;color:white;padding:15px;border-radius:8px;text-align:center">
+            <h2>Exam Results 📊</h2>
+        </div>
+        <div style="padding:20px;border:1px solid #eee;border-radius:8px;margin-top:10px">
+            <p>Dear <strong>{student['name']}</strong>,</p>
+            <p>Aapke exam results ready hain:</p>
+            <table style="width:100%;border-collapse:collapse">
+                <tr style="background:#f0f0f0"><th style="padding:8px">Subject</th><th>Marks</th><th>Status</th></tr>
+                <tr><td style="padding:8px;border-top:1px solid #eee">Mathematics</td><td style="text-align:center">{student['math']}/100</td><td style="text-align:center">{'✅' if student['math']>=40 else '❌'}</td></tr>
+                <tr style="background:#f9f9f9"><td style="padding:8px">Science</td><td style="text-align:center">{student['science']}/100</td><td style="text-align:center">{'✅' if student['science']>=40 else '❌'}</td></tr>
+                <tr><td style="padding:8px;border-top:1px solid #eee">English</td><td style="text-align:center">{student['english']}/100</td><td style="text-align:center">{'✅' if student['english']>=40 else '❌'}</td></tr>
+            </table>
+            <div style="background:{'#dcfce7' if pct>=60 else '#fee2e2'};padding:10px;border-radius:6px;margin-top:15px;text-align:center">
+                <strong>Total: {total}/300 | {pct}% | Grade: {grade}</strong>
+            </div>
+        </div>
+        </body></html>
+        """
+        
+        print(f"\\\\n📧 Email for: {student['email']}")
+        print(f"   Subject: Exam Results — {grade} Grade")
+        print(f"   {pct}% | {'PASS ✅' if pct >= 40 else 'FAIL ❌'}")
+    
+    print("\\\\n(Real use ke liye smtplib se Gmail App Password se send karo)")
+
+demo_email_automation()`,
     task_en: { description: 'Build a birthday reminder: read CSV (name, email, birthday). Check today\'s birthdays and print personalized HTML emails with name, age, and a fun message.', hint: 'datetime.now().strftime("%m-%d") for today. age = current_year - birth_year. HTML template with f-strings.' },
     quiz_en: [
       { q: 'Why use an App Password for Gmail instead of your regular password?', options: ['App Password is more secure', 'Google blocks regular password for 2FA-enabled accounts in scripts', 'Faster authentication', 'Required for all emails'], correct: 1, explanation: 'With 2FA enabled, regular password does not work for third-party apps. App Password is a special 16-char password for one app.' },
@@ -1570,6 +3738,126 @@ print(region_perf)`,
   },
   'py-w11-s4': {
     title_en: 'Week 11 Project — Complete Automation Suite',
+    content_en: `## Week 11 Project — Office Automation Suite!
+
+Build a complete automation tool that handles real company/school tasks!
+
+### Project Features:
+\`\`\`
+Automation Suite
+├── 1. File Organiser
+│   ├── Organise Downloads folder by type + date
+│   └── Find and report duplicate files
+│
+├── 2. Report Generator
+│   ├── Read student data from CSV
+│   ├── Create Excel report with charts
+│   └── Send individual emails with grades
+│
+├── 3. Backup System
+│   ├── Compress folders into zip archives
+│   ├── Timestamp-based backup naming
+│   └── Keep only last N backups (auto-clean)
+│
+└── 4. File Monitor
+    ├── Watch a folder for new files
+    └── Auto-process on arrival
+\`\`\`
+
+### ZIP Backup System:
+\`\`\`python
+import shutil
+from datetime import datetime
+from pathlib import Path
+
+def create_backup(source_dir, backup_dir, keep_last=5):
+    source    = Path(source_dir)
+    backup    = Path(backup_dir)
+    backup.mkdir(exist_ok=True)
+    
+    timestamp   = datetime.now().strftime('%Y%m%d_%H%M%S')
+    backup_name = f"backup_{source.name}_{timestamp}"
+    
+    # Create zip
+    archive = shutil.make_archive(
+        backup / backup_name, 'zip', source
+    )
+    print(f"✅ Backup created: {archive}")
+    
+    # Keep only last N backups
+    backups = sorted(backup.glob('*.zip'))
+    for old in backups[:-keep_last]:
+        old.unlink()
+        print(f"🗑️  Removed old backup: {old.name}")
+\`\`\``,
+    codeExample_en: `import os, shutil, csv
+from pathlib import Path
+from datetime import datetime
+import openpyxl
+from openpyxl.styles import Font, PatternFill, Alignment
+
+class AutomationSuite:
+    def __init__(self, work_dir='.'):
+        self.work_dir = Path(work_dir)
+        self.log = []
+    
+    def _log(self, msg):
+        timestamp = datetime.now().strftime('%H:%M:%S')
+        entry = f"[{timestamp}] {msg}"
+        self.log.append(entry)
+        print(entry)
+    
+    def organize_files(self, folder):
+        folder = Path(folder)
+        categories = {
+            'Images': ['.jpg','.png','.gif','.webp'],
+            'Docs': ['.pdf','.docx','.txt','.xlsx'],
+            'Code': ['.py','.js','.html','.css'],
+            'Videos': ['.mp4','.avi','.mkv'],
+        }
+        moved = 0
+        for f in folder.iterdir():
+            if f.is_file():
+                for cat, exts in categories.items():
+                    if f.suffix.lower() in exts:
+                        dest = folder / cat
+                        dest.mkdir(exist_ok=True)
+                        shutil.move(str(f), str(dest / f.name))
+                        moved += 1
+                        break
+        self._log(f"Organized {moved} files in {folder}")
+    
+    def generate_excel_report(self, data, output_file):
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Report"
+        if not data: return
+        headers = list(data[0].keys())
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col, value=header)
+            cell.font = Font(bold=True, color='FFFFFF')
+            cell.fill = PatternFill(fill_type='solid', fgColor='6366F1')
+            cell.alignment = Alignment(horizontal='center')
+        for row, record in enumerate(data, 2):
+            for col, key in enumerate(headers, 1):
+                ws.cell(row=row, column=col, value=record[key])
+        wb.save(output_file)
+        self._log(f"Excel report saved: {output_file}")
+    
+    def print_summary(self):
+        print("\\\\n=== Automation Log ===")
+        for entry in self.log:
+            print(f"  {entry}")
+
+# Demo
+suite = AutomationSuite()
+sample_data = [
+    {'Name': 'Rahul', 'Score': 85, 'Grade': 'A'},
+    {'Name': 'Priya', 'Score': 92, 'Grade': 'A+'},
+    {'Name': 'Arjun', 'Score': 70, 'Grade': 'B'},
+]
+suite.generate_excel_report(sample_data, 'student_report.xlsx')
+suite.print_summary()`,
     task_en: { description: 'Build AutomationSuite class: organize_files(), generate_excel_report(), email_notifier(). Create main() that runs all three in sequence.', hint: 'CSV with csv.DictReader. HTML with f-strings. main() calls all three methods in order.' },
     quiz_en: [
       { q: 'What is the advantage of using a class for an automation suite?', options: ['Runs faster', 'Groups related methods and shared state, easy to extend', 'Uses less memory', 'No advantage'], correct: 1, explanation: 'A class bundles related automation methods with shared state (log, config). Easy to add new methods.' },
@@ -1579,6 +3867,96 @@ print(region_perf)`,
   },
   'py-w12-s1': {
     title_en: 'Course Recap — A Three-Month Journey',
+    content_en: `## Three Months of Learning — What You Achieved!
+
+Seriously — you learned all of this in 3 months. Be proud of yourself!
+
+### Month 1 — Foundation ✅
+\`\`\`
+Week 1: Variables, Input/Output, Basic Math
+Week 2: Conditions (if/elif), Loops (for/while), Lists
+Week 3: Strings, Dictionaries, File Handling
+Week 4: OOP, Classes, Modules, Error Handling
+\`\`\`
+
+### Month 2 — Intermediate ✅
+\`\`\`
+Week 5:  Regular Expressions
+Week 6:  Web Scraping (requests + BeautifulSoup)
+Week 7:  APIs (REST, JSON, GET/POST)
+Week 8:  Data Analysis (Pandas, Matplotlib)
+\`\`\`
+
+### Month 3 — Advanced ✅
+\`\`\`
+Week 9:  Django Web Framework
+Week 10: Machine Learning (scikit-learn)
+Week 11: Automation (os, shutil, Excel, Email)
+Week 12: Final Capstone Project
+\`\`\`
+
+### Skills You Have Now:
+\`\`\`python
+skills = {
+    "Languages":     ["Python 3.10+"],
+    "Web":           ["Django", "requests", "BeautifulSoup"],
+    "Data":          ["Pandas", "NumPy", "Matplotlib"],
+    "ML":            ["scikit-learn", "joblib"],
+    "Automation":    ["os", "shutil", "openpyxl", "smtplib"],
+    "Concepts":      ["OOP", "APIs", "Regex", "SQL (Django ORM)"],
+    "Tools":         ["pip", "venv", "Git basics"],
+}
+\`\`\`
+
+### What You Can Build Now:
+1. ✅ Web scraper for any website
+2. ✅ REST API client (connect to any service)
+3. ✅ Data analysis dashboard
+4. ✅ Django website with database
+5. ✅ ML model that makes predictions
+6. ✅ Office automation tools
+7. ✅ Bulk email sender`,
+    codeExample_en: `# A quick review — all the most important concepts in one place
+
+# ─ OOP ─
+class PythonStudent:
+    def __init__(self, naam, months_studied):
+        self.name = naam
+        self.months = months_studied
+        self.skills = []
+    
+    def add_skill(self, skill):
+        self.skills.append(skill)
+        return self
+    
+    def show_profile(self):
+        print(f"\\\\n{'='*40}")
+        print(f"  👤 {self.name}")
+        print(f"  📅 {self.months} months of Python")
+        print(f"  🛠️  Skills ({len(self.skills)}):")
+        for s in self.skills:
+            print(f"     ✓ {s}")
+        print(f"{'='*40}")
+
+# ─ Method chaining ─
+student = PythonStudent("Aap", 3)
+for skill in ["OOP", "Web Scraping", "APIs", "Pandas", "Django", "ML", "Automation"]:
+    student.add_skill(skill)
+
+student.show_profile()
+
+# ─ Lambda + sorted ─
+skills_by_length = sorted(student.skills, key=lambda x: len(x))
+print("\\\\nSkills by name length:", skills_by_length)
+
+# ─ List comprehension ─
+advanced_skills = [s for s in student.skills if len(s) > 4]
+print("Advanced skills:", advanced_skills)
+
+# ─ Dictionary comprehension ─
+skill_levels = {skill: "Intermediate" for skill in student.skills}
+skill_levels["OOP"] = "Advanced"
+print("\\\\nSkill Levels:", skill_levels)`,
     task_en: { description: 'Create a Python recap script: dictionary of all concepts by week, count per month, generate a "Python Journey Report" as a text file.', hint: 'concepts = {"Week 1": ["variables", "loops"], ...}. Count with len(). Write to "report.txt".' },
     quiz_en: [
       { q: 'Which was NOT covered in Month 2?', options: ['Regular Expressions', 'Web Scraping', 'Django Web Framework', 'Pandas & Matplotlib'], correct: 2, explanation: 'Django is Month 3 (Week 9). Month 2: Regex, Web Scraping, APIs, Pandas.' },
@@ -1588,6 +3966,109 @@ print(region_perf)`,
   },
   'py-w12-s2': {
     title_en: 'Capstone Project — Student Management System 2.0',
+    content_en: `## Capstone Project — Put It All Together!
+
+In Month 1 you built a simple Student Management System. Now make it 10× more powerful using all the skills!
+
+### Project: EduTrack Pro
+
+**Features (each feature uses one month's skills):**
+
+\`\`\`
+EduTrack Pro
+├── 🗄️  Database (Month 1 — File Handling)
+│   ├── JSON-based persistent storage
+│   └── CRUD operations for students
+│
+├── 📊 Analytics (Month 2 — Pandas + Matplotlib)
+│   ├── Grade distribution chart
+│   ├── Subject-wise performance
+│   └── Monthly progress tracking
+│
+├── 🌐 Web API (Month 3 — Django)
+│   ├── REST API: GET /students, POST /add, etc.
+│   └── Web dashboard
+│
+├── 🤖 ML Predictor (Month 3 — scikit-learn)
+│   ├── Predict final grade from current performance
+│   └── At-risk student alert system
+│
+└── 📧 Reports (Month 3 — Automation)
+    ├── Auto-generate Excel report
+    └── Email progress reports to parents
+\`\`\`
+
+### Week 12 Goal:
+Build this complete system in stages:
+1. Core CRUD operations (Day 1-2)
+2. Analytics dashboard (Day 3-4)
+3. Django web interface (Day 5-6)
+4. ML grade predictor (Day 7-8)
+5. Auto-report generation (Day 9-10)`,
+    codeExample_en: `import json
+import pandas as pd
+import matplotlib.pyplot as plt
+from datetime import datetime
+import os
+
+class EduTrackPro:
+    def __init__(self, data_file='edutrack_data.json'):
+        self.data_file = data_file
+        self.students = self._load_data()
+    
+    def _load_data(self):
+        try:
+            with open(self.data_file) as f:
+                return json.load(f)
+        except FileNotFoundError:
+            return {}
+    
+    def _save_data(self):
+        with open(self.data_file, 'w') as f:
+            json.dump(self.students, f, indent=2)
+    
+    def add_student(self, sid, naam, class_name, email):
+        self.students[sid] = {
+            'name': naam, 'class': class_name,
+            'email': email, 'marks': {}, 'attendance': {}
+        }
+        self._save_data()
+        print(f"Student {naam} added ✅")
+    
+    def add_marks(self, sid, exam, subject, marks):
+        if sid not in self.students:
+            print("Student not found!"); return
+        if exam not in self.students[sid]['marks']:
+            self.students[sid]['marks'][exam] = {}
+        self.students[sid]['marks'][exam][subject] = marks
+        self._save_data()
+    
+    def get_report_card(self, sid):
+        if sid not in self.students:
+            return None
+        s = self.students[sid]
+        print(f"\\\\n{'='*50}")
+        print(f"  REPORT CARD — {s['naam']} ({s['class']})")
+        print(f"{'='*50}")
+        for exam, subjects in s['marks'].items():
+            print(f"\\\\n{exam}:")
+            total = 0
+            for sub, mark in subjects.items():
+                print(f"  {sub:<12} {mark:>3}/100  {'█'*int(mark/10)}")
+                total += mark
+            avg = total / len(subjects) if subjects else 0
+            print(f"  Average: {avg:.1f}%")
+        print(f"{'='*50}")
+
+# Demo
+tracker = EduTrackPro()
+tracker.add_student("STU001", "Rahul Kumar", "10A", "parent@gmail.com")
+tracker.add_marks("STU001", "Unit Test 1", "Math", 85)
+tracker.add_marks("STU001", "Unit Test 1", "Science", 92)
+tracker.add_marks("STU001", "Unit Test 1", "English", 78)
+tracker.add_marks("STU001", "Mid Term", "Math", 88)
+tracker.add_marks("STU001", "Mid Term", "Science", 85)
+tracker.get_report_card("STU001")`,
     task_en: { description: 'Build EduTrack Pro: JSON database, pandas analytics (3 charts), ML grade predictor, Excel report. Test end-to-end with 5 students.', hint: 'pandas DataFrame from students. plt.subplots(1,3). at_risk = [s for s in students if avg < 60].' },
     quiz_en: [
       { q: 'For a small project, what is the advantage of JSON over a full database?', options: ['JSON is faster', 'No setup needed — works directly with files', 'More secure', 'Handles more data'], correct: 1, explanation: 'JSON file requires no installation, no server, no schema. Perfect for small projects and learning.' },
@@ -1597,6 +4078,137 @@ print(region_perf)`,
   },
   'py-w12-s3': {
     title_en: 'Capstone Part 2 — Adding ML + Automation',
+    content_en: `## Capstone Part 2 — Adding ML + Automation!
+
+### Add an ML Grade Predictor to EduTrack:
+
+\`\`\`python
+import numpy as np
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
+import joblib
+
+class GradePredictor:
+    def __init__(self):
+        self.model   = None
+        self.classes = ['F', 'C', 'B', 'A', 'A+']
+    
+    def train(self, student_data):
+        """Train on historical data"""
+        # Features: attendance, assignment_avg, midterm
+        X = [[s['attendance'], s['assignments'], s['midterm']]
+             for s in student_data]
+        y = [s['final_grade'] for s in student_data]
+        
+        self.model = RandomForestClassifier(n_estimators=100)
+        self.model.fit(X, y)
+        joblib.dump(self.model, 'grade_model.pkl')
+        print("✅ Model trained and saved!")
+    
+    def predict(self, attendance, assignments, midterm):
+        """Predict final grade for a student"""
+        if not self.model:
+            self.model = joblib.load('grade_model.pkl')
+        
+        features   = [[attendance, assignments, midterm]]
+        prediction = self.model.predict(features)[0]
+        proba      = self.model.predict_proba(features)[0]
+        confidence = max(proba) * 100
+        
+        return prediction, confidence
+\`\`\`
+
+### Auto-Report Generation:
+\`\`\`python
+import openpyxl
+import smtplib
+from datetime import datetime
+
+def generate_and_email_report(student, email_config):
+    """Create Excel report and email it"""
+    
+    # 1. Generate Excel
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = f"Report — {student['name']}"
+    
+    ws['A1'] = f"Progress Report: {student['name']}"
+    ws['A2'] = f"Generated: {datetime.now().strftime('%d %b %Y')}"
+    # ... add data, charts, formatting
+    
+    filename = f"report_{student['name'].replace(' ', '_')}.xlsx"
+    wb.save(filename)
+    
+    # 2. Email it
+    # ... attach and send
+    print(f"📧 Report emailed to {student['email']}")
+\`\`\``,
+    codeExample_en: `import numpy as np
+import pandas as pd
+from sklearn.ensemble import RandomForestClassifier
+import joblib
+import json
+
+# Grade predictor with synthetic training data
+class SmartGradePredictor:
+    
+    def generate_training_data(self, n=300):
+        """Training data generate karo"""
+        np.random.seed(42)
+        
+        avg_marks = np.random.uniform(30, 100, n)
+        attendance = np.random.uniform(50, 100, n)
+        study_hours = np.random.uniform(1, 8, n)
+        
+        # Grade logic
+        score = avg_marks * 0.6 + attendance * 0.2 + study_hours * 3
+        grades = []
+        for s in score:
+            if s > 80: grades.append('A+')
+            elif s > 70: grades.append('A')
+            elif s > 60: grades.append('B')
+            elif s > 50: grades.append('C')
+            else: grades.append('F')
+        
+        return pd.DataFrame({
+            'avg_marks': avg_marks,
+            'attendance_pct': attendance,
+            'study_hours': study_hours,
+        }), grades
+    
+    def train(self):
+        X, y = self.generate_training_data()
+        self.model = RandomForestClassifier(n_estimators=100, random_state=42)
+        self.model.fit(X, y)
+        joblib.dump(self.model, 'grade_model.pkl')
+        print("Model trained aur saved ✅")
+    
+    def predict_student(self, avg, attendance, study_hours):
+        try:
+            model = joblib.load('grade_model.pkl')
+        except:
+            self.train()
+            model = joblib.load('grade_model.pkl')
+        
+        features = pd.DataFrame([[avg, attendance, study_hours]],
+                                  columns=['avg_marks', 'attendance_pct', 'study_hours'])
+        grade = model.predict(features)[0]
+        probs = model.predict_proba(features)[0]
+        classes = model.classes_
+        
+        print(f"\\\\nGrade Prediction:")
+        print(f"  Predicted Grade: {grade}")
+        for cls, prob in sorted(zip(classes, probs), key=lambda x: -x[1])[:3]:
+            print(f"  {cls}: {prob*100:.1f}%")
+        
+        return grade
+
+predictor = SmartGradePredictor()
+predictor.train()
+print("\\\\nStudent 1 (High performer):")
+predictor.predict_student(avg=88, attendance=95, study_hours=6)
+print("\\\\nStudent 2 (Struggling):")
+predictor.predict_student(avg=45, attendance=60, study_hours=2)`,
     task_en: { description: 'Complete EduTrack Pro: SmartGradePredictor class, generate_excel_report(), send_alert_email() for at-risk students. Test the full pipeline.', hint: 'Save model with joblib. Keep features consistent between training and prediction. Same scaler for transform.' },
     quiz_en: [
       { q: 'What does joblib.load() allow you to do?', options: ['Load a Python module', 'Use a previously trained model without retraining', 'Load a database', 'Import a CSV file'], correct: 1, explanation: 'joblib.load() deserializes a saved model — you get the exact trained model back without any retraining.' },
@@ -1606,6 +4218,113 @@ print(region_perf)`,
   },
   'py-w12-s4': {
     title_en: 'Course Complete! Certificate and Next Steps',
+    content_en: `## 🎉 CONGRATULATIONS! Python Course Complete!
+
+You did it! 3 months, 12 weeks, 48 sections — from Python NOOB to PRO!
+
+### Final Checklist — Make Sure All Projects Are Complete:
+\`\`\`
+Month 1 Projects:
+  ✅ Student Management System (Week 4)
+
+Month 2 Projects:
+  ✅ Form Validator (Regex) (Week 5)
+  ✅ Price Tracker (Web Scraping) (Week 6)
+  ✅ News Aggregator (APIs) (Week 7)
+  ✅ Sales Analytics Dashboard (Week 8)
+
+Month 3 Projects:
+  ✅ Django Blog (Week 9)
+  ✅ ML Pipeline (Week 10)
+  ✅ Automation Suite (Week 11)
+  ✅ EduTrack Pro — Capstone (Week 12)
+\`\`\`
+
+### What is Next? Your Roadmap:
+
+**Path 1 — Web Development:**
+\`\`\`
+Django REST Framework → React Frontend → Docker → AWS/GCP
+\`\`\`
+
+**Path 2 — Data Science / AI:**
+\`\`\`
+NumPy advanced → TensorFlow/PyTorch → Deep Learning → LLMs
+\`\`\`
+
+**Path 3 — Automation / DevOps:**
+\`\`\`
+Advanced scripting → Ansible/Terraform → CI/CD → Cloud automation
+\`\`\`
+
+### Keep Practising:
+- **LeetCode** — Python algorithm challenges (start Easy)
+- **Kaggle** — Real datasets for ML practice
+- **GitHub** — Upload all your projects
+- **FastAPI** — Modern Python web API framework
+- **Discord/Communities** — Python India, r/learnpython
+
+### You are now a Python Developer! 🐍🚀
+Keep building. Keep learning. The journey has just begun!`,
+    codeExample_en: `# Final Python celebration script!
+
+import random
+from datetime import datetime
+
+def celebrate_completion():
+    achievements = [
+        "12 weeks of consistent learning",
+        "48+ coding sections completed",
+        "8 real projects built",
+        "Regex, Web Scraping, APIs mastered",
+        "Pandas & Data Visualization learned",
+        "Django web app created",
+        "ML model trained and deployed",
+        "Automation scripts written",
+    ]
+
+    quotes = [
+        "Code is like humor. When you have to explain it, it's bad. — Cory House",
+        "First, solve the problem. Then, write the code. — John Johnson",
+        "Experience is the name everyone gives to their mistakes. — Oscar Wilde",
+        "The best way to predict the future is to implement it. — David Heinemeier Hansson",
+    ]
+
+    print("\\\\n" + "🎉 " * 20)
+    print("\\\\n  ██████╗  ██████╗ ███╗  ██╗███████╗ ██╗")
+    print("  ██╔══██╗██╔═══██╗████╗ ██║██╔════╝ ██║")
+    print("  ██║  ██║██║   ██║██╔██╗██║█████╗   ██║")
+    print("  ██║  ██║██║   ██║██║╚████║██╔══╝   ╚═╝")
+    print("  ██████╔╝╚██████╔╝██║ ╚███║███████╗ ██╗")
+    print("  ╚═════╝  ╚═════╝ ╚═╝  ╚══╝╚══════╝ ╚═╝")
+    print()
+    print(f"  Python Programming — COURSE COMPLETE!")
+    print(f"  {datetime.now().strftime('%d %B %Y')}")
+    print("\\\\n" + "🏆 " * 20)
+    
+    print("\\\\n📋 Your Achievements:")
+    for i, achievement in enumerate(achievements, 1):
+        print(f"  {i}. ✅ {achievement}")
+    
+    print("\\\\n💡 Inspiration:")
+    print(f'  "{random.choice(quotes)}"')
+    
+    print("\\\\n🚀 Next Steps:")
+    next_steps = [
+        "GitHub pe ek project upload karo aaj",
+        "LinkedIn pe Python certificate add karo",
+        "Ek real problem solve karo Python se",
+        "Kaggle pe pehla competition join karo",
+        "Django REST API banao portfolio ke liye",
+    ]
+    for step in next_steps:
+        print(f"  → {step}")
+    
+    print("\\\\n" + "⭐ " * 20)
+    print("\\\\n  You did it! Ab duniya dekhegi! 💪")
+    print("\\\\n" + "⭐ " * 20)
+
+celebrate_completion()`,
     task_en: { description: 'FINAL TASK: Complete EduTrack Pro with all features. Create requirements.txt and README.md. Run the celebration script. YOU DID IT!', hint: 'pip freeze > requirements.txt in terminal. README: Project name, Features, Install instructions, How to run.' },
     quiz_en: [
       { q: 'What is requirements.txt used for?', options: ['Project description', 'List of all dependencies so others can recreate the environment', 'License file', 'Installation guide'], correct: 1, explanation: '"pip install -r requirements.txt" installs all listed packages — anyone can recreate your exact environment.' },
