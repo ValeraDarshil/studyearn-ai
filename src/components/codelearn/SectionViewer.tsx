@@ -342,8 +342,7 @@ export default function SectionViewer({
         // eslint-disable-next-line no-new-func
         const fn = new Function('console', userCode);
         fn(fakeConsole);
-        setOutput(logs.join('
-') || '(No output — use console.log() to print)');
+        setOutput(logs.join('\n') || '(No output — use console.log() to print)');
         setOutputIsError(false);
       } catch (err) {
         setOutput('Error: ' + err.message);
