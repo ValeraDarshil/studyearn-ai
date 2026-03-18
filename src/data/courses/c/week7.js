@@ -189,175 +189,175 @@ int unused = 5;  // no warning
 #pragma GCC diagnostic pop
 \`\`\``,
 
-      content_en: `## C Preprocessor — Compiler ka Gatekeeper!
+      content_en: `## C Preprocessor — Compiler's Gatekeeper!
 
-Compilation se **pehle** preprocessor run hota hai. Source code ko transform karta hai — then compiler ko deta hai.
+Compilation from **first** preprocessor run it is. Source code to transform it does — then compiler to deta hai.
 
 ### Compilation Pipeline
 
 \`\`\`
-  Source.c
-     │
-     ▼
-  Preprocessor     ← #include, #define, #ifdef process do
-     │  (produces expanded source)
-     ▼
-  Compiler         ← C → Assembly
-     │
-     ▼
-  Assembler         ← Assembly → Object code (.o)
-     │
-     ▼
-  Linker            ← .o files + libraries → Executable
-     │
-     ▼
-  Executable        ← Run do!
+ Source.c
+ │
+ ▼
+ Preprocessor ← #include, #define, #ifdef process do
+ │ (produces expanded source)
+ ▼
+ Compiler ← C → Assembly
+ │
+ ▼
+ Assembler ← Assembly → Object code (.o)
+ │
+ ▼
+ Linker ← .o files + libraries → Executable
+ │
+ ▼
+ Executable ← Run do!
 
-gcc -E file.c       ← only preprocessor run do (output dekho!)
-gcc -S file.c       ← assembly tak compile do
+gcc -E file.c ← only preprocessor run do (output dekho!)
+gcc -S file.c ← assembly until compile do
 \`\`\`
 
 ### #include — Header Files Import Do
 
 \`\`\`c
-#include <stdio.h>      // System header — angle brackets
-#include <stdlib.h>     // Search in standard include paths
+#include <stdio.h> // System header — angle brackets
+#include <stdlib.h> // Search in standard include paths
 #include <string.h>
 #include <math.h>
 
-#include "myheader.h"   // User header — double quotes
-#include "utils/helper.h"  // Relative path
+#include "myheader.h" // User header — double quotes
+#include "utils/helper.h" // Relative path
 
 // #include literally pastes file contents here!
-// stdio.h in printf ka prototype hai — compiler ko pata hota hai
+// stdio.h in printf's prototype is — compiler to pata it is
 \`\`\`
 
 ### Header Guard — Double Include Prevent Do
 
 \`\`\`c
 // ── myheader.h ──────────────────────────────────────────
-#ifndef MYHEADER_H    // agar MYHEADER_H define nahi hai
-#define MYHEADER_H    // toh define do
+#ifndef MYHEADER_H // if MYHEADER_H define not hai
+#define MYHEADER_H // then define do
 
 // ... header content ...
 typedef struct { int x, y; } Point;
 int add(int a, int b);
 #define PI 3.14159f
 
-#endif  // MYHEADER_H
+#endif // MYHEADER_H
 
 // Bina header guard ke:
 // main.c → #include "a.h" → #include "myheader.h"
-//        → #include "b.h" → #include "myheader.h"  ← DUPLICATE!
+// → #include "b.h" → #include "myheader.h" ← DUPLICATE!
 // With guard: second include silently skipped ✅
 
 // Modern alternative (GCC/Clang extension):
-#pragma once  // same effect, simpler syntax
+#pragma once // same effect, simpler syntax
 \`\`\`
 
 ### #define — Constants Define Do
 
 \`\`\`c
 // Symbolic constants — magic numbers avoid do!
-#define PI          3.14159265358979f
-#define MAX_SIZE    100
+#define PI 3.14159265358979f
+#define MAX_SIZE 100
 #define BUFFER_SIZE 4096
-#define APP_NAME    "StudyEarn C"
-#define VERSION     "1.0.0"
-#define NEWLINE     '\\n'
+#define APP_NAME "StudyEarn C"
+#define VERSION "1.0.0"
+#define NEWLINE '\\n'
 
 // Use do
 float area = PI * r * r;
 char name[] = APP_NAME;
 
 // ❌ Bad — magic numbers
-if (marks >= 60) printf("Pass\\n");   // 60 what it is?
+if (marks >= 60) printf("Pass\\n"); // 60 what it is?
 
 // ✅ Good — named constants
-#define PASS_MARKS  60
+#define PASS_MARKS 60
 #define MERIT_MARKS 75
 if (marks >= PASS_MARKS) printf("Pass\\n");
 
 // Undefine
 #undef MAX_SIZE
-#define MAX_SIZE 200  // redefine
+#define MAX_SIZE 200 // redefine
 
 // Predefined macros
-printf("%s\\n", __FILE__);    // current filename
-printf("%d\\n", __LINE__);    // current line number
-printf("%s\\n", __DATE__);    // compile date "Jan 15 2024"
-printf("%s\\n", __TIME__);    // compile time "10:30:00"
-printf("%s\\n", __func__);    // current function name (C99)
+printf("%s\\n", __FILE__); // current filename
+printf("%d\\n", __LINE__); // current line number
+printf("%s\\n", __DATE__); // compile date "Jan 15 2024"
+printf("%s\\n", __TIME__); // compile time "10:30:00"
+printf("%s\\n", __func__); // current function name (C99)
 \`\`\`
 
 ### Conditional Compilation — Platform-Specific Code
 
 \`\`\`c
 // ── Feature flags ──
-#define DEBUG       1   // debugging on
-#define ENABLE_LOG  1
+#define DEBUG 1 // debugging on
+#define ENABLE_LOG 1
 
 #if DEBUG
-    #define DBG(fmt, ...) fprintf(stderr, "[DBG %s:%d] " fmt "\\n", __func__, __LINE__, ##__VA_ARGS__)
+ #define DBG(fmt, ...) fprintf(stderr, "[DBG %s:%d] " fmt "\\n", __func__, __LINE__, ##__VA_ARGS__)
 #else
-    #define DBG(fmt, ...) // nothing — zero overhead in release!
+ #define DBG(fmt, ...) // nothing — zero overhead in release!
 #endif
 
-DBG("Value is: %d", x);  // prints in debug, gone in release
+DBG("Value is: %d", x); // prints in debug, gone in release
 
 // ── Platform detection ──
 #ifdef _WIN32
-    #define CLEAR_SCREEN "cls"
-    #define PATH_SEP '\\\\'
+ #define CLEAR_SCREEN "cls"
+ #define PATH_SEP '\\\\'
 #elif defined(__linux__)
-    #define CLEAR_SCREEN "clear"
-    #define PATH_SEP '/'
+ #define CLEAR_SCREEN "clear"
+ #define PATH_SEP '/'
 #elif defined(__APPLE__)
-    #define CLEAR_SCREEN "clear"
-    #define PATH_SEP '/'
+ #define CLEAR_SCREEN "clear"
+ #define PATH_SEP '/'
 #else
-    #define CLEAR_SCREEN ""
-    #define PATH_SEP '/'
+ #define CLEAR_SCREEN ""
+ #define PATH_SEP '/'
 #endif
 
 system(CLEAR_SCREEN);
 
 // ── ifdef / ifndef / elif / endif ──
-#ifndef NDEBUG          // agar NDEBUG defined nahi
-    // debug code here
+#ifndef NDEBUG // if NDEBUG defined nahi
+ // debug code here
 #endif
 
 #if defined(WINDOWS) && !defined(UNICODE)
-    // Windows ANSI mode
+ // Windows ANSI mode
 #endif
 
 // ── #error — compile-time error ──
 #if BUFFER_SIZE < 64
-    #error "BUFFER_SIZE must be at least 64!"
+ #error "BUFFER_SIZE must be at least 64!"
 #endif
 
 // ── #warning — compile-time warning ──
 #if defined(DEPRECATED_API)
-    #warning "This API is deprecated, use new_api() instead"
+ #warning "This API is deprecated, use new_api() instead"
 #endif
 \`\`\`
 
 ### #pragma — Compiler Directives
 
 \`\`\`c
-#pragma once            // header guard (GCC/MSVC/Clang)
+#pragma once // header guard (GCC/MSVC/Clang)
 
-#pragma pack(1)         // no struct padding
-typedef struct { char a; int b; } Packed;  // 5 bytes, not 8
-#pragma pack()          // restore default
+#pragma pack(1) // no struct padding
+typedef struct { char a; int b; } Packed; // 5 bytes, not 8
+#pragma pack() // restore default
 
-#pragma GCC optimize("O3")          // max optimization
-#pragma GCC target("avx2")          // use AVX2 instructions
+#pragma GCC optimize("O3") // max optimization
+#pragma GCC target("avx2") // use AVX2 instructions
 
 // Suppress warnings
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-variable"
-int unused = 5;  // no warning
+int unused = 5; // no warning
 #pragma GCC diagnostic pop
 \`\`\``,
 
@@ -769,55 +769,55 @@ printf("%d\\n",   abs_val(-42));     // 42   (calls abs)
 
 \`\`\`c
 // ── do-while(0) trick — multi-statement macros ──
-// ❌ Bad — agar if ke saath use do toh broken!
+// ❌ Bad — if if with use do then broken!
 #define INIT_BAD(x) x.a=0; x.b=0; x.c=0;
-if (flag) INIT_BAD(obj);  // only obj.a=0 if ke andar!
+if (flag) INIT_BAD(obj); // only obj.a=0 if's andar!
 
 // ✅ Good — do-while(0) wraps multiple statements safely
 #define INIT(x) do { x.a=0; x.b=0; x.c=0; } while(0)
-if (flag) INIT(obj);  // perfect!
+if (flag) INIT(obj); // perfect!
 
 // ── Stringify and Token Pasting ──
-#define STR(x)       #x        // x ko string literal build
-#define XSTR(x)      STR(x)    // macro expand karke stringify
-#define CONCAT(a,b)  a##b      // two tokens join do
-#define FIELD(s,f)   s.f       // generic field access
+#define STR(x) #x // x to string literal build
+#define XSTR(x) STR(x) // macro expand karke stringify
+#define CONCAT(a,b) a##b // two tokens join do
+#define FIELD(s,f) s.f // generic field access
 
 // Examples
-printf(STR(Hello World));     // "Hello World"
-printf(XSTR(MAX_SIZE));       // "100" (expands MAX_SIZE first)
+printf(STR(Hello World)); // "Hello World"
+printf(XSTR(MAX_SIZE)); // "100" (expands MAX_SIZE first)
 
-int CONCAT(my, Var) = 42;     // myVar = 42
-int CONCAT(arr_, 5)[10];      // arr_5[10]
+int CONCAT(my, Var) = 42; // myVar = 42
+int CONCAT(arr_, 5)[10]; // arr_5[10]
 
 // ── X-Macro pattern — DRY principle ──
 // Define data once, use in multiple places
 #define COLORS \\
-    X(RED,   0xFF0000) \\
-    X(GREEN, 0x00FF00) \\
-    X(BLUE,  0x0000FF) \\
-    X(WHITE, 0xFFFFFF)
+ X(RED, 0xFF0000) \\
+ X(GREEN, 0x00FF00) \\
+ X(BLUE, 0x0000FF) \\
+ X(WHITE, 0xFFFFFF)
 
 // Generate enum
 typedef enum {
-    #define X(name, val) COLOR_##name,
-    COLORS
-    #undef X
-    COLOR_COUNT
+ #define X(name, val) COLOR_##name,
+ COLORS
+ #undef X
+ COLOR_COUNT
 } Color;
 
 // Generate string array
 const char *colorNames[] = {
-    #define X(name, val) #name,
-    COLORS
-    #undef X
+ #define X(name, val) #name,
+ COLORS
+ #undef X
 };
 
 // Generate value array
 const int colorValues[] = {
-    #define X(name, val) val,
-    COLORS
-    #undef X
+ #define X(name, val) val,
+ COLORS
+ #undef X
 };
 
 // Usage
@@ -831,49 +831,49 @@ printf("%s = 0x%06X\\n", colorNames[COLOR_RED], colorValues[COLOR_RED]);
 #include <stdarg.h>
 
 // printf jaisi function build — variable arguments!
-// ... = zero or zyada extra arguments
+// ... = zero or more extra arguments
 
 // ── Basic variadic ──
 int mySum(int count, ...) {
-    va_list args;
-    va_start(args, count);  // initialize — count = last named param
+ va_list args;
+ va_start(args, count); // initialize — count = last named param
 
-    int sum = 0;
-    for (int i = 0; i < count; i++) {
-        sum += va_arg(args, int);  // next argument lo (type specify do)
-    }
+ int sum = 0;
+ for (int i = 0; i < count; i++) {
+ sum += va_arg(args, int); // next argument lo (type specify do)
+ }
 
-    va_end(args);   // cleanup — ZARURI!
-    return sum;
+ va_end(args); // cleanup — ZARURI!
+ return sum;
 }
 
 // Usage
-printf("Sum: %d\\n", mySum(3, 10, 20, 30));  // 60
-printf("Sum: %d\\n", mySum(5, 1,2,3,4,5));  // 15
+printf("Sum: %d\\n", mySum(3, 10, 20, 30)); // 60
+printf("Sum: %d\\n", mySum(5, 1,2,3,4,5)); // 15
 
 // ── Custom printf-like logger ──
 void myLog(const char *level, const char *fmt, ...) {
-    printf("[%s] ", level);
+ printf("[%s] ", level);
 
-    va_list args;
-    va_start(args, fmt);
-    vprintf(fmt, args);   // vprintf = printf with va_list
-    va_end(args);
+ va_list args;
+ va_start(args, fmt);
+ vprintf(fmt, args); // vprintf = printf with va_list
+ va_end(args);
 
-    printf("\\n");
+ printf("\\n");
 }
 
-myLog("INFO",  "Server started on port %d", 8080);
+myLog("INFO", "Server started on port %d", 8080);
 myLog("ERROR", "File %s not found (errno=%d)", "data.txt", errno);
 myLog("DEBUG", "Processing %d records from %s", 100, "db");
 \`\`\`
 
-### Inline Functions — Macro ka Better Alternative
+### Inline Functions — Macro's Better Alternative
 
 \`\`\`c
 // ❌ Macro problems — no type checking, side effects
 #define SQUARE(x) ((x)*(x))
-SQUARE(i++);  // i incremented twice!
+SQUARE(i++); // i incremented twice!
 
 // ✅ Inline function — type safe, no side effects, same speed!
 static inline int square(int x) { return x * x; }
@@ -884,7 +884,7 @@ static inline float squareF(float x) { return x * x; }
 
 // Always inline (GCC extension)
 static __attribute__((always_inline)) inline int fastAbs(int x) {
-    return x < 0 ? -x : x;
+ return x < 0 ? -x : x;
 }
 
 // Never inline (for profiling/debugging)
@@ -914,27 +914,27 @@ STATIC_ASSERT(sizeof(void*) >= 4, "Need at least 32-bit pointers");
 \`\`\`c
 // _Generic — compile-time type dispatch!
 #define type_name(x) _Generic((x), \\
-    int:    "int",           \\
-    float:  "float",         \\
-    double: "double",        \\
-    char:   "char",          \\
-    char*:  "string",        \\
-    default:"unknown"        \\
+ int: "int", \\
+ float: "float", \\
+ double: "double", \\
+ char: "char", \\
+ char*: "string", \\
+ default:"unknown" \\
 )
 
 #define abs_val(x) _Generic((x), \\
-    int:    abs,      \\
-    float:  fabsf,    \\
-    double: fabs      \\
+ int: abs, \\
+ float: fabsf, \\
+ double: fabs \\
 )(x)
 
 // Usage
-printf("%s\\n", type_name(42));      // "int"
-printf("%s\\n", type_name(3.14f));   // "float"
+printf("%s\\n", type_name(42)); // "int"
+printf("%s\\n", type_name(3.14f)); // "float"
 printf("%s\\n", type_name("hello")); // "string"
 
-printf("%.2f\\n", abs_val(-3.14f));  // 3.14 (calls fabsf)
-printf("%d\\n",   abs_val(-42));     // 42   (calls abs)
+printf("%.2f\\n", abs_val(-3.14f)); // 3.14 (calls fabsf)
+printf("%d\\n", abs_val(-42)); // 42 (calls abs)
 \`\`\``,
 
       codeExample: `#include <stdio.h>
@@ -1350,84 +1350,84 @@ playerState &= ~PLAYER_JUMPING;     // stop jumping
 
       content_en: `## Bitwise Operations — Low-Level Power!
 
-C in directly bits ke saath kaam kar sakte ho — hardware programming, networking, cryptography ke liye essential!
+C in directly bits with kaam you can do — hardware programming, networking, cryptography for essential!
 
 ### Number Systems — Revision
 
 \`\`\`
-Decimal:  Base 10 (0-9)     — 42   = 4×10 + 2×1
-Binary:   Base 2  (0,1)     — 0b101010 = 42
-Octal:    Base 8  (0-7)     — 052      = 42
-Hex:      Base 16 (0-F)     — 0x2A     = 42
+Decimal: Base 10 (0-9) — 42 = 4×10 + 2×1
+Binary: Base 2 (0,1) — 0b101010 = 42
+Octal: Base 8 (0-7) — 052 = 42
+Hex: Base 16 (0-F) — 0x2A = 42
 
-Binary:  42 = 32+8+2 = 0b00101010
-           Bit: 7654 3210
-                0010 1010
-                    ↑
-                bit 1 = 1 (value 2)
+Binary: 42 = 32+8+2 = 0b00101010
+ Bit: 7654 3210
+ 0010 1010
+ ↑
+ bit 1 = 1 (value 2)
 \`\`\`
 
 ### 6 Bitwise Operators
 
 \`\`\`c
-unsigned int a = 0b1010;  // 10
-unsigned int b = 0b1100;  // 12
+unsigned int a = 0b1010; // 10
+unsigned int b = 0b1100; // 12
 
-// ── AND (&) — dono bits 1 ho toh 1 ──
+// ── AND (&) — dono bits 1 ho then 1 ──
 // 1010
 // 1100
 // ────
-// 1000  = 8
-printf("a & b = %d\\n", a & b);  // 8
+// 1000 = 8
+printf("a & b = %d\\n", a & b); // 8
 
-// ── OR (|) — koi bhi ek bit 1 ho toh 1 ──
+// ── OR (|) — any also ek bit 1 ho then 1 ──
 // 1010
 // 1100
 // ────
-// 1110  = 14
-printf("a | b = %d\\n", a | b);  // 14
+// 1110 = 14
+printf("a | b = %d\\n", a | b); // 14
 
-// ── XOR (^) — different ho toh 1 ──
+// ── XOR (^) — different ho then 1 ──
 // 1010
 // 1100
 // ────
-// 0110  = 6
-printf("a ^ b = %d\\n", a ^ b);  // 6
+// 0110 = 6
+printf("a ^ b = %d\\n", a ^ b); // 6
 
-// ── NOT (~) — sab bits flip ──
+// ── NOT (~) — all bits flip ──
 // ~1010 = 0101...11110101 = -11 (signed) or large unsigned
-printf("~a = %d\\n", ~a);  // -11 (two's complement)
+printf("~a = %d\\n", ~a); // -11 (two's complement)
 
-// ── Left Shift (<<) — bits left move, zeros right se ──
+// ── Left Shift (<<) — bits left move, zeros right from ──
 // 0001010 << 1 = 0010100 = 20 (× 2 !)
-printf("a << 1 = %d\\n", a << 1);  // 20  (10 × 2)
-printf("a << 2 = %d\\n", a << 2);  // 40  (10 × 4)
-printf("1 << 4 = %d\\n", 1 << 4);  // 16  (2^4)
+printf("a << 1 = %d\\n", a << 1); // 20 (10 × 2)
+printf("a << 2 = %d\\n", a << 2); // 40 (10 × 4)
+printf("1 << 4 = %d\\n", 1 << 4); // 16 (2^4)
 
 // ── Right Shift (>>) — bits right move ──
 // 0001010 >> 1 = 0000101 = 5 (÷ 2 !)
-printf("a >> 1 = %d\\n", a >> 1);  // 5   (10 ÷ 2)
-printf("a >> 2 = %d\\n", a >> 2);  // 2   (10 ÷ 4, truncated)
+printf("a >> 1 = %d\\n", a >> 1); // 5 (10 ÷ 2)
+printf("a >> 2 = %d\\n", a >> 2); // 2 (10 ÷ 4, truncated)
 \`\`\`
 
 ### Bit Manipulation Tricks
 
 \`\`\`c
 // ── Bit set, clear, toggle, check ──
-int n = 0b10100;  // 20
+int n = 0b10100; // 20
 
 // Set bit k (make it 1)
 int k = 1;
-n |= (1 << k);     // n = 0b10110 = 22
+n |= (1 << k); // n = 0b10110 = 22
 
 // Clear bit k (make it 0)
-n &= ~(1 << k);    // n = 0b10100 = 20
+n &= ~(1 << k); // n = 0b10100 = 20
 
 // Toggle bit k (flip)
-n ^= (1 << k);     // n = 0b10110 = 22
+n ^= (1 << k); // n = 0b10110 = 22
 
 // Check bit k
-int isSet = (n >> k) & 1;   // 1 if set, 0 if clear
+int isSet = (n >> k) & 1; // 1 if set, 0 if clear
 // OR:
 int isSet2 = (n & (1 << k)) != 0;
 
@@ -1438,80 +1438,80 @@ int isPow2 = n > 0 && (n & (n-1)) == 0;
 
 // ── Count set bits (popcount) ──
 int countBits(int n) {
-    int count = 0;
-    while (n) { count += n & 1; n >>= 1; }
-    return count;
+ int count = 0;
+ while (n) { count += n & 1; n >>= 1; }
+ return count;
 }
 // OR: __builtin_popcount(n) — GCC built-in, single instruction!
 
 // ── Lowest set bit ──
-int lsb = n & (-n);  // isolate lowest 1-bit
+int lsb = n & (-n); // isolate lowest 1-bit
 // 12 = 1100, -12 = 0100 (two's complement), 1100 & 0100 = 0100 = 4
 
 // ── Swap without temp ──
 int x = 5, y = 10;
-x ^= y; y ^= x; x ^= y;  // x=10, y=5 (clever but unreadable!)
+x ^= y; y ^= x; x ^= y; // x=10, y=5 (clever but unreadable!)
 
 // ── Multiply/Divide by power of 2 ──
 int val = 5;
-int mul4  = val << 2;   // 5 * 4 = 20 (faster than *)
-int div8  = val >> 3;   // 5 / 8 = 0 (integer)
+int mul4 = val << 2; // 5 * 4 = 20 (faster than *)
+int div8 = val >> 3; // 5 / 8 = 0 (integer)
 // Note: arithmetic shift right for signed (compiler-dependent)
 
 // ── Get/Set nibble (4 bits) ──
-uint8_t byte = 0xAB;  // 1010 1011
-uint8_t hi   = (byte >> 4) & 0x0F;  // 0xA = 10 (high nibble)
-uint8_t lo   = byte & 0x0F;          // 0xB = 11 (low nibble)
+uint8_t byte = 0xAB; // 1010 1011
+uint8_t = (byte >> 4) & 0x0F; // 0xA = 10 (high nibble)
+uint8_t lo = byte & 0x0F; // 0xB = 11 (low nibble)
 \`\`\`
 
 ### Real-World Bitwise Applications
 
 \`\`\`c
 // ── 1. Permission System (Linux-style) ──
-#define PERM_READ    04  // 100 binary
-#define PERM_WRITE   02  // 010 binary
-#define PERM_EXECUTE 01  // 001 binary
+#define PERM_READ 04 // 100 binary
+#define PERM_WRITE 02 // 010 binary
+#define PERM_EXECUTE 01 // 001 binary
 
-int perms = PERM_READ | PERM_WRITE;  // 110 = 6 = rw-
-if (perms & PERM_READ)    printf("readable\\n");
+int perms = PERM_READ | PERM_WRITE; // 110 = 6 = rw-
+if (perms & PERM_READ) printf("readable\\n");
 if (!(perms & PERM_EXECUTE)) printf("not executable\\n");
 
 // ── 2. Color manipulation (RGB) ──
-uint32_t color = 0xFF6366F1;  // ARGB: alpha=FF, r=63, g=66, b=F1
+uint32_t color = 0xFF6366F1; // ARGB: alpha=FF, r=63, g=66, b=F1
 
-uint8_t alpha = (color >> 24) & 0xFF;  // 0xFF = 255
-uint8_t red   = (color >> 16) & 0xFF;  // 0x63 = 99
-uint8_t green = (color >>  8) & 0xFF;  // 0x66 = 102
-uint8_t blue  =  color        & 0xFF;  // 0xF1 = 241
+uint8_t alpha = (color >> 24) & 0xFF; // 0xFF = 255
+uint8_t red = (color >> 16) & 0xFF; // 0x63 = 99
+uint8_t green = (color >> 8) & 0xFF; // 0x66 = 102
+uint8_t blue = color & 0xFF; // 0xF1 = 241
 
 // Pack back
 uint32_t newColor = ((uint32_t)alpha << 24) |
-                    ((uint32_t)red   << 16) |
-                    ((uint32_t)green <<  8) |
-                    blue;
+ ((uint32_t)red << 16) |
+ ((uint32_t)green << 8) |
+ blue;
 
 // ── 3. IP Address parsing ──
-uint32_t ip = 0xC0A80101;  // 192.168.1.1
+uint32_t ip = 0xC0A80101; // 192.168.1.1
 
 printf("%d.%d.%d.%d\\n",
-    (ip >> 24) & 0xFF,  // 192
-    (ip >> 16) & 0xFF,  // 168
-    (ip >>  8) & 0xFF,  // 1
-     ip        & 0xFF   // 1
+ (ip >> 24) & 0xFF, // 192
+ (ip >> 16) & 0xFF, // 168
+ (ip >> 8) & 0xFF, // 1
+ ip & 0xFF // 1
 );
 
 // ── 4. State flags in a game ──
-#define PLAYER_ALIVE     (1 << 0)  // 0001
+#define PLAYER_ALIVE (1 << 0) // 0001
 #define PLAYER_INVINCIBLE (1 << 1) // 0010
-#define PLAYER_JUMPING   (1 << 2)  // 0100
-#define PLAYER_ATTACKING (1 << 3)  // 1000
+#define PLAYER_JUMPING (1 << 2) // 0100
+#define PLAYER_ATTACKING (1 << 3) // 1000
 
-int playerState = PLAYER_ALIVE | PLAYER_JUMPING;  // 0101 = 5
+int playerState = PLAYER_ALIVE | PLAYER_JUMPING; // 0101 = 5
 
-if (playerState & PLAYER_ALIVE)    printf("Player alive\\n");
-if (playerState & PLAYER_JUMPING)  printf("Player jumping\\n");
-playerState |=  PLAYER_INVINCIBLE;  // add invincible
-playerState &= ~PLAYER_JUMPING;     // stop jumping
+if (playerState & PLAYER_ALIVE) printf("Player alive\\n");
+if (playerState & PLAYER_JUMPING) printf("Player jumping\\n");
+playerState |= PLAYER_INVINCIBLE; // add invincible
+playerState &= ~PLAYER_JUMPING; // stop jumping
 \`\`\``,
 
       codeExample: `#include <stdio.h>
@@ -1861,7 +1861,7 @@ Skills gained:
 
       content_en: `## Week 7 Project — Sab Combine Do!
 
-Is hafte seekha:
+This week covered:
 - Preprocessor — #define, conditional compilation, header guards
 - Macros — advanced patterns, X-macros, variadic
 - Inline functions — type-safe macro alternatives
@@ -1889,17 +1889,17 @@ Ab ek **Complete Configuration & Permission System** build!
 // Each user has bitmask for each resource type
 
 // ── Build flags ──
-#define CONFIG_MAX_SECTIONS  16
-#define CONFIG_MAX_KEYS      64
-#define CONFIG_MAX_VAL_LEN  256
-#define CONFIG_MAX_KEY_LEN   64
+#define CONFIG_MAX_SECTIONS 16
+#define CONFIG_MAX_KEYS 64
+#define CONFIG_MAX_VAL_LEN 256
+#define CONFIG_MAX_KEY_LEN 64
 
 // Feature flags
-#define FEATURE_LOGGING     (1 << 0)  // 1
-#define FEATURE_CACHING     (1 << 1)  // 2
-#define FEATURE_COMPRESSION (1 << 2)  // 4
-#define FEATURE_ENCRYPTION  (1 << 3)  // 8
-#define FEATURE_ALL         0xFF
+#define FEATURE_LOGGING (1 << 0) // 1
+#define FEATURE_CACHING (1 << 1) // 2
+#define FEATURE_COMPRESSION (1 << 2) // 4
+#define FEATURE_ENCRYPTION (1 << 3) // 8
+#define FEATURE_ALL 0xFF
 \`\`\`
 
 ### Config Parser Using Macros
@@ -1907,19 +1907,19 @@ Ab ek **Complete Configuration & Permission System** build!
 \`\`\`c
 // Type-safe config value access
 #define CONFIG_GET_INT(cfg, sec, key, def) \\
-    config_get_int(cfg, sec, key, def)
+ config_get_int(cfg, sec, key, def)
 
 #define CONFIG_GET_STR(cfg, sec, key, def) \\
-    config_get_str(cfg, sec, key, def)
+ config_get_str(cfg, sec, key, def)
 
 #define CONFIG_GET_BOOL(cfg, sec, key, def) \\
-    config_get_bool(cfg, sec, key, def)
+ config_get_bool(cfg, sec, key, def)
 
 // Validation macro
 #define VALIDATE_PORT(p) \\
-    ((p) >= 1 && (p) <= 65535)
+ ((p) >= 1 && (p) <= 65535)
 #define VALIDATE_IP(s) \\
-    (strlen(s) >= 7 && strstr(s, ".") != NULL)
+ (strlen(s) >= 7 && strstr(s, ".") != NULL)
 \`\`\`
 
 ### Bitfield Struct — Efficient Storage
@@ -1927,33 +1927,33 @@ Ab ek **Complete Configuration & Permission System** build!
 \`\`\`c
 // Store 8 boolean flags in 1 byte (not 8 bytes!)
 typedef struct {
-    unsigned isAdmin     : 1;  // 1 bit
-    unsigned isActive    : 1;
-    unsigned isPremium   : 1;
-    unsigned canRead     : 1;
-    unsigned canWrite    : 1;
-    unsigned canDelete   : 1;
-    unsigned canExport   : 1;
-    unsigned canImport   : 1;
-} UserFlags;  // Total: 1 byte (not 8!)
+ unsigned isAdmin : 1; // 1 bit
+ unsigned isActive : 1;
+ unsigned isPremium : 1;
+ unsigned canRead : 1;
+ unsigned canWrite : 1;
+ unsigned canDelete : 1;
+ unsigned canExport : 1;
+ unsigned canImport : 1;
+} UserFlags; // Total: 1 byte (not 8!)
 
 // Usage
 UserFlags f = {0};
 f.isActive = 1;
-f.canRead  = 1;
+f.canRead = 1;
 f.canWrite = 1;
 
 if (f.canRead) { /* read allowed */ }
-printf("UserFlags size: %lu bytes\\n", sizeof(UserFlags));  // 1 byte!
+printf("UserFlags size: %lu bytes\\n", sizeof(UserFlags)); // 1 byte!
 
 // Packed struct with bitfields
 typedef struct {
-    uint32_t year   : 12;  // 0-4095
-    uint32_t month  : 4;   // 0-15
-    uint32_t day    : 5;   // 0-31
-    uint32_t hour   : 5;   // 0-31
-    uint32_t minute : 6;   // 0-63
-    // Total: 32 bits = 4 bytes (compressed date+time!)
+ uint32_t year : 12; // 0-4095
+ uint32_t month : 4; // 0-15
+ uint32_t day : 5; // 0-31
+ uint32_t hour : 5; // 0-31
+ uint32_t minute : 6; // 0-63
+ // Total: 32 bits = 4 bytes (compressed date+time!)
 } PackedDateTime;
 \`\`\`
 
@@ -1961,19 +1961,19 @@ typedef struct {
 
 \`\`\`
 Month 2 (Weeks 5-8) Summary:
-  ✅ Week 5: Structures, Unions, Enums, Linked Lists
-  ✅ Week 6: File I/O, Binary files, Error Handling
-  ✅ Week 7: Preprocessor, Macros, Bitwise Operations
-  📚 Week 8: Stack, Queue, Hash Table (next!)
+ ✅ Week 5: Structures, Unions, Enums, Linked Lists
+ ✅ Week 6: File I/O, Binary files, Error Handling
+ ✅ Week 7: Preprocessor, Macros, Bitwise Operations
+ 📚 Week 8: Stack, Queue, Hash Table (next!)
 
 Skills gained:
-  - Custom data types (struct, union, enum)
-  - Dynamic data structures (linked list)
-  - File persistence (text + binary)
-  - Error handling best practices
-  - Preprocessor meta-programming
-  - Low-level bit manipulation
-  - Bitfields for memory efficiency
+ - Custom data types (struct, union, enum)
+ - Dynamic data structures (linked list)
+ - File persistence (text + binary)
+ - Error handling best practices
+ - Preprocessor meta-programming
+ - Low-level bit manipulation
+ - Bitfields for memory efficiency
 \`\`\``,
 
       codeExample: `#include <stdio.h>

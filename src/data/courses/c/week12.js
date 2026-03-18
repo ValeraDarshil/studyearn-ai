@@ -133,120 +133,120 @@ Heap Sort          O(nlogn) O(nlogn) O(nlogn) O(1)
 Counting Sort      O(n+k)   O(n+k)   O(n+k)   O(k)
 \`\`\``,
 
-      content_en: `## 12 Weeks ka Safar — Kya Seekha?
+      content_en: `## 12 Weeks 's Journey — What Was Learned?
 
-Congratulations! 12 hafte in tumne C programming ki complete journey ki hai. Ab ek comprehensive review karte hain.
+Congratulations! You have completed the full 12-week C programming journey. Here is a comprehensive review of everything covered.
 
 ### Month 1 — C Foundation (Weeks 1-4)
 
 \`\`\`
 Week 1: C Basics
-  ✅ Variables, data types (int, float, double, char)
-  ✅ printf/scanf — I/O
-  ✅ Operators — arithmetic, relational, logical, bitwise
-  ✅ Compilation process
+ ✅ Variables, data types (int, float, double, char)
+ ✅ printf/scanf — I/O
+ ✅ Operators — arithmetic, relational, logical, bitwise
+ ✅ Compilation process
 
 Week 2: Control Flow
-  ✅ if/else/else if, ternary operator
-  ✅ switch statement, fall-through
-  ✅ for, while, do-while loops
-  ✅ break, continue
+ ✅ if/else/else if, ternary operator
+ ✅ switch statement, fall-through
+ ✅ for, while, do-while loops
+ ✅ break, continue
 
 Week 3: Functions, Arrays, Strings
-  ✅ Function prototypes, return values, scope
-  ✅ Pass by value vs pointer
-  ✅ Recursion — base case, memoization, Tower of Hanoi
-  ✅ Arrays — 1D/2D, sorting, searching
-  ✅ Strings — string.h functions, fgets, Caesar cipher
+ ✅ Function prototypes, return values, scope
+ ✅ Pass by value vs pointer
+ ✅ Recursion — base case, memoization, Tower of Hanoi
+ ✅ Arrays — 1D/2D, sorting, searching
+ ✅ Strings — string.h functions, fgets, Caesar cipher
 
 Week 4: Pointers & Memory
-  ✅ Pointer basics — &, *, pointer arithmetic
-  ✅ Pass by reference, double pointers
-  ✅ Dynamic memory — malloc, calloc, realloc, free
-  ✅ Memory errors — leak, dangling, overflow
-  ✅ Function pointers — callbacks, qsort
+ ✅ Pointer basics — &, *, pointer arithmetic
+ ✅ Pass by reference, double pointers
+ ✅ Dynamic memory — malloc, calloc, realloc, free
+ ✅ Memory errors — leak, dangling, overflow
+ ✅ Function pointers — callbacks, qsort
 \`\`\`
 
 ### Month 2 — Data Structures (Weeks 5-8)
 
 \`\`\`
 Week 5: Structures & Linked Lists
-  ✅ struct — typedef, nested, array of structs
-  ✅ union — tagged union, type punning
-  ✅ enum — named constants, bit flags
-  ✅ Linked Lists — singly, doubly, merge sort, Floyd's cycle
+ ✅ struct — typedef, nested, array of structs
+ ✅ union — tagged union, type punning
+ ✅ enum — named constants, bit flags
+ ✅ Linked Lists — singly, doubly, merge sort, Floyd's cycle
 
 Week 6: File I/O & Error Handling
-  ✅ Text files — fopen, fprintf, fgets, fseek
-  ✅ Binary files — fread, fwrite, random access
-  ✅ Custom file format with header + magic bytes
-  ✅ Error handling — errno, custom codes, goto cleanup
-  ✅ File-based database system
+ ✅ Text files — fopen, fprintf, fgets, fseek
+ ✅ Binary files — fread, fwrite, random access
+ ✅ Custom file format with header + magic bytes
+ ✅ Error handling — errno, custom codes, goto cleanup
+ ✅ File-based database system
 
 Week 7: Preprocessor & Bitwise
-  ✅ #define, #ifdef, conditional compilation
-  ✅ Function-like macros, do-while(0) trick
-  ✅ X-Macro pattern, variadic functions
-  ✅ Inline functions
-  ✅ Bitwise operations — AND/OR/XOR/shifts
-  ✅ Bit manipulation tricks, bitfields
+ ✅ #define, #ifdef, conditional compilation
+ ✅ Function-like macros, do-while(0) trick
+ ✅ X-Macro pattern, variadic functions
+ ✅ Inline functions
+ ✅ Bitwise operations — AND/OR/XOR/shifts
+ ✅ Bit manipulation tricks, bitfields
 
 Week 8: Stack, Queue, Hash Table
-  ✅ Stack — array + linked list, postfix eval, brackets
-  ✅ Queue — circular, priority queue (min-heap)
-  ✅ Hash table — chaining, open addressing
-  ✅ BFS with queue, word frequency counter
+ ✅ Stack — array + linked list, postfix eval, brackets
+ ✅ Queue — circular, priority queue (min-heap)
+ ✅ Hash table — chaining, open addressing
+ ✅ BFS with queue, word frequency counter
 \`\`\`
 
 ### Month 3 — Advanced Algorithms (Weeks 9-11)
 
 \`\`\`
 Week 9: Trees
-  ✅ Binary tree traversals — inorder, preorder, postorder, BFS
-  ✅ Tree properties — height, diameter, balance
-  ✅ BST — insert, search, delete (3 cases)
-  ✅ BST — floor/ceil, kth smallest, range queries
-  ✅ AVL tree — rotations, guaranteed O(log n)
+ ✅ Binary tree traversals — inorder, preorder, postorder, BFS
+ ✅ Tree properties — height, diameter, balance
+ ✅ BST — insert, search, delete (3 cases)
+ ✅ BST — floor/ceil, kth smallest, range queries
+ ✅ AVL tree — rotations, guaranteed O(log n)
 
 Week 10: Sorting Algorithms
-  ✅ O(n²): Bubble, Selection, Insertion, Shell
-  ✅ O(n logn): Merge Sort, Quick Sort (3-way, random pivot)
-  ✅ O(n): Heap Sort, Counting Sort, Radix Sort
-  ✅ When to use what — decision guide
-  ✅ stdlib qsort, bsearch
+ ✅ O(n²): Bubble, Selection, Insertion, Shell
+ ✅ O(n logn): Merge Sort, Quick Sort (3-way, random pivot)
+ ✅ O(n): Heap Sort, Counting Sort, Radix Sort
+ ✅ When to use what — decision guide
+ ✅ stdlib qsort, bsearch
 
 Week 11: Graphs
-  ✅ Adjacency matrix vs adjacency list
-  ✅ DFS, BFS — traversal, cycle detection, components
-  ✅ Dijkstra's shortest path (matrix + heap versions)
-  ✅ Topological sort (DFS + Kahn's BFS)
-  ✅ Prim's MST
-  ✅ Strongly connected components
+ ✅ Adjacency matrix vs adjacency list
+ ✅ DFS, BFS — traversal, cycle detection, components
+ ✅ Dijkstra's shortest path (matrix + heap versions)
+ ✅ Topological sort (DFS + Kahn's BFS)
+ ✅ Prim's MST
+ ✅ Strongly connected components
 \`\`\`
 
 ### Big-O Complexity Cheat Sheet
 
 \`\`\`
-Data Structure     Access   Search   Insert   Delete
+Data Structure Access Search Insert Delete
 ─────────────────────────────────────────────────────
-Array              O(1)     O(n)     O(n)     O(n)
-Linked List        O(n)     O(n)     O(1)     O(1)*
-Stack (array)      O(1)     O(n)     O(1)     O(1)
-Queue (linked)     O(1)     O(n)     O(1)     O(1)
-Hash Table         O(1)     O(1)*    O(1)*    O(1)*
-BST                O(logn)* O(logn)* O(logn)* O(logn)*
-AVL Tree           O(logn)  O(logn)  O(logn)  O(logn)
-Min-Heap           O(1)     O(n)     O(logn)  O(logn)
+Array O(1) O(n) O(n) O(n)
+Linked List O(n) O(n) O(1) O(1)*
+Stack (array) O(1) O(n) O(1) O(1)
+Queue (linked) O(1) O(n) O(1) O(1)
+Hash Table O(1) O(1)* O(1)* O(1)*
+BST O(logn)* O(logn)* O(logn)* O(logn)*
+AVL Tree O(logn) O(logn) O(logn) O(logn)
+Min-Heap O(1) O(n) O(logn) O(logn)
 ─────────────────────────────────────────────────────
 * = average case
 
-Sorting            Best     Average  Worst    Space
+Sorting Best Average Worst Space
 ─────────────────────────────────────────────────────
-Insertion Sort     O(n)     O(n²)    O(n²)    O(1)
-Merge Sort         O(nlogn) O(nlogn) O(nlogn) O(n)
-Quick Sort         O(nlogn) O(nlogn) O(n²)    O(logn)
-Heap Sort          O(nlogn) O(nlogn) O(nlogn) O(1)
-Counting Sort      O(n+k)   O(n+k)   O(n+k)   O(k)
+Insertion Sort O(n) O(n²) O(n²) O(1)
+Merge Sort O(nlogn) O(nlogn) O(nlogn) O(n)
+Quick Sort O(nlogn) O(nlogn) O(n²) O(logn)
+Heap Sort O(nlogn) O(nlogn) O(nlogn) O(1)
+Counting Sort O(n+k) O(n+k) O(n+k) O(k)
 \`\`\``,
 
       codeExample: `#include <stdio.h>
@@ -523,7 +523,7 @@ studyearn/
 
       content_en: `## Final Project — Sab Kuch Ek In!
 
-12 hafte in jo seekha — sab ek production-ready system in use do!
+In 12 weeks jo seekha — all ek production-ready system in use do!
 
 ### Project Specification
 
@@ -541,27 +541,27 @@ Features:
 8. Analytics Dashboard
 
 Architecture:
-  ┌─────────────────────────────────────────────┐
-  │           StudyEarn Student Portal           │
-  ├─────────────────────────────────────────────┤
-  │  Core Data Structures                        │
-  │  ┌────────────┐ ┌──────────┐ ┌───────────┐  │
-  │  │ Hash Table │ │  BST     │ │  Graph    │  │
-  │  │(fast lookup│ │(sorted   │ │(course    │  │
-  │  │ by roll)   │ │ listing) │ │ prereqs)  │  │
-  │  └────────────┘ └──────────┘ └───────────┘  │
-  ├─────────────────────────────────────────────┤
-  │  Algorithms                                  │
-  │  • Quick Sort — leaderboard by score         │
-  │  • Dijkstra  — shortest course path          │
-  │  • Topo Sort — prerequisite order            │
-  │  • BFS/DFS   — recommendation engine         │
-  ├─────────────────────────────────────────────┤
-  │  Persistence                                 │
-  │  • Binary files — student records            │
-  │  • CSV export  — reports                     │
-  │  • Log file    — audit trail                 │
-  └─────────────────────────────────────────────┘
+ ┌─────────────────────────────────────────────┐
+ │ StudyEarn Student Portal │
+ ├─────────────────────────────────────────────┤
+ │ Core Data Structures │
+ │ ┌────────────┐ ┌──────────┐ ┌───────────┐ │
+ │ │ Hash Table │ │ BST │ │ Graph │ │
+ │ │(fast lookup│ │(sorted │ │(course │ │
+ │ │ by roll) │ │ listing) │ │ prereqs) │ │
+ │ └────────────┘ └──────────┘ └───────────┘ │
+ ├─────────────────────────────────────────────┤
+ │ Algorithms │
+ │ • Quick Sort — leaderboard by score │
+ │ • Dijkstra — shortest course path │
+ │ • Topo Sort — prerequisite order │
+ │ • BFS/DFS — recommendation engine │
+ ├─────────────────────────────────────────────┤
+ │ Persistence │
+ │ • Binary files — student records │
+ │ • CSV export — reports │
+ │ • Log file — audit trail │
+ └─────────────────────────────────────────────┘
 \`\`\`
 
 ### Core Data Structures Used
@@ -569,16 +569,16 @@ Architecture:
 \`\`\`c
 // Student record
 typedef struct {
-    uint32_t rollNo;
-    char     name[60];
-    char     email[60];
-    float    marks[10];   // up to 10 courses
-    float    gpa;
-    char     grade;
-    uint8_t  enrolled[10]; // which courses enrolled
-    uint8_t  completed[10];
-    int      totalXP;
-    uint8_t  active;
+ uint32_t rollNo;
+ char name[60];
+ char email[60];
+ float marks[10]; // up to 10 courses
+ float gpa;
+ char grade;
+ uint8_t enrolled[10]; // which courses enrolled
+ uint8_t completed[10];
+ int totalXP;
+ uint8_t active;
 } Student;
 
 // BST for sorted student listing
@@ -589,17 +589,17 @@ typedef struct {
 
 // Menu system
 typedef enum {
-    MENU_REGISTER = 1,
-    MENU_LOGIN,
-    MENU_VIEW_PROFILE,
-    MENU_ENROLL,
-    MENU_UPDATE_MARKS,
-    MENU_LEADERBOARD,
-    MENU_SEARCH,
-    MENU_ANALYTICS,
-    MENU_EXPORT,
-    MENU_LOGOUT,
-    MENU_EXIT = 0,
+ MENU_REGISTER = 1,
+ MENU_LOGIN,
+ MENU_VIEW_PROFILE,
+ MENU_ENROLL,
+ MENU_UPDATE_MARKS,
+ MENU_LEADERBOARD,
+ MENU_SEARCH,
+ MENU_ANALYTICS,
+ MENU_EXPORT,
+ MENU_LOGOUT,
+ MENU_EXIT = 0,
 } MenuChoice;
 \`\`\`
 
@@ -607,20 +607,20 @@ typedef enum {
 
 \`\`\`
 studyearn/
-├── main.c          ← entry point, menu loop
-├── student.h       ← Student struct, prototypes
-├── student.c       ← CRUD operations
-├── database.h      ← DB layer (binary files)
-├── database.c      ← file operations
-├── bst.h           ← BST for sorted listing
-├── hashtable.h     ← O(1) lookup
-├── sort.h          ← sorting functions
-├── analytics.h     ← statistics, reporting
-├── Makefile        ← build system
+├── main.c ← entry point, menu loop
+├── student.h ← Student struct, prototypes
+├── student.c ← CRUD operations
+├── database.h ← DB layer (binary files)
+├── database.c ← file operations
+├── bst.h ← BST for sorted listing
+├── hashtable.h ← O(1) lookup
+├── sort.h ← sorting functions
+├── analytics.h ← statistics, reporting
+├── Makefile ← build system
 └── data/
-    ├── students.bin  ← binary student data
-    ├── students.idx  ← index file
-    └── audit.log     ← operation log
+ ├── students.bin ← binary student data
+ ├── students.idx ← index file
+ └── audit.log ← operation log
 \`\`\``,
 
       codeExample: `#include <stdio.h>
@@ -1124,10 +1124,10 @@ S s = {.b=20, .c=30};  // a defaults to 0
 
 // Thread function
 void* threadFunc(void *arg) {
-    int id = *(int*)arg;
-    printf("Thread %d running\\n", id);
-    // do work...
-    return NULL;
+ int id = *(int*)arg;
+ printf("Thread %d running\\n", id);
+ // do work...
+ return NULL;
 }
 
 // Create and join threads
@@ -1135,20 +1135,20 @@ pthread_t threads[4];
 int ids[4] = {1, 2, 3, 4};
 
 for (int i = 0; i < 4; i++)
-    pthread_create(&threads[i], NULL, threadFunc, &ids[i]);
+ pthread_create(&threads[i], NULL, threadFunc, &ids[i]);
 
 for (int i = 0; i < 4; i++)
-    pthread_join(threads[i], NULL);  // wait for all
+ pthread_join(threads[i], NULL); // wait for all
 
 // Mutex — protect shared data
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 int sharedCounter = 0;
 
 void* safeIncrement(void *arg) {
-    pthread_mutex_lock(&mutex);
-    sharedCounter++;  // critical section
-    pthread_mutex_unlock(&mutex);
-    return NULL;
+ pthread_mutex_lock(&mutex);
+ sharedCounter++; // critical section
+ pthread_mutex_unlock(&mutex);
+ return NULL;
 }
 // Compile: gcc -pthread program.c
 \`\`\`
@@ -1164,9 +1164,9 @@ void* safeIncrement(void *arg) {
 int server_fd = socket(AF_INET, SOCK_STREAM, 0);
 
 struct sockaddr_in addr = {
-    .sin_family      = AF_INET,
-    .sin_port        = htons(8080),
-    .sin_addr.s_addr = INADDR_ANY,
+ .sin_family = AF_INET,
+ .sin_port = htons(8080),
+ .sin_addr.s_addr = INADDR_ANY,
 };
 
 bind(server_fd, (struct sockaddr*)&addr, sizeof(addr));
@@ -1187,19 +1187,19 @@ close(server_fd);
 jmp_buf jumpBuffer;
 
 void riskyFunc() {
-    printf("About to fail...\\n");
-    longjmp(jumpBuffer, 1);  // jump back!
+ printf("About to fail...\\n");
+ longjmp(jumpBuffer, 1); // jump back!
 }
 
 int main() {
-    if (setjmp(jumpBuffer) == 0) {
-        printf("Trying risky function...\\n");
-        riskyFunc();
-        printf("This won't print\\n");
-    } else {
-        printf("Recovered from error!\\n");
-    }
-    return 0;
+ if (setjmp(jumpBuffer) == 0) {
+ printf("Trying risky function...\\n");
+ riskyFunc();
+ printf("This won't print\\n");
+ } else {
+ printf("Recovered from error!\\n");
+ }
+ return 0;
 }
 \`\`\`
 
@@ -1212,11 +1212,11 @@ volatile int hardwareRegister = 0;
 volatile int* const PORT = (volatile int*)0xFFFF0000;
 // Used in: embedded systems, signal handlers, hardware interfacing
 
-// restrict: pointer is the ONLY way to access this data
+// restrict: pointer is were ONLY way to access this data
 // Allows compiler to make aggressive optimizations
 void add(float *restrict a, float *restrict b, float *restrict c, int n) {
-    for (int i = 0; i < n; i++) c[i] = a[i] + b[i];
-    // Compiler knows a, b, c don't overlap → SIMD possible!
+ for (int i = 0; i < n; i++) c[i] = a[i] + b[i];
+ // Compiler knows a, b, c don't overlap → SIMD possible!
 }
 \`\`\`
 
@@ -1224,23 +1224,23 @@ void add(float *restrict a, float *restrict b, float *restrict c, int n) {
 
 \`\`\`c
 // Type-safe "generic" functions
-#define ABS(x) _Generic((x),    \\
-    int:    abs,                 \\
-    long:   labs,                \\
-    float:  fabsf,               \\
-    double: fabs                 \\
+#define ABS(x) _Generic((x), \\
+ int: abs, \\
+ long: labs, \\
+ float: fabsf, \\
+ double: fabs \\
 )(x)
 
-#define MAX(a,b) _Generic((a),  \\
-    int:    imax,                \\
-    float:  fmaxf,               \\
-    double: fmax                 \\
+#define MAX(a,b) _Generic((a), \\
+ int: imax, \\
+ float: fmaxf, \\
+ double: fmax \\
 )(a,b)
 
 // Usage — type-safe!
-ABS(-5);       // calls abs()
-ABS(-3.14f);   // calls fabsf()
-ABS(-2.718);   // calls fabs()
+ABS(-5); // calls abs()
+ABS(-3.14f); // calls fabsf()
+ABS(-2.718); // calls fabs()
 \`\`\`
 
 ### Useful C99/C11/C17 Features
@@ -1248,30 +1248,30 @@ ABS(-2.718);   // calls fabs()
 \`\`\`c
 // C99: Variable Length Arrays
 void func(int n) {
-    int arr[n];  // size at runtime! (be careful — stack)
+ int arr[n]; // size at runtime! (be careful — stack)
 }
 
 // C99: Compound literals
 void draw(struct Point p) { }
-draw((struct Point){.x=10, .y=20});  // temporary struct
+draw((struct Point){.x=10, .y=20}); // temporary struct
 
 // C11: Anonymous structs/unions
 typedef struct {
-    union {
-        struct { int x, y; };    // anonymous!
-        int coords[2];
-    };
+ union {
+ struct { int x, y; }; // anonymous!
+ int coords[2];
+ };
 } Point;
-Point p; p.x = 1; p.coords[1] = 2;  // both work!
+Point p; p.x = 1; p.coords[1] = 2; // both work!
 
 // C11: _Alignas, _Alignof
-_Alignas(16) float simdData[4];  // 16-byte aligned for SSE
+_Alignas(16) float simdData[4]; // 16-byte aligned for SSE
 
 // Designated initializers (C99)
-int arr[10] = {[3]=30, [7]=70};  // only indices 3 and 7 set
+int arr[10] = {[3]=30, [7]=70}; // only indices 3 and 7 set
 
 typedef struct { int a, b, c; } S;
-S s = {.b=20, .c=30};  // a defaults to 0
+S s = {.b=20, .c=30}; // a defaults to 0
 \`\`\``,
 
       codeExample: `#include <stdio.h>
@@ -1596,89 +1596,89 @@ Total: 12 weeks × 4 sections = 48 sections
 
 \`\`\`
 ✅ Month 1 — C Foundation
-  • Variables, operators, control flow, functions
-  • Arrays, strings, pointers, dynamic memory
-  • Recursion, file I/O basics
+ • Variables, operators, control flow, functions
+ • Arrays, strings, pointers, dynamic memory
+ • Recursion, file I/O basics
 
 ✅ Month 2 — Data Structures
-  • struct, union, enum, linked lists
-  • Stack, Queue, Hash Table
-  • Binary files, error handling
-  • Preprocessor, macros, bitwise ops
+ • struct, union, enum, linked lists
+ • Stack, Queue, Hash Table
+ • Binary files, error handling
+ • Preprocessor, macros, bitwise ops
 
 ✅ Month 3 — Advanced Algorithms
-  • Binary Trees, BST, AVL Tree
-  • 8 Sorting Algorithms (O(n²) to O(n))
-  • Graphs — DFS/BFS/Dijkstra/MST/TopSort
-  • Production-ready system design
+ • Binary Trees, BST, AVL Tree
+ • 8 Sorting Algorithms (O(n²) to O(n))
+ • Graphs — DFS/BFS/Dijkstra/MST/TopSort
+ • Production-ready system design
 
 Total: 12 weeks × 4 sections = 48 sections
-       48 × 3 quiz questions = 144 quiz questions
-       12 hands-on projects
+ 48 × 3 quiz questions = 144 quiz questions
+ 12 hands-on projects
 \`\`\`
 
 ### Skills Unlocked
 
 \`\`\`
 🔓 Systems Programming
-    C ka foundation → Linux, drivers, embedded
+ C's foundation → Linux, drivers, embedded
 
 🔓 Competitive Programming
-    O(n²) se O(n) sorts, O(logn) trees, O(V+E) graphs
+ O(n²) from O(n) sorts, O(logn) trees, O(V+E) graphs
 
 🔓 Software Engineering
-    Clean code, error handling, modular design
+ Clean code, error handling, modular design
 
 🔓 Computer Science Theory
-    Big-O, space-time trade-offs, algorithm design
+ Big-O, space-time trade-offs, algorithm design
 
 🔓 Problem Solving
-    Any DS/Algo problem break do and solve do
+ Any DS/Algo problem break do and solve do
 \`\`\`
 
 ### Next Steps — C After
 
 \`\`\`
 🚀 Immediate Next:
-  • C++ (OOP + STL + modern C++)
-  • Competitive Programming (Codeforces/LeetCode)
-  • System Design (OS, networks, databases)
+ • C++ (OOP + STL + modern C++)
+ • Competitive Programming (Codeforces/LeetCode)
+ • System Design (OS, networks, databases)
 
 🚀 Career Paths:
-  • Systems Programmer (Linux, embedded, RTOS)
-  • Backend Engineer (performance-critical systems)
-  • Game Developer (game engines, graphics)
-  • Compiler Engineer (GCC, LLVM)
-  • Security Researcher (vulnerability research)
-  • Embedded Engineer (IoT, automotive, aerospace)
+ • Systems Programmer (Linux, embedded, RTOS)
+ • Backend Engineer (performance-critical systems)
+ • Game Developer (game engines, graphics)
+ • Compiler Engineer (GCC, LLVM)
+ • Security Researcher (vulnerability research)
+ • Embedded Engineer (IoT, automotive, aerospace)
 
 🚀 Resources:
-  • "The C Programming Language" by K&R (Bible!)
-  • "Programming Pearls" by Jon Bentley
-  • Linux kernel source code (github.com/torvalds/linux)
-  • Codeforces / LeetCode for practice
+ • "The C Programming Language" by K&R (Bible!)
+ • "Programming Pearls" by Jon Bentley
+ • Linux kernel source code (github.com/torvalds/linux)
+ • Codeforces / LeetCode for practice
 \`\`\`
 
 ### Certificate Achievement!
 
 \`\`\`
 ╔══════════════════════════════════════════════════════════╗
-║          🎓 STUDYEARN AI CERTIFICATE                     ║
-║                                                          ║
-║   This certifies that the student has successfully       ║
-║   completed the                                          ║
-║                                                          ║
-║        C PROGRAMMING — NOOB TO PRO                       ║
-║                                                          ║
-║   12-Week Comprehensive Course covering:                 ║
-║   ✓ C Foundation (Months 1)                              ║
-║   ✓ Data Structures (Month 2)                            ║
-║   ✓ Advanced Algorithms (Month 3)                        ║
-║                                                          ║
-║   Skills: Pointers, Memory Management, DS & Algorithms   ║
-║   Level: Intermediate to Advanced                        ║
-║                                                          ║
-║              StudyEarn AI Platform                       ║
+║ 🎓 STUDYEARN AI CERTIFICATE ║
+║ ║
+║ This certifies that were student has successfully ║
+║ completed were ║
+║ ║
+║ C PROGRAMMING — NOOB TO PRO ║
+║ ║
+║ 12-Week Comprehensive Course covering: ║
+║ ✓ C Foundation (Months 1) ║
+║ ✓ Data Structures (Month 2) ║
+║ ✓ Advanced Algorithms (Month 3) ║
+║ ║
+║ Skills: Pointers, Memory Management, DS & Algorithms ║
+║ Level: Intermediate to Advanced ║
+║ ║
+║ StudyEarn AI Platform ║
 ╚══════════════════════════════════════════════════════════╝
 \`\`\``,
 

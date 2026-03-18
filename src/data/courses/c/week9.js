@@ -217,118 +217,118 @@ void inorderIter(BTNode *root) {
 
       content_en: `## Binary Tree — Hierarchical Data Structure!
 
-Tree = hierarchical structure jisme ek node ke maximum 2 children hote hain.
+Tree = hierarchical structure jisme ek node's maximum 2 children hote hain.
 
 ### Why Trees?
 \`\`\`
 Real World Uses:
-  File System        ← folders/files hierarchy
-  HTML DOM           ← webpage element tree
-  Organization Chart ← company hierarchy
-  Decision Trees     ← AI/ML
-  Expression Trees   ← compiler (3+4*2)
-  Database Indexes   ← B-trees for fast lookup
-  Huffman Coding     ← file compression
+ File System ← folders/files hierarchy
+ HTML DOM ← webpage element tree
+ Organization Chart ← company hierarchy
+ Decision Trees ← AI/ML
+ Expression Trees ← compiler (3+4*2)
+ Database Indexes ← B-trees for fast lookup
+ Huffman Coding ← file compression
 \`\`\`
 
 ### Tree Terminology
 
 \`\`\`
-        [10]          ← Root (koi parent nahi)
-       /    \\
-     [5]   [15]       ← Internal nodes
-    /   \\    \\
-  [3]  [7]  [20]     ← Leaf nodes (koi child nahi)
+ [10] ← Root (any parent nahi)
+ / \\
+ [5] [15] ← Internal nodes
+ / \\ \\
+ [3] [7] [20] ← Leaf nodes (any child nahi)
 
-Root     = topmost node (10)
-Leaf     = node with no children (3, 7, 20)
-Height   = longest root-to-leaf path = 2
-Depth    = distance from root (10=0, 5=1, 3=2)
-Level    = set of nodes at same depth
-Parent   = node above (5 is parent of 3, 7)
-Child    = node below (3, 7 are children of 5)
-Subtree  = node + all descendants
+Root = topmost node (10)
+Leaf = node with no children (3, 7, 20)
+Height = longest root-to-leaf path = 2
+Depth = distance from root (10=0, 5=1, 3=2)
+Level = set of nodes at same depth
+Parent = node above (5 is parent of 3, 7)
+Child = node below (3, 7 are children of 5)
+Subtree = node + all descendants
 \`\`\`
 
 ### Binary Tree Node
 
 \`\`\`c
 typedef struct BTNode {
-    int            data;
-    struct BTNode *left;
-    struct BTNode *right;
+ int data;
+ struct BTNode *left;
+ struct BTNode *right;
 } BTNode;
 
 // Create node
 BTNode* newNode(int data) {
-    BTNode *n = (BTNode*)malloc(sizeof(BTNode));
-    n->data  = data;
-    n->left  = NULL;
-    n->right = NULL;
-    return n;
+ BTNode *n = (BTNode*)malloc(sizeof(BTNode));
+ n->data = data;
+ n->left = NULL;
+ n->right = NULL;
+ return n;
 }
 
 // Build manually
-BTNode *root    = newNode(1);
-root->left      = newNode(2);
-root->right     = newNode(3);
-root->left->left  = newNode(4);
+BTNode *root = newNode(1);
+root->left = newNode(2);
+root->right = newNode(3);
+root->left->left = newNode(4);
 root->left->right = newNode(5);
-//      1
-//    /   \\
-//   2     3
-//  / \\
-// 4   5
+// 1
+// / \\
+// 2 3
+// / \\
+// 4 5
 \`\`\`
 
 ### Tree Traversals — 4 Ways to Visit All Nodes
 
 \`\`\`c
 // ── 1. Inorder (Left → Root → Right) ──
-// BST mein: sorted order in print karta hai!
+// BST mein: sorted order in print it does!
 void inorder(BTNode *root) {
-    if (!root) return;
-    inorder(root->left);
-    printf("%d ", root->data);
-    inorder(root->right);
+ if (!root) return;
+ inorder(root->left);
+ printf("%d ", root->data);
+ inorder(root->right);
 }
 // Output for BST: 3 5 7 10 15 20 (sorted!)
 
 // ── 2. Preorder (Root → Left → Right) ──
-// Tree copy/serialize ke liye useful
+// Tree copy/serialize for useful
 void preorder(BTNode *root) {
-    if (!root) return;
-    printf("%d ", root->data);   // root FIRST
-    preorder(root->left);
-    preorder(root->right);
+ if (!root) return;
+ printf("%d ", root->data); // root FIRST
+ preorder(root->left);
+ preorder(root->right);
 }
 
 // ── 3. Postorder (Left → Right → Root) ──
-// Tree delete karne ke liye useful
+// Tree delete to do useful
 void postorder(BTNode *root) {
-    if (!root) return;
-    postorder(root->left);
-    postorder(root->right);
-    printf("%d ", root->data);   // root LAST
-    // free(root) yahan safe hai!
+ if (!root) return;
+ postorder(root->left);
+ postorder(root->right);
+ printf("%d ", root->data); // root LAST
+ // free(root) here is safe!
 }
 
 // ── 4. Level Order (BFS) ── Queue use do!
 void levelOrder(BTNode *root) {
-    if (!root) return;
-    // Queue (from Week 8)
-    BTNode *queue[1000];
-    int front = 0, rear = 0;
-    queue[rear++] = root;
+ if (!root) return;
+ // Queue (from Week 8)
+ BTNode *queue[1000];
+ int front = 0, rear = 0;
+ queue[rear++] = root;
 
-    while (front < rear) {
-        BTNode *curr = queue[front++];
-        printf("%d ", curr->data);
-        if (curr->left)  queue[rear++] = curr->left;
-        if (curr->right) queue[rear++] = curr->right;
-    }
+ while (front < rear) {
+ BTNode *curr = queue[front++];
+ printf("%d ", curr->data);
+ if (curr->left) queue[rear++] = curr->left;
+ if (curr->right) queue[rear++] = curr->right;
+ }
 }
-// Output:  1 2 3 4 5  (level by level)
+// Output: 1 2 3 4 5 (level by level)
 \`\`\`
 
 ### Tree Properties — Useful Functions
@@ -336,55 +336,55 @@ void levelOrder(BTNode *root) {
 \`\`\`c
 // Height of tree — O(n)
 int height(BTNode *root) {
-    if (!root) return -1;  // empty tree height = -1
-    int lh = height(root->left);
-    int rh = height(root->right);
-    return 1 + (lh > rh ? lh : rh);
+ if (!root) return -1; // empty tree height = -1
+ int lh = height(root->left);
+ int rh = height(root->right);
+ return 1 + (lh > rh ? lh : rh);
 }
 
 // Count nodes — O(n)
 int countNodes(BTNode *root) {
-    if (!root) return 0;
-    return 1 + countNodes(root->left) + countNodes(root->right);
+ if (!root) return 0;
+ return 1 + countNodes(root->left) + countNodes(root->right);
 }
 
 // Count leaf nodes
 int countLeaves(BTNode *root) {
-    if (!root) return 0;
-    if (!root->left && !root->right) return 1;  // leaf!
-    return countLeaves(root->left) + countLeaves(root->right);
+ if (!root) return 0;
+ if (!root->left && !root->right) return 1; // leaf!
+ return countLeaves(root->left) + countLeaves(root->right);
 }
 
 // Sum of all nodes
 int sumTree(BTNode *root) {
-    if (!root) return 0;
-    return root->data + sumTree(root->left) + sumTree(root->right);
+ if (!root) return 0;
+ return root->data + sumTree(root->left) + sumTree(root->right);
 }
 
 // Mirror/Invert tree
 BTNode* mirror(BTNode *root) {
-    if (!root) return NULL;
-    BTNode *temp  = root->left;
-    root->left    = mirror(root->right);
-    root->right   = mirror(temp);
-    return root;
+ if (!root) return NULL;
+ BTNode *temp = root->left;
+ root->left = mirror(root->right);
+ root->right = mirror(temp);
+ return root;
 }
 
 // Check if two trees are identical
 int isIdentical(BTNode *a, BTNode *b) {
-    if (!a && !b) return 1;
-    if (!a || !b) return 0;
-    return a->data == b->data &&
-           isIdentical(a->left,  b->left) &&
-           isIdentical(a->right, b->right);
+ if (!a && !b) return 1;
+ if (!a || !b) return 0;
+ return a->data == b->data &&
+ isIdentical(a->left, b->left) &&
+ isIdentical(a->right, b->right);
 }
 
 // Free entire tree
 void freeTree(BTNode *root) {
-    if (!root) return;
-    freeTree(root->left);
-    freeTree(root->right);
-    free(root);
+ if (!root) return;
+ freeTree(root->left);
+ freeTree(root->right);
+ free(root);
 }
 \`\`\`
 
@@ -393,23 +393,23 @@ void freeTree(BTNode *root) {
 \`\`\`c
 // Iterative inorder — no recursion
 void inorderIter(BTNode *root) {
-    // Use our Stack from Week 8
-    BTNode *stack[1000];
-    int top = -1;
-    BTNode *curr = root;
+ // Use our Stack from Week 8
+ BTNode *stack[1000];
+ int top = -1;
+ BTNode *curr = root;
 
-    while (curr || top >= 0) {
-        // Go as far left as possible
-        while (curr) {
-            stack[++top] = curr;
-            curr = curr->left;
-        }
-        // Pop and process
-        curr = stack[top--];
-        printf("%d ", curr->data);
-        // Move to right subtree
-        curr = curr->right;
-    }
+ while (curr || top >= 0) {
+ // Go as far left as possible
+ while (curr) {
+ stack[++top] = curr;
+ curr = curr->left;
+ }
+ // Pop and process
+ curr = stack[top--];
+ printf("%d ", curr->data);
+ // Move to right subtree
+ curr = curr->right;
+ }
 }
 \`\`\``,
 
@@ -798,85 +798,85 @@ Solution: AVL tree / Red-Black tree (self-balancing)
 
       content_en: `## BST — Ordered Binary Tree!
 
-BST Rule: har node ke liye —
-- Left subtree in saari values CHHOTI hoti hain
-- Right subtree in saari values BADI hoti hain
+BST Rule: har node for —
+- Left subtree in saari values CHHOTI it isn
+- Right subtree in saari values BADI it isn
 
 ### BST Insert
 
 \`\`\`c
 typedef struct BST {
-    int        data;
-    struct BST *left, *right;
+ int data;
+ struct BST *left, *right;
 } BST;
 
 BST* bst_insert(BST *root, int val) {
-    if (!root) return newNode(val);    // empty spot mila!
+ if (!root) return newNode(val); // empty spot mila!
 
-    if (val < root->data)
-        root->left  = bst_insert(root->left,  val);
-    else if (val > root->data)
-        root->right = bst_insert(root->right, val);
-    // val == root->data: duplicate, ignore
+ if (val < root->data)
+ root->left = bst_insert(root->left, val);
+ else if (val > root->data)
+ root->right = bst_insert(root->right, val);
+ // val == root->data: duplicate, ignore
 
-    return root;
+ return root;
 }
 
 // Build BST
 BST *tree = NULL;
 int values[] = {50, 30, 70, 20, 40, 60, 80};
 for (int i = 0; i < 7; i++)
-    tree = bst_insert(tree, values[i]);
-//        50
-//       /  \\
-//     30    70
-//    / \\   / \\
-//   20 40 60 80
+ tree = bst_insert(tree, values[i]);
+// 50
+// / \\
+// 30 70
+// / \\ / \\
+// 20 40 60 80
 \`\`\`
 
 ### BST Search — O(log n) average
 
 \`\`\`c
 BST* bst_search(BST *root, int val) {
-    if (!root || root->data == val) return root;
-    if (val < root->data) return bst_search(root->left,  val);
-    return                       bst_search(root->right, val);
+ if (!root || root->data == val) return root;
+ if (val < root->data) return bst_search(root->left, val);
+ return bst_search(root->right, val);
 }
 
 // Iterative search (faster — no recursion overhead)
 BST* bst_searchIter(BST *root, int val) {
-    while (root) {
-        if (val == root->data) return root;
-        root = (val < root->data) ? root->left : root->right;
-    }
-    return NULL;
+ while (root) {
+ if (val == root->data) return root;
+ root = (val < root->data) ? root->left : root->right;
+ }
+ return NULL;
 }
 
 // Min and Max — O(h)
 BST* bst_min(BST *root) {
-    while (root && root->left) root = root->left;
-    return root;  // leftmost node
+ while (root && root->left) root = root->left;
+ return root; // leftmost node
 }
 BST* bst_max(BST *root) {
-    while (root && root->right) root = root->right;
-    return root;  // rightmost node
+ while (root && root->right) root = root->right;
+ return root; // rightmost node
 }
 
 // Floor and Ceiling
-BST* bst_floor(BST *root, int val) {   // largest value <= val
-    if (!root) return NULL;
-    if (root->data == val) return root;
-    if (root->data > val)  return bst_floor(root->left, val);
-    BST *right = bst_floor(root->right, val);
-    return right ? right : root;
+BST* bst_floor(BST *root, int val) { // largest value <= val
+ if (!root) return NULL;
+ if (root->data == val) return root;
+ if (root->data > val) return bst_floor(root->left, val);
+ BST *right = bst_floor(root->right, val);
+ return right ? right : root;
 }
 
-BST* bst_ceil(BST *root, int val) {    // smallest value >= val
-    if (!root) return NULL;
-    if (root->data == val) return root;
-    if (root->data < val)  return bst_ceil(root->right, val);
-    BST *left = bst_ceil(root->left, val);
-    return left ? left : root;
+BST* bst_ceil(BST *root, int val) { // smallest value >= val
+ if (!root) return NULL;
+ if (root->data == val) return root;
+ if (root->data < val) return bst_ceil(root->right, val);
+ BST *left = bst_ceil(root->left, val);
+ return left ? left : root;
 }
 \`\`\`
 
@@ -884,40 +884,40 @@ BST* bst_ceil(BST *root, int val) {    // smallest value >= val
 
 \`\`\`c
 BST* bst_delete(BST *root, int val) {
-    if (!root) return NULL;
+ if (!root) return NULL;
 
-    if (val < root->data) {
-        root->left  = bst_delete(root->left,  val);
-    } else if (val > root->data) {
-        root->right = bst_delete(root->right, val);
-    } else {
-        // Found! 3 cases:
+ if (val < root->data) {
+ root->left = bst_delete(root->left, val);
+ } else if (val > root->data) {
+ root->right = bst_delete(root->right, val);
+ } else {
+ // Found! 3 cases:
 
-        // Case 1: Leaf node (no children)
-        if (!root->left && !root->right) {
-            free(root);
-            return NULL;
-        }
+ // Case 1: Leaf node (no children)
+ if (!root->left && !root->right) {
+ free(root);
+ return NULL;
+ }
 
-        // Case 2: One child
-        if (!root->left) {
-            BST *temp = root->right;
-            free(root);
-            return temp;
-        }
-        if (!root->right) {
-            BST *temp = root->left;
-            free(root);
-            return temp;
-        }
+ // Case 2: One child
+ if (!root->left) {
+ BST *temp = root->right;
+ free(root);
+ return temp;
+ }
+ if (!root->right) {
+ BST *temp = root->left;
+ free(root);
+ return temp;
+ }
 
-        // Case 3: Two children
-        // Find inorder successor (smallest in right subtree)
-        BST *successor = bst_min(root->right);
-        root->data  = successor->data;         // copy successor data
-        root->right = bst_delete(root->right, successor->data); // delete successor
-    }
-    return root;
+ // Case 3: Two children
+ // Find inorder successor (smallest in right subtree)
+ BST *successor = bst_min(root->right);
+ root->data = successor->data; // copy successor data
+ root->right = bst_delete(root->right, successor->data); // delete successor
+ }
+ return root;
 }
 \`\`\`
 
@@ -926,44 +926,44 @@ BST* bst_delete(BST *root, int val) {
 \`\`\`c
 // Check if tree is valid BST
 int isValidBST(BST *root, int min, int max) {
-    if (!root) return 1;
-    if (root->data <= min || root->data >= max) return 0;
-    return isValidBST(root->left,  min, root->data) &&
-           isValidBST(root->right, root->data, max);
+ if (!root) return 1;
+ if (root->data <= min || root->data >= max) return 0;
+ return isValidBST(root->left, min, root->data) &&
+ isValidBST(root->right, root->data, max);
 }
 // Call: isValidBST(root, INT_MIN, INT_MAX)
 
 // Kth smallest element
 int kthSmallest(BST *root, int *k) {
-    if (!root) return -1;
-    int left = kthSmallest(root->left, k);
-    if (*k == 0) return left;
-    if (--(*k) == 0) return root->data;
-    return kthSmallest(root->right, k);
+ if (!root) return -1;
+ int left = kthSmallest(root->left, k);
+ if (*k == 0) return left;
+ if (--(*k) == 0) return root->data;
+ return kthSmallest(root->right, k);
 }
 
 // Count nodes in range [lo, hi]
 int countRange(BST *root, int lo, int hi) {
-    if (!root) return 0;
-    if (root->data < lo) return countRange(root->right, lo, hi);
-    if (root->data > hi) return countRange(root->left,  lo, hi);
-    return 1 + countRange(root->left, lo, hi) + countRange(root->right, lo, hi);
+ if (!root) return 0;
+ if (root->data < lo) return countRange(root->right, lo, hi);
+ if (root->data > hi) return countRange(root->left, lo, hi);
+ return 1 + countRange(root->left, lo, hi) + countRange(root->right, lo, hi);
 }
 \`\`\`
 
 ### BST Complexity
 
 \`\`\`
-Operation    Average    Worst (skewed)
+Operation Average Worst (skewed)
 ─────────────────────────────────────────
-Search       O(log n)   O(n)
-Insert       O(log n)   O(n)
-Delete       O(log n)   O(n)
-Min/Max      O(log n)   O(n)
-Inorder      O(n)       O(n)
+Search O(log n) O(n)
+Insert O(log n) O(n)
+Delete O(log n) O(n)
+Min/Max O(log n) O(n)
+Inorder O(n) O(n)
 
 Worst case: sorted input → skewed tree (linked list!)
-[1]→[2]→[3]→[4]→[5]  ← insert 1,2,3,4,5 → right-skewed!
+[1]→[2]→[3]→[4]→[5] ← insert 1,2,3,4,5 → right-skewed!
 Solution: AVL tree / Red-Black tree (self-balancing)
 \`\`\``,
 
@@ -1342,19 +1342,19 @@ BST worst case O(n) — skewed tree. AVL tree: **height difference ≤ 1** alway
 // AVL property: balance factor ∈ {-1, 0, 1} for EVERY node
 
 typedef struct AVL {
-    int        data;
-    struct AVL *left, *right;
-    int        height;  // cache height for O(1) access
+ int data;
+ struct AVL *left, *right;
+ int height; // cache height for O(1) access
 } AVL;
 
 int avl_height(AVL *n) { return n ? n->height : -1; }
 int avl_bf(AVL *n) { return n ? avl_height(n->left) - avl_height(n->right) : 0; }
 
 void avl_updateHeight(AVL *n) {
-    if (!n) return;
-    int lh = avl_height(n->left);
-    int rh = avl_height(n->right);
-    n->height = 1 + (lh > rh ? lh : rh);
+ if (!n) return;
+ int lh = avl_height(n->left);
+ int rh = avl_height(n->right);
+ n->height = 1 + (lh > rh ? lh : rh);
 }
 \`\`\`
 
@@ -1362,61 +1362,61 @@ void avl_updateHeight(AVL *n) {
 
 \`\`\`c
 // ── Right Rotation ──
-//       y                x
-//      / \\      →       / \\
-//     x   T3           T1   y
-//    / \\                   / \\
-//   T1  T2               T2  T3
+// y x
+// / \\ → / \\
+// x T3 T1 y
+// / \\ / \\
+// T1 T2 T2 T3
 AVL* rotateRight(AVL *y) {
-    AVL *x  = y->left;
-    AVL *T2 = x->right;
+ AVL *x = y->left;
+ AVL *T2 = x->right;
 
-    x->right = y;    // rotation
-    y->left  = T2;
+ x->right = y; // rotation
+ y->left = T2;
 
-    avl_updateHeight(y);  // y pehle (neeche hai ab)
-    avl_updateHeight(x);  // x baad mein
-    return x;             // new root
+ avl_updateHeight(y); // y first (neeche is ab)
+ avl_updateHeight(x); // x later
+ return x; // new root
 }
 
 // ── Left Rotation ──
-//     x                  y
-//    / \\       →        / \\
-//   T1   y              x   T3
-//       / \\           / \\
-//      T2  T3         T1  T2
+// x y
+// / \\ → / \\
+// T1 y x T3
+// / \\ / \\
+// T2 T3 T1 T2
 AVL* rotateLeft(AVL *x) {
-    AVL *y  = x->right;
-    AVL *T2 = y->left;
+ AVL *y = x->right;
+ AVL *T2 = y->left;
 
-    y->left  = x;    // rotation
-    x->right = T2;
+ y->left = x; // rotation
+ x->right = T2;
 
-    avl_updateHeight(x);
-    avl_updateHeight(y);
-    return y;             // new root
+ avl_updateHeight(x);
+ avl_updateHeight(y);
+ return y; // new root
 }
 
 // ── 4 Imbalance Cases ──
 AVL* avl_balance(AVL *node) {
-    avl_updateHeight(node);
-    int bf = avl_bf(node);
+ avl_updateHeight(node);
+ int bf = avl_bf(node);
 
-    // Left Heavy (bf > 1)
-    if (bf > 1) {
-        if (avl_bf(node->left) < 0)
-            node->left = rotateLeft(node->left);  // Left-Right case
-        return rotateRight(node);                  // Left-Left case
-    }
+ // Left Heavy (bf > 1)
+ if (bf > 1) {
+ if (avl_bf(node->left) < 0)
+ node->left = rotateLeft(node->left); // Left-Right case
+ return rotateRight(node); // Left-Left case
+ }
 
-    // Right Heavy (bf < -1)
-    if (bf < -1) {
-        if (avl_bf(node->right) > 0)
-            node->right = rotateRight(node->right); // Right-Left case
-        return rotateLeft(node);                     // Right-Right case
-    }
+ // Right Heavy (bf < -1)
+ if (bf < -1) {
+ if (avl_bf(node->right) > 0)
+ node->right = rotateRight(node->right); // Right-Left case
+ return rotateLeft(node); // Right-Right case
+ }
 
-    return node;  // already balanced
+ return node; // already balanced
 }
 \`\`\`
 
@@ -1424,60 +1424,60 @@ AVL* avl_balance(AVL *node) {
 
 \`\`\`c
 AVL* avl_insert(AVL *root, int val) {
-    // Step 1: Normal BST insert
-    if (!root) {
-        AVL *n = (AVL*)malloc(sizeof(AVL));
-        n->data = val; n->left = n->right = NULL; n->height = 0;
-        return n;
-    }
+ // Step 1: Normal BST insert
+ if (!root) {
+ AVL *n = (AVL*)malloc(sizeof(AVL));
+ n->data = val; n->left = n->right = NULL; n->height = 0;
+ return n;
+ }
 
-    if (val < root->data)
-        root->left  = avl_insert(root->left,  val);
-    else if (val > root->data)
-        root->right = avl_insert(root->right, val);
-    else
-        return root;  // duplicate
+ if (val < root->data)
+ root->left = avl_insert(root->left, val);
+ else if (val > root->data)
+ root->right = avl_insert(root->right, val);
+ else
+ return root; // duplicate
 
-    // Step 2: Rebalance going back up
-    return avl_balance(root);
+ // Step 2: Rebalance going back up
+ return avl_balance(root);
 }
 
 // AVL Delete
 AVL* avl_delete(AVL *root, int val) {
-    if (!root) return NULL;
+ if (!root) return NULL;
 
-    if (val < root->data)
-        root->left  = avl_delete(root->left,  val);
-    else if (val > root->data)
-        root->right = avl_delete(root->right, val);
-    else {
-        if (!root->left || !root->right) {
-            AVL *temp = root->left ? root->left : root->right;
-            free(root);
-            return temp;
-        }
-        // Two children: inorder successor
-        AVL *succ = root->right;
-        while (succ->left) succ = succ->left;
-        root->data  = succ->data;
-        root->right = avl_delete(root->right, succ->data);
-    }
-    return avl_balance(root);
+ if (val < root->data)
+ root->left = avl_delete(root->left, val);
+ else if (val > root->data)
+ root->right = avl_delete(root->right, val);
+ else {
+ if (!root->left || !root->right) {
+ AVL *temp = root->left ? root->left : root->right;
+ free(root);
+ return temp;
+ }
+ // Two children: inorder successor
+ AVL *succ = root->right;
+ while (succ->left) succ = succ->left;
+ root->data = succ->data;
+ root->right = avl_delete(root->right, succ->data);
+ }
+ return avl_balance(root);
 }
 \`\`\`
 
 ### AVL vs BST — When to Use?
 
 \`\`\`
-Feature           BST         AVL Tree
+Feature BST AVL Tree
 ─────────────────────────────────────────────
-Search            O(h)        O(log n) ✅
-Insert            O(h)        O(log n) ✅
-Delete            O(h)        O(log n) ✅
-Height (worst)    O(n) ❌     O(log n) ✅
-Implementation    Simple      Complex
-Overhead          Low         Rotation cost
-Space             O(n)        O(n) + height field
+Search O(h) O(log n) ✅
+Insert O(h) O(log n) ✅
+Delete O(h) O(log n) ✅
+Height (worst) O(n) ❌ O(log n) ✅
+Implementation Simple Complex
+Overhead Low Rotation cost
+Space O(n) O(n) + height field
 
 h = height (log n avg, n worst for BST)
 
@@ -1766,9 +1766,9 @@ Month 3 (Weeks 9-12):
   📚 Week 12: Final Project + Certificate 🎓
 \`\`\``,
 
-      content_en: `## Week 9 Project — BST se Real Dictionary Build!
+      content_en: `## Week 9 Project — BST from Real Dictionary Build!
 
-Is hafte seekha:
+This week covered:
 - Binary tree basics, traversals (inorder, preorder, postorder, level order)
 - BST insert, search, delete, validation
 - AVL tree — self-balancing, guaranteed O(log n)
@@ -1778,49 +1778,49 @@ Is hafte seekha:
 \`\`\`c
 // ── Word entry ──
 typedef struct {
-    char  word[50];
-    char  meaning[200];
-    char  example[200];
-    char  partOfSpeech[20];  // noun, verb, adjective...
-    int   frequency;          // how often used
+ char word[50];
+ char meaning[200];
+ char example[200];
+ char partOfSpeech[20]; // noun, verb, adjective...
+ int frequency; // how often used
 } DictEntry;
 
 // ── AVL-based dictionary ──
 typedef struct DictNode {
-    DictEntry        entry;
-    int              height;
-    struct DictNode *left, *right;
+ DictEntry entry;
+ int height;
+ struct DictNode *left, *right;
 } DictNode;
 
 // ── Features ──
-// 1. Add word     — O(log n) insert
-// 2. Search word  — O(log n) exact match
+// 1. Add word — O(log n) insert
+// 2. Search word — O(log n) exact match
 // 3. Auto-suggest — O(k) prefix search
-// 4. Delete word  — O(log n) delete
-// 5. List all     — O(n) inorder (sorted!)
-// 6. Stats        — word count, height
-// 7. Save/Load    — binary file (from Week 6!)
+// 4. Delete word — O(log n) delete
+// 5. List all — O(n) inorder (sorted!)
+// 6. Stats — word count, height
+// 7. Save/Load — binary file (from Week 6!)
 \`\`\`
 
 ### Prefix Search (Auto-suggest)
 
 \`\`\`c
 void autoSuggest(DictNode *root, const char *prefix, int *count) {
-    if (!root || *count >= 10) return;  // max 10 suggestions
+ if (!root || *count >= 10) return; // max 10 suggestions
 
-    // Inorder traversal — alphabetical order!
-    autoSuggest(root->left, prefix, count);
+ // Inorder traversal — alphabetical order!
+ autoSuggest(root->left, prefix, count);
 
-    if (strncmp(root->entry.word, prefix, strlen(prefix)) == 0) {
-        printf("  %d. %s\\n", ++(*count), root->entry.word);
-    }
-    // Optimization: if word > prefix alphabetically and no common prefix, skip right
-    if (strcmp(root->entry.word, prefix) > 0 &&
-        strncmp(root->entry.word, prefix, strlen(prefix)) != 0) {
-        // No more matches possible in right subtree if prefix doesn't match
-    }
+ if (strncmp(root->entry.word, prefix, strlen(prefix)) == 0) {
+ printf(" %d. %s\\n", ++(*count), root->entry.word);
+ }
+ // Optimization: if word > prefix alphabetically and no common prefix, skip right
+ if (strcmp(root->entry.word, prefix) > 0 &&
+ strncmp(root->entry.word, prefix, strlen(prefix)) != 0) {
+ // No more matches possible in right subtree if prefix doesn't match
+ }
 
-    autoSuggest(root->right, prefix, count);
+ autoSuggest(root->right, prefix, count);
 }
 \`\`\`
 
@@ -1829,34 +1829,34 @@ void autoSuggest(DictNode *root, const char *prefix, int *count) {
 \`\`\`c
 // Save dictionary to binary file
 void saveDict(DictNode *root, FILE *fp) {
-    if (!root) {
-        // Write NULL marker
-        int marker = -1;
-        fwrite(&marker, sizeof(int), 1, fp);
-        return;
-    }
-    // Write entry
-    fwrite(&root->entry, sizeof(DictEntry), 1, fp);
-    saveDict(root->left,  fp);
-    saveDict(root->right, fp);
+ if (!root) {
+ // Write NULL marker
+ int marker = -1;
+ fwrite(&marker, sizeof(int), 1, fp);
+ return;
+ }
+ // Write entry
+ fwrite(&root->entry, sizeof(DictEntry), 1, fp);
+ saveDict(root->left, fp);
+ saveDict(root->right, fp);
 }
 
 // Load dictionary from binary file (preorder reconstruction)
 DictNode* loadDict(FILE *fp) {
-    int marker;
-    fread(&marker, sizeof(int), 1, fp);
-    if (marker == -1) return NULL;
+ int marker;
+ fread(&marker, sizeof(int), 1, fp);
+ if (marker == -1) return NULL;
 
-    DictEntry entry;
-    // marker is actually first bytes of DictEntry
-    memcpy(&entry, &marker, sizeof(int));
-    fread((char*)&entry + sizeof(int),
-          sizeof(DictEntry) - sizeof(int), 1, fp);
+ DictEntry entry;
+ // marker is actually first bytes of DictEntry
+ memcpy(&entry, &marker, sizeof(int));
+ fread((char*)&entry + sizeof(int),
+ sizeof(DictEntry) - sizeof(int), 1, fp);
 
-    DictNode *node = createDictNode(entry);
-    node->left  = loadDict(fp);
-    node->right = loadDict(fp);
-    return node;
+ DictNode *node = createDictNode(entry);
+ node->left = loadDict(fp);
+ node->right = loadDict(fp);
+ return node;
 }
 \`\`\`
 
@@ -1864,10 +1864,10 @@ DictNode* loadDict(FILE *fp) {
 
 \`\`\`
 Month 3 (Weeks 9-12):
-  ✅ Week 9:  Binary Trees, BST, AVL Tree
-  📚 Week 10: Sorting Algorithms Master Class (next!)
-  📚 Week 11: Graphs — DFS, BFS, Dijkstra
-  📚 Week 12: Final Project + Certificate 🎓
+ ✅ Week 9: Binary Trees, BST, AVL Tree
+ 📚 Week 10: Sorting Algorithms Master Class (next!)
+ 📚 Week 11: Graphs — DFS, BFS, Dijkstra
+ 📚 Week 12: Final Project + Certificate 🎓
 \`\`\``,
 
       codeExample: `#include <stdio.h>

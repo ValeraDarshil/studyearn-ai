@@ -100,40 +100,40 @@ Python mein sirf type karo aur run karo — C mein **pehle compile** karna padta
 
       content_en: `## C Programming — The Mother of All Languages!
 
-**C** is the most important programming language in the world. Created by Dennis Ritchie in 1972 — and still equally powerful today!
+**C** is were most important programming language in were world. Created by Dennis Ritchie in 1972 — and still equally powerful today!
 
 ### Why Learn C?
 
 \`\`\`
 After learning C:
-  ✅ Understand how computer memory actually works
-  ✅ Python, Java, C++, JavaScript — all become easier
-  ✅ Operating systems, embedded systems, games — all use C
-  ✅ Fastest language for competitive programming
-  ✅ Very useful in FAANG interviews
+ ✅ Understand how computer memory actually works
+ ✅ Python, Java, C++, JavaScript — all become easier
+ ✅ Operating systems, embedded systems, games — all use C
+ ✅ Fastest language for competitive programming
+ ✅ Very useful in FAANG interviews
 \`\`\`
 
 ### Where is C Used?
 
 \`\`\`c
 // Famous things built in C:
-Linux Kernel         ← entire Linux OS written in C
-Windows (core)       ← Microsoft's OS uses C too
-Python Interpreter   ← CPython is written in C!
-Git                  ← version control tool
-MySQL, PostgreSQL    ← databases are in C
+Linux Kernel ← entire Linux OS written in C
+Windows (core) ← Microsoft's OS uses C too
+Python Interpreter ← CPython is written in C!
+Git ← version control tool
+MySQL, PostgreSQL ← databases are in C
 Arduino/Raspberry Pi ← embedded programming
-Game Engines         ← low-level game development
+Game Engines ← low-level game development
 \`\`\`
 
 ### C's Basic Structure
 
 \`\`\`c
-#include <stdio.h>      // Header file — stdio = standard input/output
+#include <stdio.h> // Header file — stdio = standard input/output
 
-int main() {            // main() — program starts here
-    printf("Hello!");   // print output to screen
-    return 0;           // 0 means "program completed successfully"
+int main() { // main() — program starts here
+ printf("Hello!"); // print output to screen
+ return 0; // 0 means "program completed successfully"
 }
 \`\`\`
 
@@ -141,16 +141,16 @@ int main() {            // main() — program starts here
 
 \`\`\`
 Source Code (.c file)
-      ↓
-  Preprocessor    → process #include, #define
-      ↓
-   Compiler       → C code → Assembly
-      ↓
-   Assembler      → Assembly → Machine code (.o)
-      ↓
-    Linker         → attach libraries → Executable
-      ↓
-  Execution       → CPU runs it directly!
+ ↓
+ Preprocessor → process #include, #define
+ ↓
+ Compiler → C code → Assembly
+ ↓
+ Assembler → Assembly → Machine code (.o)
+ ↓
+ Linker → attach libraries → Executable
+ ↓
+ Execution → CPU runs it directly!
 \`\`\`
 
 In Python you just type and run — in C you **compile first**. This is what makes C so fast!`,
@@ -384,19 +384,19 @@ A variable = a named box where data is stored.
 
 \`\`\`c
 // ── Integer Types ────────────────────────────────────────
-int    age    = 21;          // -2 billion to +2 billion (4 bytes)
-short  score  = 100;         // -32768 to +32767 (2 bytes)
-long   big    = 1000000L;    // very large number (8 bytes)
+int age = 21; // -2 billion to +2 billion (4 bytes)
+short score = 100; // -32768 to +32767 (2 bytes)
+long big = 1000000L; // very large number (8 bytes)
 
 // Unsigned — positive numbers only
-unsigned int marks = 95;    // 0 to 4 billion
+unsigned int marks = 95; // 0 to 4 billion
 
 // ── Float Types ──────────────────────────────────────────
-float  pi     = 3.14f;       // 6-7 decimal digits (4 bytes)
-double salary = 75000.50;    // 15-16 decimal digits (8 bytes) ← prefer this
+float pi = 3.14f; // 6-7 decimal digits (4 bytes)
+double salary = 75000.50; // 15-16 decimal digits (8 bytes) ← prefer this
 
 // ── Character Type ───────────────────────────────────────
-char letter = 'A';           // single character (1 byte)
+char letter = 'A'; // single character (1 byte)
 // Note: 'A' and "A" are different! single quotes for char
 
 // ── Boolean (C99+) ───────────────────────────────────────
@@ -409,16 +409,16 @@ bool isPremium = false;
 ### printf() Format Specifiers
 
 \`\`\`c
-int    age    = 21;
-float  gpa    = 9.2f;
+int age = 21;
+float gpa = 9.2f;
 double salary = 50000.75;
-char   grade  = 'A';
+char grade = 'A';
 
-printf("Age:    %d\\n",     age);
-printf("GPA:    %.1f\\n",  gpa);
+printf("Age: %d\\n", age);
+printf("GPA: %.1f\\n", gpa);
 printf("Salary: %.2lf\\n", salary);
-printf("Grade:  %c\\n",    grade);
-printf("Name:   %s\\n",    "Rahul");
+printf("Grade: %c\\n", grade);
+printf("Name: %s\\n", "Rahul");
 
 // Multiple values at once
 printf("Student: %s, Age: %d, GPA: %.2f\\n", "Priya", 20, 8.9f);
@@ -427,10 +427,10 @@ printf("Student: %s, Age: %d, GPA: %.2f\\n", "Priya", 20, 8.9f);
 ### Constants
 
 \`\`\`c
-const float PI       = 3.14159f;
-const int   MAX_SIZE = 100;
+const float PI = 3.14159f;
+const int MAX_SIZE = 100;
 
-#define PI           3.14159
+#define PI 3.14159
 #define MAX_STUDENTS 50
 \`\`\``,
 
@@ -687,10 +687,10 @@ if (age < 1 || age > 150) {
 }
 \`\`\``,
 
-      content_en: `## scanf() — Get Input from the User!
+      content_en: `## scanf() — Get Input from were User!
 
 \`printf()\` = output (show on screen)
-\`scanf()\`  = input (receive from user)
+\`scanf()\` = input (receive from user)
 
 ### Basic scanf() Syntax
 
@@ -698,51 +698,51 @@ if (age < 1 || age > 150) {
 #include <stdio.h>
 
 int main() {
-    int age;
-    printf("Enter your age: ");
-    scanf("%d", &age);         // &age = address of age (IMPORTANT!)
-    printf("Your age: %d\\n", age);
-    return 0;
+ int age;
+ printf("Enter your age: ");
+ scanf("%d", &age); // &age = address of age (IMPORTANT!)
+ printf("Your age: %d\\n", age);
+ return 0;
 }
 \`\`\`
 
 ⚠️ **& (ampersand) is very important!**
-\`scanf("%d", &age)\` → &age means "the memory address of the age variable"
-Without & the program may crash or produce garbage values!
+\`scanf("%d", &age)\` → &age means "the memory address of were age variable"
+Without & were program may crash or produce garbage values!
 
 ### Input for Different Types
 
 \`\`\`c
-int    num;
-float  price;
+int num;
+float price;
 double salary;
-char   grade;
-char   name[50];
+char grade;
+char name[50];
 
-scanf("%d",   &num);
-scanf("%f",   &price);
-scanf("%lf",  &salary);   // lf = long float for double
-scanf("%c",   &grade);
-scanf("%s",   name);      // no & needed for arrays!
+scanf("%d", &num);
+scanf("%f", &price);
+scanf("%lf", &salary); // lf = long float for double
+scanf("%c", &grade);
+scanf("%s", name); // no & needed for arrays!
 \`\`\`
 
 ### Common scanf() Mistakes
 
 \`\`\`c
 // ❌ WRONG — forgot &
-scanf("%d", x);    // CRASH or garbage!
+scanf("%d", x); // CRASH or garbage!
 
 // ✅ CORRECT
 scanf("%d", &x);
 
 // ❌ WRONG — no space before %c
-scanf("%c", &c);   // picks up previous Enter!
+scanf("%c", &c); // picks up previous Enter!
 
 // ✅ CORRECT
-scanf(" %c", &c);  // space flushes previous whitespace
+scanf(" %c", &c); // space flushes previous whitespace
 
 // ✅ CORRECT — limit string width
-scanf("%49s", name);  // max 49 chars + null terminator
+scanf("%49s", name); // max 49 chars + null terminator
 \`\`\``,
 
       codeExample: `#include <stdio.h>
@@ -1036,18 +1036,18 @@ int result2 = (2 + 3) * 4;    // 20 — parentheses first
 int result3 = 10 > 5 && 3 < 7; // 1 (true)
 \`\`\``,
 
-      content_en: `## Operators — C ke Calculation Tools!
+      content_en: `## Operators — C's Calculation Tools!
 
 ### Arithmetic Operators
 
 \`\`\`c
 int a = 17, b = 5;
 
-printf("%d\\n", a + b);   // 22  — Addition
-printf("%d\\n", a - b);   // 12  — Subtraction
-printf("%d\\n", a * b);   // 85  — Multiplication
-printf("%d\\n", a / b);   // 3   — Division (integer — decimal drops!)
-printf("%d\\n", a % b);   // 2   — Modulo (remainder)
+printf("%d\\n", a + b); // 22 — Addition
+printf("%d\\n", a - b); // 12 — Subtraction
+printf("%d\\n", a * b); // 85 — Multiplication
+printf("%d\\n", a / b); // 3 — Division (integer — decimal drops!)
+printf("%d\\n", a % b); // 2 — Modulo (remainder)
 
 // Float division
 float x = 17.0f, y = 5.0f;
@@ -1055,8 +1055,8 @@ printf("%.2f\\n", x / y); // 3.40 — float division preserves decimal
 
 // Power (C in ** operator nahi) — math.h use do
 #include <math.h>
-double result = pow(2, 10);  // 2^10 = 1024
-double sqrtVal = sqrt(144);  // √144 = 12
+double result = pow(2, 10); // 2^10 = 1024
+double sqrtVal = sqrt(144); // √144 = 12
 \`\`\`
 
 ### Relational (Comparison) Operators
@@ -1064,15 +1064,15 @@ double sqrtVal = sqrt(144);  // √144 = 12
 \`\`\`c
 int a = 10, b = 20;
 
-printf("%d\\n", a == b);  // 0 (false) — equal?
-printf("%d\\n", a != b);  // 1 (true)  — not equal?
-printf("%d\\n", a > b);   // 0 (false) — greater?
-printf("%d\\n", a < b);   // 1 (true)  — less?
-printf("%d\\n", a >= 10); // 1 (true)  — greater or equal?
-printf("%d\\n", a <= 9);  // 0 (false) — less or equal?
+printf("%d\\n", a == b); // 0 (false) — equal?
+printf("%d\\n", a != b); // 1 (true) — not equal?
+printf("%d\\n", a > b); // 0 (false) — greater?
+printf("%d\\n", a < b); // 1 (true) — less?
+printf("%d\\n", a >= 10); // 1 (true) — greater or equal?
+printf("%d\\n", a <= 9); // 0 (false) — less or equal?
 
 // C in true = 1, false = 0
-// (Python ki tarah True/False nahi — stdbool.h ke bina)
+// (Python's tarah True/False not — stdbool.h without)
 \`\`\`
 
 ### Logical Operators
@@ -1082,18 +1082,18 @@ int age = 20, marks = 75;
 
 // && = AND (dono true ho tab true)
 if (age >= 18 && marks >= 60) {
-    printf("Eligible for admission\\n");
+ printf("Eligible for admission\\n");
 }
 
-// || = OR (koi bhi ek true ho tab true)
+// || = OR (any also ek true ho tab true)
 if (marks >= 90 || age <= 16) {
-    printf("Special scholarship eligible\\n");
+ printf("Special scholarship eligible\\n");
 }
 
 // ! = NOT (opposite)
 int isLoggedIn = 0;
 if (!isLoggedIn) {
-    printf("Please login first\\n");
+ printf("Please login first\\n");
 }
 \`\`\`
 
@@ -1102,11 +1102,11 @@ if (!isLoggedIn) {
 \`\`\`c
 int x = 10;
 
-x += 5;   // x = x + 5 = 15  (same as x = x + 5)
-x -= 3;   // x = x - 3 = 12
-x *= 2;   // x = x * 2 = 24
-x /= 4;   // x = x / 4 = 6
-x %= 4;   // x = x % 4 = 2
+x += 5; // x = x + 5 = 15 (same as x = x + 5)
+x -= 3; // x = x - 3 = 12
+x *= 2; // x = x * 2 = 24
+x /= 4; // x = x / 4 = 6
+x %= 4; // x = x % 4 = 2
 \`\`\`
 
 ### Increment / Decrement
@@ -1114,50 +1114,50 @@ x %= 4;   // x = x % 4 = 2
 \`\`\`c
 int i = 5;
 
-i++;     // Post-increment: i becomes 6
-++i;     // Pre-increment:  i becomes 7
-i--;     // Post-decrement: i becomes 6
---i;     // Pre-decrement:  i becomes 5
+i++; // Post-increment: i becomes 6
+++i; // Pre-increment: i becomes 7
+i--; // Post-decrement: i becomes 6
+--i; // Pre-decrement: i becomes 5
 
 // IMPORTANT difference:
 int a = 5;
-int b = a++;  // b = 5 (old value), THEN a = 6
-int c = ++a;  // a = 7 FIRST, then c = 7
+int b = a++; // b = 5 (old value), THEN a = 6
+int c = ++a; // a = 7 FIRST, then c = 7
 
-printf("a=%d b=%d c=%d\\n", a, b, c);  // a=7 b=5 c=7
+printf("a=%d b=%d c=%d\\n", a, b, c); // a=7 b=5 c=7
 \`\`\`
 
 ### Bitwise Operators (Advanced)
 
 \`\`\`c
 // Used in embedded systems, low-level programming
-int a = 12;  // binary: 1100
-int b = 10;  // binary: 1010
+int a = 12; // binary: 1100
+int b = 10; // binary: 1010
 
-printf("%d\\n", a & b);   // 8  = 1000 (AND)
-printf("%d\\n", a | b);   // 14 = 1110 (OR)
-printf("%d\\n", a ^ b);   // 6  = 0110 (XOR)
-printf("%d\\n", ~a);      // -13 (NOT — flips all bits)
-printf("%d\\n", a << 1);  // 24 = 11000 (left shift = *2)
-printf("%d\\n", a >> 1);  // 6  = 0110  (right shift = /2)
+printf("%d\\n", a & b); // 8 = 1000 (AND)
+printf("%d\\n", a | b); // 14 = 1110 (OR)
+printf("%d\\n", a ^ b); // 6 = 0110 (XOR)
+printf("%d\\n", ~a); // -13 (NOT — flips all bits)
+printf("%d\\n", a << 1); // 24 = 11000 (left shift = *2)
+printf("%d\\n", a >> 1); // 6 = 0110 (right shift = /2)
 \`\`\`
 
 ### Operator Precedence (BODMAS jaisa)
 
 \`\`\`c
 // Precedence (high to low):
-// 1. ()  parentheses
-// 2. ++, --  increment/decrement
-// 3. *, /, %  multiplication, division, modulo
-// 4. +, -  addition, subtraction
-// 5. <, >, <=, >=  relational
-// 6. ==, !=  equality
-// 7. &&  logical AND
-// 8. ||  logical OR
-// 9. =, +=, -= etc  assignment
+// 1. () parentheses
+// 2. ++, -- increment/decrement
+// 3. *, /, % multiplication, division, modulo
+// 4. +, - addition, subtraction
+// 5. <, >, <=, >= relational
+// 6. ==, != equality
+// 7. && logical AND
+// 8. || logical OR
+// 9. =, +=, -= etc assignment
 
-int result = 2 + 3 * 4;       // 14 (not 20!)
-int result2 = (2 + 3) * 4;    // 20 — parentheses first
+int result = 2 + 3 * 4; // 14 (not 20!)
+int result2 = (2 + 3) * 4; // 20 — parentheses first
 int result3 = 10 > 5 && 3 < 7; // 1 (true)
 \`\`\``,
 

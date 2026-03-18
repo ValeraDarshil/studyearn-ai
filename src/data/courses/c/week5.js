@@ -223,33 +223,33 @@ if (memcmp(&s1, &s2, sizeof(Student)) == 0) {
 }
 \`\`\``,
 
-      content_en: `## struct — Related Data ko Ek Jagah Rakho!
+      content_en: `## struct — Related Data to Ek Jagah Rakho!
 
-Abhi tak: ek student ke liye alag alag variables — name, age, marks, grade.
-struct se: sab kuch ek unit mein! Like real world in ek "Student" hota hai.
+Abhi tak: ek student for separately variables — name, age, marks, grade.
+struct se: all some ek unit mein! Like real world in ek "Student" it is.
 
 ### Basic struct
 
 \`\`\`c
 // struct define do
 struct Student {
-    int   rollNo;
-    char  name[50];
-    float marks;
-    char  grade;
-    int   age;
+ int rollNo;
+ char name[50];
+ float marks;
+ char grade;
+ int age;
 };
 
 // Variable declare do
 struct Student s1;
-struct Student s2 = {101, "Rahul", 85.5f, 'A', 20};  // initialize
+struct Student s2 = {101, "Rahul", 85.5f, 'A', 20}; // initialize
 
 // Access — dot operator
 s1.rollNo = 102;
 strcpy(s1.name, "Priya");
 s1.marks = 92.0f;
 s1.grade = 'A';
-s1.age   = 19;
+s1.age = 19;
 
 printf("%d %s %.1f %c\\n", s1.rollNo, s1.name, s1.marks, s1.grade);
 \`\`\`
@@ -257,25 +257,25 @@ printf("%d %s %.1f %c\\n", s1.rollNo, s1.name, s1.marks, s1.grade);
 ### typedef — Cleaner Syntax
 
 \`\`\`c
-// Without typedef — har baar 'struct' likhna padta hai
+// Without typedef — every time 'struct' you have to write
 struct Student s1;
 
 // With typedef — shorter!
 typedef struct {
-    int   rollNo;
-    char  name[50];
-    float marks[5];
-    float average;
-    char  grade;
+ int rollNo;
+ char name[50];
+ float marks[5];
+ float average;
+ char grade;
 } Student;
 
-Student s1;              // ✅ no 'struct' keyword needed
-Student s2 = {0};        // zero-initialize sab kuch
+Student s1; // ✅ no 'struct' keyword needed
+Student s2 = {0}; // zero-initialize all some
 
-// Named struct + typedef — self-referential structures ke liye zaruri (linked list)
+// Named struct + typedef — self-referential structures for necessary (linked list)
 typedef struct Node {
-    int         data;
-    struct Node *next;  // khud ko point karna — typedef pehle complete nahi hoti
+ int data;
+ struct Node *next; // khud to point to do — typedef first complete not hoti
 } Node;
 \`\`\`
 
@@ -283,92 +283,92 @@ typedef struct Node {
 
 \`\`\`c
 typedef struct {
-    char  a;    // 1 byte
-    // 3 bytes padding (compiler adds for alignment!)
-    int   b;    // 4 bytes
-    char  c;    // 1 byte
-    // 3 bytes padding
-    float d;    // 4 bytes
-} Padded;  // Total: 16 bytes (not 10!)
+ char a; // 1 byte
+ // 3 bytes padding (compiler adds for alignment!)
+ int b; // 4 bytes
+ char c; // 1 byte
+ // 3 bytes padding
+ float d; // 4 bytes
+} Padded; // Total: 16 bytes (not 10!)
 
 typedef struct {
-    int   b;    // 4 bytes
-    float d;    // 4 bytes
-    char  a;    // 1 byte
-    char  c;    // 1 byte
-    // 2 bytes padding
-} Packed;  // Total: 12 bytes — reordering saves memory!
+ int b; // 4 bytes
+ float d; // 4 bytes
+ char a; // 1 byte
+ char c; // 1 byte
+ // 2 bytes padding
+} Packed; // Total: 12 bytes — reordering saves memory!
 
-printf("Padded: %lu bytes\\n", sizeof(Padded));  // 16
-printf("Packed: %lu bytes\\n", sizeof(Packed));  // 12
+printf("Padded: %lu bytes\\n", sizeof(Padded)); // 16
+printf("Packed: %lu bytes\\n", sizeof(Packed)); // 12
 
 // Force no padding (gcc extension)
 typedef struct __attribute__((packed)) {
-    char a; int b; char c; float d;
-} NoPad;  // exactly 10 bytes (careful — unaligned access can be slow!)
+ char a; int b; char c; float d;
+} NoPad; // exactly 10 bytes (careful — unaligned access can be slow!)
 \`\`\`
 
 ### Nested Structures
 
 \`\`\`c
 typedef struct {
-    int day, month, year;
+ int day, month, year;
 } Date;
 
 typedef struct {
-    float latitude;
-    float longitude;
+ float latitude;
+ float longitude;
 } Location;
 
 typedef struct {
-    char     name[50];
-    Date     birthDate;
-    Date     enrollDate;
-    Location hometown;
-    float    gpa;
+ char name[50];
+ Date birthDate;
+ Date enrollDate;
+ Location hometown;
+ float gpa;
 } Student;
 
 Student s;
-s.birthDate.day   = 15;
+s.birthDate.day = 15;
 s.birthDate.month = 8;
-s.birthDate.year  = 2003;
-s.hometown.latitude  = 19.076f;   // Mumbai
+s.birthDate.year = 2003;
+s.hometown.latitude = 19.076f; // Mumbai
 s.hometown.longitude = 72.877f;
 
 printf("Born: %d/%d/%d\\n",
-    s.birthDate.day,
-    s.birthDate.month,
-    s.birthDate.year);
+ s.birthDate.day,
+ s.birthDate.month,
+ s.birthDate.year);
 \`\`\`
 
 ### Array of Structures
 
 \`\`\`c
 typedef struct {
-    int   roll;
-    char  name[40];
-    float marks;
+ int roll;
+ char name[40];
+ float marks;
 } Student;
 
-Student class[50];  // 50 students ka array
+Student class[50]; // 50 students's array
 int count = 0;
 
 // Add student
-class[count].roll  = 101;
+class[count].roll = 101;
 strcpy(class[count].name, "Rahul");
 class[count].marks = 88.5f;
 count++;
 
 // Loop through all
 for (int i = 0; i < count; i++) {
-    printf("%d. %s — %.1f\\n", class[i].roll, class[i].name, class[i].marks);
+ printf("%d. %s — %.1f\\n", class[i].roll, class[i].name, class[i].marks);
 }
 
 // Sort by marks (qsort)
 int cmpMarks(const void *a, const void *b) {
-    Student *sa = (Student*)a;
-    Student *sb = (Student*)b;
-    return (sb->marks - sa->marks) > 0 ? 1 : -1;  // descending
+ Student *sa = (Student*)a;
+ Student *sb = (Student*)b;
+ return (sb->marks - sa->marks) > 0 ? 1 : -1; // descending
 }
 qsort(class, count, sizeof(Student), cmpMarks);
 \`\`\`
@@ -379,22 +379,22 @@ qsort(class, count, sizeof(Student), cmpMarks);
 typedef struct { int x, y; } Point;
 typedef struct { Point center; float radius; } Circle;
 
-// Pass by value — copy milti hai (large struct ke liye inefficient!)
+// Pass by value — copy milti is (large struct for inefficient!)
 float circleArea(Circle c) {
-    return 3.14159f * c.radius * c.radius;
+ return 3.14159f * c.radius * c.radius;
 }
 
 // Pass by pointer — efficient! (recommended for large structs)
 float circleAreaPtr(const Circle *c) {
-    return 3.14159f * c->radius * c->radius;
+ return 3.14159f * c->radius * c->radius;
 }
 
 // Return struct by value
 Point midpoint(Point p1, Point p2) {
-    Point mid;
-    mid.x = (p1.x + p2.x) / 2;
-    mid.y = (p1.y + p2.y) / 2;
-    return mid;
+ Point mid;
+ mid.x = (p1.x + p2.x) / 2;
+ mid.y = (p1.y + p2.y) / 2;
+ return mid;
 }
 
 // Usage
@@ -403,29 +403,29 @@ printf("Area: %.2f\\n", circleAreaPtr(&c));
 
 Point a = {0, 0}, b = {10, 8};
 Point m = midpoint(a, b);
-printf("Midpoint: (%d, %d)\\n", m.x, m.y);  // (5, 4)
+printf("Midpoint: (%d, %d)\\n", m.x, m.y); // (5, 4)
 \`\`\`
 
 ### struct Assignment and Comparison
 
 \`\`\`c
 Student s1 = {101, "Rahul", 85.5f};
-Student s2 = s1;  // ✅ Shallow copy — OK for simple structs
+Student s2 = s1; // ✅ Shallow copy — OK for simple structs
 
-s2.roll = 102;   // s1.roll unchanged (copy!)
+s2.roll = 102; // s1.roll unchanged (copy!)
 strcpy(s2.name, "Priya");
 
-// ❌ Direct comparison nahi kar sakte
-if (s1 == s2) { }  // COMPILE ERROR!
+// ❌ Direct comparison not kar sakte
+if (s1 == s2) { } // COMPILE ERROR!
 
 // ✅ Field by field compare do
 if (s1.roll == s2.roll && strcmp(s1.name, s2.name) == 0) {
-    printf("Same student\\n");
+ printf("Same student\\n");
 }
 
-// Ya memcmp (only POD structs ke liye — padding issues)
+// Ya memcmp (only POD structs for — padding issues)
 if (memcmp(&s1, &s2, sizeof(Student)) == 0) {
-    printf("Identical\\n");
+ printf("Identical\\n");
 }
 \`\`\``,
 
@@ -837,122 +837,122 @@ userPerms ^= PERM_READ;
 
       content_en: `## Union — Ek Memory, Multiple Types!
 
-Union struct jaisa hota hai but **sabhi members ek hi memory share karte hain**.
+Union struct jaisa it is but **allhi members ek memory share we do**.
 
 ### Union Basics
 
 \`\`\`c
 union Data {
-    int   i;
-    float f;
-    char  str[20];
+ int i;
+ float f;
+ char str[20];
 };
 // sizeof(union Data) = sizeof(largest member) = 20
 
 union Data d;
 d.i = 42;
-printf("int: %d\\n", d.i);      // 42
-printf("float: %f\\n", d.f);    // garbage! (memory reinterpreted)
+printf("int: %d\\n", d.i); // 42
+printf("float: %f\\n", d.f); // garbage! (memory reinterpreted)
 
 d.f = 3.14f;
-printf("float: %f\\n", d.f);    // 3.14
-printf("int: %d\\n", d.i);      // garbage! (float bits as int)
+printf("float: %f\\n", d.f); // 3.14
+printf("int: %d\\n", d.i); // garbage! (float bits as int)
 
-// Only LAST assigned member valid hota hai!
+// Only LAST assigned member valid it is!
 \`\`\`
 
-### union ka Real Use — Tagged Union (Variant Type)
+### union's Real Use — Tagged Union (Variant Type)
 
 \`\`\`c
 typedef enum {
-    TYPE_INT,
-    TYPE_FLOAT,
-    TYPE_STRING,
+ TYPE_INT,
+ TYPE_FLOAT,
+ TYPE_STRING,
 } DataType;
 
 typedef struct {
-    DataType type;    // which field is valid
-    union {
-        int   i;
-        float f;
-        char  s[50];
-    } value;
+ DataType type; // which field is valid
+ union {
+ int i;
+ float f;
+ char s[50];
+ } value;
 } Variant;
 
 Variant v;
 
-v.type    = TYPE_INT;
+v.type = TYPE_INT;
 v.value.i = 42;
 
 // Safe access — check type first!
 void printVariant(const Variant *v) {
-    switch (v->type) {
-        case TYPE_INT:    printf("int: %d\\n",   v->value.i); break;
-        case TYPE_FLOAT:  printf("float: %.2f\\n", v->value.f); break;
-        case TYPE_STRING: printf("str: %s\\n",   v->value.s); break;
-    }
+ switch (v->type) {
+ case TYPE_INT: printf("int: %d\\n", v->value.i); break;
+ case TYPE_FLOAT: printf("float: %.2f\\n", v->value.f); break;
+ case TYPE_STRING: printf("str: %s\\n", v->value.s); break;
+ }
 }
 \`\`\`
 
 ### union for Type Punning (Low-level)
 
 \`\`\`c
-// Float ke bits check do as integer
+// Float's bits check do as integer
 union FloatInt {
-    float f;
-    int   i;
+ float f;
+ int i;
 };
 
 union FloatInt fi;
 fi.f = 3.14f;
-printf("Float bits as int: 0x%08X\\n", fi.i);  // IEEE 754 representation
+printf("Float bits as int: 0x%08X\\n", fi.i); // IEEE 754 representation
 
 // Endianness check
 union {
-    int  i;
-    char bytes[4];
+ int i;
+ char bytes[4];
 } endian;
 
 endian.i = 1;
 if (endian.bytes[0] == 1)
-    printf("Little-endian (x86, ARM)\\n");
+ printf("Little-endian (x86, ARM)\\n");
 else
-    printf("Big-endian (some network, old MIPS)\\n");
+ printf("Big-endian (some network, old MIPS)\\n");
 \`\`\`
 
 ### enum — Named Constants!
 
 \`\`\`c
 // Without enum — magic numbers (bad!)
-int status = 2;  // 2 what it is? koi nahi jaanta
+int status = 2; // 2 what it is? any not jaanta
 
 // With enum — readable!
 typedef enum {
-    STATUS_PENDING = 0,
-    STATUS_ACTIVE  = 1,
-    STATUS_BLOCKED = 2,
-    STATUS_DELETED = 3,
+ STATUS_PENDING = 0,
+ STATUS_ACTIVE = 1,
+ STATUS_BLOCKED = 2,
+ STATUS_DELETED = 3,
 } UserStatus;
 
 UserStatus user = STATUS_ACTIVE;
 
 if (user == STATUS_ACTIVE) {
-    printf("User is active\\n");
+ printf("User is active\\n");
 }
 
-// Default values — 0 se start, har baar +1
+// Default values — 0 from start, every time +1
 typedef enum {
-    MON = 1,  // start from 1
-    TUE, WED, THU, FRI,  // 2, 3, 4, 5
-    SAT, SUN              // 6, 7
+ MON = 1, // start from 1
+ TUE, WED, THU, FRI, // 2, 3, 4, 5
+ SAT, SUN // 6, 7
 } Weekday;
 
 // Custom values
 typedef enum {
-    HTTP_OK       = 200,
-    HTTP_CREATED  = 201,
-    HTTP_NOT_FOUND = 404,
-    HTTP_ERROR    = 500,
+ HTTP_OK = 200,
+ HTTP_CREATED = 201,
+ HTTP_NOT_FOUND = 404,
+ HTTP_ERROR = 500,
 } HttpStatus;
 \`\`\`
 
@@ -962,27 +962,27 @@ typedef enum {
 typedef enum { NORTH, SOUTH, EAST, WEST } Direction;
 
 void move(Direction dir, int *x, int *y) {
-    switch (dir) {
-        case NORTH: (*y)++; break;
-        case SOUTH: (*y)--; break;
-        case EAST:  (*x)++; break;
-        case WEST:  (*x)--; break;
-    }
+ switch (dir) {
+ case NORTH: (*y)++; break;
+ case SOUTH: (*y)--; break;
+ case EAST: (*x)++; break;
+ case WEST: (*x)--; break;
+ }
 }
 
 // String to enum
 Direction strToDir(const char *s) {
-    if (strcmp(s, "NORTH") == 0) return NORTH;
-    if (strcmp(s, "SOUTH") == 0) return SOUTH;
-    if (strcmp(s, "EAST")  == 0) return EAST;
-    if (strcmp(s, "WEST")  == 0) return WEST;
-    return -1;  // invalid
+ if (strcmp(s, "NORTH") == 0) return NORTH;
+ if (strcmp(s, "SOUTH") == 0) return SOUTH;
+ if (strcmp(s, "EAST") == 0) return EAST;
+ if (strcmp(s, "WEST") == 0) return WEST;
+ return -1; // invalid
 }
 
 // enum to string
 const char* dirToStr(Direction d) {
-    static const char *names[] = {"NORTH","SOUTH","EAST","WEST"};
-    return names[d];
+ static const char *names[] = {"NORTH","SOUTH","EAST","WEST"};
+ return names[d];
 }
 \`\`\`
 
@@ -991,18 +991,18 @@ const char* dirToStr(Direction d) {
 \`\`\`c
 // Each flag = power of 2 (single bit)
 typedef enum {
-    PERM_NONE    = 0,        // 0000
-    PERM_READ    = 1 << 0,  // 0001 = 1
-    PERM_WRITE   = 1 << 1,  // 0010 = 2
-    PERM_EXECUTE = 1 << 2,  // 0100 = 4
-    PERM_ALL     = PERM_READ | PERM_WRITE | PERM_EXECUTE,  // 0111 = 7
+ PERM_NONE = 0, // 0000
+ PERM_READ = 1 << 0, // 0001 = 1
+ PERM_WRITE = 1 << 1, // 0010 = 2
+ PERM_EXECUTE = 1 << 2, // 0100 = 4
+ PERM_ALL = PERM_READ | PERM_WRITE | PERM_EXECUTE, // 0111 = 7
 } Permission;
 
-int userPerms = PERM_READ | PERM_WRITE;  // 0011 = 3
+int userPerms = PERM_READ | PERM_WRITE; // 0011 = 3
 
 // Check permission
-if (userPerms & PERM_READ)    printf("Can read\\n");
-if (userPerms & PERM_WRITE)   printf("Can write\\n");
+if (userPerms & PERM_READ) printf("Can read\\n");
+if (userPerms & PERM_WRITE) printf("Can write\\n");
 if (userPerms & PERM_EXECUTE) printf("Can execute\\n");
 
 // Add permission
@@ -1448,42 +1448,42 @@ void printBackward(DNode *tail) { while (tail) { printf("%d ",tail->data); tail=
 
       content_en: `## Linked List — Pointer-based Dynamic Data!
 
-Array in limitation: fixed size, insert/delete in shift karna padta hai.
+Array in limitation: fixed size, insert/delete in shift to do padta hai.
 Linked List mein: dynamic size, O(1) insert/delete at any position (with pointer)!
 
 ### Singly Linked List — Basics
 
 \`\`\`c
 typedef struct Node {
-    int          data;
-    struct Node *next;  // pointer to next node
+ int data;
+ struct Node *next; // pointer to next node
 } Node;
 
 // Create node
 Node* createNode(int data) {
-    Node *n = (Node*)malloc(sizeof(Node));
-    if (!n) { perror("malloc"); exit(1); }
-    n->data = data;
-    n->next = NULL;
-    return n;
+ Node *n = (Node*)malloc(sizeof(Node));
+ if (!n) { perror("malloc"); exit(1); }
+ n->data = data;
+ n->next = NULL;
+ return n;
 }
 
 // Print list
 void printList(Node *head) {
-    Node *curr = head;
-    while (curr != NULL) {
-        printf("%d", curr->data);
-        if (curr->next) printf(" → ");
-        curr = curr->next;
-    }
-    printf(" → NULL\\n");
+ Node *curr = head;
+ while (curr != NULL) {
+ printf("%d", curr->data);
+ if (curr->next) printf(" → ");
+ curr = curr->next;
+ }
+ printf(" → NULL\\n");
 }
 
 // Length
 int length(Node *head) {
-    int count = 0;
-    for (Node *curr = head; curr; curr = curr->next) count++;
-    return count;
+ int count = 0;
+ for (Node *curr = head; curr; curr = curr->next) count++;
+ return count;
 }
 \`\`\`
 
@@ -1492,46 +1492,46 @@ int length(Node *head) {
 \`\`\`c
 // Insert at beginning — O(1)
 Node* insertFront(Node *head, int data) {
-    Node *n = createNode(data);
-    n->next = head;
-    return n;  // new head!
+ Node *n = createNode(data);
+ n->next = head;
+ return n; // new head!
 }
 
 // Insert at end — O(n)
 Node* insertEnd(Node *head, int data) {
-    Node *n = createNode(data);
-    if (!head) return n;  // empty list
-    Node *curr = head;
-    while (curr->next) curr = curr->next;  // go to last
-    curr->next = n;
-    return head;
+ Node *n = createNode(data);
+ if (!head) return n; // empty list
+ Node *curr = head;
+ while (curr->next) curr = curr->next; // go to last
+ curr->next = n;
+ return head;
 }
 
 // Insert at position — O(n)
 Node* insertAt(Node *head, int data, int pos) {
-    if (pos == 0) return insertFront(head, data);
-    Node *n = createNode(data);
-    Node *curr = head;
-    for (int i = 0; i < pos-1 && curr->next; i++)
-        curr = curr->next;
-    n->next    = curr->next;
-    curr->next = n;
-    return head;
+ if (pos == 0) return insertFront(head, data);
+ Node *n = createNode(data);
+ Node *curr = head;
+ for (int i = 0; i < pos-1 && curr->next; i++)
+ curr = curr->next;
+ n->next = curr->next;
+ curr->next = n;
+ return head;
 }
 
 // Insert in sorted order
 Node* insertSorted(Node *head, int data) {
-    Node *n = createNode(data);
-    if (!head || data <= head->data) {
-        n->next = head;
-        return n;
-    }
-    Node *curr = head;
-    while (curr->next && curr->next->data < data)
-        curr = curr->next;
-    n->next    = curr->next;
-    curr->next = n;
-    return head;
+ Node *n = createNode(data);
+ if (!head || data <= head->data) {
+ n->next = head;
+ return n;
+ }
+ Node *curr = head;
+ while (curr->next && curr->next->data < data)
+ curr = curr->next;
+ n->next = curr->next;
+ curr->next = n;
+ return head;
 }
 \`\`\`
 
@@ -1540,36 +1540,36 @@ Node* insertSorted(Node *head, int data) {
 \`\`\`c
 // Delete by value — O(n)
 Node* deleteNode(Node *head, int val) {
-    if (!head) return NULL;
+ if (!head) return NULL;
 
-    // Deleting head
-    if (head->data == val) {
-        Node *temp = head->next;
-        free(head);
-        return temp;
-    }
+ // Deleting head
+ if (head->data == val) {
+ Node *temp = head->next;
+ free(head);
+ return temp;
+ }
 
-    // Find node before target
-    Node *curr = head;
-    while (curr->next && curr->next->data != val)
-        curr = curr->next;
+ // Find node before target
+ Node *curr = head;
+ while (curr->next && curr->next->data != val)
+ curr = curr->next;
 
-    if (curr->next) {  // found
-        Node *temp = curr->next;
-        curr->next = temp->next;
-        free(temp);
-    }
-    return head;
+ if (curr->next) { // found
+ Node *temp = curr->next;
+ curr->next = temp->next;
+ free(temp);
+ }
+ return head;
 }
 
 // Delete entire list — O(n)
 void freeList(Node *head) {
-    Node *curr = head;
-    while (curr) {
-        Node *next = curr->next;
-        free(curr);
-        curr = next;
-    }
+ Node *curr = head;
+ while (curr) {
+ Node *next = curr->next;
+ free(curr);
+ curr = next;
+ }
 }
 \`\`\`
 
@@ -1578,32 +1578,32 @@ void freeList(Node *head) {
 \`\`\`c
 // Search — O(n)
 Node* search(Node *head, int val) {
-    for (Node *curr = head; curr; curr = curr->next)
-        if (curr->data == val) return curr;
-    return NULL;
+ for (Node *curr = head; curr; curr = curr->next)
+ if (curr->data == val) return curr;
+ return NULL;
 }
 
 // Reverse — O(n), O(1) space
 Node* reverseList(Node *head) {
-    Node *prev = NULL, *curr = head, *next = NULL;
-    while (curr) {
-        next       = curr->next;  // save next
-        curr->next = prev;        // reverse link
-        prev       = curr;        // move prev
-        curr       = next;        // move curr
-    }
-    return prev;  // new head
+ Node *prev = NULL, *curr = head, *next = NULL;
+ while (curr) {
+ next = curr->next; // save next
+ curr->next = prev; // reverse link
+ prev = curr; // move prev
+ curr = next; // move curr
+ }
+ return prev; // new head
 }
 
 // Detect cycle (Floyd's algorithm)
 int hasCycle(Node *head) {
-    Node *slow = head, *fast = head;
-    while (fast && fast->next) {
-        slow = slow->next;
-        fast = fast->next->next;
-        if (slow == fast) return 1;  // cycle!
-    }
-    return 0;
+ Node *slow = head, *fast = head;
+ while (fast && fast->next) {
+ slow = slow->next;
+ fast = fast->next->next;
+ if (slow == fast) return 1; // cycle!
+ }
+ return 0;
 }
 \`\`\`
 
@@ -1611,34 +1611,34 @@ int hasCycle(Node *head) {
 
 \`\`\`c
 typedef struct DNode {
-    int          data;
-    struct DNode *prev;
-    struct DNode *next;
+ int data;
+ struct DNode *prev;
+ struct DNode *next;
 } DNode;
 
 DNode* createDNode(int data) {
-    DNode *n = (DNode*)malloc(sizeof(DNode));
-    n->data = data;
-    n->prev = n->next = NULL;
-    return n;
+ DNode *n = (DNode*)malloc(sizeof(DNode));
+ n->data = data;
+ n->prev = n->next = NULL;
+ return n;
 }
 
 // Insert after node — O(1) with pointer!
 void insertAfter(DNode *node, int data) {
-    DNode *n = createDNode(data);
-    n->prev  = node;
-    n->next  = node->next;
-    if (node->next) node->next->prev = n;
-    node->next = n;
+ DNode *n = createDNode(data);
+ n->prev = node;
+ n->next = node->next;
+ if (node->next) node->next->prev = n;
+ node->next = n;
 }
 
 // Delete node — O(1) with pointer!
 DNode* deleteNode(DNode *head, DNode *node) {
-    if (node->prev) node->prev->next = node->next;
-    if (node->next) node->next->prev = node->prev;
-    if (head == node) head = node->next;
-    free(node);
-    return head;
+ if (node->prev) node->prev->next = node->next;
+ if (node->next) node->next->prev = node->prev;
+ if (head == node) head = node->next;
+ free(node);
+ return head;
 }
 
 // Print forward and backward
@@ -1959,12 +1959,12 @@ void applyAnnualHike(EmpList *list) {
 
       content_en: `## Week 5 Project — Sab Kuch Combine!
 
-Is hafte seekha:
+This week covered:
 - struct — complex data types
 - union + enum — flexible types, bit flags
 - Linked list — dynamic data structure
 
-Ab ek complete **Employee Management System** build!
+Now let's build a complete **Employee Management System** build!
 
 ### System Architecture
 
@@ -1979,38 +1979,38 @@ typedef struct { char street[60]; char city[30]; int pin; } Address;
 typedef struct { int day, month, year; } Date;
 
 typedef struct {
-    int        id;
-    char       name[60];
-    char       email[60];
-    Department dept;
-    Role       role;
-    EmpType    type;
-    float      salary;
-    Date       joinDate;
-    Address    addr;
-    int        skills;  // bit flags — SKILL_C | SKILL_PYTHON etc
+ int id;
+ char name[60];
+ char email[60];
+ Department dept;
+ Role role;
+ EmpType type;
+ float salary;
+ Date joinDate;
+ Address addr;
+ int skills; // bit flags — SKILL_C | SKILL_PYTHON etc
 } Employee;
 
 typedef struct EmpNode {
-    Employee         emp;
-    struct EmpNode  *next;
+ Employee emp;
+ struct EmpNode *next;
 } EmpNode;
 
 typedef struct {
-    EmpNode *head;
-    int      count;
-    int      nextId;
+ EmpNode *head;
+ int count;
+ int nextId;
 } EmpList;
 
 // ── Skill bit flags ──
 typedef enum {
-    SKILL_C       = 1 << 0,  // 1
-    SKILL_CPP     = 1 << 1,  // 2
-    SKILL_PYTHON  = 1 << 2,  // 4
-    SKILL_JAVA    = 1 << 3,  // 8
-    SKILL_JS      = 1 << 4,  // 16
-    SKILL_SQL     = 1 << 5,  // 32
-    SKILL_LINUX   = 1 << 6,  // 64
+ SKILL_C = 1 << 0, // 1
+ SKILL_CPP = 1 << 1, // 2
+ SKILL_PYTHON = 1 << 2, // 4
+ SKILL_JAVA = 1 << 3, // 8
+ SKILL_JS = 1 << 4, // 16
+ SKILL_SQL = 1 << 5, // 32
+ SKILL_LINUX = 1 << 6, // 64
 } Skill;
 \`\`\`
 
@@ -2018,10 +2018,10 @@ typedef enum {
 
 \`\`\`c
 // CRUD
-void     addEmployee(EmpList *list, Employee e);
+void addEmployee(EmpList *list, Employee e);
 Employee* findById(EmpList *list, int id);
-int      updateSalary(EmpList *list, int id, float newSalary);
-int      deleteEmployee(EmpList *list, int id);
+int updateSalary(EmpList *list, int id, float newSalary);
+int deleteEmployee(EmpList *list, int id);
 
 // Query
 void filterByDept(EmpList *list, Department dept);
@@ -2046,24 +2046,24 @@ const char* roleName(Role r);
 \`\`\`c
 // Role-based hike
 float calcHike(const Employee *e) {
-    float pct;
-    switch (e->role) {
-        case ROLE_MANAGER: pct = 0.15f; break;
-        case ROLE_LEAD:    pct = 0.12f; break;
-        case ROLE_SENIOR:  pct = 0.10f; break;
-        case ROLE_JUNIOR:  pct = 0.08f; break;
-        default:           pct = 0.05f; break;
-    }
-    return e->salary * pct;
+ float pct;
+ switch (e->role) {
+ case ROLE_MANAGER: pct = 0.15f; break;
+ case ROLE_LEAD: pct = 0.12f; break;
+ case ROLE_SENIOR: pct = 0.10f; break;
+ case ROLE_JUNIOR: pct = 0.08f; break;
+ default: pct = 0.05f; break;
+ }
+ return e->salary * pct;
 }
 
 void applyAnnualHike(EmpList *list) {
-    EmpNode *curr = list->head;
-    while (curr) {
-        float hike = calcHike(&curr->emp);
-        curr->emp.salary += hike;
-        curr = curr->next;
-    }
+ EmpNode *curr = list->head;
+ while (curr) {
+ float hike = calcHike(&curr->emp);
+ curr->emp.salary += hike;
+ curr = curr->next;
+ }
 }
 \`\`\``,
 

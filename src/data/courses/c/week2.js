@@ -158,16 +158,16 @@ if ((age >= 18 && age <= 60) && (income > 0 || hasDegree)) {
 
 \`\`\`c
 if (condition) {
-    // when condition is true
+ // when condition is true
 } else {
-    // when condition is false
+ // when condition is false
 }
 
 int marks = 75;
 if (marks >= 60) {
-    printf("Pass! ✅\\n");
+ printf("Pass! ✅\\n");
 } else {
-    printf("Fail! ❌\\n");
+ printf("Fail! ❌\\n");
 }
 \`\`\`
 
@@ -175,11 +175,11 @@ if (marks >= 60) {
 
 \`\`\`c
 int marks = 82;
-if      (marks >= 90) printf("Grade: A\\n");
+if (marks >= 90) printf("Grade: A\\n");
 else if (marks >= 75) printf("Grade: B\\n");
 else if (marks >= 60) printf("Grade: C\\n");
 else if (marks >= 45) printf("Grade: D\\n");
-else                  printf("Grade: F\\n");
+else printf("Grade: F\\n");
 \`\`\`
 
 ### Ternary Operator
@@ -194,12 +194,12 @@ int max = (a > b) ? a : b;
 
 \`\`\`c
 // ❌ = vs == confusion
-if (x = 10)  { }  // assignment — always true!
-if (x == 10) { }  // comparison ✅
+if (x = 10) { } // assignment — always true!
+if (x == 10) { } // comparison ✅
 
 // ❌ Floating point exact comparison
-if (f == 0.3) { }          // unreliable!
-if (fabs(f-0.3) < 0.0001)  // use tolerance ✅
+if (f == 0.3) { } // unreliable!
+if (fabs(f-0.3) < 0.0001) // use tolerance ✅
 \`\`\``,
 
       codeExample: `#include <stdio.h>
@@ -493,14 +493,14 @@ fixed options               String comparisons (C switch mein nahi)
 
 \`\`\`c
 switch (expression) {
-    case value1:
-        // when expression == value1
-        break;      // ← REQUIRED! without break, fall-through occurs
-    case value2:
-        // when expression == value2
-        break;
-    default:
-        break;
+ case value1:
+ // when expression == value1
+ break; // ← REQUIRED! without break, fall-through occurs
+ case value2:
+ // when expression == value2
+ break;
+ default:
+ break;
 }
 \`\`\`
 
@@ -509,27 +509,27 @@ switch (expression) {
 \`\`\`c
 int x = 2;
 switch (x) {
-    case 2:
-        printf("Two\\n");
-        // no break! falls through →
-    case 3:
-        printf("Three\\n");
-        break;
+ case 2:
+ printf("Two\\n");
+ // no break! falls through →
+ case 3:
+ printf("Three\\n");
+ break;
 }
 // Output: Two
-//         Three  ← fall-through!
+// Three ← fall-through!
 \`\`\`
 
 ### Intentional Fall-through
 
 \`\`\`c
 switch (month) {
-    case 4: case 6: case 9: case 11:
-        printf("30 days\\n"); break;
-    case 2:
-        printf("28 or 29 days\\n"); break;
-    default:
-        printf("31 days\\n");
+ case 4: case 6: case 9: case 11:
+ printf("30 days\\n"); break;
+ case 2:
+ printf("28 or 29 days\\n"); break;
+ default:
+ printf("31 days\\n");
 }
 \`\`\`
 
@@ -842,22 +842,22 @@ do-while loop:  Jab body kam se kam ek baar chalani ho (menu, login)
 
       content_en: `## Loops — The Power of Repetition!
 
-### for Loop — When You Know the Count
+### for Loop — When You Know were Count
 
 \`\`\`c
 for (initialization; condition; update) {
-    // body
+ // body
 }
 
-for (int i = 1; i <= 10; i++) printf("%d ", i);  // 1 to 10
-for (int i = 10; i >= 1; i--) printf("%d ", i);  // countdown
+for (int i = 1; i <= 10; i++) printf("%d ", i); // 1 to 10
+for (int i = 10; i >= 1; i--) printf("%d ", i); // countdown
 for (int i = 0; i <= 20; i += 2) printf("%d ", i); // even numbers
 
 // Nested — multiplication table
 for (int i = 1; i <= 3; i++) {
-    for (int j = 1; j <= 3; j++)
-        printf("%d×%d=%-3d ", i, j, i*j);
-    printf("\\n");
+ for (int j = 1; j <= 3; j++)
+ printf("%d×%d=%-3d ", i, j, i*j);
+ printf("\\n");
 }
 \`\`\`
 
@@ -868,14 +868,14 @@ while (condition) { /* body */ }
 
 int n = 12345, count = 0;
 while (n > 0) { n /= 10; count++; }
-printf("Digits: %d\\n", count);  // 5
+printf("Digits: %d\\n", count); // 5
 \`\`\`
 
 ### do-while — At Least Once
 
 \`\`\`c
 do {
-    // runs at least once
+ // runs at least once
 } while (condition);
 \`\`\`
 
@@ -883,11 +883,11 @@ do {
 
 \`\`\`c
 for (int i=1; i<=10; i++) {
-    if (i==5) break;     // stop at 5: 1 2 3 4
+ if (i==5) break; // stop at 5: 1 2 3 4
 }
 
 for (int i=1; i<=10; i++) {
-    if (i%2==0) continue; // skip evens: 1 3 5 7 9
+ if (i%2==0) continue; // skip evens: 1 3 5 7 9
 }
 \`\`\``,
 
@@ -1187,22 +1187,22 @@ Now build a complete **interactive menu-driven program**!
 // Armstrong Number: sum of cubes of digits == number
 // 153 = 1³ + 5³ + 3³ = 153 ✅
 int isArmstrong(int n) {
-    int orig=n, sum=0;
-    while(n>0) { int d=n%10; sum+=d*d*d; n/=10; }
-    return sum==orig;
+ int orig=n, sum=0;
+ while(n>0) { int d=n%10; sum+=d*d*d; n/=10; }
+ return sum==orig;
 }
 
 // Prime — check up to sqrt(n)
 int isPrime(int n) {
-    if(n<=1) return 0;
-    for(int i=2; i*i<=n; i++) if(n%i==0) return 0;
-    return 1;
+ if(n<=1) return 0;
+ for(int i=2; i*i<=n; i++) if(n%i==0) return 0;
+ return 1;
 }
 
 // GCD — Euclidean Algorithm
 int gcd(int a, int b) {
-    while(b) { int t=b; b=a%b; a=t; }
-    return a;
+ while(b) { int t=b; b=a%b; a=t; }
+ return a;
 }
 \`\`\`
 
@@ -1211,9 +1211,9 @@ int gcd(int a, int b) {
 \`\`\`c
 // Pyramid
 for(int i=1; i<=n; i++) {
-    for(int j=1; j<=n-i; j++) printf(" ");
-    for(int j=1; j<=2*i-1; j++) printf("*");
-    printf("\\n");
+ for(int j=1; j<=n-i; j++) printf(" ");
+ for(int j=1; j<=2*i-1; j++) printf("*");
+ printf("\\n");
 }
 \`\`\``,
 

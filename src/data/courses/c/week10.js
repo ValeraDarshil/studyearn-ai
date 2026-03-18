@@ -154,14 +154,14 @@ Rule of thumb: n < 50 → Insertion Sort, n >= 50 → use O(n log n)
 
       content_en: `## O(n²) Sorting Algorithms — Simple but Slow!
 
-Beginner-friendly sorts hain — samajhne in aasaan, but large data ke liye slow.
+Beginner-friendly sorts are — samajhne in aasaan, but large data for slow.
 
 ### Why Study O(n²)?
 \`\`\`
-✅ Interview in concept clearly explain karna padta hai
-✅ Small arrays (<50 elements) ke liye actually fast hain (cache friendly)
-✅ Insertion sort: almost-sorted data ke liye O(n) — practical!
-✅ Hybrid sorts (TimSort) internally Insertion sort use karte hain
+✅ Interview in concept clearly explain to do padta hai
+✅ Small arrays (<50 elements) for actually fast are (cache friendly)
+✅ Insertion sort: almost-sorted data for O(n) — practical!
+✅ Hybrid sorts (TimSort) internally Insertion sort use we do
 \`\`\`
 
 ### Bubble Sort — Adjacent Elements Compare and Swap
@@ -169,26 +169,26 @@ Beginner-friendly sorts hain — samajhne in aasaan, but large data ke liye slow
 \`\`\`c
 // Each pass: largest element "bubbles up" to end
 void bubbleSort(int arr[], int n) {
-    for (int i = 0; i < n - 1; i++) {
-        int swapped = 0;  // optimization flag
-        for (int j = 0; j < n - i - 1; j++) {
-            if (arr[j] > arr[j+1]) {
-                // Swap
-                int temp  = arr[j];
-                arr[j]    = arr[j+1];
-                arr[j+1]  = temp;
-                swapped   = 1;
-            }
-        }
-        if (!swapped) break;  // already sorted — early exit!
-    }
+ for (int i = 0; i < n - 1; i++) {
+ int swapped = 0; // optimization flag
+ for (int j = 0; j < n - i - 1; j++) {
+ if (arr[j] > arr[j+1]) {
+ // Swap
+ int temp = arr[j];
+ arr[j] = arr[j+1];
+ arr[j+1] = temp;
+ swapped = 1;
+ }
+ }
+ if (!swapped) break; // already sorted — early exit!
+ }
 }
 
-// Pass 1: [64,34,25,12,22] → [34,25,12,22,64]  ← 64 bubbled up
-// Pass 2: [34,25,12,22,64] → [25,12,22,34,64]  ← 34 bubbled up
-// Pass 3: [25,12,22,34,64] → [12,22,25,34,64]  ← sorted!
+// Pass 1: [64,34,25,12,22] → [34,25,12,22,64] ← 64 bubbled up
+// Pass 2: [34,25,12,22,64] → [25,12,22,34,64] ← 34 bubbled up
+// Pass 3: [25,12,22,34,64] → [12,22,25,34,64] ← sorted!
 
-// Time:  O(n²) worst/avg, O(n) best (sorted input with flag)
+// Time: O(n²) worst/avg, O(n) best (sorted input with flag)
 // Space: O(1) — in-place
 // Stable: YES (equal elements maintain relative order)
 \`\`\`
@@ -198,18 +198,18 @@ void bubbleSort(int arr[], int n) {
 \`\`\`c
 // Each pass: minimum of remaining unsorted part find do, swap to front
 void selectionSort(int arr[], int n) {
-    for (int i = 0; i < n - 1; i++) {
-        int minIdx = i;
-        for (int j = i + 1; j < n; j++) {
-            if (arr[j] < arr[minIdx])
-                minIdx = j;
-        }
-        if (minIdx != i) {
-            int temp      = arr[i];
-            arr[i]        = arr[minIdx];
-            arr[minIdx]   = temp;
-        }
-    }
+ for (int i = 0; i < n - 1; i++) {
+ int minIdx = i;
+ for (int j = i + 1; j < n; j++) {
+ if (arr[j] < arr[minIdx])
+ minIdx = j;
+ }
+ if (minIdx != i) {
+ int temp = arr[i];
+ arr[i] = arr[minIdx];
+ arr[minIdx] = temp;
+ }
+ }
 }
 
 // Pass 1: [64,25,12,22,11] → min=11 at idx 4 → swap → [11,25,12,22,64]
@@ -217,28 +217,28 @@ void selectionSort(int arr[], int n) {
 // Pass 3: [11,12,25,22,64] → min=22 at idx 3 → swap → [11,12,22,25,64]
 // Pass 4: [11,12,22,25,64] → min=25 at idx 3 → no swap → done!
 
-// Time:  O(n²) always (no early exit possible)
+// Time: O(n²) always (no early exit possible)
 // Space: O(1) — in-place
 // Stable: NO (swap can change relative order of equal elements)
 // Advantage: minimum number of swaps (exactly n-1 swaps worst case)
 \`\`\`
 
-### Insertion Sort — Card Game ki tarah!
+### Insertion Sort — Card Game's tarah!
 
 \`\`\`c
 // Think of sorting cards: pick next card, insert at correct position
 void insertionSort(int arr[], int n) {
-    for (int i = 1; i < n; i++) {
-        int key = arr[i];   // "picked card"
-        int j   = i - 1;
+ for (int i = 1; i < n; i++) {
+ int key = arr[i]; // "picked card"
+ int j = i - 1;
 
-        // Shift all larger elements one position right
-        while (j >= 0 && arr[j] > key) {
-            arr[j + 1] = arr[j];
-            j--;
-        }
-        arr[j + 1] = key;   // insert at correct position
-    }
+ // Shift all larger elements one position right
+ while (j >= 0 && arr[j] > key) {
+ arr[j + 1] = arr[j];
+ j--;
+ }
+ arr[j + 1] = key; // insert at correct position
+ }
 }
 
 // i=1: key=34, [64|34,25,12,22] → shift 64 → [34,64,25,12,22]
@@ -246,29 +246,29 @@ void insertionSort(int arr[], int n) {
 // i=3: key=12, shift 64,34,25 → [12,25,34,64,22]
 // i=4: key=22, shift 64,34,25 → [12,22,25,34,64] ✓
 
-// Time:  O(n²) worst, O(n) best (already sorted!)
+// Time: O(n²) worst, O(n) best (already sorted!)
 // Space: O(1)
 // Stable: YES
 // Best for: small arrays, nearly-sorted data, online sorting
 \`\`\`
 
-### Shell Sort — Insertion Sort ka Improved Version
+### Shell Sort — Insertion Sort's Improved Version
 
 \`\`\`c
-// Gap sequence se compare do — elements pehle se "partially sorted"
+// Gap sequence from compare do — elements first from "partially sorted"
 void shellSort(int arr[], int n) {
-    // Start with large gap, reduce to 1
-    for (int gap = n/2; gap > 0; gap /= 2) {
-        for (int i = gap; i < n; i++) {
-            int temp = arr[i];
-            int j    = i;
-            while (j >= gap && arr[j - gap] > temp) {
-                arr[j] = arr[j - gap];
-                j     -= gap;
-            }
-            arr[j] = temp;
-        }
-    }
+ // Start with large gap, reduce to 1
+ for (int gap = n/2; gap > 0; gap /= 2) {
+ for (int i = gap; i < n; i++) {
+ int temp = arr[i];
+ int j = i;
+ while (j >= gap && arr[j - gap] > temp) {
+ arr[j] = arr[j - gap];
+ j -= gap;
+ }
+ arr[j] = temp;
+ }
+ }
 }
 // Time: O(n log²n) with good gap sequence
 // Better than simple O(n²) in practice
@@ -277,12 +277,12 @@ void shellSort(int arr[], int n) {
 ### Comparison — When to Use What
 
 \`\`\`
-Sort        Best    Average  Worst   Space  Stable  Notes
+Sort Best Average Worst Space Stable Notes
 ──────────────────────────────────────────────────────────────────
-Bubble      O(n)    O(n²)    O(n²)   O(1)   ✅Yes   Educational only
-Selection   O(n²)   O(n²)    O(n²)   O(1)   ❌No    Min swaps
-Insertion   O(n)    O(n²)    O(n²)   O(1)   ✅Yes   Best for small/nearly sorted
-Shell       O(n lg) O(n^1.3) O(n²)   O(1)   ❌No    Practical improvement
+Bubble O(n) O(n²) O(n²) O(1) ✅Yes Educational only
+Selection O(n²) O(n²) O(n²) O(1) ❌No Min swaps
+Insertion O(n) O(n²) O(n²) O(1) ✅Yes Best for small/nearly sorted
+Shell O(n lg) O(n^1.3) O(n²) O(1) ❌No Practical improvement
 ──────────────────────────────────────────────────────────────────
 Rule of thumb: n < 50 → Insertion Sort, n >= 50 → use O(n log n)
 \`\`\``,
@@ -661,7 +661,7 @@ Winner: QuickSort for most cases (cache + in-place advantage)
 
       content_en: `## O(n log n) — Professional Sorting!
 
-Ye algorithms large datasets ke liye use hote hain — real applications mein.
+Ye algorithms large datasets for use hote are — real applications mein.
 
 ### Merge Sort — Divide and Conquer
 
@@ -670,33 +670,33 @@ Ye algorithms large datasets ke liye use hote hain — real applications mein.
 // Guaranteed O(n log n) — best, worst, average same!
 
 void merge(int arr[], int left, int mid, int right) {
-    int n1 = mid - left + 1;
-    int n2 = right - mid;
+ int n1 = mid - left + 1;
+ int n2 = right - mid;
 
-    int *L = (int*)malloc(n1 * sizeof(int));
-    int *R = (int*)malloc(n2 * sizeof(int));
+ int *L = (int*)malloc(n1 * sizeof(int));
+ int *R = (int*)malloc(n2 * sizeof(int));
 
-    for (int i = 0; i < n1; i++) L[i] = arr[left + i];
-    for (int j = 0; j < n2; j++) R[j] = arr[mid + 1 + j];
+ for (int i = 0; i < n1; i++) L[i] = arr[left + i];
+ for (int j = 0; j < n2; j++) R[j] = arr[mid + 1 + j];
 
-    int i = 0, j = 0, k = left;
-    while (i < n1 && j < n2) {
-        if (L[i] <= R[j]) arr[k++] = L[i++];  // <= for stability!
-        else               arr[k++] = R[j++];
-    }
-    while (i < n1) arr[k++] = L[i++];
-    while (j < n2) arr[k++] = R[j++];
+ int i = 0, j = 0, k = left;
+ while (i < n1 && j < n2) {
+ if (L[i] <= R[j]) arr[k++] = L[i++]; // <= for stability!
+ else arr[k++] = R[j++];
+ }
+ while (i < n1) arr[k++] = L[i++];
+ while (j < n2) arr[k++] = R[j++];
 
-    free(L); free(R);
+ free(L); free(R);
 }
 
 void mergeSort(int arr[], int left, int right) {
-    if (left >= right) return;  // base case: 1 element
+ if (left >= right) return; // base case: 1 element
 
-    int mid = left + (right - left) / 2;  // avoid overflow!
-    mergeSort(arr, left,  mid);
-    mergeSort(arr, mid+1, right);
-    merge(arr, left, mid, right);
+ int mid = left + (right - left) / 2; // avoid overflow!
+ mergeSort(arr, left, mid);
+ mergeSort(arr, mid+1, right);
+ merge(arr, left, mid, right);
 }
 // Call: mergeSort(arr, 0, n-1);
 
@@ -709,7 +709,7 @@ void mergeSort(int arr[], int left, int right) {
 // Merge: [3,27,38,43] [9,10,82]
 // Merge: [3,9,10,27,38,43,82] ✓
 
-// Time:  O(n log n) always
+// Time: O(n log n) always
 // Space: O(n) — needs auxiliary array
 // Stable: YES
 // Best for: linked lists, external sorting, stability needed
@@ -721,29 +721,29 @@ void mergeSort(int arr[], int left, int right) {
 // Pivot choose do → partition → recursively sort both sides
 
 int partition(int arr[], int low, int high) {
-    int pivot = arr[high];  // last element as pivot
-    int i = low - 1;        // smaller elements boundary
+ int pivot = arr[high]; // last element as pivot
+ int i = low - 1; // smaller elements boundary
 
-    for (int j = low; j < high; j++) {
-        if (arr[j] <= pivot) {
-            i++;
-            int temp  = arr[i];
-            arr[i]    = arr[j];
-            arr[j]    = temp;
-        }
-    }
-    // Put pivot in correct position
-    int temp    = arr[i+1];
-    arr[i+1]    = arr[high];
-    arr[high]   = temp;
-    return i + 1;  // pivot index
+ for (int j = low; j < high; j++) {
+ if (arr[j] <= pivot) {
+ i++;
+ int temp = arr[i];
+ arr[i] = arr[j];
+ arr[j] = temp;
+ }
+ }
+ // Put pivot in correct position
+ int temp = arr[i+1];
+ arr[i+1] = arr[high];
+ arr[high] = temp;
+ return i + 1; // pivot index
 }
 
 void quickSort(int arr[], int low, int high) {
-    if (low >= high) return;
-    int pi = partition(arr, low, high);
-    quickSort(arr, low,    pi - 1);  // left of pivot
-    quickSort(arr, pi + 1, high);    // right of pivot
+ if (low >= high) return;
+ int pi = partition(arr, low, high);
+ quickSort(arr, low, pi - 1); // left of pivot
+ quickSort(arr, pi + 1, high); // right of pivot
 }
 
 // Visualization with pivot=10:
@@ -753,7 +753,7 @@ void quickSort(int arr[], int low, int high) {
 // j=2: 8>5, skip
 // j=3: 9>5, skip
 // j=4: 1<=5, swap → i=0, [1,7,8,9,10,5]
-// Place pivot: [1,5,8,9,10,7]  ← 5 in position!
+// Place pivot: [1,5,8,9,10,7] ← 5 in position!
 // Recurse on [1] and [8,9,10,7]
 \`\`\`
 
@@ -761,60 +761,60 @@ void quickSort(int arr[], int low, int high) {
 
 \`\`\`c
 // Strategy 1: Last element (simple but bad for sorted input)
-int pivot = arr[high];  // O(n²) on sorted array!
+int pivot = arr[high]; // O(n²) on sorted array!
 
 // Strategy 2: First element
-int pivot = arr[low];   // also bad for sorted array
+int pivot = arr[low]; // also bad for sorted array
 
 // Strategy 3: Random pivot (much better!)
 int randIdx = low + rand() % (high - low + 1);
-int temp    = arr[randIdx]; arr[randIdx] = arr[high]; arr[high] = temp;
-int pivot   = arr[high];
+int temp = arr[randIdx]; arr[randIdx] = arr[high]; arr[high] = temp;
+int pivot = arr[high];
 // Expected O(n log n), astronomically unlikely worst case
 
 // Strategy 4: Median of Three (best in practice)
-int mid   = low + (high - low) / 2;
+int mid = low + (high - low) / 2;
 // Sort low, mid, high
-if (arr[low] > arr[mid])  { int t=arr[low];  arr[low]=arr[mid];  arr[mid]=t;  }
-if (arr[low] > arr[high]) { int t=arr[low];  arr[low]=arr[high]; arr[high]=t; }
-if (arr[mid] > arr[high]) { int t=arr[mid];  arr[mid]=arr[high]; arr[high]=t; }
+if (arr[low] > arr[mid]) { int t=arr[low]; arr[low]=arr[mid]; arr[mid]=t; }
+if (arr[low] > arr[high]) { int t=arr[low]; arr[low]=arr[high]; arr[high]=t; }
+if (arr[mid] > arr[high]) { int t=arr[mid]; arr[mid]=arr[high]; arr[high]=t; }
 // arr[mid] is now median → swap to high-1 as pivot
 int pivot = arr[mid];
 
 // 3-way partition (Dutch National Flag) — handles duplicates efficiently
 void quickSort3Way(int arr[], int lo, int hi) {
-    if (lo >= hi) return;
-    int lt = lo, gt = hi, i = lo;
-    int pivot = arr[lo];
-    while (i <= gt) {
-        if      (arr[i] < pivot) { SWAP(arr[lt++], arr[i++]); }
-        else if (arr[i] > pivot) { SWAP(arr[i],    arr[gt--]); }
-        else                     { i++; }
-    }
-    // arr[lo..lt-1] < pivot, arr[lt..gt] == pivot, arr[gt+1..hi] > pivot
-    quickSort3Way(arr, lo, lt-1);
-    quickSort3Way(arr, gt+1, hi);
+ if (lo >= hi) return;
+ int lt = lo, gt = hi, i = lo;
+ int pivot = arr[lo];
+ while (i <= gt) {
+ if (arr[i] < pivot) { SWAP(arr[lt++], arr[i++]); }
+ else if (arr[i] > pivot) { SWAP(arr[i], arr[gt--]); }
+ else { i++; }
+ }
+ // arr[lo..lt-1] < pivot, arr[lt..gt] == pivot, arr[gt+1..hi] > pivot
+ quickSort3Way(arr, lo, lt-1);
+ quickSort3Way(arr, gt+1, hi);
 }
 \`\`\`
 
 ### Merge vs Quick — Deep Comparison
 
 \`\`\`
-Feature         Merge Sort      Quick Sort
+Feature Merge Sort Quick Sort
 ────────────────────────────────────────────────────────────
-Time (avg)      O(n log n)      O(n log n)
-Time (worst)    O(n log n) ✅   O(n²) — bad pivot ❌
-Time (best)     O(n log n)      O(n log n)
-Space           O(n) ❌         O(log n) ✅ (stack)
-Stable          Yes ✅          No ❌
-Cache friendly  Poor ❌         Excellent ✅ (in-place)
-Real speed      Slower          2-3x faster in practice!
-Best for        Linked lists    Arrays, in-place sorting
-                External sort   Most real applications
-                Stability needed
+Time (avg) O(n log n) O(n log n)
+Time (worst) O(n log n) ✅ O(n²) — bad pivot ❌
+Time (best) O(n log n) O(n log n)
+Space O(n) ❌ O(log n) ✅ (stack)
+Stable Yes ✅ No ❌
+Cache friendly Poor ❌ Excellent ✅ (in-place)
+Real speed Slower 2-3x faster in practice!
+Best for Linked lists Arrays, in-place sorting
+ External sort Most real applications
+ Stability needed
 ────────────────────────────────────────────────────────────
 Winner: QuickSort for most cases (cache + in-place advantage)
-        MergeSort for stability or linked lists
+ MergeSort for stability or linked lists
 \`\`\``,
 
       codeExample: `#include <stdio.h>
@@ -1203,37 +1203,37 @@ stdlib qsort() → IntroSort (Quick+Heap+Insertion hybrid) — best of all world
 // Heap = complete binary tree with heap property
 // Max-Heap: parent >= children
 
-// "Heapify" — subtree ko max-heap build
+// "Heapify" — subtree to max-heap build
 void heapify(int arr[], int n, int i) {
-    int largest = i;       // root
-    int left    = 2*i + 1;
-    int right   = 2*i + 2;
+ int largest = i; // root
+ int left = 2*i + 1;
+ int right = 2*i + 2;
 
-    if (left  < n && arr[left]  > arr[largest]) largest = left;
-    if (right < n && arr[right] > arr[largest]) largest = right;
+ if (left < n && arr[left] > arr[largest]) largest = left;
+ if (right < n && arr[right] > arr[largest]) largest = right;
 
-    if (largest != i) {
-        int temp      = arr[i];
-        arr[i]        = arr[largest];
-        arr[largest]  = temp;
-        heapify(arr, n, largest);  // fix affected subtree
-    }
+ if (largest != i) {
+ int temp = arr[i];
+ arr[i] = arr[largest];
+ arr[largest] = temp;
+ heapify(arr, n, largest); // fix affected subtree
+ }
 }
 
 void heapSort(int arr[], int n) {
-    // Step 1: Build max-heap — O(n)
-    for (int i = n/2 - 1; i >= 0; i--)
-        heapify(arr, n, i);
+ // Step 1: Build max-heap — O(n)
+ for (int i = n/2 - 1; i >= 0; i--)
+ heapify(arr, n, i);
 
-    // Step 2: Extract max one by one — O(n log n)
-    for (int i = n - 1; i > 0; i--) {
-        int temp  = arr[0];    // max is at root
-        arr[0]    = arr[i];    // move to end
-        arr[i]    = temp;
-        heapify(arr, i, 0);    // fix heap (size reduced by 1)
-    }
+ // Step 2: Extract max one by one — O(n log n)
+ for (int i = n - 1; i > 0; i--) {
+ int temp = arr[0]; // max is at root
+ arr[0] = arr[i]; // move to end
+ arr[i] = temp;
+ heapify(arr, i, 0); // fix heap (size reduced by 1)
+ }
 }
-// Time:  O(n log n) — always (best, worst, avg same!)
+// Time: O(n log n) — always (best, worst, avg same!)
 // Space: O(1) — in-place!
 // Stable: NO
 // Advantage over QuickSort: guaranteed O(n log n), no O(n²) worst case
@@ -1247,36 +1247,36 @@ void heapSort(int arr[], int n) {
 // Example: sort exam scores (0-100)
 
 void countingSort(int arr[], int n, int maxVal) {
-    int *count  = (int*)calloc(maxVal + 1, sizeof(int));
-    int *output = (int*)malloc(n * sizeof(int));
+ int *count = (int*)calloc(maxVal + 1, sizeof(int));
+ int *output = (int*)malloc(n * sizeof(int));
 
-    // Step 1: Count occurrences
-    for (int i = 0; i < n; i++)
-        count[arr[i]]++;
+ // Step 1: Count occurrences
+ for (int i = 0; i < n; i++)
+ count[arr[i]]++;
 
-    // Step 2: Prefix sum (for stable sort)
-    for (int i = 1; i <= maxVal; i++)
-        count[i] += count[i-1];
+ // Step 2: Prefix sum (for stable sort)
+ for (int i = 1; i <= maxVal; i++)
+ count[i] += count[i-1];
 
-    // Step 3: Build output (right to left for stability)
-    for (int i = n - 1; i >= 0; i--) {
-        output[count[arr[i]] - 1] = arr[i];
-        count[arr[i]]--;
-    }
+ // Step 3: Build output (right to left for stability)
+ for (int i = n - 1; i >= 0; i--) {
+ output[count[arr[i]] - 1] = arr[i];
+ count[arr[i]]--;
+ }
 
-    // Step 4: Copy back
-    for (int i = 0; i < n; i++)
-        arr[i] = output[i];
+ // Step 4: Copy back
+ for (int i = 0; i < n; i++)
+ arr[i] = output[i];
 
-    free(count); free(output);
+ free(count); free(output);
 }
 
 // Example: Sort [4,2,2,8,3,3,1]
-// count: [0,1,2,2,1,0,0,0,1]  (count[x] = how many times x appears)
-// prefix:[0,1,3,5,6,6,6,6,7]  (where each element should go)
+// count: [0,1,2,2,1,0,0,0,1] (count[x] = how many times x appears)
+// prefix:[0,1,3,5,6,6,6,6,7] (where each element should go)
 // Output: [1,2,2,3,3,4,8] ✓
 
-// Time:  O(n + k) where k = range of values
+// Time: O(n + k) where k = range of values
 // Space: O(n + k)
 // Stable: YES
 // FASTEST when k = O(n)! (e.g., sort n students by score 0-100)
@@ -1290,41 +1290,41 @@ void countingSort(int arr[], int n, int maxVal) {
 
 // Counting sort on digit d (0=units, 1=tens, 2=hundreds...)
 void countingSortByDigit(int arr[], int n, int exp) {
-    int output[n];
-    int count[10] = {0};
+ int output[n];
+ int count[10] = {0};
 
-    // Count occurrences of each digit
-    for (int i = 0; i < n; i++)
-        count[(arr[i] / exp) % 10]++;
+ // Count occurrences of each digit
+ for (int i = 0; i < n; i++)
+ count[(arr[i] / exp) % 10]++;
 
-    // Prefix sum
-    for (int i = 1; i < 10; i++)
-        count[i] += count[i-1];
+ // Prefix sum
+ for (int i = 1; i < 10; i++)
+ count[i] += count[i-1];
 
-    // Build output (right to left for stability)
-    for (int i = n-1; i >= 0; i--) {
-        output[count[(arr[i] / exp) % 10] - 1] = arr[i];
-        count[(arr[i] / exp) % 10]--;
-    }
+ // Build output (right to left for stability)
+ for (int i = n-1; i >= 0; i--) {
+ output[count[(arr[i] / exp) % 10] - 1] = arr[i];
+ count[(arr[i] / exp) % 10]--;
+ }
 
-    for (int i = 0; i < n; i++) arr[i] = output[i];
+ for (int i = 0; i < n; i++) arr[i] = output[i];
 }
 
 void radixSort(int arr[], int n) {
-    int max = arr[0];
-    for (int i = 1; i < n; i++) if (arr[i] > max) max = arr[i];
+ int max = arr[0];
+ for (int i = 1; i < n; i++) if (arr[i] > max) max = arr[i];
 
-    // Sort by each digit: units, tens, hundreds...
-    for (int exp = 1; max/exp > 0; exp *= 10)
-        countingSortByDigit(arr, n, exp);
+ // Sort by each digit: units, tens, hundreds...
+ for (int exp = 1; max/exp > 0; exp *= 10)
+ countingSortByDigit(arr, n, exp);
 }
 
 // Example: Sort [170,45,75,90,802,24,2,66]
-// Pass 1 (units):  [170,90,802,2,24,45,75,66]  sort by last digit
-// Pass 2 (tens):   [802,2,24,45,66,170,75,90]  sort by 2nd digit
-// Pass 3 (hundreds):[2,24,45,66,75,90,170,802]  sorted!
+// Pass 1 (units): [170,90,802,2,24,45,75,66] sort by last digit
+// Pass 2 (tens): [802,2,24,45,66,170,75,90] sort by 2nd digit
+// Pass 3 (hundreds):[2,24,45,66,75,90,170,802] sorted!
 
-// Time:  O(d * (n + k)) where d=digits, k=10 for decimal = O(n)!
+// Time: O(d * (n + k)) where d=digits, k=10 for decimal = O(n)!
 // Space: O(n + k)
 // Stable: YES (if counting sort is stable)
 // AMAZING when: many numbers, fixed digit count
@@ -1333,20 +1333,20 @@ void radixSort(int arr[], int n) {
 ### Sorting Algorithm Master Summary
 
 \`\`\`
-Algorithm      Time(avg)     Time(best) Time(worst)  Space  Stable  Notes
+Algorithm Time(avg) Time(best) Time(worst) Space Stable Notes
 ─────────────────────────────────────────────────────────────────────────────
-Bubble         O(n²)         O(n)       O(n²)        O(1)   ✅   Educational
-Selection      O(n²)         O(n²)      O(n²)        O(1)   ❌   Min swaps
-Insertion      O(n²)         O(n)       O(n²)        O(1)   ✅   Small/nearly sorted
-Shell          O(n^1.3)      O(n log n) O(n²)        O(1)   ❌   Practical improvement
+Bubble O(n²) O(n) O(n²) O(1) ✅ Educational
+Selection O(n²) O(n²) O(n²) O(1) ❌ Min swaps
+Insertion O(n²) O(n) O(n²) O(1) ✅ Small/nearly sorted
+Shell O(n^1.3) O(n log n) O(n²) O(1) ❌ Practical improvement
 ─────────────────────────────────────────────────────────────────────────────
-Merge Sort     O(n log n)    O(n log n) O(n log n)   O(n)   ✅   Linked lists, stable
-Quick Sort     O(n log n)    O(n log n) O(n²)        O(lg)  ❌   Arrays, fastest avg
-Heap Sort      O(n log n)    O(n log n) O(n log n)   O(1)   ❌   Guaranteed O(n log n)
+Merge Sort O(n log n) O(n log n) O(n log n) O(n) ✅ Linked lists, stable
+Quick Sort O(n log n) O(n log n) O(n²) O(lg) ❌ Arrays, fastest avg
+Heap Sort O(n log n) O(n log n) O(n log n) O(1) ❌ Guaranteed O(n log n)
 ─────────────────────────────────────────────────────────────────────────────
-Counting Sort  O(n+k)        O(n+k)     O(n+k)       O(k)   ✅   Small int range
-Radix Sort     O(d(n+k))     O(d(n+k))  O(d(n+k))    O(n+k) ✅   Fixed-width integers
-Bucket Sort    O(n+k)        O(n)       O(n²)        O(n)   ✅   Uniform distribution
+Counting Sort O(n+k) O(n+k) O(n+k) O(k) ✅ Small int range
+Radix Sort O(d(n+k)) O(d(n+k)) O(d(n+k)) O(n+k) ✅ Fixed-width integers
+Bucket Sort O(n+k) O(n) O(n²) O(n) ✅ Uniform distribution
 ─────────────────────────────────────────────────────────────────────────────
 stdlib qsort() → IntroSort (Quick+Heap+Insertion hybrid) — best of all worlds!
 \`\`\``,
@@ -1684,23 +1684,23 @@ Learned in Weeks 9-10:
 // - Memory usage estimation
 
 typedef struct {
-    char   name[30];
-    void   (*sortFn)(int*, int);
-    long   comparisons;
-    long   swaps;
-    double timeMs;
-    int    stable;
-    int    inPlace;
+ char name[30];
+ void (*sortFn)(int*, int);
+ long comparisons;
+ long swaps;
+ double timeMs;
+ int stable;
+ int inPlace;
 } SortStats;
 
 // Input patterns to test:
 typedef enum {
-    RANDOM,          // uniform random
-    SORTED,          // already sorted (best case for some)
-    REVERSE_SORTED,  // worst case for naive Quick Sort
-    NEARLY_SORTED,   // 5% elements out of place
-    FEW_UNIQUE,      // many duplicates (3-way QS shines)
-    PIPE_ORGAN,      // 1,2,3,...,n/2,n/2,...,3,2,1 (adversarial)
+ RANDOM, // uniform random
+ SORTED, // already sorted (best case for some)
+ REVERSE_SORTED, // worst case for naive Quick Sort
+ NEARLY_SORTED, // 5% elements out of place
+ FEW_UNIQUE, // many duplicates (3-way QS shines)
+ PIPE_ORGAN, // 1,2,3,...,n/2,n/2,...,3,2,1 (adversarial)
 } InputPattern;
 \`\`\`
 
@@ -1708,25 +1708,25 @@ typedef enum {
 
 \`\`\`
 Sort karni hai?
-  │
-  ├─ n < 50?
-  │    └── Insertion Sort ✅
-  │
-  ├─ Stability required?
-  │    ├── Yes → Merge Sort (linked list) / TimSort (array)
-  │    └── No  → Quick Sort (random pivot)
-  │
-  ├─ Guaranteed O(n log n) needed?
-  │    └── Heap Sort / Merge Sort
-  │
-  ├─ Integers, small range?
-  │    └── Counting Sort (fastest!)
-  │
-  ├─ Integers, fixed digits?
-  │    └── Radix Sort
-  │
-  └─ General purpose?
-       └── stdlib qsort() / IntroSort
+ │
+ ├─ n < 50?
+ │ └── Insertion Sort ✅
+ │
+ ├─ Stability required?
+ │ ├── Yes → Merge Sort (linked list) / TimSort (array)
+ │ └── No → Quick Sort (random pivot)
+ │
+ ├─ Guaranteed O(n log n) needed?
+ │ └── Heap Sort / Merge Sort
+ │
+ ├─ Integers, small range?
+ │ └── Counting Sort (fastest!)
+ │
+ ├─ Integers, fixed digits?
+ │ └── Radix Sort
+ │
+ └─ General purpose?
+ └── stdlib qsort() / IntroSort
 \`\`\`
 
 ### stdlib qsort() — C Standard Library
@@ -1736,17 +1736,17 @@ Sort karni hai?
 
 // Comparator: negative if a<b, 0 if equal, positive if a>b
 int cmpInt(const void *a, const void *b) {
-    return *(int*)a - *(int*)b;   // ascending
+ return *(int*)a - *(int*)b; // ascending
 }
 int cmpIntDesc(const void *a, const void *b) {
-    return *(int*)b - *(int*)a;   // descending
+ return *(int*)b - *(int*)a; // descending
 }
 int cmpStr(const void *a, const void *b) {
-    return strcmp(*(char**)a, *(char**)b);
+ return strcmp(*(char**)a, *(char**)b);
 }
 int cmpStruct(const void *a, const void *b) {
-    Student *sa = (Student*)a, *sb = (Student*)b;
-    return sb->marks - sa->marks;  // sort by marks descending
+ Student *sa = (Student*)a, *sb = (Student*)b;
+ return sb->marks - sa->marks; // sort by marks descending
 }
 
 // Usage
@@ -1764,18 +1764,18 @@ if (found) printf("Found: %d at index %ld\\n", *found, found - arr);
 
 \`\`\`
 Month 3 (Weeks 9-12):
-  ✅ Week 9:  Binary Trees, BST, AVL Tree
-  ✅ Week 10: Sorting Algorithms Master Class
-  📚 Week 11: Graphs — DFS, BFS, Dijkstra, TopSort (next!)
-  📚 Week 12: Final Project + Certificate 🎓
+ ✅ Week 9: Binary Trees, BST, AVL Tree
+ ✅ Week 10: Sorting Algorithms Master Class
+ 📚 Week 11: Graphs — DFS, BFS, Dijkstra, TopSort (next!)
+ 📚 Week 12: Final Project + Certificate 🎓
 
 Learned in Weeks 9-10:
-  - Tree traversals (4 types)
-  - BST operations O(log n)
-  - AVL self-balancing O(log n) guaranteed
-  - 8 sorting algorithms from O(n²) to O(n)
-  - Stability, in-place, cache performance
-  - Decision making: when to use which
+ - Tree traversals (4 types)
+ - BST operations O(log n)
+ - AVL self-balancing O(log n) guaranteed
+ - 8 sorting algorithms from O(n²) to O(n)
+ - Stability, in-place, cache performance
+ - Decision making: when to use which
 \`\`\``,
 
       codeExample: `#include <stdio.h>
