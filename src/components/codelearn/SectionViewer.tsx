@@ -281,115 +281,54 @@ export default function SectionViewer({
       return;
     }
 
-    // ── C / C++ / JavaScript → Piston API (free, no API key) ──
-    const langMap: Record<string, { language: string; version: string; ext: string }> = {
-      c:          { language: 'c',          version: '10.2.0',  ext: 'c'  },
-      cpp:        { language: 'c++',        version: '10.2.0',  ext: 'cpp'},
-      javascript: { language: 'javascript', version: '18.15.0', ext: 'js' },
-    };
-
-    const pistonLang = langMap[language];
-    if (!pistonLang) {
-      setOutput(`${language.toUpperCase()}: Not supported for in-browser execution.\nTry onlinegdb.com`);
+    // ── C / C++ / JavaScript → Backend (Piston via server, no CORS/auth issues) ──
+    const supported = ['c', 'cpp', 'javascript'];
+    if (!supported.includes(language)) {
+      setOutput(`${language.toUpperCase()}: Not supported.\nTry onlinegdb.com`);
       setRunning(false);
       return;
     }
 
-    // ── Smart stdin: scan code for scanf/input patterns and auto-generate inputs ──
-    const generateStdin = (code: string, lang: string): string => {
-      if (lang === 'javascript') return '';
-
-      // Count how many scanf/fgets calls exist
-      const scanfMatches = (code.match(/scanf\s*\(/g) || []).length;
-      const fgetsMatches = (code.match(/fgets\s*\(/g) || []).length;
-      const totalInputs  = scanfMatches + fgetsMatches;
-
-      if (totalInputs === 0) return ''; // no input needed
-
-      // Detect input types from format strings
-      const inputs: string[] = [];
-      const fmtRegex = /scanf\s*\(\s*["'](.*?)["']/g;
-      let match;
-      while ((match = fmtRegex.exec(code)) !== null) {
-        const fmt = match[1];
-        // Generate appropriate sample value per format specifier
-        if (fmt.includes('%d') || fmt.includes('%i')) inputs.push('10');
-        else if (fmt.includes('%f') || fmt.includes('%lf')) inputs.push('3.14');
-        else if (fmt.includes('%c')) inputs.push('A');
-        else if (fmt.includes('%s')) inputs.push('Rahul');
-        else inputs.push('5');
-      }
-
-      // fgets → provide a full line
-      for (let i = 0; i < fgetsMatches; i++) inputs.push('Rahul Sharma');
-
-      // Special patterns: ATM PIN → use correct pin from code
-      if (code.includes('1234') && code.includes('scanf') && code.includes('pin')) {
-        return '1234\n5000\n';
-      }
-      // Menu-driven program → choice + two numbers
-      if (code.includes('choice') && code.includes('scanf')) {
-        return '1\n10\n5\n0\n';
-      }
-      // Guessing game → guess the secret
-      if (code.includes('secret') && code.includes('guess')) {
-        return '42\n';
-      }
-
-      return inputs.slice(0, 10).join('\n') + '\n';
-    };
-
-    const stdin = generateStdin(userCode, language);
-
     try {
-      const resp = await fetch('https://emkc.org/api/v2/piston/execute', {
+      const apiBase = import.meta.env.VITE_API_URL || '';
+      const resp = await fetch(`${apiBase}/api/codelearn/run-code`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
-          language:        pistonLang.language,
-          version:         pistonLang.version,
-          files:           [{ name: `main.${pistonLang.ext}`, content: userCode }],
-          stdin:           stdin,
-          run_timeout:     8000,
-          compile_timeout: 15000,
+          language,
+          code:           userCode,
+          stdin:          '',
+          expectedOutput: null,
+          sectionId:      null,
         }),
       });
 
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      if (!resp.ok) throw new Error(`Server error: ${resp.status}`);
       const data = await resp.json();
 
-      const compileErr = data.compile?.stderr?.trim() || '';
-      const runStdout  = data.run?.stdout?.trim()    || '';
-      const runStderr  = data.run?.stderr?.trim()    || '';
-      const exitCode   = data.run?.code ?? 0;
-
-      // Build clean output
-      let out = '';
-      if (compileErr) {
-        // Clean up gcc error paths
-        out = '❌ Compile Error:\n' + compileErr.replace(/\/tmp\/[^:]+:/g, 'line ').replace(/\/piston\/jobs\/[^:]+:/g, '');
+      if (data.success) {
+        setOutput(data.output || '(No output)');
+        setOutputIsError(data.isCorrect === false && !data.output?.includes('unavailable'));
       } else {
-        out = runStdout;
-        if (runStderr) out += (out ? '\n' : '') + runStderr;
-        if (!out)      out = '(No output — check if printf/cout is present)';
-        if (exitCode !== 0 && exitCode !== null) {
-          out += `\n\n[Exit code: ${exitCode}]`;
-        }
+        throw new Error(data.message || 'Unknown error');
       }
-
-      setOutput(out);
-      setOutputIsError(!!compileErr || (exitCode !== 0 && exitCode !== null && !runStdout));
 
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      setOutput(
-        `⚠️ Compiler service unavailable.\n\n` +
-        `Free online compilers:\n` +
-        `• onlinegdb.com  ← Best for C/C++\n` +
-        `• godbolt.org    ← See assembly too\n` +
-        `• replit.com     ← All languages\n\n` +
-        `Error: ${msg}`
-      );
+      // If auth error, show login message; else show fallback
+      if (msg.includes('401') || msg.includes('Login')) {
+        setOutput('⚠️ Please log in to run code.');
+      } else {
+        setOutput(
+          `⚠️ Compiler temporarily unavailable.\n\n` +
+          `Free online C compilers:\n` +
+          `• onlinegdb.com  ← Best for C/C++\n` +
+          `• godbolt.org    ← Compiler explorer\n` +
+          `• replit.com     ← All languages\n\n` +
+          `Error: ${msg}`
+        );
+      }
       setOutputIsError(true);
     }
 
