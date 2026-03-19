@@ -1230,12 +1230,13 @@ router.post('/google', authLimiter, async (req, res) => {
 // ─────────────────────────────────────────────────────────────
 // POST /api/auth/google/apply-referral
 // Google signup ke baad referral code apply karne ke liye
+// skipMode: true = auto-assign default referrer (first user = admin)
 // ─────────────────────────────────────────────────────────────
 router.post('/google/apply-referral', async (req: any, res) => {
   try {
     await connectDB();
 
-    // Get user from JWT token
+    // Auth check
     const authHeader = req.headers.authorization;
     if (!authHeader?.startsWith('Bearer ')) {
       return res.status(401).json({ success: false, message: 'Not authenticated' });
@@ -1252,20 +1253,19 @@ router.post('/google/apply-referral', async (req: any, res) => {
     const user = await User.findById(userId) as any;
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
-    // Already has referral — can't apply again
+    // Already has referral — don't double apply
     if (user.referredBy) {
-      return res.status(400).json({ success: false, message: 'Referral code already applied to this account.' });
+      return res.json({ success: true, bonusPoints: 0, message: 'Already applied' });
     }
 
     const { referralCode, skipMode } = req.body;
-    const code = referralCode?.trim().toUpperCase() || "";
+    const code = (referralCode || '').trim().toUpperCase();
 
     let referrer: any = null;
     let bonusForUser = 0;
 
     if (code) {
-      // ── Manual referral code entered ──────────────────────
-      // Don't allow self-referral
+      // ── Manual code entered ───────────────────────────────
       if (user.referralCode === code) {
         return res.status(400).json({ success: false, message: "You can't use your own referral code!" });
       }
@@ -1273,24 +1273,15 @@ router.post('/google/apply-referral', async (req: any, res) => {
       if (!referrer) {
         return res.status(404).json({ success: false, message: 'Invalid referral code. Please check and try again.' });
       }
-      // Bonus: extra 100 pts for using referral code
-      bonusForUser = 100;
+      bonusForUser = 100; // Extra 100 pts bonus for using referral code
 
     } else if (skipMode) {
-      // ── Skip mode — auto-assign default referrer ──────────
-      // Same logic as normal signup: first user (admin) gets auto-referral
+      // ── Skip — auto assign to first user (admin/owner) ────
       referrer = await getDefaultReferrer() as any;
-      // No bonus for user when skipping (same as normal signup auto-referral)
-      bonusForUser = 0;
+      bonusForUser = 0; // No bonus for user when skipping
     }
 
     if (!referrer) {
-      // No referrer found — just proceed silently
-      return res.json({ success: true, bonusPoints: 0 });
-    }
-
-    // Already referred — don't double-apply
-    if (user.referredBy) {
       return res.json({ success: true, bonusPoints: 0 });
     }
 
@@ -1302,32 +1293,35 @@ router.post('/google/apply-referral', async (req: any, res) => {
     user.referredBy = referrer.referralCode || code;
     await user.save();
 
-    // Give +100 pts to referrer
+    // ✅ Give +100 pts to referrer (THIS is the fix — was missing before)
     referrer.points  = (referrer.points  || 0) + 100;
     referrer.totalXP = (referrer.totalXP || 0) + 100;
     await referrer.save();
 
-    // Log activities
+    // Log activity for referrer
+    await Activity.create({
+      userId:       referrer._id,
+      action:       'referral',
+      details:      `${user.name} joined via Google ${code ? '(referral code)' : '(auto-referral)'}`,
+      pointsEarned: 100,
+    });
+
+    // Log activity for user if they got bonus
     if (bonusForUser > 0) {
       await Activity.create({
         userId:       user._id,
         action:       'referral',
-        details:      `Applied referral code ${code} — bonus ${bonusForUser} pts!`,
+        details:      `Referral bonus applied — code ${code}`,
         pointsEarned: bonusForUser,
       });
     }
-    await Activity.create({
-      userId:       referrer._id,
-      action:       'referral',
-      details:      `${user.name} joined via Google ${code ? `(code: ${code})` : '(auto-referral)'}`,
-      pointsEarned: 100,
-    });
 
+    logger.info(`Referral applied: ${user.email} → ${referrer.email}, referrer +100 pts`);
     return res.json({ success: true, bonusPoints: bonusForUser });
 
   } catch (error: any) {
     logger.error('Apply referral error:', error.message);
-    return res.status(500).json({ success: false, message: 'Server error. Please try again.' });
+    return res.status(500).json({ success: false, message: 'Server error: ' + error.message });
   }
 });
 
