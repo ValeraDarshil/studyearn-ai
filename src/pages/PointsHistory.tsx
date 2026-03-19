@@ -1,6 +1,7 @@
 /**
  * StudyEarn AI — Points History Page
  * Last 30 days ka detailed points breakdown
+ * Saara purana data bhi dikhta hai (Activity collection se)
  */
 import { useState, useEffect, useMemo } from "react";
 import {
@@ -12,9 +13,10 @@ import {
 import { useApp } from "../context/AppContext";
 import { AnimatedNumber } from "../components/AnimatedNumber";
 
-const API_URL = import.meta.env.VITE_API_URL as string;
+const API_URL = (import.meta.env.VITE_API_URL as string) || "";
 
-const ACTION_META: Record<string, { label: string; icon: any; color: string; bg: string }> = {
+// ── Action metadata ───────────────────────────────────────────
+const ACTION_META: Record<string, { label: string; icon: React.ElementType; color: string; bg: string }> = {
   ask_question:       { label: "Ask AI",           icon: Brain,        color: "text-blue-400",    bg: "bg-blue-500/10"    },
   generate_ppt:       { label: "PPT Generated",    icon: Presentation, color: "text-purple-400",  bg: "bg-purple-500/10"  },
   ppt_generated:      { label: "PPT Generated",    icon: Presentation, color: "text-purple-400",  bg: "bg-purple-500/10"  },
@@ -35,7 +37,7 @@ const ACTION_META: Record<string, { label: string; icon: any; color: string; bg:
 };
 
 const getMeta = (action: string) =>
-  ACTION_META[action] || { label: action.replace(/_/g, " "), icon: Zap, color: "text-slate-400", bg: "bg-slate-500/10" };
+  ACTION_META[action] ?? { label: action.replace(/_/g, " "), icon: Zap, color: "text-slate-400", bg: "bg-slate-500/10" };
 
 interface Activity {
   _id: string;
@@ -49,20 +51,20 @@ function formatTime(ts: string) {
   return new Date(ts).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
 }
 
-function getDayLabel(ts: string) {
-  const d = new Date(ts);
-  const now = new Date();
-  const today    = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const yesterday = new Date(today.getTime() - 86400000);
-  const actDay   = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  if (actDay.getTime() === today.getTime())    return "Today";
-  if (actDay.getTime() === yesterday.getTime()) return "Yesterday";
-  return d.toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "short" });
-}
-
 function getDayKey(ts: string) {
   const d = new Date(ts);
   return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+}
+
+function getDayLabel(ts: string) {
+  const d    = new Date(ts);
+  const now  = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const actD  = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const diff  = Math.round((today - actD) / 86400000);
+  if (diff === 0) return "Today";
+  if (diff === 1) return "Yesterday";
+  return d.toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "short" });
 }
 
 export function PointsHistory() {
@@ -72,6 +74,7 @@ export function PointsHistory() {
   const [filter, setFilter]             = useState("all");
   const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set());
 
+  // Fetch — last 30 days, all historical data from Activity collection
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) return;
@@ -82,32 +85,26 @@ export function PointsHistory() {
       .then(d => {
         if (d.success) {
           const cutoff = Date.now() - 30 * 86400000;
-          setActivities(
-            d.activities.filter((a: Activity) =>
-              new Date(a.timestamp).getTime() > cutoff && a.pointsEarned > 0
-            )
+          const filtered = (d.activities as Activity[]).filter(
+            a => new Date(a.timestamp).getTime() > cutoff && a.pointsEarned > 0
           );
+          setActivities(filtered);
+          // Auto-expand today + yesterday
+          const keys = new Set<string>();
+          const now = new Date();
+          keys.add(getDayKey(now.toISOString()));
+          keys.add(getDayKey(new Date(now.getTime() - 86400000).toISOString()));
+          setExpandedDays(keys);
         }
       })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
-  // Auto-expand today + yesterday
-  useEffect(() => {
-    if (activities.length > 0) {
-      const now = new Date();
-      const y   = new Date(now.getTime() - 86400000);
-      setExpandedDays(new Set([
-        getDayKey(now.toISOString()),
-        getDayKey(y.toISOString()),
-      ]));
-    }
-  }, [activities]);
-
+  // Filter pills — built from actual data
   const filterOptions = useMemo(() => {
     const seen = new Set<string>();
-    const opts = [{ value: "all", label: "All" }];
+    const opts: { value: string; label: string }[] = [{ value: "all", label: "All" }];
     activities.forEach(a => {
       if (!seen.has(a.action)) {
         seen.add(a.action);
@@ -126,9 +123,8 @@ export function PointsHistory() {
   const grouped = useMemo(() => {
     const map = new Map<string, { label: string; acts: Activity[]; total: number }>();
     filtered.forEach(a => {
-      const key   = getDayKey(a.timestamp);
-      const label = getDayLabel(a.timestamp);
-      if (!map.has(key)) map.set(key, { label, acts: [], total: 0 });
+      const key = getDayKey(a.timestamp);
+      if (!map.has(key)) map.set(key, { label: getDayLabel(a.timestamp), acts: [], total: 0 });
       const entry = map.get(key)!;
       entry.acts.push(a);
       entry.total += a.pointsEarned;
@@ -139,8 +135,8 @@ export function PointsHistory() {
   const totalEarned = useMemo(() => activities.reduce((s, a) => s + a.pointsEarned, 0), [activities]);
   const topSource   = useMemo(() => {
     const map: Record<string, number> = {};
-    activities.forEach(a => { map[a.action] = (map[a.action] || 0) + a.pointsEarned; });
-    const top = Object.entries(map).sort((a, b) => b[1] - a[1])[0];
+    activities.forEach(a => { map[a.action] = (map[a.action] ?? 0) + a.pointsEarned; });
+    const top = Object.entries(map).sort((x, y) => y[1] - x[1])[0];
     return top ? getMeta(top[0]).label : "—";
   }, [activities]);
 
@@ -158,20 +154,20 @@ export function PointsHistory() {
         <p className="text-sm text-slate-400 mt-1">Last 30 days ka detailed breakdown</p>
       </div>
 
-      {/* Stats row */}
+      {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: "Total Points",   value: points,           icon: Zap,       color: "text-yellow-400",  bg: "bg-yellow-500/10"  },
-          { label: "Earned (30d)",   value: totalEarned,      icon: TrendingUp, color: "text-green-400",  bg: "bg-green-500/10"   },
-          { label: "Transactions",   value: activities.length, icon: Star,      color: "text-purple-400", bg: "bg-purple-500/10"  },
+          { label: "Total Points",  value: points,            icon: Zap,        color: "text-yellow-400", bg: "bg-yellow-500/10" },
+          { label: "Earned (30d)",  value: totalEarned,       icon: TrendingUp, color: "text-green-400",  bg: "bg-green-500/10"  },
+          { label: "Transactions",  value: activities.length, icon: Star,       color: "text-purple-400", bg: "bg-purple-500/10" },
         ].map(({ label, value, icon: Icon, color, bg }) => (
           <div key={label} className="glass rounded-2xl p-4 border border-white/5 flex items-center gap-3">
             <div className={`w-10 h-10 rounded-xl ${bg} flex items-center justify-center flex-shrink-0`}>
               <Icon className={`w-5 h-5 ${color}`} />
             </div>
             <div>
-              <div className="text-xs text-slate-500 mb-0.5">{label}</div>
-              <div className="text-xl font-bold text-white"><AnimatedNumber value={value} /></div>
+              <p className="text-xs text-slate-500 mb-0.5">{label}</p>
+              <p className="text-xl font-bold text-white"><AnimatedNumber value={value} /></p>
             </div>
           </div>
         ))}
@@ -180,8 +176,8 @@ export function PointsHistory() {
             <Trophy className="w-5 h-5 text-blue-400" />
           </div>
           <div>
-            <div className="text-xs text-slate-500 mb-0.5">Top Source</div>
-            <div className="text-sm font-bold text-white truncate">{topSource}</div>
+            <p className="text-xs text-slate-500 mb-0.5">Top Source</p>
+            <p className="text-sm font-bold text-white truncate">{topSource}</p>
           </div>
         </div>
       </div>
@@ -201,7 +197,7 @@ export function PointsHistory() {
         ))}
       </div>
 
-      {/* List */}
+      {/* Content */}
       {loading ? (
         <div className="glass rounded-2xl p-12 text-center border border-white/5">
           <div className="w-8 h-8 border-2 border-purple-500/30 border-t-purple-400 rounded-full animate-spin mx-auto mb-3" />
@@ -211,7 +207,7 @@ export function PointsHistory() {
         <div className="glass rounded-2xl p-12 text-center border border-white/5">
           <Zap className="w-10 h-10 text-slate-600 mx-auto mb-3" />
           <p className="text-slate-400 text-sm font-medium">No points earned in last 30 days</p>
-          <p className="text-slate-600 text-xs mt-1">Ask AI, generate PPTs, or complete challenges!</p>
+          <p className="text-slate-600 text-xs mt-1">Ask AI, take quizzes, or complete daily challenges!</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -220,11 +216,11 @@ export function PointsHistory() {
             const isToday    = label === "Today";
             return (
               <div key={key} className="glass rounded-2xl border border-white/5 overflow-hidden">
-                {/* Day header */}
+                {/* Day row */}
                 <button onClick={() => toggleDay(key)}
                   className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-white/[0.02] transition-colors group">
                   <div className="flex items-center gap-3">
-                    <div className={`w-2 h-2 rounded-full ${isToday ? "bg-green-400 shadow-sm shadow-green-400/50" : "bg-white/20"}`} />
+                    <div className={`w-2 h-2 rounded-full flex-shrink-0 ${isToday ? "bg-green-400 shadow-sm shadow-green-400/50" : "bg-white/20"}`} />
                     <span className="text-sm font-semibold text-white">{label}</span>
                     <span className="text-xs text-slate-600 bg-white/[0.03] px-2 py-0.5 rounded-full">
                       {acts.length} {acts.length === 1 ? "event" : "events"}
@@ -237,12 +233,11 @@ export function PointsHistory() {
                     </div>
                     {isExpanded
                       ? <ChevronUp className="w-4 h-4 text-slate-500 group-hover:text-slate-300 transition-colors" />
-                      : <ChevronDown className="w-4 h-4 text-slate-500 group-hover:text-slate-300 transition-colors" />
-                    }
+                      : <ChevronDown className="w-4 h-4 text-slate-500 group-hover:text-slate-300 transition-colors" />}
                   </div>
                 </button>
 
-                {/* Individual activities */}
+                {/* Activity rows */}
                 {isExpanded && (
                   <div className="border-t border-white/[0.06]">
                     {acts.map((act, idx) => {
@@ -253,12 +248,9 @@ export function PointsHistory() {
                           className={`flex items-center gap-3 px-5 py-3.5 hover:bg-white/[0.02] transition-colors ${
                             idx < acts.length - 1 ? "border-b border-white/[0.04]" : ""
                           }`}>
-                          {/* Icon */}
                           <div className={`w-9 h-9 rounded-xl ${meta.bg} flex items-center justify-center flex-shrink-0`}>
                             <Icon className={`w-4 h-4 ${meta.color}`} />
                           </div>
-
-                          {/* Text */}
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-0.5">
                               <span className={`text-xs font-semibold ${meta.color}`}>{meta.label}</span>
@@ -266,8 +258,6 @@ export function PointsHistory() {
                             </div>
                             <p className="text-sm text-slate-300 truncate">{act.details}</p>
                           </div>
-
-                          {/* Points */}
                           <div className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
                             <Zap className="w-3 h-3 text-yellow-400" />
                             <span className="text-xs font-bold text-yellow-400">+{act.pointsEarned}</span>
