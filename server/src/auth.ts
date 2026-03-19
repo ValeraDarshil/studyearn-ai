@@ -146,11 +146,10 @@ async function getDefaultReferrer() {
 
       .sort({ createdAt: 1 })
 
-      .select('_id referralCode name')
+      .select('_id referralCode name points totalXP')
 
-      .limit(1)
-
-      .lean();
+      .limit(1);
+      // NOTE: No .lean() — need Mongoose document so .save() works
 
     
 
@@ -1277,7 +1276,11 @@ router.post('/google/apply-referral', async (req: any, res) => {
 
     } else if (skipMode) {
       // ── Skip — auto assign to first user (admin/owner) ────
-      referrer = await getDefaultReferrer() as any;
+      // Use findById (not lean) to get full Mongoose document with .save()
+      const defaultRef = await getDefaultReferrer() as any;
+      if (defaultRef?._id) {
+        referrer = await User.findById(defaultRef._id);
+      }
       bonusForUser = 0; // No bonus for user when skipping
     }
 
