@@ -52,7 +52,19 @@ export function GoogleWelcome() {
     }
   };
 
-  const handleSkip = () => {
+  const handleSkip = async () => {
+    // Even on skip — auto-assign default referrer (same as normal signup)
+    try {
+      const token = localStorage.getItem("token");
+      await fetch(`${API_URL}/api/auth/google/apply-referral`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ referralCode: "", skipMode: true }),
+      });
+    } catch { /* silent — don't block navigation */ }
     sessionStorage.removeItem("newGoogleUser");
     navigate("/app", { replace: true });
   };
