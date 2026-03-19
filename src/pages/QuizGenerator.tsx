@@ -82,84 +82,68 @@ function parseQuestionsJSON(text: string): Question[] | null {
 /** Strategy 2: Regex text parser — bulletproof fallback */
 function parseQuestionsRegex(text: string): Question[] {
   const questions: Question[] = [];
-  // Split on Q1. / Q2. / 1. / **1. / 1) patterns
-  const blocks = text.split(/
-(?=\*{0,2}Q?\s*\d+[\.\)\s])/i).filter(b => b.trim());
+  const blocks = text.split(/\n(?=\*{0,2}Q?\s*\d+[\.)\s])/i).filter((b: string) => b.trim());
 
   for (const block of blocks) {
     try {
-      const lines = block.trim().split("
-").map(l => l.trim()).filter(Boolean);
+      const lines = block.trim().split("\n").map((l: string) => l.trim()).filter(Boolean);
       if (lines.length < 5) continue;
 
-      // Question text — strip Q1. / **1. prefixes
+      // Question text
       const qLine = lines[0]
-        .replace(/^\*{0,2}Q?\s*\d+[\.\)\s]+\*{0,2}\s*/i, "")
+        .replace(/^\*{0,2}Q?\s*\d+[\.)\s]+\*{0,2}\s*/i, "")
         .replace(/\*+/g, "").trim();
       if (!qLine || qLine.length < 5) continue;
 
-      // Options A B C D — match any format: A) A. (A) A-
+      // Options A B C D
       const optLines: { letter: string; text: string }[] = [];
       for (const line of lines) {
-        const m = line.replace(/\*+/g, "").match(/^\(?([A-D])[\.\)\-\s]\s*(.+)/i);
+        const m = line.replace(/\*+/g, "").match(/^\(?([A-D])[.)]\s*(.+)/i);
         if (m) optLines.push({ letter: m[1].toUpperCase(), text: m[2].trim() });
       }
       if (optLines.length < 4) continue;
       optLines.sort((a, b) => "ABCD".indexOf(a.letter) - "ABCD".indexOf(b.letter));
       const opts = optLines.map(o => o.text);
 
-      // Answer — multiple fallback strategies
-      let answerIdx = -1; // -1 = not found
+      // Answer — 3 fallback strategies
+      let answerIdx = -1;
 
-      // Strategy A: "Answer: B" / "Correct Answer: B" / "Answer : B"
+      // Strategy A: "Answer: B" / "Correct Answer: B"
       for (const line of lines) {
         const clean = line.replace(/\*+/g, "").trim();
-        if (!/^(correct\s+)?answer\s*[:\-]/i.test(clean)) continue;
-        const after = clean.replace(/^.*?[:\-]\s*/i, "").trim();
+        if (!/^(correct\s+)?answer[\s:]/i.test(clean)) continue;
+        const after = clean.replace(/^.*?:\s*/i, "").trim();
         const m = after.match(/^([A-D])/i);
         if (m) { answerIdx = "ABCD".indexOf(m[1].toUpperCase()); break; }
       }
 
-      // Strategy B: "The correct answer is C" / "answer is B"
+      // Strategy B: "The correct answer is C"
       if (answerIdx === -1) {
         for (const line of lines) {
-          const clean = line.replace(/\*+/g, "").trim();
-          const m = clean.match(/(?:correct\s+answer\s+is|answer\s+is)\s+([A-D])/i);
+          const m = line.replace(/\*+/g, "").match(/(?:correct\s+answer\s+is|answer\s+is)\s+([A-D])/i);
           if (m) { answerIdx = "ABCD".indexOf(m[1].toUpperCase()); break; }
         }
       }
 
-      // Strategy C: scan ALL lines for standalone letter like "(B)" or "**B**"
+      // Strategy C: Any line with "answer" keyword containing a letter
       if (answerIdx === -1) {
         for (const line of lines) {
-          if (/answer/i.test(line)) {
-            const m = line.match(/([A-D])/i);
-            if (m) { answerIdx = "ABCD".indexOf(m[1].toUpperCase()); break; }
-          }
+          if (!/answer/i.test(line)) continue;
+          const m = line.match(/\b([A-D])\b/i);
+          if (m) { answerIdx = "ABCD".indexOf(m[1].toUpperCase()); break; }
         }
       }
 
-      // If still not found — skip this question (don't default to 0!)
+      // Skip if answer not found (never default to 0!)
       if (answerIdx === -1) continue;
 
       // Explanation
       let explanation = "";
       for (const line of lines) {
         const clean = line.replace(/\*+/g, "").trim();
-        if (/^explanation\s*[:\-]/i.test(clean)) {
-          explanation = clean.replace(/^.*?[:\-]\s*/i, "").trim();
+        if (/^explanation\s*:/i.test(clean)) {
+          explanation = clean.replace(/^.*?:\s*/i, "").trim();
           break;
-        }
-      }
-      if (!explanation) {
-        // Try to find any line after answer that looks explanatory
-        let pastAnswer = false;
-        for (const line of lines) {
-          if (/answer/i.test(line)) { pastAnswer = true; continue; }
-          if (pastAnswer && line.length > 15 && !/^[A-D][\.\)]/i.test(line)) {
-            explanation = line.replace(/\*+/g, "").trim();
-            break;
-          }
         }
       }
       if (!explanation) explanation = "See your textbook for more details.";
