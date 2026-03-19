@@ -411,7 +411,7 @@
 //             <Route path="leaderboard" element={<Leaderboard />} />
 //             <Route path="profile" element={<Profile />} />
 //             <Route path="refer" element={<ReferFriends />} />
-            <Route path="points-history" element={<PointsHistory />} />
+//             <Route path="points-history" element={<PointsHistory />} />
 //             <Route path="quiz" element={<QuizGenerator />} />
 //             <Route path="planner" element={<StudyPlanner />} />
 //             <Route path="challenge" element={<DailyChallenge />} />
