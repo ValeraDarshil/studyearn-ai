@@ -1,14 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, Link, useSearchParams } from "react-router-dom";
-import {
-  Mail,
-  Lock,
-  User as UserIcon,
-  LogIn,
-  Loader2,
-  Gift,
-  CheckCircle2,
-} from "lucide-react";
+import { Mail, Lock, User as UserIcon, LogIn, Loader2, Gift, CheckCircle2 } from "lucide-react";
+
+const API_URL = import.meta.env.VITE_API_URL as string;
 
 export function Signup() {
   const navigate = useNavigate();
@@ -23,9 +17,8 @@ export function Signup() {
   const [error, setError] = useState("");
   const [showReferralBonus, setShowReferralBonus] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
-
-  // ✅ Toast state — replaces ugly alert()
   const [toastMsg, setToastMsg] = useState("");
+
   const showToast = (msg: string) => {
     setToastMsg(msg);
     setTimeout(() => setToastMsg(""), 4000);
@@ -39,97 +32,53 @@ export function Signup() {
     e.preventDefault();
     setError("");
     setLoading(true);
-
-    if (password.length < 8) {
-      setError("Password must be at least 8 characters");
-      setLoading(false);
-      return;
-    }
-    if (!/\d/.test(password)) {
-      setError("Password must contain at least one number (e.g. abc12345)");
-      setLoading(false);
-      return;
-    }
-
+    if (password.length < 8) { setError("Password must be at least 8 characters"); setLoading(false); return; }
+    if (!/\d/.test(password)) { setError("Password must contain at least one number (e.g. abc12345)"); setLoading(false); return; }
     try {
-      const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/auth/signup`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name,
-            email,
-            password,
-            referralCode: referralCode.trim().toUpperCase() || undefined,
-          }),
-        },
-      );
-
+      const res = await fetch(`${API_URL}/api/auth/signup`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email, password, referralCode: referralCode.trim().toUpperCase() || undefined }),
+      });
       const data = await res.json();
-
       if (data.success) {
         localStorage.setItem("token", data.token);
-
-        // ✅ Toast instead of alert() — beautiful, non-blocking
-        if (data.referralBonus) {
-          showToast("🎉 Referral bonus applied! You got 200 points!");
-        }
-
+        if (data.referralBonus) showToast("🎉 Referral bonus applied! You got 200 points!");
         navigate("/app");
-        // ✅ Same as Login — reload so App.tsx loadUserData() runs fresh
         window.location.reload();
       } else {
         setError(data.message || "Signup failed");
       }
-    } catch (err) {
+    } catch {
       setError("Cannot connect to server. Is backend running?");
     } finally {
       setLoading(false);
     }
   };
 
-  // ── Google Sign Up — no external package needed ──────────
   const handleGoogleSignup = () => {
     setGoogleLoading(true);
     setError("");
-
-    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-    if (!clientId) {
-      setError("Google Sign In not configured.");
-      setGoogleLoading(false);
-      return;
-    }
-
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string;
+    if (!clientId) { setError("Google Sign In not configured."); setGoogleLoading(false); return; }
     const google = (window as any).google;
-    if (!google) {
-      setError("Google Sign In failed to load. Please refresh.");
-      setGoogleLoading(false);
-      return;
-    }
-
+    if (!google) { setError("Google Sign In failed to load. Please refresh."); setGoogleLoading(false); return; }
     const client = google.accounts.oauth2.initTokenClient({
       client_id: clientId,
       scope: "email profile",
       callback: async (tokenResponse: any) => {
-        if (tokenResponse.error) {
-          setError("Google sign in was cancelled.");
-          setGoogleLoading(false);
-          return;
-        }
+        if (tokenResponse.error) { setError("Google sign in was cancelled."); setGoogleLoading(false); return; }
         try {
           const userInfoRes = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
             headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
           });
           const userInfo = await userInfoRes.json();
-
-          const res = await fetch(`${API_URL_SIGNUP}/api/auth/google`, {
+          const res = await fetch(`${API_URL}/api/auth/google`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ idToken: tokenResponse.access_token, userInfo }),
           });
           const data = await res.json();
-
           if (data.success) {
             localStorage.setItem("token", data.token);
             navigate("/app");
@@ -137,11 +86,8 @@ export function Signup() {
           } else {
             setError(data.message || "Google sign up failed");
           }
-        } catch {
-          setError("Google sign up failed. Please try again.");
-        } finally {
-          setGoogleLoading(false);
-        }
+        } catch { setError("Google sign up failed. Please try again."); }
+        finally { setGoogleLoading(false); }
       },
     });
     client.requestAccessToken();
@@ -149,29 +95,13 @@ export function Signup() {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 animated-bg grid-bg">
-      {/* Orbs */}
       <div className="orb w-[500px] h-[500px] bg-blue-500 top-[-200px] left-[-100px] fixed" />
       <div className="orb w-[400px] h-[400px] bg-purple-600 top-[30%] right-[-150px] fixed" />
 
-      {/* ✅ Toast notification — slides in from top-right */}
       {toastMsg && (
-        <div
-          className="fixed top-6 right-4 z-[100] flex items-center gap-3 px-4 py-3 rounded-2xl border border-green-500/40 max-w-xs"
-          style={{
-            background:
-              "linear-gradient(135deg, rgba(10,17,40,0.97) 0%, rgba(5,30,20,0.97) 100%)",
-            boxShadow:
-              "0 20px 60px rgba(0,0,0,0.6), 0 0 30px rgba(34,197,94,0.15)",
-            backdropFilter: "blur(20px)",
-            animation: "slideInRight 0.4s cubic-bezier(0.34,1.56,0.64,1)",
-          }}
-        >
-          <style>{`
-            @keyframes slideInRight {
-              from { opacity: 0; transform: translateX(60px) scale(0.8); }
-              to   { opacity: 1; transform: translateX(0) scale(1); }
-            }
-          `}</style>
+        <div className="fixed top-6 right-4 z-[100] flex items-center gap-3 px-4 py-3 rounded-2xl border border-green-500/40 max-w-xs"
+          style={{ background: "linear-gradient(135deg,rgba(10,17,40,0.97),rgba(5,30,20,0.97))", boxShadow: "0 20px 60px rgba(0,0,0,0.6),0 0 30px rgba(34,197,94,0.15)", backdropFilter: "blur(20px)", animation: "slideInRight 0.4s cubic-bezier(0.34,1.56,0.64,1)" }}>
+          <style>{`@keyframes slideInRight { from{opacity:0;transform:translateX(60px) scale(0.8)} to{opacity:1;transform:translateX(0) scale(1)} }`}</style>
           <CheckCircle2 className="w-6 h-6 text-green-400 flex-shrink-0" />
           <p className="text-sm font-semibold text-white">{toastMsg}</p>
         </div>
@@ -179,15 +109,10 @@ export function Signup() {
 
       <div className="relative w-full max-w-md z-10 py-8">
         <div className="text-center mb-8">
-          <h1 className="text-3xl sm:text-4xl font-bold gradient-text mb-2">
-            StudyEarn AI
-          </h1>
-          <p className="text-slate-400 text-sm">
-            Create your account and start earning
-          </p>
+          <h1 className="text-3xl sm:text-4xl font-bold gradient-text mb-2">StudyEarn AI</h1>
+          <p className="text-slate-400 text-sm">Create your account and start earning</p>
         </div>
 
-        {/* Referral Bonus Badge */}
         {showReferralBonus && (
           <div className="glass rounded-2xl p-4 mb-4 border border-green-500/20 bg-gradient-to-br from-green-500/10 to-emerald-500/10">
             <div className="flex items-center gap-3">
@@ -195,12 +120,8 @@ export function Signup() {
                 <Gift className="w-5 h-5 text-white" />
               </div>
               <div className="flex-1">
-                <div className="text-sm font-semibold text-white">
-                  🎁 Referral Bonus Active!
-                </div>
-                <div className="text-xs text-green-400">
-                  Get 200 points instead of 100!
-                </div>
+                <div className="text-sm font-semibold text-white">🎁 Referral Bonus Active!</div>
+                <div className="text-xs text-green-400">Get 200 points instead of 100!</div>
               </div>
             </div>
           </div>
@@ -208,132 +129,62 @@ export function Signup() {
 
         <div className="glass rounded-2xl p-6 sm:p-8 border border-white/10">
           <form onSubmit={handleSignup} className="space-y-5">
-            {/* Name */}
             <div>
-              <label className="text-sm font-medium text-slate-300 mb-2 block">
-                Full Name
-              </label>
+              <label className="text-sm font-medium text-slate-300 mb-2 block">Full Name</label>
               <div className="relative">
                 <UserIcon className="absolute left-3 top-3 w-5 h-5 text-slate-500" />
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  required
-                  placeholder="John Doe"
-                  className="w-full bg-white/[0.03] border border-white/10 rounded-xl pl-11 pr-4 py-3 text-white placeholder-slate-600 focus:outline-none focus:border-blue-500/40"
-                  style={{ fontSize: "16px" }}
-                />
+                <input type="text" value={name} onChange={(e) => setName(e.target.value)} required placeholder="John Doe" style={{ fontSize: "16px" }}
+                  className="w-full bg-white/[0.03] border border-white/10 rounded-xl pl-11 pr-4 py-3 text-white placeholder-slate-600 focus:outline-none focus:border-blue-500/40" />
               </div>
             </div>
-
-            {/* Email */}
             <div>
-              <label className="text-sm font-medium text-slate-300 mb-2 block">
-                Email Address
-              </label>
+              <label className="text-sm font-medium text-slate-300 mb-2 block">Email Address</label>
               <div className="relative">
                 <Mail className="absolute left-3 top-3 w-5 h-5 text-slate-500" />
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  placeholder="you@example.com"
-                  className="w-full bg-white/[0.03] border border-white/10 rounded-xl pl-11 pr-4 py-3 text-white placeholder-slate-600 focus:outline-none focus:border-blue-500/40"
-                  style={{ fontSize: "16px" }}
-                />
+                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="you@example.com" style={{ fontSize: "16px" }}
+                  className="w-full bg-white/[0.03] border border-white/10 rounded-xl pl-11 pr-4 py-3 text-white placeholder-slate-600 focus:outline-none focus:border-blue-500/40" />
               </div>
             </div>
-
-            {/* Password */}
             <div>
-              <label className="text-sm font-medium text-slate-300 mb-2 block">
-                Password
-              </label>
+              <label className="text-sm font-medium text-slate-300 mb-2 block">Password</label>
               <div className="relative">
                 <Lock className="absolute left-3 top-3 w-5 h-5 text-slate-500" />
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  placeholder="••••••••"
-                  className="w-full bg-white/[0.03] border border-white/10 rounded-xl pl-11 pr-4 py-3 text-white placeholder-slate-600 focus:outline-none focus:border-blue-500/40"
-                  style={{ fontSize: "16px" }}
-                />
+                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required placeholder="••••••••" style={{ fontSize: "16px" }}
+                  className="w-full bg-white/[0.03] border border-white/10 rounded-xl pl-11 pr-4 py-3 text-white placeholder-slate-600 focus:outline-none focus:border-blue-500/40" />
               </div>
-              <p className="text-xs text-slate-500 mt-1">
-                Must be at least 6 characters
-              </p>
+              <p className="text-xs text-slate-500 mt-1">Min. 8 characters + at least 1 number</p>
             </div>
-
-            {/* Referral Code */}
             <div>
-              <label className="text-sm font-medium text-slate-300 mb-2 block flex items-center gap-2">
-                Referral Code
-                <span className="text-xs text-slate-500">(Optional)</span>
+              <label className="text-sm font-medium text-slate-300 mb-2 block">
+                Referral Code <span className="text-xs text-slate-500">(Optional)</span>
               </label>
               <div className="relative">
                 <Gift className="absolute left-3 top-3 w-5 h-5 text-slate-500" />
-                <input
-                  type="text"
-                  value={referralCode}
-                  onChange={(e) => {
-                    setReferralCode(e.target.value.toUpperCase());
-                    setShowReferralBonus(e.target.value.length > 0);
-                  }}
-                  placeholder="Enter code for bonus points"
-                  className="w-full bg-white/[0.03] border border-white/10 rounded-xl pl-11 pr-4 py-3 text-white placeholder-slate-600 focus:outline-none focus:border-green-500/40 uppercase"
-                  style={{ fontSize: "16px" }}
-                />
+                <input type="text" value={referralCode}
+                  onChange={(e) => { setReferralCode(e.target.value.toUpperCase()); setShowReferralBonus(e.target.value.length > 0); }}
+                  placeholder="Enter code for bonus points" style={{ fontSize: "16px" }}
+                  className="w-full bg-white/[0.03] border border-white/10 rounded-xl pl-11 pr-4 py-3 text-white placeholder-slate-600 focus:outline-none focus:border-green-500/40 uppercase" />
               </div>
             </div>
-
             {error && (
-              <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 text-sm text-red-400">
-                {error}
-              </div>
+              <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 text-sm text-red-400">{error}</div>
             )}
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold disabled:opacity-50 hover:opacity-90 transition-opacity mt-2"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  Creating Account...
-                </>
-              ) : (
-                <>
-                  <LogIn className="w-5 h-5" />
-                  Sign Up
-                </>
-              )}
+            <button type="submit" disabled={loading}
+              className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold disabled:opacity-50 hover:opacity-90 transition-opacity mt-2">
+              {loading ? (<><Loader2 className="w-5 h-5 animate-spin" />Creating Account...</>) : (<><LogIn className="w-5 h-5" />Sign Up</>)}
             </button>
           </form>
 
-          {/* Google Sign Up */}
-          <div className="relative mt-2 mb-1">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-white/10" />
-            </div>
+          <div className="relative mt-4 mb-3">
+            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/10" /></div>
             <div className="relative flex justify-center text-xs">
               <span className="bg-[#0f1117] px-3 text-slate-500">or sign up with</span>
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={handleGoogleSignup}
-            disabled={googleLoading || loading}
-            className="w-full flex items-center justify-center gap-3 px-4 py-3 rounded-xl border border-white/10 bg-white/[0.03] text-white text-sm font-medium hover:bg-white/[0.06] hover:border-white/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {googleLoading ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
-            ) : (
+          <button type="button" onClick={handleGoogleSignup} disabled={googleLoading || loading}
+            className="w-full flex items-center justify-center gap-3 px-4 py-3 rounded-xl border border-white/10 bg-white/[0.03] text-white text-sm font-medium hover:bg-white/[0.06] hover:border-white/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+            {googleLoading ? (<Loader2 className="w-5 h-5 animate-spin" />) : (
               <svg className="w-5 h-5" viewBox="0 0 24 24">
                 <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
                 <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
@@ -346,21 +197,12 @@ export function Signup() {
 
           <div className="mt-6 text-center text-sm">
             <span className="text-slate-500">Already have an account? </span>
-            <Link
-              to="/login"
-              className="text-blue-400 hover:text-blue-300 font-medium"
-            >
-              Login
-            </Link>
+            <Link to="/login" className="text-blue-400 hover:text-blue-300 font-medium">Login</Link>
           </div>
         </div>
 
-        {/* Welcome Bonus Badge */}
         <div className="mt-4 text-center text-xs text-slate-600">
-          <p>
-            🎁 Get {showReferralBonus ? "200" : "100"} points welcome bonus on
-            signup!
-          </p>
+          <p>🎁 Get {showReferralBonus ? "200" : "100"} points welcome bonus on signup!</p>
         </div>
       </div>
     </div>
