@@ -1170,17 +1170,21 @@ router.post('/google', authLimiter, async (req, res) => {
     }
 
     // ── Update streak + daily login ──────────────────────────
-    const streakInfo = await updateStreakOnLogin(user);
-    await user.save();
-
-    // Log login activity (skip for new users — already logged signup)
-    if (!isNewUser) {
-      await Activity.create({
-        userId:       user._id,
-        action:       'login',
-        details:      `Logged in with Google`,
-        pointsEarned: streakInfo.bonusPoints,
-      });
+    let streakInfo = { streak: user.streak, streakIncreased: false, bonusPoints: 0 };
+    try {
+      streakInfo = await updateStreakOnLogin(user);
+      await user.save();
+      if (!isNewUser) {
+        await Activity.create({
+          userId:       user._id,
+          action:       'login',
+          details:      'Logged in with Google',
+          pointsEarned: streakInfo.bonusPoints,
+        });
+      }
+    } catch (streakErr: any) {
+      logger.error('Streak update error (non-fatal):', streakErr.message);
+      // Don't fail login just because streak update failed
     }
 
     // ── Generate JWT ─────────────────────────────────────────
@@ -1221,8 +1225,11 @@ router.post('/google', authLimiter, async (req, res) => {
     });
 
   } catch (error: any) {
-    logger.error('Google auth error:', error.message);
-    return res.status(500).json({ success: false, message: 'Server error. Please try again.' });
+    logger.error('Google auth error:', error.message, error.stack);
+    return res.status(500).json({ 
+      success: false, 
+      message: error.message || 'Server error. Please try again.',
+    });
   }
 });
 
