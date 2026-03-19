@@ -41,7 +41,10 @@ export function GoogleWelcome() {
       if (data.success) {
         setApplied(true);
         sessionStorage.removeItem("newGoogleUser");
-        setTimeout(() => navigate("/app", { replace: true }), 1500);
+        setTimeout(() => {
+          navigate("/app", { replace: true });
+          window.location.reload();
+        }, 1500);
       } else {
         setError(data.message || "Invalid referral code.");
         setLoading(false);
@@ -67,6 +70,7 @@ export function GoogleWelcome() {
     } catch { /* silent — don't block navigation */ }
     sessionStorage.removeItem("newGoogleUser");
     navigate("/app", { replace: true });
+    window.location.reload();
   };
 
   return (
