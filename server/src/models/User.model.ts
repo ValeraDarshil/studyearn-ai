@@ -16,7 +16,7 @@ const userSchema = new mongoose.Schema({
 
   email:    { type: String, required: true, unique: true, lowercase: true, trim: true },
 
-  password: { type: String, required: true },
+  password: { type: String, default: null }, // null for Google OAuth users
 
 
 
@@ -55,6 +55,10 @@ const userSchema = new mongoose.Schema({
   // ── Profile ───────────────────────────────────────────────
 
   avatar: { type: String, default: null },
+
+  // ── Google OAuth ──────────────────────────────────────────
+  googleId:  { type: String, default: null, sparse: true },
+  // password is optional for Google users (they don't have one)
 
 
 

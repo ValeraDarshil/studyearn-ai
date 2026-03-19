@@ -17,6 +17,7 @@ import { otpLimiter } from './middleware/rateLimiter.js';
 import { sendOTPEmail } from './services/emailService.js';
 import { logger } from './utils/logger.js';
 import crypto from 'crypto';
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID!; // kept for future use
 
 
 
@@ -468,6 +469,13 @@ router.post('/login', authLimiter, validateLogin, async (req, res) => {
 
 
     // Check password
+    // Google OAuth users have no password — block email/password login for them
+    if (!user.password) {
+      return res.status(401).json({
+        success: false,
+        message: 'This account uses Google Sign In. Please use the "Continue with Google" button.',
+      });
+    }
 
     const isMatch = await bcrypt.compare(password, user.password);
 
@@ -1074,5 +1082,148 @@ router.post('/reset-password', async (req, res) => {
 });
 
 
+
+
+// ─────────────────────────────────────────────────────────────
+// POST /api/auth/google — Google OAuth Sign In / Sign Up
+// Frontend sends: { idToken: "google-id-token" }
+// Backend verifies with Google, creates/finds user, returns JWT
+// ─────────────────────────────────────────────────────────────
+router.post('/google', authLimiter, async (req, res) => {
+  try {
+    await connectDB();
+
+    const { idToken } = req.body;
+    if (!idToken) {
+      return res.status(400).json({ success: false, message: 'Google token required' });
+    }
+
+    // ── Verify Google token via userinfo endpoint ────────────
+    // We use access_token (from useGoogleLogin) + userInfo sent from frontend
+    // Double verification: access_token validates with Google, userInfo provides data
+    let payload: any;
+    const { userInfo } = req.body;
+
+    try {
+      // Verify the access token is valid by calling Google userinfo
+      const googleRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+        headers: { Authorization: `Bearer ${idToken}` },
+      });
+      if (!googleRes.ok) throw new Error('Invalid token');
+      payload = await googleRes.json();
+    } catch {
+      return res.status(401).json({ success: false, message: 'Invalid Google token. Please try again.' });
+    }
+
+    if (!payload?.email) {
+      return res.status(401).json({ success: false, message: 'Could not get email from Google account.' });
+    }
+
+    const googleId = payload.sub;
+    const email    = payload.email;
+    const googleName = payload.name || userInfo?.name;
+    const cleanEmail = email.toLowerCase().trim();
+
+    // ── Find existing user ────────────────────────────────────
+    let user: any = await User.findOne({
+      $or: [{ googleId }, { email: cleanEmail }],
+    });
+
+    let isNewUser = false;
+
+    if (!user) {
+      // ── NEW USER — create account ─────────────────────────
+      isNewUser = true;
+      const displayName = googleName || cleanEmail.split('@')[0];
+
+      user = new User({
+        name:         displayName,
+        email:        cleanEmail,
+        password:     null,       // Google users have no password
+        googleId,
+        points:       100,        // Welcome bonus
+        totalXP:      100,
+        questionsLeft: 15,
+        streak:       1,
+        lastActive:   new Date(),
+      });
+
+      // Generate referral code
+      await user.save(); // save first to get _id
+      user.referralCode = generateReferralCode(user.name, user._id.toString());
+      await user.save();
+
+      // Log signup activity
+      await Activity.create({
+        userId:       user._id,
+        action:       'signup',
+        details:      `Signed up with Google (${cleanEmail})`,
+        pointsEarned: 100,
+      });
+
+    } else {
+      // ── EXISTING USER — link Google ID if not already ─────
+      if (!user.googleId) {
+        user.googleId = googleId;
+        await user.save();
+      }
+    }
+
+    // ── Update streak + daily login ──────────────────────────
+    const streakInfo = await updateStreakOnLogin(user);
+    await user.save();
+
+    // Log login activity (skip for new users — already logged signup)
+    if (!isNewUser) {
+      await Activity.create({
+        userId:       user._id,
+        action:       'login',
+        details:      `Logged in with Google`,
+        pointsEarned: streakInfo.bonusPoints,
+      });
+    }
+
+    // ── Generate JWT ─────────────────────────────────────────
+    const token = jwt.sign(
+      { userId: user._id, email: user.email },
+      JWT_SECRET,
+      { expiresIn: JWT_EXPIRES }
+    );
+
+    // ── Premium check ─────────────────────────────────────────
+    const premExp = user.premiumExpiresAt;
+    const isPremium = user.isPremium === true && premExp && new Date(premExp) > new Date();
+    if (user.isPremium && !isPremium) {
+      user.isPremium = false;
+      user.premiumExpiresAt = null;
+      await user.save();
+    }
+
+    res.setHeader('Cache-Control', 'no-store');
+    return res.json({
+      success:    true,
+      token,
+      isNewUser,
+      streakInfo,
+      user: {
+        _id:           user._id,
+        name:          user.name,
+        email:         user.email,
+        points:        user.points,
+        totalXP:       user.totalXP || user.points,
+        questionsLeft: user.questionsLeft,
+        streak:        user.streak,
+        isPremium:     isPremium || false,
+        premiumExpiresAt: user.premiumExpiresAt || null,
+        avatar:        user.avatar || null,
+        googleId:      user.googleId || null,
+      },
+    });
+
+  } catch (error: any) {
+    logger.error('Google auth error:', error.message);
+    return res.status(500).json({ success: false, message: 'Server error. Please try again.' });
+  }
+});
 
 export default router;
