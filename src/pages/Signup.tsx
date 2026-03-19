@@ -85,8 +85,13 @@ export function Signup() {
           const data = await res.json();
           if (data.success) {
             localStorage.setItem("token", data.token);
-            navigate("/app");
-            window.location.reload();
+            if (data.isNewUser) {
+              sessionStorage.setItem("newGoogleUser", "1");
+              navigate("/google-welcome");
+            } else {
+              navigate("/app");
+              window.location.reload();
+            }
           } else {
             setError(data.message || "Google sign up failed");
           }

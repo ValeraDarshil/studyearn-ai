@@ -393,6 +393,7 @@
 //           <Route path="/login" element={<Login />} />
 //           <Route path="/signup" element={<Signup />} />
 //           <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/google-welcome" element={<GoogleWelcome />} />
 
 //           <Route
 //             path="/app"
@@ -473,6 +474,9 @@ import { StudyTools } from "./pages/StudyTools";
 import { CollabNotes } from "./pages/CollabNotes";
 import { ACHIEVEMENTS } from "./data/achievements";
 import { CursorSpotlight } from "./components/CursorSpotlight";
+
+// ── Google Welcome Page ──────────────────────────────────────
+import { GoogleWelcome } from "./pages/GoogleWelcome";
 
 // ── CodeLearn Pages ───────────────────────────────────────────
 import CodeLearnHome from "./pages/codelearn/CodeLearnHome";
@@ -819,6 +823,7 @@ function AppContent() {
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/google-welcome" element={<GoogleWelcome />} />
 
           {/* ── CodeLearn Public Routes (no login needed to browse) ── */}
           <Route path="/codelearn" element={<CodeLearnHome />} />

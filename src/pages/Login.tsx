@@ -72,8 +72,14 @@ export function Login() {
             if (data.streakInfo?.streakIncreased) {
               sessionStorage.setItem("streakCelebration", JSON.stringify(data.streakInfo));
             }
-            navigate("/app");
-            window.location.reload();
+            // New Google user → referral code page first
+            if (data.isNewUser) {
+              sessionStorage.setItem("newGoogleUser", "1");
+              navigate("/google-welcome");
+            } else {
+              navigate("/app");
+              window.location.reload();
+            }
           } else {
             setError(data.message || "Google sign in failed");
           }

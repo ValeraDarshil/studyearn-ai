@@ -1136,51 +1136,29 @@ router.post('/google', authLimiter, async (req, res) => {
       isNewUser = true;
       const displayName = googleName || cleanEmail.split('@')[0];
 
-      // ── Handle referral code ──────────────────────────────
-      const { referralCode } = req.body;
-      let welcomeBonus = 100;
-      let referrerUser: any = null;
-
-      if (referralCode && referralCode.trim()) {
-        referrerUser = await User.findOne({ referralCode: referralCode.toUpperCase().trim() });
-        if (referrerUser) {
-          welcomeBonus = 200; // Referral bonus
-          referrerUser.points += 100;
-          referrerUser.totalXP  = (referrerUser.totalXP || 0) + 100;
-          await referrerUser.save();
-          await Activity.create({
-            userId:       referrerUser._id,
-            action:       'referral',
-            details:      `Referred ${displayName} (Google signup)`,
-            pointsEarned: 100,
-          });
-        }
-      }
-
       user = new User({
         name:         displayName,
         email:        cleanEmail,
-        password:     null,
+        password:     null,       // Google users have no password
         googleId,
-        points:       welcomeBonus,
-        totalXP:      welcomeBonus,
+        points:       100,        // Welcome bonus
+        totalXP:      100,
         questionsLeft: 15,
         streak:       1,
         lastActive:   new Date(),
-        referredBy:   referrerUser ? referrerUser.referralCode : null,
       });
 
-      await user.save();
+      // Generate referral code
+      await user.save(); // save first to get _id
       user.referralCode = generateReferralCode(user.name, user._id.toString());
       await user.save();
 
+      // Log signup activity
       await Activity.create({
         userId:       user._id,
         action:       'signup',
-        details:      referrerUser
-          ? `Signed up with Google via referral (${referrerUser.referralCode})`
-          : `Signed up with Google (${cleanEmail})`,
-        pointsEarned: welcomeBonus,
+        details:      `Signed up with Google (${cleanEmail})`,
+        pointsEarned: 100,
       });
 
     } else {
@@ -1244,6 +1222,88 @@ router.post('/google', authLimiter, async (req, res) => {
 
   } catch (error: any) {
     logger.error('Google auth error:', error.message);
+    return res.status(500).json({ success: false, message: 'Server error. Please try again.' });
+  }
+});
+
+
+// ─────────────────────────────────────────────────────────────
+// POST /api/auth/google/apply-referral
+// Google signup ke baad referral code apply karne ke liye
+// ─────────────────────────────────────────────────────────────
+router.post('/google/apply-referral', async (req: any, res) => {
+  try {
+    await connectDB();
+
+    // Get user from JWT token
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) {
+      return res.status(401).json({ success: false, message: 'Not authenticated' });
+    }
+    const token = authHeader.split(' ')[1];
+    let userId: string;
+    try {
+      const decoded: any = jwt.verify(token, JWT_SECRET);
+      userId = decoded.userId;
+    } catch {
+      return res.status(401).json({ success: false, message: 'Invalid token' });
+    }
+
+    const user = await User.findById(userId) as any;
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    // Already has referral — can't apply again
+    if (user.referredBy) {
+      return res.status(400).json({ success: false, message: 'Referral code already applied to this account.' });
+    }
+
+    const { referralCode } = req.body;
+    if (!referralCode?.trim()) {
+      return res.status(400).json({ success: false, message: 'Referral code required' });
+    }
+
+    const code = referralCode.trim().toUpperCase();
+
+    // Don't allow self-referral
+    if (user.referralCode === code) {
+      return res.status(400).json({ success: false, message: "You can't use your own referral code!" });
+    }
+
+    // Find referrer
+    const referrer = await User.findOne({ referralCode: code }) as any;
+    if (!referrer) {
+      return res.status(404).json({ success: false, message: 'Invalid referral code. Please check and try again.' });
+    }
+
+    // Apply referral — give bonus to new user
+    user.points  = (user.points  || 0) + 100; // extra 100 on top of 100 already given
+    user.totalXP = (user.totalXP || 0) + 100;
+    user.referredBy = code;
+    await user.save();
+
+    // Give bonus to referrer
+    referrer.points  = (referrer.points  || 0) + 100;
+    referrer.totalXP = (referrer.totalXP || 0) + 100;
+    await referrer.save();
+
+    // Log activities
+    await Activity.create({
+      userId:       user._id,
+      action:       'referral',
+      details:      `Applied referral code ${code} — bonus 100 pts!`,
+      pointsEarned: 100,
+    });
+    await Activity.create({
+      userId:       referrer._id,
+      action:       'referral',
+      details:      `${user.name} joined using your referral code!`,
+      pointsEarned: 100,
+    });
+
+    return res.json({ success: true, bonusPoints: 100 });
+
+  } catch (error: any) {
+    logger.error('Apply referral error:', error.message);
     return res.status(500).json({ success: false, message: 'Server error. Please try again.' });
   }
 });
