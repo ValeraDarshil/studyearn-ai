@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { Mail, Lock, LogIn, Loader2, AlertCircle } from "lucide-react";
-import { useGoogleLogin } from "@react-oauth/google";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -53,47 +52,67 @@ export function Login() {
       setLoading(false);
     }
   };
-  // ── Google Sign In ─────────────────────────────────────────
-  const handleGoogleLogin = useGoogleLogin({
-    onSuccess: async (tokenResponse) => {
-      setGoogleLoading(true);
-      setError("");
-      try {
-        // Get user info from Google
-        const userInfoRes = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
-          headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
-        });
-        const userInfo = await userInfoRes.json();
+  // ── Google Sign In — no external package needed ──────────
+  const handleGoogleLogin = () => {
+    setGoogleLoading(true);
+    setError("");
 
-        // Send to our backend
-        const res = await fetch(`${API_URL}/api/auth/google`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ idToken: tokenResponse.access_token, userInfo }),
-        });
-        const data = await res.json();
-
-        if (data.success) {
-          localStorage.setItem("token", data.token);
-          if (data.streakInfo?.streakIncreased) {
-            sessionStorage.setItem("streakCelebration", JSON.stringify(data.streakInfo));
-          }
-          navigate("/app");
-          window.location.reload();
-        } else {
-          setError(data.message || "Google sign in failed");
-        }
-      } catch {
-        setError("Google sign in failed. Please try again.");
-      } finally {
-        setGoogleLoading(false);
-      }
-    },
-    onError: () => {
-      setError("Google sign in was cancelled or failed.");
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+    if (!clientId) {
+      setError("Google Sign In not configured.");
       setGoogleLoading(false);
-    },
-  });
+      return;
+    }
+
+    // Use Google Identity Services (loaded via script tag in index.html)
+    const google = (window as any).google;
+    if (!google) {
+      setError("Google Sign In failed to load. Please refresh.");
+      setGoogleLoading(false);
+      return;
+    }
+
+    const client = google.accounts.oauth2.initTokenClient({
+      client_id: clientId,
+      scope: "email profile",
+      callback: async (tokenResponse: any) => {
+        if (tokenResponse.error) {
+          setError("Google sign in was cancelled.");
+          setGoogleLoading(false);
+          return;
+        }
+        try {
+          const userInfoRes = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+            headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
+          });
+          const userInfo = await userInfoRes.json();
+
+          const res = await fetch(`${API_URL}/api/auth/google`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ idToken: tokenResponse.access_token, userInfo }),
+          });
+          const data = await res.json();
+
+          if (data.success) {
+            localStorage.setItem("token", data.token);
+            if (data.streakInfo?.streakIncreased) {
+              sessionStorage.setItem("streakCelebration", JSON.stringify(data.streakInfo));
+            }
+            navigate("/app");
+            window.location.reload();
+          } else {
+            setError(data.message || "Google sign in failed");
+          }
+        } catch {
+          setError("Google sign in failed. Please try again.");
+        } finally {
+          setGoogleLoading(false);
+        }
+      },
+    });
+    client.requestAccessToken();
+  };
 
 
 
@@ -200,7 +219,7 @@ export function Login() {
 
           <button
             type="button"
-            onClick={() => handleGoogleLogin()}
+            onClick={handleGoogleLogin}
             disabled={googleLoading || loading}
             className="w-full flex items-center justify-center gap-3 px-4 py-3 rounded-xl border border-white/10 bg-white/[0.03] text-white text-sm font-medium hover:bg-white/[0.06] hover:border-white/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >

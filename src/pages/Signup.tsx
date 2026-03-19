@@ -89,42 +89,63 @@ export function Signup() {
     }
   };
 
-  // ── Google Sign Up / Sign In ───────────────────────────────
-  const handleGoogleSignup = useGoogleLogin({
-    onSuccess: async (tokenResponse) => {
-      setGoogleLoading(true);
-      setError("");
-      try {
-        const userInfoRes = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
-          headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
-        });
-        const userInfo = await userInfoRes.json();
+  // ── Google Sign Up — no external package needed ──────────
+  const handleGoogleSignup = () => {
+    setGoogleLoading(true);
+    setError("");
 
-        const res = await fetch(`${API_URL_SIGNUP}/api/auth/google`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ idToken: tokenResponse.access_token, userInfo }),
-        });
-        const data = await res.json();
-
-        if (data.success) {
-          localStorage.setItem("token", data.token);
-          navigate("/app");
-          window.location.reload();
-        } else {
-          setError(data.message || "Google sign up failed");
-        }
-      } catch {
-        setError("Google sign up failed. Please try again.");
-      } finally {
-        setGoogleLoading(false);
-      }
-    },
-    onError: () => {
-      setError("Google sign in was cancelled or failed.");
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+    if (!clientId) {
+      setError("Google Sign In not configured.");
       setGoogleLoading(false);
-    },
-  });
+      return;
+    }
+
+    const google = (window as any).google;
+    if (!google) {
+      setError("Google Sign In failed to load. Please refresh.");
+      setGoogleLoading(false);
+      return;
+    }
+
+    const client = google.accounts.oauth2.initTokenClient({
+      client_id: clientId,
+      scope: "email profile",
+      callback: async (tokenResponse: any) => {
+        if (tokenResponse.error) {
+          setError("Google sign in was cancelled.");
+          setGoogleLoading(false);
+          return;
+        }
+        try {
+          const userInfoRes = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+            headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
+          });
+          const userInfo = await userInfoRes.json();
+
+          const res = await fetch(`${API_URL_SIGNUP}/api/auth/google`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ idToken: tokenResponse.access_token, userInfo }),
+          });
+          const data = await res.json();
+
+          if (data.success) {
+            localStorage.setItem("token", data.token);
+            navigate("/app");
+            window.location.reload();
+          } else {
+            setError(data.message || "Google sign up failed");
+          }
+        } catch {
+          setError("Google sign up failed. Please try again.");
+        } finally {
+          setGoogleLoading(false);
+        }
+      },
+    });
+    client.requestAccessToken();
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 animated-bg grid-bg">
@@ -306,7 +327,7 @@ export function Signup() {
 
           <button
             type="button"
-            onClick={() => handleGoogleSignup()}
+            onClick={handleGoogleSignup}
             disabled={googleLoading || loading}
             className="w-full flex items-center justify-center gap-3 px-4 py-3 rounded-xl border border-white/10 bg-white/[0.03] text-white text-sm font-medium hover:bg-white/[0.06] hover:border-white/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
