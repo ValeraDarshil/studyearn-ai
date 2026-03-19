@@ -411,6 +411,7 @@
 //             <Route path="leaderboard" element={<Leaderboard />} />
 //             <Route path="profile" element={<Profile />} />
 //             <Route path="refer" element={<ReferFriends />} />
+            <Route path="points-history" element={<PointsHistory />} />
 //             <Route path="quiz" element={<QuizGenerator />} />
 //             <Route path="planner" element={<StudyPlanner />} />
 //             <Route path="challenge" element={<DailyChallenge />} />
@@ -477,6 +478,7 @@ import { CursorSpotlight } from "./components/CursorSpotlight";
 
 // ── Google Welcome Page ──────────────────────────────────────
 import { GoogleWelcome } from "./pages/GoogleWelcome";
+import { PointsHistory } from "./pages/PointsHistory";
 
 // ── CodeLearn Pages ───────────────────────────────────────────
 import CodeLearnHome from "./pages/codelearn/CodeLearnHome";
@@ -846,6 +848,7 @@ function AppContent() {
             <Route path="leaderboard" element={<Leaderboard />} />
             <Route path="profile" element={<Profile />} />
             <Route path="refer" element={<ReferFriends />} />
+            <Route path="points-history" element={<PointsHistory />} />
             <Route path="quiz" element={<QuizGenerator />} />
             <Route path="planner" element={<StudyPlanner />} />
             <Route path="challenge" element={<DailyChallenge />} />

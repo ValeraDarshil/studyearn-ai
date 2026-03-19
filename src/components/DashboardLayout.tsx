@@ -35,6 +35,7 @@
 //     { icon: Presentation, label: 'PPT Generator',   path: '/app/ppt' },
 //     { icon: FileText,     label: 'PDF Tools',       path: '/app/pdf' },
 //     { icon: Gift,         label: 'My Points',       path: '/app/rewards' },
+    { icon: Zap,          label: 'Points History',  path: '/app/points-history' },
 //     { icon: Trophy,       label: 'Leaderboard',     path: '/app/leaderboard' },
 //     // ✅ Refer Friends — now visible in sidebar
 //     { icon: Users,        label: 'Refer Friends',   path: '/app/refer', badge: '+100 pts' },
@@ -354,6 +355,7 @@ export function DashboardLayout() {
     { icon: Presentation, label: 'PPT Generator',   path: '/app/ppt' },
     { icon: FileText,     label: 'PDF Tools',       path: '/app/pdf' },
     { icon: Gift,         label: 'My Points',       path: '/app/rewards' },
+    { icon: Zap,          label: 'Points History',  path: '/app/points-history' },
     { icon: Trophy,       label: 'Leaderboard',     path: '/app/leaderboard' },
     { icon: Users,        label: 'Refer Friends',   path: '/app/refer', badge: '+100 pts' },
     { icon: Code2,        label: 'Code Learn',      path: '/codelearn', badge: 'NEW' },
