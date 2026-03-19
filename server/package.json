@@ -9,13 +9,16 @@
     "start:single": "node dist/index.js"
   },
   "dependencies": {
+    "@logtail/pino": "^0.5.5",
+    "@react-oauth/google": "^0.13.4",
+    "@sentry/node": "^8.54.0",
+    "@types/compression": "^1.8.1",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
+    "@types/helmet": "^0.0.48",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/multer": "^2.0.0",
     "@types/node": "^25.3.2",
-    "@logtail/pino": "^0.5.5",
-    "@sentry/node": "^8.54.0",
     "axios": "^1.13.5",
     "bcryptjs": "^3.0.3",
     "compression": "^1.8.1",
@@ -36,8 +39,6 @@
     "pptxgenjs": "^3.12.0",
     "sharp": "^0.34.5",
     "typescript": "^5.9.3",
-    "uuid": "^13.0.0",
-    "@types/compression": "^1.8.1",
-    "@types/helmet": "^0.0.48"
+    "uuid": "^13.0.0"
   }
 }
