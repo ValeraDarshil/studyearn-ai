@@ -1136,29 +1136,51 @@ router.post('/google', authLimiter, async (req, res) => {
       isNewUser = true;
       const displayName = googleName || cleanEmail.split('@')[0];
 
+      // ── Handle referral code ──────────────────────────────
+      const { referralCode } = req.body;
+      let welcomeBonus = 100;
+      let referrerUser: any = null;
+
+      if (referralCode && referralCode.trim()) {
+        referrerUser = await User.findOne({ referralCode: referralCode.toUpperCase().trim() });
+        if (referrerUser) {
+          welcomeBonus = 200; // Referral bonus
+          referrerUser.points += 100;
+          referrerUser.totalXP  = (referrerUser.totalXP || 0) + 100;
+          await referrerUser.save();
+          await Activity.create({
+            userId:       referrerUser._id,
+            action:       'referral',
+            details:      `Referred ${displayName} (Google signup)`,
+            pointsEarned: 100,
+          });
+        }
+      }
+
       user = new User({
         name:         displayName,
         email:        cleanEmail,
-        password:     null,       // Google users have no password
+        password:     null,
         googleId,
-        points:       100,        // Welcome bonus
-        totalXP:      100,
+        points:       welcomeBonus,
+        totalXP:      welcomeBonus,
         questionsLeft: 15,
         streak:       1,
         lastActive:   new Date(),
+        referredBy:   referrerUser ? referrerUser.referralCode : null,
       });
 
-      // Generate referral code
-      await user.save(); // save first to get _id
+      await user.save();
       user.referralCode = generateReferralCode(user.name, user._id.toString());
       await user.save();
 
-      // Log signup activity
       await Activity.create({
         userId:       user._id,
         action:       'signup',
-        details:      `Signed up with Google (${cleanEmail})`,
-        pointsEarned: 100,
+        details:      referrerUser
+          ? `Signed up with Google via referral (${referrerUser.referralCode})`
+          : `Signed up with Google (${cleanEmail})`,
+        pointsEarned: welcomeBonus,
       });
 
     } else {
@@ -1170,21 +1192,17 @@ router.post('/google', authLimiter, async (req, res) => {
     }
 
     // ── Update streak + daily login ──────────────────────────
-    let streakInfo = { streak: user.streak, streakIncreased: false, bonusPoints: 0 };
-    try {
-      streakInfo = await updateStreakOnLogin(user);
-      await user.save();
-      if (!isNewUser) {
-        await Activity.create({
-          userId:       user._id,
-          action:       'login',
-          details:      'Logged in with Google',
-          pointsEarned: streakInfo.bonusPoints,
-        });
-      }
-    } catch (streakErr: any) {
-      logger.error('Streak update error (non-fatal):', streakErr.message);
-      // Don't fail login just because streak update failed
+    const streakInfo = await updateStreakOnLogin(user);
+    await user.save();
+
+    // Log login activity (skip for new users — already logged signup)
+    if (!isNewUser) {
+      await Activity.create({
+        userId:       user._id,
+        action:       'login',
+        details:      `Logged in with Google`,
+        pointsEarned: streakInfo.bonusPoints,
+      });
     }
 
     // ── Generate JWT ─────────────────────────────────────────
@@ -1225,11 +1243,8 @@ router.post('/google', authLimiter, async (req, res) => {
     });
 
   } catch (error: any) {
-    logger.error('Google auth error:', error.message, error.stack);
-    return res.status(500).json({ 
-      success: false, 
-      message: error.message || 'Server error. Please try again.',
-    });
+    logger.error('Google auth error:', error.message);
+    return res.status(500).json({ success: false, message: 'Server error. Please try again.' });
   }
 });
 

@@ -76,7 +76,11 @@ export function Signup() {
           const res = await fetch(`${API_URL}/api/auth/google`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ idToken: tokenResponse.access_token, userInfo }),
+            body: JSON.stringify({ 
+              idToken: tokenResponse.access_token, 
+              userInfo,
+              referralCode: referralCode.trim().toUpperCase() || undefined,
+            }),
           });
           const data = await res.json();
           if (data.success) {
