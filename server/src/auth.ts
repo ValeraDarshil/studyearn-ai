@@ -30,8 +30,7 @@ const JWT_SECRET = process.env.JWT_SECRET!;
 const JWT_EXPIRES = '7d';
 const JWT_OPTIONS = {
   algorithm: 'HS512' as const,
-  issuer:    'studyearn-ai',
-  audience:  'studyearn-users',
+  // issuer/audience removed — causes verification failures with existing tokens
 };
 
 
@@ -639,7 +638,7 @@ router.get('/me', async (req, res) => {
 
 
 
-    const decoded = jwt.verify(token, JWT_SECRET, { algorithms: ['HS512'], issuer: 'studyearn-ai', audience: 'studyearn-users' }) as { userId: string };
+    const decoded = jwt.verify(token, JWT_SECRET, { algorithms: ['HS512', 'HS256'] }) as { userId: string };
 
     const user = await User.findById(decoded.userId).select('-password');
 
@@ -1249,7 +1248,7 @@ router.post('/google/apply-referral', async (req: any, res) => {
     const token = authHeader.split(' ')[1];
     let userId: string;
     try {
-      const decoded: any = jwt.verify(token, JWT_SECRET, { algorithms: ['HS512'], issuer: 'studyearn-ai', audience: 'studyearn-users' });
+      const decoded: any = jwt.verify(token, JWT_SECRET, { algorithms: ['HS512', 'HS256'] });
       userId = decoded.userId;
     } catch {
       return res.status(401).json({ success: false, message: 'Invalid token' });
