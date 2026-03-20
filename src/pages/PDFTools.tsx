@@ -33,6 +33,7 @@ interface Tool {
   extraConfig?: "split-pages" | "rotate-deg" | "watermark-text" | "page-num-pos";
   defaultFilename: string;
   category: "convert" | "edit" | "organize";
+  comingSoon?: boolean;
 }
 
 const TOOLS: Tool[] = [
@@ -48,18 +49,21 @@ const TOOLS: Tool[] = [
     icon: FileType, color: "from-blue-500 to-blue-700",
     accept: ".docx,.doc,.odt,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     multi: false, singleFile: true, defaultFilename: "word-converted", category: "convert",
+    comingSoon: true,
   },
   {
     id: "ppt-pdf", title: "PPT → PDF", desc: ".pptx/.ppt presentations ko PDF mein convert karo",
     icon: PptIcon, color: "from-orange-500 to-red-500",
     accept: ".pptx,.ppt,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation",
     multi: false, singleFile: true, defaultFilename: "presentation-converted", category: "convert",
+    comingSoon: true,
   },
   {
     id: "excel-pdf", title: "Excel → PDF", desc: ".xlsx/.xls spreadsheets ko PDF mein convert karo",
     icon: FileSpreadsheet, color: "from-emerald-500 to-teal-600",
     accept: ".xlsx,.xls,.ods,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     multi: false, singleFile: true, defaultFilename: "spreadsheet-converted", category: "convert",
+    comingSoon: true,
   },
   // ── Organize ─────────────────────────────────────────────
   {
@@ -80,12 +84,6 @@ const TOOLS: Tool[] = [
     icon: Minimize2, color: "from-cyan-500 to-cyan-700",
     accept: "application/pdf,.pdf", multi: false, singleFile: true,
     defaultFilename: "compressed", category: "edit",
-  },
-  {
-    id: "rotate-pdf", title: "Rotate PDF", desc: "Saare pages ko 90°, 180°, ya 270° rotate karo",
-    icon: RotateCw, color: "from-yellow-500 to-orange-500",
-    accept: "application/pdf,.pdf", multi: false, singleFile: true,
-    extraConfig: "rotate-deg", defaultFilename: "rotated", category: "edit",
   },
   {
     id: "page-numbers", title: "Add Page Numbers", desc: "Har page pe page number stamp karo",
@@ -176,6 +174,7 @@ export function PDFTools() {
   };
 
   const selectTool = (tool: Tool) => {
+    if (tool.comingSoon) return; // Don't open coming soon tools
     setActiveTool(tool);
     setFiles([]); setResult(null); setError("");
     setCustomName(tool.defaultFilename);
@@ -265,17 +264,30 @@ export function PDFTools() {
           <div className="grid sm:grid-cols-2 lg:grid-cols-2 gap-4">
             {TOOLS.filter(t => t.category === activeCategory).map(tool => (
               <button key={tool.id} onClick={() => selectTool(tool)}
-                className="glass rounded-2xl p-5 text-left border border-white/5 hover:border-white/10 hover:-translate-y-0.5 transition-all group">
+                disabled={tool.comingSoon}
+                className={`glass rounded-2xl p-5 text-left border transition-all relative overflow-hidden ${
+                  tool.comingSoon
+                    ? "border-white/5 opacity-60 cursor-not-allowed"
+                    : "border-white/5 hover:border-white/10 hover:-translate-y-0.5 group cursor-pointer"
+                }`}>
+                {tool.comingSoon && (
+                  <div className="absolute top-2.5 right-2.5 flex items-center gap-1 px-2 py-0.5 rounded-full bg-yellow-500/15 border border-yellow-500/30">
+                    <span className="text-[9px] font-bold text-yellow-400 uppercase tracking-wider">Coming Soon</span>
+                  </div>
+                )}
                 <div className="flex items-start gap-4">
-                  <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${tool.color} flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform`}>
+                  <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${tool.color} flex items-center justify-center flex-shrink-0 ${!tool.comingSoon ? "group-hover:scale-105" : ""} transition-transform`}>
                     <tool.icon className="w-5 h-5 text-white" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
                       <h3 className="font-bold text-white text-sm">{tool.title}</h3>
-                      <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-slate-400 flex-shrink-0 transition-colors" />
+                      {!tool.comingSoon && <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-slate-400 flex-shrink-0 transition-colors ml-auto" />}
                     </div>
                     <p className="text-xs text-slate-500 mt-1 leading-relaxed">{tool.desc}</p>
+                    {tool.comingSoon && (
+                      <p className="text-[10px] text-yellow-500/70 mt-1">Server upgrade needed — coming soon!</p>
+                    )}
                   </div>
                 </div>
               </button>
