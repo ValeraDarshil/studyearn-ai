@@ -28,7 +28,7 @@ export function authenticate(req: Request, res: Response, next: NextFunction) {
     if (!token) {
       return res.status(401).json({ success: false, message: 'No token provided' });
     }
-    const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
+    const decoded = jwt.verify(token, JWT_SECRET, { algorithms: ['HS512', 'HS256'], issuer: 'studyearn-ai', audience: 'studyearn-users' }) as { userId: string };
     req.userId = decoded.userId;
     next();
   } catch {
@@ -44,7 +44,7 @@ export function getUserIdFromToken(req: Request): string | null {
   try {
     const token = req.headers.authorization?.replace('Bearer ', '');
     if (!token) return null;
-    const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
+    const decoded = jwt.verify(token, JWT_SECRET, { algorithms: ['HS512', 'HS256'], issuer: 'studyearn-ai', audience: 'studyearn-users' }) as { userId: string };
     return decoded.userId;
   } catch {
     return null;
