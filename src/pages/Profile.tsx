@@ -199,7 +199,8 @@ function AvatarPickerModal({
 }
 
 export function Profile() {
-  const { points, totalXP, streak, questionsLeft, unlockedAchievements } = useApp();
+  const { points, totalXP, streak, questionsLeft, isPremium, unlockedAchievements } = useApp();
+  const dailyLimit = isPremium ? 30 : 15;
   const [loading, setLoading]     = useState(true);
   const [saving, setSaving]       = useState(false);
   const [error, setError]         = useState("");
@@ -419,8 +420,8 @@ export function Profile() {
           </h2>
           <div className="space-y-3">
             {[
-              { label: "Questions used today",   value: `${5 - questionsLeft}/5`,          bar: ((5 - questionsLeft) / 5) * 100,           color: "from-blue-500 to-cyan-500" },
-              { label: "Points this session",    value: points.toLocaleString(),            bar: Math.min((points / 5000) * 100, 100),       color: "from-purple-500 to-pink-500" },
+              { label: "Questions used today",   value: `${dailyLimit - questionsLeft}/${dailyLimit}`, bar: (Math.max(0, dailyLimit - questionsLeft) / dailyLimit) * 100, color: "from-blue-500 to-cyan-500" },
+              { label: "Total Points",           value: points.toLocaleString(),            bar: Math.min((points / Math.max(points, 1000)) * 100, 100), color: "from-purple-500 to-pink-500" },
               { label: "Streak progress (7 day)", value: `${Math.min(streak, 7)}/7`,        bar: (Math.min(streak, 7) / 7) * 100,           color: "from-orange-500 to-red-500" },
             ].map(item => (
               <div key={item.label}>
