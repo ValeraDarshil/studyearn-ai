@@ -4,20 +4,33 @@
 
  */
 
+
+
 import mongoose from 'mongoose';
+
+
 
 const userSchema = new mongoose.Schema({
 
   name:     { type: String, required: true, trim: true },
+
   email:    { type: String, required: true, unique: true, lowercase: true, trim: true },
-  password: { type: String, required: true },
+
+  password: { type: String, default: null }, // null for Google OAuth users
+
+
 
   // ── Gamification ──────────────────────────────────────────
 
   points:  { type: Number, default: 100 },
+
   totalXP: { type: Number, default: 100 }, // Never decreases — used for level
+
   streak:  { type: Number, default: 1 },
+
   lastActive: { type: Date, default: Date.now },
+
+
 
   // ── Daily Question Quota (Hourly Refill System) ─────────────
   questionsLeft: { type: Number, default: 15 },
@@ -29,23 +42,34 @@ const userSchema = new mongoose.Schema({
   videoAdsToday:  { type: Number, default: 0 },
   videoAdsDate:   { type: String, default: () => new Date().toISOString().split('T')[0] },
 
+
+
   // ── Referral System ───────────────────────────────────────
 
   referralCode: { type: String, unique: true, sparse: true },
+
   referredBy:   { type: String, default: null },
+
+
 
   // ── Profile ───────────────────────────────────────────────
 
   avatar: { type: String, default: null },
 
+
+
   // ── Achievements ──────────────────────────────────────────
 
   unlockedAchievements: { type: [String], default: [] },
 
+
+
   // ── Action Counters ───────────────────────────────────────
 
   totalQuestionsAsked: { type: Number, default: 0 },
+
   totalPPTsGenerated:  { type: Number, default: 0 },
+
   totalPDFsConverted:  { type: Number, default: 0 },
 
   // ── New achievement counters ───────────────────────────────
@@ -57,12 +81,18 @@ const userSchema = new mongoose.Schema({
   totalDaysActive:           { type: Number, default: 0 },
   lastDayActiveKey:          { type: String, default: null },  // IST date key for dedup
 
+
+
   createdAt: { type: Date, default: Date.now },
+
+
 
   // ── Premium Plan ──────────────────────────────────────────
 
   isPremium:          { type: Boolean, default: false },
+
   premiumExpiresAt:   { type: Date,    default: null },
+
   premiumActivatedAt: { type: Date,    default: null },
 
   // ── Forgot Password OTP ───────────────────────────────────
@@ -70,11 +100,18 @@ const userSchema = new mongoose.Schema({
   resetOtpExpiresAt: { type: Date,    default: null }, // expires in 10 min
   resetOtpAttempts:  { type: Number,  default: 0    }, // max 5 wrong attempts
 
+
+
   // ── Study Planner — server-side, cross-device ─────────────
+
   // { examName, examDate, subjects, days: StudyDay[], createdAt }
+
   studyPlan: { type: mongoose.Schema.Types.Mixed, default: null },
 
+
+
   // ── Daily Challenge — server-side, cross-device ───────────
+
   // { date: 'YYYY-MM-DD', challenge: ChallengeData, result: ChallengeResult | null }
 
   dailyChallenge:        { type: mongoose.Schema.Types.Mixed, default: null },
@@ -83,10 +120,15 @@ const userSchema = new mongoose.Schema({
   // ── Formula Sheet Bookmarks ───────────────────────────────
   // Array of formula IDs e.g. ['p1', 'p2', 'c5'] — cross-device sync
   formulaBookmarks: { type: [String], default: [] },
+
 });
+
+
 
 // Indexes for fast queries
 // email + referralCode already indexed via unique:true in schema
 userSchema.index({ points: -1 }); // Leaderboard sorting
+
+
 
 export const User = mongoose.model('User', userSchema);
