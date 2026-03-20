@@ -179,7 +179,7 @@ export function Dashboard() {
       {/* Stats Row */}
       <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4 stagger-children">
         {/* Points */}
-        <div className="glass glass-hover card-shine rounded-2xl p-4 animate-slide-up border border-purple-500/10 hover:border-purple-500/25 hover:-translate-y-1 transition-all duration-300 group">
+        <div onClick={() => navigate("/app/points-history")} className="glass glass-hover card-shine rounded-2xl p-4 animate-slide-up border border-purple-500/10 hover:border-purple-500/25 hover:-translate-y-1 transition-all duration-300 group cursor-pointer" title="View Points History">
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs text-slate-500 font-medium">Total Points</span>
             <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
