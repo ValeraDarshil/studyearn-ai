@@ -726,17 +726,35 @@ function AppContent() {
   const checkAndUnlockAchievements = useCallback(async (
     override?: Partial<UserStats & { points: number; streak: number }>
   ) => {
+    // ✅ Only check achievements when user is logged in
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
     const currentPoints   = override?.points ?? pointsRef.current;
     const currentStreak   = override?.streak ?? streakRef.current;
     const currentStats    = { ...userStatsRef.current, ...override };
     const currentUnlocked = [...unlockedRef.current];
+    
+    // ✅ Don't show achievements on initial load if user just opened site
+    // Only show if at least 1 stat is non-zero (means user has actually done something)
+    const hasActivity = currentPoints > 0 || currentStreak > 0 ||
+      Object.values(currentStats).some(v => (v as number) > 0);
+    if (!hasActivity) return;
 
     const statMap: Record<string, number> = {
-      totalQuestionsAsked: currentStats.totalQuestionsAsked || 0,
-      totalPPTsGenerated:  currentStats.totalPPTsGenerated  || 0,
-      totalPDFsConverted:  currentStats.totalPDFsConverted  || 0,
-      streak: currentStreak || 0,
-      points: currentPoints || 0,
+      totalQuestionsAsked:      currentStats.totalQuestionsAsked      || 0,
+      totalPPTsGenerated:       currentStats.totalPPTsGenerated       || 0,
+      totalPDFsConverted:       currentStats.totalPDFsConverted       || 0,
+      totalQuizCompleted:       currentStats.totalQuizCompleted       || 0,
+      totalChallengesCompleted: currentStats.totalChallengesCompleted  || 0,
+      totalChallengesCorrect:   currentStats.totalChallengesCorrect   || 0,
+      totalNotesCreated:        currentStats.totalNotesCreated        || 0,
+      totalStudyToolsUsed:      currentStats.totalStudyToolsUsed      || 0,
+      totalDaysActive:          currentStats.totalDaysActive          || 0,
+      referrals:                currentStats.referrals                || 0,
+      formulaBookmarksCount:    currentStats.formulaBookmarksCount    || 0,
+      streak:                   currentStreak                         || 0,
+      points:                   currentPoints                         || 0,
     };
 
     const toUnlock = ACHIEVEMENTS.filter(ach => {
