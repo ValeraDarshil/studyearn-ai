@@ -485,39 +485,107 @@ import CodeLearnHome from "./pages/codelearn/CodeLearnHome";
 import CoursePage from "./pages/codelearn/CoursePage";
 import CertificatePage from "./pages/codelearn/CertificatePage";
 
-// ── Achievement Toast Notification ───────────────────────────
+// ── Achievement Unlocked — Center Modal ──────────────────────
 function AchievementToast({ achievement, onClose }: { achievement: any; onClose: () => void }) {
   useEffect(() => {
-    const t = setTimeout(onClose, 4000);
+    const t = setTimeout(onClose, 5000);
     return () => clearTimeout(t);
   }, [onClose]);
 
+  const rarityColors: Record<string, { border: string; glow: string; badge: string; ring: string }> = {
+    common:    { border: "border-slate-400/40",  glow: "rgba(148,163,184,0.15)", badge: "bg-slate-500/20 text-slate-300",   ring: "#94a3b8" },
+    rare:      { border: "border-blue-400/50",   glow: "rgba(59,130,246,0.25)",  badge: "bg-blue-500/20 text-blue-300",    ring: "#3b82f6" },
+    epic:      { border: "border-purple-400/60", glow: "rgba(168,85,247,0.30)",  badge: "bg-purple-500/20 text-purple-300",ring: "#a855f7" },
+    legendary: { border: "border-yellow-400/70", glow: "rgba(234,179,8,0.35)",   badge: "bg-yellow-500/20 text-yellow-300",ring: "#eab308" },
+  };
+  const r = rarityColors[achievement.rarity || "common"];
+
   return (
-    <div
-      className="fixed top-20 right-4 z-[100] flex items-center gap-3 px-4 py-3 rounded-2xl border border-yellow-500/40 max-w-xs"
-      style={{
-        background: "linear-gradient(135deg, rgba(10,17,40,0.97) 0%, rgba(20,10,40,0.97) 100%)",
-        boxShadow: "0 20px 60px rgba(0,0,0,0.6), 0 0 30px rgba(234,179,8,0.15)",
-        backdropFilter: "blur(20px)",
-        animation: "slideInRight 0.4s cubic-bezier(0.34,1.56,0.64,1)",
-      }}
-    >
+    <>
       <style>{`
-        @keyframes slideInRight {
-          from { opacity: 0; transform: translateX(60px) scale(0.8); }
-          to   { opacity: 1; transform: translateX(0) scale(1); }
-        }
+        @keyframes achBgIn   { from { opacity: 0 } to { opacity: 1 } }
+        @keyframes achCardIn { from { opacity: 0; transform: scale(0.7) translateY(40px) } to { opacity: 1; transform: scale(1) translateY(0) } }
+        @keyframes achIconPop { 0% { transform: scale(0) rotate(-20deg) } 60% { transform: scale(1.3) rotate(5deg) } 100% { transform: scale(1) rotate(0deg) } }
+        @keyframes achShine  { from { left: -100% } to { left: 200% } }
+        @keyframes achPulse  { 0%,100% { box-shadow: 0 0 0 0 ${r.ring}40 } 50% { box-shadow: 0 0 0 16px ${r.ring}00 } }
       `}</style>
-      <div className="text-3xl">{achievement.icon}</div>
-      <div className="flex-1 min-w-0">
-        <p className="text-[11px] font-semibold text-yellow-400 uppercase tracking-widest mb-0.5">🏆 Achievement Unlocked!</p>
-        <p className="text-sm font-bold text-white truncate">{achievement.name}</p>
-        <p className="text-[11px] text-slate-400 truncate">{achievement.desc}</p>
-        {achievement.reward > 0 && (
-          <p className="text-[11px] text-green-400 font-semibold mt-0.5">+{achievement.reward} bonus pts</p>
-        )}
+
+      {/* Backdrop */}
+      <div
+        className="fixed inset-0 z-[200]"
+        style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)", animation: "achBgIn 0.3s ease" }}
+        onClick={onClose}
+      />
+
+      {/* Card */}
+      <div
+        className={`fixed z-[201] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[320px] sm:w-[380px] rounded-3xl border ${r.border} overflow-hidden`}
+        style={{
+          background: "linear-gradient(145deg, rgba(10,12,28,0.98) 0%, rgba(15,8,35,0.98) 100%)",
+          boxShadow: `0 40px 80px rgba(0,0,0,0.8), 0 0 60px ${r.glow}, inset 0 1px 0 rgba(255,255,255,0.08)`,
+          animation: "achCardIn 0.5s cubic-bezier(0.34,1.56,0.64,1)",
+        }}
+      >
+        {/* Shine sweep */}
+        <div className="absolute inset-0 overflow-hidden rounded-3xl pointer-events-none">
+          <div className="absolute top-0 bottom-0 w-16 skew-x-12 opacity-20"
+            style={{ background: "linear-gradient(90deg, transparent, white, transparent)", animation: "achShine 2s ease 0.6s forwards", left: "-100%" }} />
+        </div>
+
+        {/* Top glow bar */}
+        <div className="h-1 w-full" style={{ background: `linear-gradient(90deg, transparent, ${r.ring}, transparent)` }} />
+
+        <div className="p-8 text-center">
+          {/* Badge label */}
+          <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest mb-5 ${r.badge}`}>
+            🏆 Achievement Unlocked
+          </div>
+
+          {/* Icon */}
+          <div
+            className="text-6xl mb-4 mx-auto w-24 h-24 rounded-2xl flex items-center justify-center"
+            style={{
+              background: `radial-gradient(circle, ${r.glow.replace("0.3","0.15")} 0%, transparent 70%)`,
+              border: `2px solid ${r.ring}40`,
+              animation: "achIconPop 0.6s cubic-bezier(0.34,1.56,0.64,1) 0.2s both, achPulse 2s ease 1s infinite",
+            }}
+          >
+            {achievement.icon}
+          </div>
+
+          {/* Rarity */}
+          <div className={`inline-block text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full mb-3 ${r.badge}`}>
+            {achievement.rarity}
+          </div>
+
+          {/* Name */}
+          <h2 className="text-2xl font-black text-white mb-2">{achievement.name}</h2>
+
+          {/* Desc */}
+          <p className="text-sm text-slate-400 mb-4 leading-relaxed">{achievement.desc}</p>
+
+          {/* Reward */}
+          {achievement.reward > 0 && (
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-green-500/10 border border-green-500/20 mb-5">
+              <span className="text-lg">⚡</span>
+              <span className="text-sm font-bold text-green-400">+{achievement.reward} Bonus Points Earned!</span>
+            </div>
+          )}
+
+          {/* Close button */}
+          <button
+            onClick={onClose}
+            className="w-full py-3 rounded-xl font-semibold text-sm text-white transition-all hover:opacity-80"
+            style={{ background: `linear-gradient(135deg, ${r.ring}80, ${r.ring}40)`, border: `1px solid ${r.ring}50` }}
+          >
+            Awesome! 🎉
+          </button>
+        </div>
+
+        {/* Bottom glow bar */}
+        <div className="h-0.5 w-full" style={{ background: `linear-gradient(90deg, transparent, ${r.ring}60, transparent)` }} />
       </div>
-    </div>
+    </>
   );
 }
 
@@ -544,14 +612,6 @@ function AppContent() {
     totalQuestionsAsked: 0,
     totalPPTsGenerated: 0,
     totalPDFsConverted: 0,
-    totalQuizCompleted: 0,
-    totalChallengesCompleted: 0,
-    totalChallengesCorrect: 0,
-    totalNotesCreated: 0,
-    totalStudyToolsUsed: 0,
-    totalDaysActive: 0,
-    referrals: 0,
-    formulaBookmarksCount: 0,
   });
 
   // Toast queue — ek ek karke dikhao, sabhi achievements miss nahi hongi
@@ -631,17 +691,9 @@ function AppContent() {
           if (d.success) {
             const unlocked = d.unlockedAchievements || [];
             const stats = {
-              totalQuestionsAsked:      d.totalQuestionsAsked      || 0,
-              totalPPTsGenerated:       d.totalPPTsGenerated       || 0,
-              totalPDFsConverted:       d.totalPDFsConverted       || 0,
-              totalQuizCompleted:       d.totalQuizCompleted       || 0,
-              totalChallengesCompleted: d.totalChallengesCompleted  || 0,
-              totalChallengesCorrect:   d.totalChallengesCorrect   || 0,
-              totalNotesCreated:        d.totalNotesCreated        || 0,
-              totalStudyToolsUsed:      d.totalStudyToolsUsed      || 0,
-              totalDaysActive:          d.totalDaysActive          || 0,
-              referrals:                d.totalReferrals           || 0,
-              formulaBookmarksCount:    (d.formulaBookmarks || []).length,
+              totalQuestionsAsked: d.totalQuestionsAsked || 0,
+              totalPPTsGenerated:  d.totalPPTsGenerated  || 0,
+              totalPDFsConverted:  d.totalPDFsConverted  || 0,
             };
             setUnlockedAchievements(unlocked);
             unlockedRef.current = unlocked;
@@ -680,19 +732,11 @@ function AppContent() {
     const currentUnlocked = [...unlockedRef.current];
 
     const statMap: Record<string, number> = {
-      totalQuestionsAsked:      currentStats.totalQuestionsAsked      || 0,
-      totalPPTsGenerated:       currentStats.totalPPTsGenerated       || 0,
-      totalPDFsConverted:       currentStats.totalPDFsConverted       || 0,
-      totalQuizCompleted:       currentStats.totalQuizCompleted       || 0,
-      totalChallengesCompleted: currentStats.totalChallengesCompleted  || 0,
-      totalChallengesCorrect:   currentStats.totalChallengesCorrect   || 0,
-      totalNotesCreated:        currentStats.totalNotesCreated        || 0,
-      totalStudyToolsUsed:      currentStats.totalStudyToolsUsed      || 0,
-      totalDaysActive:          currentStats.totalDaysActive          || 0,
-      referrals:                currentStats.referrals                || 0,
-      formulaBookmarksCount:    currentStats.formulaBookmarksCount    || 0,
-      streak:                   currentStreak                         || 0,
-      points:                   currentPoints                         || 0,
+      totalQuestionsAsked: currentStats.totalQuestionsAsked || 0,
+      totalPPTsGenerated:  currentStats.totalPPTsGenerated  || 0,
+      totalPDFsConverted:  currentStats.totalPDFsConverted  || 0,
+      streak: currentStreak || 0,
+      points: currentPoints || 0,
     };
 
     const toUnlock = ACHIEVEMENTS.filter(ach => {
@@ -773,16 +817,6 @@ function AppContent() {
     };
     setRecentActivity((prev) => [newActivity, ...prev].slice(0, 10));
     await logActivityAPI(action, details, pointsEarned);
-
-    // ✅ Auto-increment achievement counters based on action
-    setUserStats(prev => {
-      const next = { ...prev };
-      if (action === 'quiz_completed')      next.totalQuizCompleted       = (prev.totalQuizCompleted       || 0) + 1;
-      if (action === 'note_created')        next.totalNotesCreated        = (prev.totalNotesCreated        || 0) + 1;
-      if (action === 'improve_notes' ||
-          action === 'analyze_pdf')         next.totalStudyToolsUsed      = (prev.totalStudyToolsUsed      || 0) + 1;
-      return next;
-    });
   };
 
   const refreshQuota = async () => {
