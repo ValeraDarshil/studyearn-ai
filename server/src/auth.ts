@@ -30,7 +30,8 @@ const JWT_SECRET = process.env.JWT_SECRET!;
 const JWT_EXPIRES = '7d';
 const JWT_OPTIONS = {
   algorithm: 'HS512' as const,
-  // issuer/audience removed — causes verification failures with existing tokens
+  issuer:    'studyearn-ai',
+  audience:  'studyearn-users',
 };
 
 
@@ -638,7 +639,7 @@ router.get('/me', async (req, res) => {
 
 
 
-    const decoded = jwt.verify(token, JWT_SECRET, { algorithms: ['HS512', 'HS256'] }) as { userId: string };
+    const decoded = jwt.verify(token, JWT_SECRET, { algorithms: ['HS512'], issuer: 'studyearn-ai', audience: 'studyearn-users' }) as { userId: string };
 
     const user = await User.findById(decoded.userId).select('-password');
 
@@ -1174,8 +1175,9 @@ router.post('/google', authLimiter, async (req, res) => {
     }
 
     // ── Update streak + daily login ──────────────────────────
+    // NOTE: updateStreakOnLogin() already calls user.save() internally
+    // Do NOT call user.save() again here — causes Mongoose VersionError
     const streakInfo = await updateStreakOnLogin(user);
-    await user.save();
 
     // Log login activity (skip for new users — already logged signup)
     if (!isNewUser) {
@@ -1225,8 +1227,11 @@ router.post('/google', authLimiter, async (req, res) => {
     });
 
   } catch (error: any) {
-    logger.error('Google auth error:', error.message);
-    return res.status(500).json({ success: false, message: 'Server error. Please try again.' });
+    logger.error({ err: error }, 'Google auth error: ' + (error?.message || String(error)));
+    return res.status(500).json({ 
+      success: false, 
+      message: 'Server error: ' + (error?.message || 'Unknown error'),
+    });
   }
 });
 
@@ -1248,7 +1253,7 @@ router.post('/google/apply-referral', async (req: any, res) => {
     const token = authHeader.split(' ')[1];
     let userId: string;
     try {
-      const decoded: any = jwt.verify(token, JWT_SECRET, { algorithms: ['HS512', 'HS256'] });
+      const decoded: any = jwt.verify(token, JWT_SECRET, { algorithms: ['HS512'], issuer: 'studyearn-ai', audience: 'studyearn-users' });
       userId = decoded.userId;
     } catch {
       return res.status(401).json({ success: false, message: 'Invalid token' });
