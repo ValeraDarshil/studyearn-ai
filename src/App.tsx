@@ -544,6 +544,14 @@ function AppContent() {
     totalQuestionsAsked: 0,
     totalPPTsGenerated: 0,
     totalPDFsConverted: 0,
+    totalQuizCompleted: 0,
+    totalChallengesCompleted: 0,
+    totalChallengesCorrect: 0,
+    totalNotesCreated: 0,
+    totalStudyToolsUsed: 0,
+    totalDaysActive: 0,
+    referrals: 0,
+    formulaBookmarksCount: 0,
   });
 
   // Toast queue — ek ek karke dikhao, sabhi achievements miss nahi hongi
@@ -623,9 +631,17 @@ function AppContent() {
           if (d.success) {
             const unlocked = d.unlockedAchievements || [];
             const stats = {
-              totalQuestionsAsked: d.totalQuestionsAsked || 0,
-              totalPPTsGenerated:  d.totalPPTsGenerated  || 0,
-              totalPDFsConverted:  d.totalPDFsConverted  || 0,
+              totalQuestionsAsked:      d.totalQuestionsAsked      || 0,
+              totalPPTsGenerated:       d.totalPPTsGenerated       || 0,
+              totalPDFsConverted:       d.totalPDFsConverted       || 0,
+              totalQuizCompleted:       d.totalQuizCompleted       || 0,
+              totalChallengesCompleted: d.totalChallengesCompleted  || 0,
+              totalChallengesCorrect:   d.totalChallengesCorrect   || 0,
+              totalNotesCreated:        d.totalNotesCreated        || 0,
+              totalStudyToolsUsed:      d.totalStudyToolsUsed      || 0,
+              totalDaysActive:          d.totalDaysActive          || 0,
+              referrals:                d.totalReferrals           || 0,
+              formulaBookmarksCount:    (d.formulaBookmarks || []).length,
             };
             setUnlockedAchievements(unlocked);
             unlockedRef.current = unlocked;
@@ -664,11 +680,19 @@ function AppContent() {
     const currentUnlocked = [...unlockedRef.current];
 
     const statMap: Record<string, number> = {
-      totalQuestionsAsked: currentStats.totalQuestionsAsked || 0,
-      totalPPTsGenerated:  currentStats.totalPPTsGenerated  || 0,
-      totalPDFsConverted:  currentStats.totalPDFsConverted  || 0,
-      streak: currentStreak || 0,
-      points: currentPoints || 0,
+      totalQuestionsAsked:      currentStats.totalQuestionsAsked      || 0,
+      totalPPTsGenerated:       currentStats.totalPPTsGenerated       || 0,
+      totalPDFsConverted:       currentStats.totalPDFsConverted       || 0,
+      totalQuizCompleted:       currentStats.totalQuizCompleted       || 0,
+      totalChallengesCompleted: currentStats.totalChallengesCompleted  || 0,
+      totalChallengesCorrect:   currentStats.totalChallengesCorrect   || 0,
+      totalNotesCreated:        currentStats.totalNotesCreated        || 0,
+      totalStudyToolsUsed:      currentStats.totalStudyToolsUsed      || 0,
+      totalDaysActive:          currentStats.totalDaysActive          || 0,
+      referrals:                currentStats.referrals                || 0,
+      formulaBookmarksCount:    currentStats.formulaBookmarksCount    || 0,
+      streak:                   currentStreak                         || 0,
+      points:                   currentPoints                         || 0,
     };
 
     const toUnlock = ACHIEVEMENTS.filter(ach => {
@@ -749,6 +773,16 @@ function AppContent() {
     };
     setRecentActivity((prev) => [newActivity, ...prev].slice(0, 10));
     await logActivityAPI(action, details, pointsEarned);
+
+    // ✅ Auto-increment achievement counters based on action
+    setUserStats(prev => {
+      const next = { ...prev };
+      if (action === 'quiz_completed')      next.totalQuizCompleted       = (prev.totalQuizCompleted       || 0) + 1;
+      if (action === 'note_created')        next.totalNotesCreated        = (prev.totalNotesCreated        || 0) + 1;
+      if (action === 'improve_notes' ||
+          action === 'analyze_pdf')         next.totalStudyToolsUsed      = (prev.totalStudyToolsUsed      || 0) + 1;
+      return next;
+    });
   };
 
   const refreshQuota = async () => {

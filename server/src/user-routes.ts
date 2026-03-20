@@ -66,22 +66,90 @@ function generateReferralCode(name: string, userId: string): string {
 // ─────────────────────────────────────────────────────────────
 // ACHIEVEMENT DEFINITIONS — keep in sync with src/data/achievements.ts
 // ─────────────────────────────────────────────────────────────
+// ── Helper: get stat value from user doc ──────────────────────
+function getStatValue(user: any, stat: string): number {
+  switch (stat) {
+    case 'totalQuestionsAsked':      return user.totalQuestionsAsked || 0;
+    case 'totalPPTsGenerated':       return user.totalPPTsGenerated  || 0;
+    case 'totalPDFsConverted':       return user.totalPDFsConverted  || 0;
+    case 'streak':                   return user.streak               || 0;
+    case 'totalXP':                  return user.totalXP              || 0;
+    case 'totalQuizCompleted':       return user.totalQuizCompleted   || 0;
+    case 'totalChallengesCompleted': return user.totalChallengesCompleted || 0;
+    case 'totalChallengesCorrect':   return user.totalChallengesCorrect   || 0;
+    case 'totalNotesCreated':        return user.totalNotesCreated    || 0;
+    case 'totalStudyToolsUsed':      return user.totalStudyToolsUsed  || 0;
+    case 'totalDaysActive':          return user.totalDaysActive       || 0;
+    case 'formulaBookmarksCount':    return (user.formulaBookmarks || []).length;
+    case 'referrals': {
+      // Count from challengeHistory not ideal — use Activity count approach
+      // For now derive from points history — actual referral count not stored directly
+      return user.totalReferrals || 0;
+    }
+    default: return 0;
+  }
+}
+
 const ACHIEVEMENT_MAP: Record<string, { stat: string; threshold: number; reward: number }> = {
-  first_question:   { stat: 'totalQuestionsAsked', threshold: 1,    reward: 20  },
-  curious_mind:     { stat: 'totalQuestionsAsked', threshold: 10,   reward: 30  },
-  knowledge_seeker: { stat: 'totalQuestionsAsked', threshold: 50,   reward: 75  },
-  question_master:  { stat: 'totalQuestionsAsked', threshold: 100,  reward: 150 },
-  first_ppt:        { stat: 'totalPPTsGenerated',  threshold: 1,    reward: 25  },
-  ppt_pro:          { stat: 'totalPPTsGenerated',  threshold: 5,    reward: 60  },
-  ppt_master:       { stat: 'totalPPTsGenerated',  threshold: 20,   reward: 200 },
-  first_pdf:        { stat: 'totalPDFsConverted',  threshold: 1,    reward: 15  },
-  pdf_expert:       { stat: 'totalPDFsConverted',  threshold: 10,   reward: 50  },
-  streak_3:         { stat: 'streak',              threshold: 3,    reward: 30  },
-  streak_7:         { stat: 'streak',              threshold: 7,    reward: 70  },
-  streak_30:        { stat: 'streak',              threshold: 30,   reward: 500 },
-  points_500:       { stat: 'totalXP',             threshold: 500,  reward: 0   },
-  points_1000:      { stat: 'totalXP',             threshold: 1000, reward: 100 },
-  points_5000:      { stat: 'totalXP',             threshold: 5000, reward: 500 },
+  // Questions
+  first_question:    { stat: 'totalQuestionsAsked', threshold: 1,     reward: 20   },
+  curious_mind:      { stat: 'totalQuestionsAsked', threshold: 10,    reward: 30   },
+  knowledge_seeker:  { stat: 'totalQuestionsAsked', threshold: 50,    reward: 75   },
+  question_master:   { stat: 'totalQuestionsAsked', threshold: 100,   reward: 150  },
+  question_legend:   { stat: 'totalQuestionsAsked', threshold: 500,   reward: 750  },
+  // PPT
+  first_ppt:         { stat: 'totalPPTsGenerated',  threshold: 1,     reward: 25   },
+  ppt_pro:           { stat: 'totalPPTsGenerated',  threshold: 5,     reward: 60   },
+  ppt_master:        { stat: 'totalPPTsGenerated',  threshold: 20,    reward: 200  },
+  ppt_legend:        { stat: 'totalPPTsGenerated',  threshold: 50,    reward: 500  },
+  // PDF
+  first_pdf:         { stat: 'totalPDFsConverted',  threshold: 1,     reward: 15   },
+  pdf_pro:           { stat: 'totalPDFsConverted',  threshold: 10,    reward: 50   },
+  pdf_master:        { stat: 'totalPDFsConverted',  threshold: 50,    reward: 200  },
+  // Streak
+  streak_3:          { stat: 'streak',              threshold: 3,     reward: 30   },
+  streak_7:          { stat: 'streak',              threshold: 7,     reward: 70   },
+  streak_14:         { stat: 'streak',              threshold: 14,    reward: 150  },
+  streak_30:         { stat: 'streak',              threshold: 30,    reward: 500  },
+  streak_100:        { stat: 'streak',              threshold: 100,   reward: 2000 },
+  // Points
+  points_100:        { stat: 'totalXP',             threshold: 100,   reward: 0    },
+  points_500:        { stat: 'totalXP',             threshold: 500,   reward: 0    },
+  points_1000:       { stat: 'totalXP',             threshold: 1000,  reward: 100  },
+  points_5000:       { stat: 'totalXP',             threshold: 5000,  reward: 500  },
+  points_10000:      { stat: 'totalXP',             threshold: 10000, reward: 1000 },
+  points_50000:      { stat: 'totalXP',             threshold: 50000, reward: 5000 },
+  // Quiz
+  first_quiz:        { stat: 'totalQuizCompleted',  threshold: 1,     reward: 20   },
+  quiz_10:           { stat: 'totalQuizCompleted',  threshold: 10,    reward: 50   },
+  quiz_50:           { stat: 'totalQuizCompleted',  threshold: 50,    reward: 150  },
+  quiz_100:          { stat: 'totalQuizCompleted',  threshold: 100,   reward: 400  },
+  // Daily Challenge
+  first_challenge:       { stat: 'totalChallengesCompleted', threshold: 1,  reward: 25  },
+  challenge_7:           { stat: 'totalChallengesCompleted', threshold: 7,  reward: 75  },
+  challenge_30:          { stat: 'totalChallengesCompleted', threshold: 30, reward: 300 },
+  challenge_correct_10:  { stat: 'totalChallengesCorrect',  threshold: 10, reward: 100 },
+  challenge_correct_50:  { stat: 'totalChallengesCorrect',  threshold: 50, reward: 500 },
+  // Notes
+  first_note:        { stat: 'totalNotesCreated',       threshold: 1,  reward: 20  },
+  notes_10:          { stat: 'totalNotesCreated',       threshold: 10, reward: 75  },
+  // Study Tools
+  first_study_tool:  { stat: 'totalStudyToolsUsed',     threshold: 1,  reward: 20  },
+  study_tools_10:    { stat: 'totalStudyToolsUsed',     threshold: 10, reward: 80  },
+  // Formula Bookmarks
+  first_bookmark:    { stat: 'formulaBookmarksCount',   threshold: 1,  reward: 15  },
+  bookmarks_10:      { stat: 'formulaBookmarksCount',   threshold: 10, reward: 50  },
+  bookmarks_25:      { stat: 'formulaBookmarksCount',   threshold: 25, reward: 150 },
+  // Social
+  first_referral:    { stat: 'referrals',               threshold: 1,  reward: 50   },
+  referrals_5:       { stat: 'referrals',               threshold: 5,  reward: 200  },
+  referrals_10:      { stat: 'referrals',               threshold: 10, reward: 500  },
+  referrals_25:      { stat: 'referrals',               threshold: 25, reward: 2000 },
+  // Days Active
+  days_active_7:     { stat: 'totalDaysActive',         threshold: 7,   reward: 50   },
+  days_active_30:    { stat: 'totalDaysActive',         threshold: 30,  reward: 200  },
+  days_active_100:   { stat: 'totalDaysActive',         threshold: 100, reward: 1000 },
+  days_active_365:   { stat: 'totalDaysActive',         threshold: 365, reward: 5000 },
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -281,25 +349,33 @@ router.post('/unlock-achievement', authenticate, async (req: any, res) => {
     const user = await User.findById(req.userId) as any;
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
-    if (user.unlockedAchievements.includes(achievementId))
+    // Already unlocked — idempotent
+    if (user.unlockedAchievements.includes(achievementId)) {
       return res.json({ success: true, unlockedAchievements: user.unlockedAchievements, rewardPoints: 0 });
-
-    const statValue = (user[achDef.stat] || 0) as number;
-    if (statValue < achDef.threshold) {
-      return res.status(403).json({
-        success: false,
-        message: `Not earned yet. Need ${achDef.threshold} ${achDef.stat}, you have ${statValue}.`,
-      });
     }
 
+    // ── Server-side validation — prevent cheating ─────────────
+    const statValue = getStatValue(user, achDef.stat);
+    if (statValue < achDef.threshold) {
+      return res.status(403).json({ success: false, message: 'Achievement not yet earned' });
+    }
+
+    // ── Award achievement ──────────────────────────────────────
     user.unlockedAchievements.push(achievementId);
     if (achDef.reward > 0) {
       user.points  = (user.points  || 0) + achDef.reward;
       user.totalXP = (user.totalXP || 0) + achDef.reward;
+      await Activity.create({
+        userId:       req.userId,
+        action:       'streak_bonus',
+        details:      `Achievement unlocked: ${achievementId} (+${achDef.reward} pts)`,
+        pointsEarned: achDef.reward,
+      });
     }
     await user.save();
+
     res.json({ success: true, unlockedAchievements: user.unlockedAchievements, rewardPoints: achDef.reward });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Unlock achievement error:', error);
     res.status(500).json({ success: false, message: 'Server error' });
   }
@@ -511,8 +587,7 @@ Rules:
 
     const challenge = {
       date: todayKey, question: qLine, options: opts,
-      answer: Number(ansIdx),  // ✅ Always store as number, never string
-      explanation, subject, pts: Number(pts) || 25,
+      answer: ansIdx, explanation, subject, pts: pts || 25,
     };
 
     // Save challenge to DB (no result yet)
@@ -575,8 +650,7 @@ router.post('/daily-challenge/result', authenticate, async (req: any, res) => {
       return res.json({ success: true, result: dc.result, alreadySubmitted: true });
 
     const challenge = dc.challenge;
-    // ✅ Number() cast — MongoDB Mixed type can store answer as string '2' not number 2
-    const correct   = Number(selectedIdx) === Number(challenge.answer);
+    const correct   = selectedIdx === challenge.answer;
 
     // Premium check
     const premExp = user.premiumExpiresAt;
@@ -592,6 +666,9 @@ router.post('/daily-challenge/result', authenticate, async (req: any, res) => {
     user.points  = (user.points  || 0) + ptsEarned;
     user.totalXP = (user.totalXP || 0) + ptsEarned;
     user.dailyChallenge = { ...dc, result };
+    // ✅ Achievement counters
+    user.totalChallengesCompleted = (user.totalChallengesCompleted || 0) + 1;
+    if (correct) user.totalChallengesCorrect = (user.totalChallengesCorrect || 0) + 1;
 
     // Save challengeHistory for 7-day tracker (single save)
     const histEntry = { date: todayKey, completed: true, correct };

@@ -4,6 +4,14 @@ export interface UserStats {
   totalQuestionsAsked: number;
   totalPPTsGenerated: number;
   totalPDFsConverted: number;
+  totalQuizCompleted: number;
+  totalChallengesCompleted: number;
+  totalChallengesCorrect: number;
+  totalNotesCreated: number;
+  totalStudyToolsUsed: number;
+  totalDaysActive: number;
+  referrals: number;
+  formulaBookmarksCount: number;
 }
 
 export interface AppContextType {
@@ -51,7 +59,7 @@ export const AppContext = createContext<AppContextType>({
   logActivity: () => {},
   userName: '',
   unlockedAchievements: [],
-  userStats: { totalQuestionsAsked: 0, totalPPTsGenerated: 0, totalPDFsConverted: 0 },
+  userStats: { totalQuestionsAsked: 0, totalPPTsGenerated: 0, totalPDFsConverted: 0, totalQuizCompleted: 0, totalChallengesCompleted: 0, totalChallengesCorrect: 0, totalNotesCreated: 0, totalStudyToolsUsed: 0, totalDaysActive: 0, referrals: 0, formulaBookmarksCount: 0 },
   checkAndUnlockAchievements: () => {},
   setUnlockedAchievements: () => {},
   setUserStats: () => {},
