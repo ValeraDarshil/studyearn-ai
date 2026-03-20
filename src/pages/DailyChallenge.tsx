@@ -71,12 +71,13 @@ function parseMCQ(text: string): { question: string; options: string[]; answer: 
     optLines.sort((a, b) => "ABCD".indexOf(a.letter) - "ABCD".indexOf(b.letter));
     const opts = optLines.map(o => o.text);
 
-    let answer = 0;
+    let answer = -1;
     for (const line of lines) {
       if (!/^\*{0,2}(correct\s+)?answer\s*[:\-]/i.test(line.replace(/\*+/g, ""))) continue;
       const lm = line.replace(/^.*?[:\-]\s*/i, "").trim().match(/^([A-D])/i);
       if (lm) { answer = "ABCD".indexOf(lm[1].toUpperCase()); break; }
     }
+    if (answer === -1) return null; // answer not found — skip question
 
     let explanation = "Check your textbook.";
     for (const line of lines) {
@@ -189,7 +190,7 @@ export function DailyChallenge() {
       }
     } catch {
       // Fallback: compute locally if server fails
-      const correct   = idx === challenge.answer;
+      const correct   = Number(idx) === Number(challenge.answer);
       const ptsEarned = correct ? challenge.pts : Math.round(challenge.pts * 0.1);
       setResult({ date: todayKey, completed: true, correct, ptsEarned });
       setHistory(prev => ({ ...prev, [todayKey]: { completed: true, correct } }));
@@ -327,7 +328,7 @@ export function DailyChallenge() {
               <div className="space-y-2">
                 {challenge.options.map((opt, i) => {
                   const isSelected = selected === i;
-                  const isCorrect  = i === challenge.answer;
+                  const isCorrect  = i === Number(challenge.answer);
                   let style = "border-white/5 bg-white/[0.02] text-slate-300 hover:border-white/10 hover:bg-white/[0.04]";
                   if (revealed) {
                     if (isCorrect)       style = "border-green-500/50 bg-green-500/10 text-green-300";
@@ -356,7 +357,7 @@ export function DailyChallenge() {
                   <div className={`rounded-xl px-4 py-3 text-sm border ${
                     result.correct ? "bg-green-500/5 border-green-500/20 text-green-200" : "bg-red-500/5 border-red-500/20 text-red-200"}`}>
                     <span className="font-semibold">
-                      {result.correct ? "✅ Correct! " : `❌ Wrong. Correct answer: ${["A","B","C","D"][challenge.answer]}. `}
+                      {result.correct ? "✅ Correct! " : `❌ Wrong. Correct answer: ${["A","B","C","D"][Number(challenge.answer)]}. `}
                     </span>
                     <MarkdownRenderer content={challenge.explanation} />
                   </div>

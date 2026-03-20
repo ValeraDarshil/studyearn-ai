@@ -511,7 +511,8 @@ Rules:
 
     const challenge = {
       date: todayKey, question: qLine, options: opts,
-      answer: ansIdx, explanation, subject, pts: pts || 25,
+      answer: Number(ansIdx),  // ✅ Always store as number, never string
+      explanation, subject, pts: Number(pts) || 25,
     };
 
     // Save challenge to DB (no result yet)
@@ -574,7 +575,8 @@ router.post('/daily-challenge/result', authenticate, async (req: any, res) => {
       return res.json({ success: true, result: dc.result, alreadySubmitted: true });
 
     const challenge = dc.challenge;
-    const correct   = selectedIdx === challenge.answer;
+    // ✅ Number() cast — MongoDB Mixed type can store answer as string '2' not number 2
+    const correct   = Number(selectedIdx) === Number(challenge.answer);
 
     // Premium check
     const premExp = user.premiumExpiresAt;
