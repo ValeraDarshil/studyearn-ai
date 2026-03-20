@@ -28,6 +28,11 @@ const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET!;
 
 const JWT_EXPIRES = '7d';
+const JWT_OPTIONS = {
+  algorithm: 'HS512' as const,
+  issuer:    'studyearn-ai',
+  audience:  'studyearn-users',
+};
 
 
 
@@ -146,10 +151,11 @@ async function getDefaultReferrer() {
 
       .sort({ createdAt: 1 })
 
-      .select('_id referralCode name points totalXP')
+      .select('_id referralCode name')
 
-      .limit(1);
-      // NOTE: No .lean() — need Mongoose document so .save() works
+      .limit(1)
+
+      .lean();
 
     
 
@@ -376,7 +382,7 @@ router.post('/signup', authLimiter, validateSignup, async (req, res) => {
 
     // Generate token
 
-    const token = jwt.sign({ userId: user._id, email: user.email }, JWT_SECRET, { expiresIn: JWT_EXPIRES });
+    const token = jwt.sign({ userId: user._id, email: user.email }, JWT_SECRET, { expiresIn: JWT_EXPIRES, ...JWT_OPTIONS });
 
 
 
@@ -544,7 +550,7 @@ router.post('/login', authLimiter, validateLogin, async (req, res) => {
 
     // Generate token
 
-    const token = jwt.sign({ userId: user._id, email: user.email }, JWT_SECRET, { expiresIn: JWT_EXPIRES });
+    const token = jwt.sign({ userId: user._id, email: user.email }, JWT_SECRET, { expiresIn: JWT_EXPIRES, ...JWT_OPTIONS });
 
 
 
@@ -633,7 +639,7 @@ router.get('/me', async (req, res) => {
 
 
 
-    const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
+    const decoded = jwt.verify(token, JWT_SECRET, { algorithms: ['HS512'], issuer: 'studyearn-ai', audience: 'studyearn-users' }) as { userId: string };
 
     const user = await User.findById(decoded.userId).select('-password');
 
@@ -1023,7 +1029,7 @@ router.post('/reset-password', async (req, res) => {
 
     try {
 
-      decoded = jwt.verify(resetToken, process.env.JWT_SECRET!);
+      decoded = jwt.verify(resetToken, process.env.JWT_SECRET!, { algorithms: ['HS512'] });
 
     } catch {
 
@@ -1186,7 +1192,7 @@ router.post('/google', authLimiter, async (req, res) => {
     const token = jwt.sign(
       { userId: user._id, email: user.email },
       JWT_SECRET,
-      { expiresIn: JWT_EXPIRES }
+      { expiresIn: JWT_EXPIRES, ...JWT_OPTIONS }
     );
 
     // ── Premium check ─────────────────────────────────────────
@@ -1243,7 +1249,7 @@ router.post('/google/apply-referral', async (req: any, res) => {
     const token = authHeader.split(' ')[1];
     let userId: string;
     try {
-      const decoded: any = jwt.verify(token, JWT_SECRET);
+      const decoded: any = jwt.verify(token, JWT_SECRET, { algorithms: ['HS512'], issuer: 'studyearn-ai', audience: 'studyearn-users' });
       userId = decoded.userId;
     } catch {
       return res.status(401).json({ success: false, message: 'Invalid token' });
@@ -1276,11 +1282,7 @@ router.post('/google/apply-referral', async (req: any, res) => {
 
     } else if (skipMode) {
       // ── Skip — auto assign to first user (admin/owner) ────
-      // Use findById (not lean) to get full Mongoose document with .save()
-      const defaultRef = await getDefaultReferrer() as any;
-      if (defaultRef?._id) {
-        referrer = await User.findById(defaultRef._id);
-      }
+      referrer = await getDefaultReferrer() as any;
       bonusForUser = 0; // No bonus for user when skipping
     }
 
