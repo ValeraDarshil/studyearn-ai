@@ -545,11 +545,11 @@ export function AskAI() {
       if (result.success) {
         const pts = result.pointsAwarded ?? (isPremium ? 20 : 10);
         aiMsg.pointsAwarded = pts;
-        // ✅ addPoints + logActivity removed — backend already logs activity
-        // and returns pointsAwarded. Only update UI state here.
+        addPoints(pts);  // ✅ UI update — frontend points display
         if (result.questionsLeft !== undefined) setQuestionsLeft(result.questionsLeft);
         else useQuestion();
         if (result.nextRefillSecs !== undefined) setNextRefillSecs(result.nextRefillSecs);
+        // logActivity removed — backend logs with actual question text (no duplicate)
         const newTotal = (userStats.totalQuestionsAsked || 0) + 1;
         setUserStats({ ...userStats, totalQuestionsAsked: newTotal });
         incrementAction("question");
