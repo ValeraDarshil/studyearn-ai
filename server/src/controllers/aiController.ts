@@ -124,9 +124,14 @@ async function handleQuestionUsed(
 
     await user.save();
 
-    const activityDetails = promptText
-      ? `Asked: ${promptText.substring(0, 80)}${promptText.length > 80 ? '…' : ''}`
-      : 'Asked AI a question';
+    // Clean prompt — hide internal system instructions (JSON arrays, "Output only", etc.)
+    const isInternalPrompt = promptText.startsWith('{') || promptText.startsWith('[') ||
+      promptText.toLowerCase().startsWith('output only') ||
+      promptText.toLowerCase().startsWith('create') && promptText.includes('json');
+    const cleanPrompt = isInternalPrompt ? '' : promptText.trim();
+    const activityDetails = cleanPrompt
+      ? `Asked: ${cleanPrompt.substring(0, 80)}${cleanPrompt.length > 80 ? '…' : ''}`
+      : 'Asked an AI question';
     await Activity.create({ userId, action: 'ask_question', details: activityDetails, pointsEarned: pts });
     logger.info(`AI question: ${user.email} | premium=${premium} | +${pts}pts | left=${(user as any).questionsLeft}`);
 

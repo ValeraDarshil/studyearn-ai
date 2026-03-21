@@ -421,9 +421,9 @@ Output the JSON array now:`;
         bullets: sl.content.split('\n').filter((l: string) => l.trim()).map((l: string) => l.replace(/^[-•*]\s*/, '').trim()).slice(0, 4),
       })));
       // ✅ Premium users get 1.5x — base 20 → 30 pts
+      // NOTE: logActivity removed — server already logs via handlePPTGenerated (no duplicate)
       const pptPts = isPremium ? 40 : 20;
       addPoints(pptPts);
-      logActivity("ppt_generated", `PPT: ${topic}${isPremium ? " ⚡" : ""}`, pptPts);
       const newTotal = (userStats.totalPPTsGenerated || 0) + 1;
       setUserStats({ ...userStats, totalPPTsGenerated: newTotal });
       incrementAction("ppt");

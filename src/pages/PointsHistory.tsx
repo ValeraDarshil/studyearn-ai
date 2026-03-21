@@ -36,8 +36,16 @@ const ACTION_META: Record<string, { label: string; icon: React.ElementType; colo
   study_plan_created: { label: "Study Planner",   icon: BookOpen,     color: "text-emerald-400", bg: "bg-emerald-500/10" },
 };
 
-const getMeta = (action: string) =>
-  ACTION_META[action] ?? { label: action.replace(/_/g, " "), icon: Zap, color: "text-slate-400", bg: "bg-slate-500/10" };
+const CANONICAL_ACTIONS: Record<string, string> = {
+  generate_ppt:  "ppt_generated",
+  convert_pdf:   "pdf_tool",
+  pdf_converted: "pdf_tool",
+  login:         "daily_login",
+};
+const getMeta = (action: string) => {
+  const key = CANONICAL_ACTIONS[action] ?? action;
+  return ACTION_META[key] ?? { label: key.replace(/_/g, " "), icon: Zap, color: "text-slate-400", bg: "bg-slate-500/10" };
+};
 
 interface Activity {
   _id: string;
@@ -102,20 +110,31 @@ export function PointsHistory() {
   }, []);
 
   // Filter pills — built from actual data
+  // Canonical action map — merges aliases so filters show unique labels only
+  const CANONICAL: Record<string, string> = {
+    generate_ppt:  "ppt_generated",
+    convert_pdf:   "pdf_tool",
+    pdf_converted: "pdf_tool",
+    login:         "daily_login",
+    daily_challenge: "daily_challenge",
+  };
+  const canonical = (action: string) => CANONICAL[action] ?? action;
+
   const filterOptions = useMemo(() => {
-    const seen = new Set<string>();
+    const seenLabels = new Set<string>();
     const opts: { value: string; label: string }[] = [{ value: "all", label: "All" }];
     activities.forEach(a => {
-      if (!seen.has(a.action)) {
-        seen.add(a.action);
-        opts.push({ value: a.action, label: getMeta(a.action).label });
+      const label = getMeta(canonical(a.action)).label;
+      if (!seenLabels.has(label)) {
+        seenLabels.add(label);
+        opts.push({ value: canonical(a.action), label });
       }
     });
     return opts;
   }, [activities]);
 
   const filtered = useMemo(() =>
-    filter === "all" ? activities : activities.filter(a => a.action === filter),
+    filter === "all" ? activities : activities.filter(a => canonical(a.action) === filter),
     [activities, filter]
   );
 
@@ -256,7 +275,12 @@ export function PointsHistory() {
                               <span className={`text-xs font-semibold ${meta.color}`}>{meta.label}</span>
                               <span className="text-[10px] text-slate-600">{formatTime(act.timestamp)}</span>
                             </div>
-                            <p className="text-sm text-slate-300 truncate">{act.details}</p>
+                            <p className="text-sm text-slate-300 truncate">
+                              {/* Hide internal system prompts that leak into details */}
+                              {act.details && !act.details.toLowerCase().startsWith('output only') && !act.details.startsWith('{') && !act.details.startsWith('[')
+                                ? act.details
+                                : getMeta(act.action).label === 'Ask AI' ? 'Asked an AI question' : getMeta(act.action).label}
+                            </p>
                           </div>
                           <div className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
                             <Zap className="w-3 h-3 text-yellow-400" />
