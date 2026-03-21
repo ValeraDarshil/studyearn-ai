@@ -38,6 +38,7 @@ function authHeaders() {
   return { "Content-Type": "application/json", Authorization: `Bearer ${token || ""}` };
 }
 
+// Legacy regex parser — fallback if AI doesn't return JSON
 function parseTimetable(text: string, examDate: string): StudyDay[] {
   const today   = new Date(); today.setHours(0,0,0,0);
   const exam    = new Date(examDate); exam.setHours(0,0,0,0);
@@ -101,27 +102,25 @@ export function StudyPlanner() {
     if (daysLeft > 90) { setError("Exam must be within 90 days!"); return; }
 
     setError(""); setLoading(true);
-    const prompt = `Create a ${daysLeft}-day study timetable for a student preparing for "${examName}" on ${new Date(examDate).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}.
 
-Subjects to cover: ${validSubjects.join(", ")}
+    // JSON-first prompt — much more reliable than regex parsing
+    const examDateFormatted = new Date(examDate).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
+    const prompt = `You are a study planner for Indian students. Create a ${daysLeft}-day study timetable for "${examName}" exam on ${examDateFormatted}.
+
+Subjects: ${validSubjects.join(", ")}
 
 Rules:
-- Distribute subjects evenly across all ${daysLeft} days
-- Each day should have 3-4 specific study tasks
-- Include chapter names or topics (realistic for Indian students)
-- Include approximate time per task (e.g., 1.5hr, 2hr)
-- Last 2-3 days should be revision only
-- Day before exam: light revision + rest
+- Distribute subjects evenly, 3-5 tasks per day
+- Include specific chapter/topic names realistic for Indian curricula
+- Include time estimate per task (e.g. 1.5hr, 2hr)
+- Last 2-3 days: revision only. Day before exam: light revision + rest.
 
-Format EXACTLY like this:
-Day 1 (${new Date().toLocaleDateString("en-IN", { weekday: "long" })}):
-- ${validSubjects[0]}: [specific chapter/topic] ([time])
-- [Subject]: [topic] ([time])
-
-Day 2:
-- ...
-
-Continue for all ${daysLeft} days.`;
+Return ONLY a valid JSON array — no markdown, no explanation, no extra text:
+[
+  { "day": "Day 1", "date": "Mon, 22 Mar", "tasks": ["Subject: Topic (2hr)", "Subject: Topic (1.5hr)"] },
+  { "day": "Day 2", "date": "Tue, 23 Mar", "tasks": ["Subject: Topic (2hr)"] }
+]
+Generate exactly ${daysLeft} day objects in the array.`;
 
     try {
       const res  = await fetch(`${API_URL}/api/ai/ask`, {
@@ -129,9 +128,41 @@ Continue for all ${daysLeft} days.`;
       });
       const data = await res.json();
       if (!data.success) throw new Error("AI error");
-      const days = parseTimetable(data.answer, examDate);
+
+      // Try JSON parse first (reliable), fall back to regex parser (legacy)
+      let days: StudyDay[] = [];
+      const rawAnswer: string = data.answer || "";
+      try {
+        const jsonStr = rawAnswer.replace(/```json|```/gi, "").trim();
+        const start = jsonStr.indexOf("[");
+        const end   = jsonStr.lastIndexOf("]");
+        if (start !== -1 && end > start) {
+          const parsed = JSON.parse(jsonStr.slice(start, end + 1));
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            const today = new Date(); today.setHours(0, 0, 0, 0);
+            days = parsed.map((item: any, i: number) => {
+              const d = new Date(today); d.setDate(today.getDate() + i);
+              const tasks: string[] = Array.isArray(item.tasks) ? item.tasks.map(String) : [];
+              return {
+                date: item.date || d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" }),
+                day:  item.day  || `Day ${i + 1}`,
+                tasks,
+                completed: new Array(tasks.length).fill(false),
+              };
+            });
+          }
+        }
+      } catch {}
+
+      // Fallback to regex parser if JSON parse failed
+      if (!days.length) days = parseTimetable(rawAnswer, examDate);
       if (!days.length) throw new Error("Could not generate plan. Please try again.");
-      const newPlan: SavedPlan = { examName: examName.trim(), examDate, subjects: validSubjects, days, createdAt: new Date().toISOString() };
+
+      const newPlan: SavedPlan = {
+        examName: examName.trim(), examDate,
+        subjects: validSubjects, days,
+        createdAt: new Date().toISOString(),
+      };
       await savePlan(newPlan);
       setActiveDay(0);
       addPoints(20);
@@ -230,7 +261,10 @@ Continue for all ${daysLeft} days.`;
 
         <button onClick={generatePlan} disabled={loading}
           className="w-full flex items-center justify-center gap-2 px-6 py-4 rounded-xl bg-gradient-to-r from-purple-500 to-blue-600 text-white font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 transition-all glow-btn">
-          {loading ? <><Loader2 className="w-5 h-5 animate-spin" /> Generating your plan…</> : <><Sparkles className="w-5 h-5" /> Generate Study Plan <ChevronRight className="w-4 h-4" /></>}
+          {loading
+            ? <><Loader2 className="w-5 h-5 animate-spin" /> Generating your plan…</>
+            : <><Sparkles className="w-5 h-5" /> Generate Study Plan <ChevronRight className="w-4 h-4" /></>
+          }
         </button>
       </div>
     </div>
