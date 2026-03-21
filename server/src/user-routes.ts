@@ -253,11 +253,24 @@ router.get('/achievements', authenticate, async (req: any, res) => {
     const user = await User.findById(req.userId).lean() as any;
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
     res.json({
-      success:              true,
-      unlockedAchievements: user.unlockedAchievements || [],
-      totalQuestionsAsked:  user.totalQuestionsAsked  || 0,
-      totalPPTsGenerated:   user.totalPPTsGenerated   || 0,
-      totalPDFsConverted:   user.totalPDFsConverted   || 0,
+      success:                  true,
+      unlockedAchievements:     user.unlockedAchievements     || [],
+      // ── Stats for achievement checking ──
+      totalQuestionsAsked:      user.totalQuestionsAsked      || 0,
+      totalPPTsGenerated:       user.totalPPTsGenerated       || 0,
+      totalPDFsConverted:       user.totalPDFsConverted       || 0,
+      totalQuizCompleted:       user.totalQuizCompleted       || 0,
+      totalChallengesCompleted: user.totalChallengesCompleted  || 0,
+      totalChallengesCorrect:   user.totalChallengesCorrect   || 0,
+      totalNotesCreated:        user.totalNotesCreated        || 0,
+      totalStudyToolsUsed:      user.totalStudyToolsUsed      || 0,
+      totalDaysActive:          user.totalDaysActive          || 0,
+      totalReferrals:           user.totalReferrals           || 0,
+      formulaBookmarks:         user.formulaBookmarks         || [],
+      // ── For profile display ──
+      totalXP:                  user.totalXP                  || 0,
+      streak:                   user.streak                   || 0,
+      points:                   user.points                   || 0,
     });
   } catch (error) {
     console.error('Get achievements error:', error);
