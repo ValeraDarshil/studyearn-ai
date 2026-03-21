@@ -128,7 +128,7 @@ export function DashboardLayout() {
         {/* Nav */}
         <nav className="flex-1 overflow-y-auto px-3 pb-6 space-y-0.5" style={{ overscrollBehavior: 'contain' }}>
           {navItemsFull.map((item) => {
-            const isExternal = 'isExternal' in item && item.isExternal;
+            const isExternal = 'isExternal' in item && (item as any).isExternal;
 
             const linkClass = (isActive: boolean) =>
               `relative flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 group/nav ${
@@ -144,13 +144,13 @@ export function DashboardLayout() {
                 )}
                 <item.icon className={`w-4 h-4 flex-shrink-0 transition-all duration-200 ${isActive ? 'text-blue-400' : 'group-hover/nav:text-white'}`} />
                 <span className="truncate flex-1">{item.label}</span>
-                {'badge' in item && item.badge && !isActive && (
+                {'badge' in item && (item as any).badge && !isActive && (
                   <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0 ${
-                    item.badge === 'NEW'
+                    (item as any).badge === 'NEW'
                       ? 'bg-violet-500/15 text-violet-400 border border-violet-500/20'
                       : 'bg-green-500/15 text-green-400 border border-green-500/20'
                   }`}>
-                    {item.badge}
+                    {(item as any).badge}
                   </span>
                 )}
               </>
