@@ -331,7 +331,7 @@ function AppContent() {
       totalStudyToolsUsed:      currentStats.totalStudyToolsUsed      || 0,
       totalDaysActive:          currentStats.totalDaysActive          || 0,
       referrals:                currentStats.referrals                || 0,
-      formulaBookmarksCount:    currentStats.formulaBookmarksCount    || 0,
+      totalFormulaBookmarks:    currentStats.formulaBookmarksCount    || 0,
       streak:                   currentStreak                         || 0,
       points:                   currentPoints                         || 0,
     };
