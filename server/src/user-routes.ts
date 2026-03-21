@@ -146,7 +146,8 @@ router.post('/add-points', authenticate, async (req: any, res) => {
   try {
     await connectDB();
     const { points } = req.body;
-    if (typeof points !== 'number' || points <= 0)
+    const MAX_POINTS_PER_CALL = 500; // Legit max is ~50 (premium AI). Cap prevents abuse.
+    if (typeof points !== 'number' || points <= 0 || points > MAX_POINTS_PER_CALL)
       return res.status(400).json({ success: false, message: 'Invalid points value' });
 
     const user = await User.findById(req.userId);
@@ -191,7 +192,15 @@ router.post('/log-activity', authenticate, async (req: any, res) => {
   try {
     await connectDB();
     const { action, details, pointsEarned } = req.body;
-    await Activity.create({ userId: req.userId, action, details, pointsEarned: pointsEarned || 0 });
+    // Sanitize inputs — prevent DB bloat and injection
+    const VALID_ACTIONS = ['ask_question','ppt_generated','pdf_converted','quiz_completed',
+      'challenge_completed','note_created','study_tool_used','formula_bookmarked',
+      'streak_bonus','login_bonus','achievement_unlocked','referral_bonus','improve_notes','analyze_pdf'];
+    const safeAction  = VALID_ACTIONS.includes(action) ? action : 'other';
+    const safeDetails = typeof details === 'string' ? details.substring(0, 200) : '';
+    const safePoints  = typeof pointsEarned === 'number' && pointsEarned >= 0 && pointsEarned <= 500
+      ? pointsEarned : 0;
+    await Activity.create({ userId: req.userId, action: safeAction, details: safeDetails, pointsEarned: safePoints });
     res.json({ success: true });
   } catch (error) {
     console.error('Log activity error:', error);

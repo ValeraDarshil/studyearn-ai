@@ -220,7 +220,7 @@ router.post('/signup', authLimiter, validateSignup, async (req, res) => {
 
     // Hash password
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashedPassword = await bcrypt.hash(password, 12);
 
 
 
@@ -1059,7 +1059,7 @@ router.post('/reset-password', async (req, res) => {
 
     // Hash new password and save
 
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
 
     user.password          = hashedPassword;
 
