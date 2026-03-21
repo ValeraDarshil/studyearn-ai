@@ -41,10 +41,17 @@ import CertificatePage from "./pages/codelearn/CertificatePage";
 
 // ── Achievement Unlocked — Center Modal ──────────────────────
 function AchievementToast({ achievement, onClose }: { achievement: any; onClose: () => void }) {
-  useEffect(() => {
-    const t = setTimeout(onClose, 5000);
-    return () => clearTimeout(t);
+  const [visible, setVisible] = useState(true);
+
+  const handleClose = useCallback(() => {
+    setVisible(false);
+    setTimeout(onClose, 350); // wait for exit animation
   }, [onClose]);
+
+  useEffect(() => {
+    const t = setTimeout(handleClose, 5000);
+    return () => clearTimeout(t);
+  }, [handleClose]);
 
   const rarityColors: Record<string, { border: string; glow: string; badge: string; ring: string }> = {
     common:    { border: "border-slate-400/40",  glow: "rgba(148,163,184,0.15)", badge: "bg-slate-500/20 text-slate-300",   ring: "#94a3b8" },
@@ -57,18 +64,24 @@ function AchievementToast({ achievement, onClose }: { achievement: any; onClose:
   return (
     <>
       <style>{`
-        @keyframes achBgIn   { from { opacity: 0 } to { opacity: 1 } }
-        @keyframes achCardIn { from { opacity: 0; transform: scale(0.7) translateY(40px) } to { opacity: 1; transform: scale(1) translateY(0) } }
+        @keyframes achBgIn    { from { opacity: 0 } to { opacity: 1 } }
+        @keyframes achBgOut   { from { opacity: 1 } to { opacity: 0 } }
+        @keyframes achCardIn  { from { opacity: 0; transform: scale(0.7) translateY(40px) } to { opacity: 1; transform: scale(1) translateY(0) } }
+        @keyframes achCardOut { from { opacity: 1; transform: scale(1) translateY(0) } to { opacity: 0; transform: scale(0.85) translateY(20px) } }
         @keyframes achIconPop { 0% { transform: scale(0) rotate(-20deg) } 60% { transform: scale(1.3) rotate(5deg) } 100% { transform: scale(1) rotate(0deg) } }
-        @keyframes achShine  { from { left: -100% } to { left: 200% } }
-        @keyframes achPulse  { 0%,100% { box-shadow: 0 0 0 0 ${r.ring}40 } 50% { box-shadow: 0 0 0 16px ${r.ring}00 } }
+        @keyframes achShine   { from { left: -100% } to { left: 200% } }
+        @keyframes achPulse   { 0%,100% { box-shadow: 0 0 0 0 ${r.ring}40 } 50% { box-shadow: 0 0 0 16px ${r.ring}00 } }
       `}</style>
 
       {/* Backdrop */}
       <div
         className="fixed inset-0 z-[200]"
-        style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)", animation: "achBgIn 0.3s ease" }}
-        onClick={onClose}
+        style={{
+          background: "rgba(0,0,0,0.75)",
+          backdropFilter: "blur(8px)",
+          animation: visible ? "achBgIn 0.3s ease forwards" : "achBgOut 0.35s ease forwards",
+        }}
+        onClick={handleClose}
       />
 
       {/* Card */}
@@ -77,7 +90,9 @@ function AchievementToast({ achievement, onClose }: { achievement: any; onClose:
         style={{
           background: "linear-gradient(145deg, rgba(10,12,28,0.98) 0%, rgba(15,8,35,0.98) 100%)",
           boxShadow: `0 40px 80px rgba(0,0,0,0.8), 0 0 60px ${r.glow}, inset 0 1px 0 rgba(255,255,255,0.08)`,
-          animation: "achCardIn 0.5s cubic-bezier(0.34,1.56,0.64,1)",
+          animation: visible
+            ? "achCardIn 0.5s cubic-bezier(0.34,1.56,0.64,1) forwards"
+            : "achCardOut 0.35s cubic-bezier(0.4,0,0.2,1) forwards",
         }}
       >
         {/* Shine sweep */}
@@ -120,7 +135,7 @@ function AchievementToast({ achievement, onClose }: { achievement: any; onClose:
           )}
 
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="w-full py-3 rounded-xl font-semibold text-sm text-white transition-all hover:opacity-80"
             style={{ background: `linear-gradient(135deg, ${r.ring}80, ${r.ring}40)`, border: `1px solid ${r.ring}50` }}
           >
@@ -188,11 +203,14 @@ function AppContent() {
 
   // ── Toast queue processor ─────────────────────────────────
   useEffect(() => {
-    if (!toastAchievement && toastQueue.length > 0) {
-      setToastAchievement(toastQueue[0]);
-      setToastQueue(prev => prev.slice(1));
+    if (!toastAchievement && toastQueue.length > 0 && !loading) {
+      const timer = setTimeout(() => {
+        setToastAchievement(toastQueue[0]);
+        setToastQueue(prev => prev.slice(1));
+      }, 400); // small gap between consecutive toasts
+      return () => clearTimeout(timer);
     }
-  }, [toastAchievement, toastQueue]);
+  }, [toastAchievement, toastQueue, loading]);
 
   useEffect(() => { loadUserData(); }, []);
 
@@ -269,7 +287,7 @@ function AppContent() {
                 points: user.points,
                 streak: user.streak || 0,
               });
-            }, 500);
+            }, 1800);
           }
         });
       } else {
