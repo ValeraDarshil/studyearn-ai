@@ -48,14 +48,16 @@ router.get('/', authenticate, async (req: any, res) => {
       isArchived: false,
     }).sort({ isPinned: -1, updatedAt: -1 }).lean();
 
+    // Strip full content but send preview + flashcard count
     const notes = rawNotes.map((n: any) => {
       let flashcardCount = 0;
       let contentPreview = '';
       if (n.format === 'flashcards' && n.content) {
         try { flashcardCount = JSON.parse(n.content).length; } catch {}
       } else if (n.content) {
+        // Strip HTML tags for plain text preview
         contentPreview = n.content
-          .replace(/<[^>]*>/g, ' ')
+          .replace(/<[^>]*>/g, ' ')   // remove HTML tags
           .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')
           .replace(/\s+/g, ' ')
           .trim()
@@ -89,6 +91,7 @@ router.post('/', authenticate, async (req: any, res) => {
   } catch { res.status(500).json({ success: false, message: 'Server error' }); }
 });
 
+// ── GET /:id ──────────────────────────────────────────────────
 // ── GET /shared/:code — MUST be before /:id to avoid route conflict ──
 router.get('/shared/:code', authenticate, async (req: any, res) => {
   try {
@@ -100,6 +103,8 @@ router.get('/shared/:code', authenticate, async (req: any, res) => {
     const isOwner  = note.owner.toString() === req.userId;
     const isCollab = note.collaborators?.some((c: any) => c.userId.toString() === req.userId);
 
+    // Private note: only owner and collaborators can access via code
+    // Public note: anyone with the code can access
     if (!note.isPublic && !isOwner && !isCollab) {
       return res.status(403).json({ success: false, message: 'This note is private. Ask the owner to make it public or add you as a collaborator.' });
     }
@@ -109,7 +114,6 @@ router.get('/shared/:code', authenticate, async (req: any, res) => {
   } catch { res.status(500).json({ success: false }); }
 });
 
-// ── GET /:id ──────────────────────────────────────────────────
 router.get('/:id', authenticate, async (req: any, res) => {
   try {
     await connectDB();
@@ -122,7 +126,7 @@ router.get('/:id', authenticate, async (req: any, res) => {
   } catch { res.status(500).json({ success: false, message: 'Server error' }); }
 });
 
-// ── GET /:id/poll?v=N ─────────────────────────────────────────
+// ── GET /:id/poll?v=N — lightweight real-time poll ────────────
 router.get('/:id/poll', authenticate, async (req: any, res) => {
   try {
     await connectDB();
@@ -130,6 +134,7 @@ router.get('/:id/poll', authenticate, async (req: any, res) => {
     const note = await Note.findById(req.params.id).lean() as any;
     if (!note) return res.status(404).json({ success: false });
     if (!canView(note, req.userId)) return res.status(403).json({ success: false });
+    // Only return full data if version changed
     if ((note.version || 0) <= clientVersion) {
       return res.json({ success: true, changed: false, version: note.version || 0 });
     }
@@ -210,6 +215,7 @@ router.post('/:id/share', authenticate, async (req: any, res) => {
         await User.findByIdAndUpdate(req.userId, { $inc: { points: 10, totalXP: 10 } });
         await Activity.create({ userId: req.userId, action: 'note_shared', details: `Shared "${note.title}" with ${target.name}`, pointsEarned: 10 });
       } else {
+        // Update permission
         const idx = note.collaborators.findIndex((c: any) => c.userId.toString() === target._id.toString());
         if (idx >= 0) note.collaborators[idx].canEdit = allowEdit;
       }
@@ -268,7 +274,7 @@ router.delete('/:id/comment/:cid', authenticate, async (req: any, res) => {
     const comments: any[] = note.comments || [];
     const idx = comments.findIndex((c: any) => c.id === req.params.cid);
     if (idx < 0) return res.status(404).json({ success: false });
-    const isNoteOwner    = note.owner.toString() === req.userId;
+    const isNoteOwner = note.owner.toString() === req.userId;
     const isCommentOwner = comments[idx].userId.toString() === req.userId;
     if (!isNoteOwner && !isCommentOwner) return res.status(403).json({ success: false });
     comments.splice(idx, 1);
@@ -296,10 +302,10 @@ router.post('/:id/react', authenticate, async (req: any, res) => {
     if (!reactions[emoji]) reactions[emoji] = [];
     const idx = reactions[emoji].findIndex((r: any) => r.userId.toString() === req.userId);
     if (idx >= 0) {
-      reactions[emoji].splice(idx, 1);
+      reactions[emoji].splice(idx, 1);                              // toggle off
       if (reactions[emoji].length === 0) delete reactions[emoji];
     } else {
-      reactions[emoji].push({ userId: req.userId, name: user?.name || 'Unknown' });
+      reactions[emoji].push({ userId: req.userId, name: user?.name || 'Unknown' }); // toggle on
     }
     note.reactions = reactions;
     note.version   = (note.version || 0) + 1;
@@ -320,11 +326,7 @@ router.post('/:id/ai', authenticate, async (req: any, res) => {
     const rawText = (note.content || '').replace(/<[^>]*>/g, '').trim();
     if (!rawText) return res.status(400).json({ success: false, message: 'Note is empty' });
 
-    const VALID_MODES = ['improve', 'summarize', 'expand', 'bullets', 'flashcards', 'quiz'];
     const { mode = 'improve' } = req.body;
-    if (!VALID_MODES.includes(mode)) {
-      return res.status(400).json({ success: false, message: `Invalid mode. Must be one of: ${VALID_MODES.join(', ')}` });
-    }
 
     const STRUCTURE_RULES = `
 FORMATTING RULES (strictly follow):
@@ -338,18 +340,49 @@ FORMATTING RULES (strictly follow):
 - DO NOT add preamble like "Here are the notes:" — start content directly`;
 
     const prompts: Record<string, string> = {
-      improve: `You are a professional note editor. Improve and clean up these student notes. Fix grammar, improve clarity, properly structure with headings and bullet points. Keep ALL key information.\n${STRUCTURE_RULES}\n\nNotes to improve:\n${rawText}`,
-      summarize: `You are a study coach. Create a concise exam-ready summary of these notes. Use clear headings and bullet points. Focus on most important facts, definitions, and concepts.\n${STRUCTURE_RULES}\n\nNotes to summarize:\n${rawText}`,
-      expand: `You are an expert teacher for Indian competitive exams (JEE/NEET/UPSC/SSC). Expand these notes with detailed explanations, real-world examples, and exam-relevant facts. Structure clearly with headings.\n${STRUCTURE_RULES}\n\nNotes to expand:\n${rawText}`,
-      bullets: `Convert these notes into well-organized bullet points grouped under clear topic headings. Each bullet should be a complete, standalone fact. Perfect for quick revision.\n${STRUCTURE_RULES}\n\nNotes to convert:\n${rawText}`,
-      flashcards: `Create 5-8 flashcard pairs from these notes. Format EXACTLY as JSON array:\n[{"q":"question","a":"answer"},...]\nReturn ONLY the JSON array, no other text, no markdown fences:\n\n${rawText}`,
-      quiz: `Generate 3 MCQs from these notes for self-testing. Format as JSON:\n[{"q":"question","opts":["A","B","C","D"],"ans":0},...]\nReturn ONLY JSON, no other text:\n\n${rawText}`,
+      improve: `You are a professional note editor. Improve and clean up these student notes. Fix grammar, improve clarity, properly structure with headings and bullet points. Keep ALL key information.
+${STRUCTURE_RULES}
+
+Notes to improve:
+${rawText}`,
+
+      summarize: `You are a study coach. Create a concise exam-ready summary of these notes. Use clear headings and bullet points. Focus on most important facts, definitions, and concepts.
+${STRUCTURE_RULES}
+
+Notes to summarize:
+${rawText}`,
+
+      expand: `You are an expert teacher for Indian competitive exams (JEE/NEET/UPSC/SSC). Expand these notes with detailed explanations, real-world examples, and exam-relevant facts. Structure clearly with headings.
+${STRUCTURE_RULES}
+
+Notes to expand:
+${rawText}`,
+
+      bullets: `Convert these notes into well-organized bullet points grouped under clear topic headings. Each bullet should be a complete, standalone fact. Perfect for quick revision.
+${STRUCTURE_RULES}
+
+Notes to convert:
+${rawText}`,
+
+      flashcards: `Create 5-8 flashcard pairs from these notes. Format EXACTLY as JSON array:
+[{"q":"question","a":"answer"},...]
+Return ONLY the JSON array, no other text, no markdown fences:
+
+${rawText}`,
+
+      quiz: `Generate 3 MCQs from these notes for self-testing. Format as JSON:
+[{"q":"question","opts":["A","B","C","D"],"ans":0},...]
+Return ONLY JSON, no other text:
+
+${rawText}`,
     };
 
-    let result = await solveText(prompts[mode], []);
+    let result = await solveText(prompts[mode] || prompts.improve, []);
+    // Strip markdown code fences if AI wrapped response (common with JSON modes)
     result = result.replace(/^```(?:json|markdown)?\n?/i, '').replace(/\n?```$/i, '').trim();
     res.json({ success: true, result, mode });
   } catch { res.status(500).json({ success: false, message: 'AI error' }); }
 });
+
 
 export default router;

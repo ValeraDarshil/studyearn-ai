@@ -18,6 +18,8 @@ const CLASS_LEVELS = [
   { value: "Postgraduate",  label: "Postgraduate",  emoji: "🏛️" },
 ];
 
+// ── Premium SVG Icons ─────────────────────────────────────────────────────────
+
 const SimpleIcon = ({ active }: { active: boolean }) => (
   <svg width="52" height="52" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
     <defs>
@@ -30,11 +32,34 @@ const SimpleIcon = ({ active }: { active: boolean }) => (
         <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
       </filter>
     </defs>
-    <path d="M26 4 L44 15 L44 37 L26 48 L8 37 L8 15 Z" stroke={active ? "url(#simpleGrad)" : "#334155"} strokeWidth="1.5" fill="none" style={{ transition: "all 0.3s" }} />
-    <rect x="15" y="17" width="22" height="3" rx="1.5" fill={active ? "url(#simpleGrad)" : "#475569"} filter={active ? "url(#simpleGlow)" : undefined} style={{ transition: "all 0.3s" }} />
-    <rect x="15" y="23" width="16" height="3" rx="1.5" fill={active ? "#60A5FA" : "#374151"} opacity={active ? 0.8 : 0.5} style={{ transition: "all 0.3s" }} />
-    <rect x="15" y="29" width="19" height="3" rx="1.5" fill={active ? "#06B6D4" : "#374151"} opacity={active ? 0.6 : 0.4} style={{ transition: "all 0.3s" }} />
-    <circle cx="40" cy="12" r="3" fill={active ? "#60A5FA" : "#1E3A5F"} style={{ transition: "all 0.3s" }} />
+    {/* Outer hexagon ring */}
+    <path
+      d="M26 4 L44 15 L44 37 L26 48 L8 37 L8 15 Z"
+      stroke={active ? "url(#simpleGrad)" : "#334155"}
+      strokeWidth="1.5" fill="none"
+      style={{ transition: "all 0.3s" }}
+    />
+    {/* Inner clean slides stack */}
+    <rect x="15" y="17" width="22" height="3" rx="1.5"
+      fill={active ? "url(#simpleGrad)" : "#475569"}
+      filter={active ? "url(#simpleGlow)" : undefined}
+      style={{ transition: "all 0.3s" }}
+    />
+    <rect x="15" y="23" width="16" height="3" rx="1.5"
+      fill={active ? "#60A5FA" : "#374151"}
+      opacity={active ? 0.8 : 0.5}
+      style={{ transition: "all 0.3s" }}
+    />
+    <rect x="15" y="29" width="19" height="3" rx="1.5"
+      fill={active ? "#06B6D4" : "#374151"}
+      opacity={active ? 0.6 : 0.4}
+      style={{ transition: "all 0.3s" }}
+    />
+    {/* Corner accent dot */}
+    <circle cx="40" cy="12" r="3"
+      fill={active ? "#60A5FA" : "#1E3A5F"}
+      style={{ transition: "all 0.3s" }}
+    />
   </svg>
 );
 
@@ -54,8 +79,18 @@ const DetailedIcon = ({ active }: { active: boolean }) => (
         <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
       </filter>
     </defs>
-    <rect x="10" y="6" width="32" height="40" rx="4" stroke={active ? "url(#detailGrad)" : "#334155"} strokeWidth="1.5" fill={active ? "rgba(124,58,237,0.08)" : "none"} style={{ transition: "all 0.3s" }} />
-    <rect x="10" y="6" width="32" height="5" rx="2" fill={active ? "url(#detailGrad)" : "#1E293B"} style={{ transition: "all 0.3s" }} />
+    {/* Document frame */}
+    <rect x="10" y="6" width="32" height="40" rx="4"
+      stroke={active ? "url(#detailGrad)" : "#334155"}
+      strokeWidth="1.5" fill={active ? "rgba(124,58,237,0.08)" : "none"}
+      style={{ transition: "all 0.3s" }}
+    />
+    {/* Top accent bar */}
+    <rect x="10" y="6" width="32" height="5" rx="2"
+      fill={active ? "url(#detailGrad)" : "#1E293B"}
+      style={{ transition: "all 0.3s" }}
+    />
+    {/* Content lines — varied widths like real data */}
     {[14, 18, 22, 27, 31, 35].map((y, i) => (
       <rect key={i} x="16" y={y} width={i % 3 === 0 ? 22 : i % 3 === 1 ? 16 : 19} height="2.2" rx="1.1"
         fill={active ? (i === 0 ? "#C4B5FD" : i < 3 ? "#A78BFA" : "#7C3AED") : "#2D3748"}
@@ -64,7 +99,11 @@ const DetailedIcon = ({ active }: { active: boolean }) => (
         style={{ transition: "all 0.3s" }}
       />
     ))}
-    <path d="M35 6 L35 15 L31.5 12 L28 15 L28 6 Z" fill={active ? "url(#detailGrad2)" : "#374151"} style={{ transition: "all 0.3s" }} />
+    {/* Bookmark ribbon */}
+    <path d="M35 6 L35 15 L31.5 12 L28 15 L28 6 Z"
+      fill={active ? "url(#detailGrad2)" : "#374151"}
+      style={{ transition: "all 0.3s" }}
+    />
   </svg>
 );
 
@@ -85,40 +124,108 @@ const CreativeIcon = ({ active }: { active: boolean }) => (
         <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
       </filter>
     </defs>
-    <circle cx="26" cy="26" r="21" stroke={active ? "url(#creativeGrad2)" : "#334155"} strokeWidth="1.5" strokeDasharray="4 3" fill="none" style={{ transition: "all 0.3s" }} />
-    <line x1="14" y1="38" x2="30" y2="22" stroke={active ? "url(#creativeGrad)" : "#475569"} strokeWidth="3" strokeLinecap="round" filter={active ? "url(#creativeGlow)" : undefined} style={{ transition: "all 0.3s" }} />
-    <path d="M30 22 L32 18 L34 22 L38 24 L34 26 L32 30 L30 26 L26 24 Z" fill={active ? "url(#creativeGrad)" : "#374151"} filter={active ? "url(#creativeGlow)" : undefined} style={{ transition: "all 0.3s" }} />
-    <circle cx="18" cy="16" r="2.5" fill={active ? "#F97316" : "#2D3748"} opacity={active ? 0.9 : 0.4} filter={active ? "url(#creativeGlow)" : undefined} style={{ transition: "all 0.3s" }} />
-    <circle cx="38" cy="36" r="1.8" fill={active ? "#A855F7" : "#2D3748"} opacity={active ? 0.8 : 0.3} style={{ transition: "all 0.3s" }} />
-    <circle cx="14" cy="28" r="1.4" fill={active ? "#06B6D4" : "#2D3748"} opacity={active ? 0.7 : 0.3} style={{ transition: "all 0.3s" }} />
-    <circle cx="36" cy="14" r="1.2" fill={active ? "#EC4899" : "#2D3748"} opacity={active ? 0.6 : 0.3} style={{ transition: "all 0.3s" }} />
+    {/* Outer circle ring */}
+    <circle cx="26" cy="26" r="21"
+      stroke={active ? "url(#creativeGrad2)" : "#334155"}
+      strokeWidth="1.5" strokeDasharray="4 3" fill="none"
+      style={{ transition: "all 0.3s" }}
+    />
+    {/* Magic wand body */}
+    <line x1="14" y1="38" x2="30" y2="22"
+      stroke={active ? "url(#creativeGrad)" : "#475569"}
+      strokeWidth="3" strokeLinecap="round"
+      filter={active ? "url(#creativeGlow)" : undefined}
+      style={{ transition: "all 0.3s" }}
+    />
+    {/* Wand tip star */}
+    <path d="M30 22 L32 18 L34 22 L38 24 L34 26 L32 30 L30 26 L26 24 Z"
+      fill={active ? "url(#creativeGrad)" : "#374151"}
+      filter={active ? "url(#creativeGlow)" : undefined}
+      style={{ transition: "all 0.3s" }}
+    />
+    {/* Sparkle dots */}
+    <circle cx="18" cy="16" r="2.5"
+      fill={active ? "#F97316" : "#2D3748"}
+      opacity={active ? 0.9 : 0.4}
+      filter={active ? "url(#creativeGlow)" : undefined}
+      style={{ transition: "all 0.3s" }}
+    />
+    <circle cx="38" cy="36" r="1.8"
+      fill={active ? "#A855F7" : "#2D3748"}
+      opacity={active ? 0.8 : 0.3}
+      style={{ transition: "all 0.3s" }}
+    />
+    <circle cx="14" cy="28" r="1.4"
+      fill={active ? "#06B6D4" : "#2D3748"}
+      opacity={active ? 0.7 : 0.3}
+      style={{ transition: "all 0.3s" }}
+    />
+    <circle cx="36" cy="14" r="1.2"
+      fill={active ? "#EC4899" : "#2D3748"}
+      opacity={active ? 0.6 : 0.3}
+      style={{ transition: "all 0.3s" }}
+    />
   </svg>
 );
 
 const PPT_STYLES = [
-  { id: "simple",   label: "Simple",   desc: "Clean & minimal — easy to read",             color: "from-blue-500/20 to-cyan-500/10",   border: "border-blue-500/40",   accent: "text-blue-300",   ring: "ring-blue-500/30",   glow: "shadow-blue-500/20",   slides: "6 slides" },
-  { id: "detailed", label: "Detailed", desc: "Deep content — every concept covered",        color: "from-purple-500/20 to-indigo-500/10", border: "border-purple-500/40", accent: "text-purple-300", ring: "ring-purple-500/30", glow: "shadow-purple-500/20", slides: "10 slides" },
-  { id: "creative", label: "Creative", desc: "Visual & engaging — with emojis & design",   color: "from-orange-500/20 to-pink-500/10",  border: "border-orange-500/40", accent: "text-orange-300", ring: "ring-orange-500/30", glow: "shadow-orange-500/20", slides: "10 slides" },
+  {
+    id: "simple",
+    label: "Simple",
+    desc: "Clean & minimal — easy to read",
+    color: "from-blue-500/20 to-cyan-500/10",
+    border: "border-blue-500/40",
+    accent: "text-blue-300",
+    ring: "ring-blue-500/30",
+    glow: "shadow-blue-500/20",
+    slides: "6 slides",
+  },
+  {
+    id: "detailed",
+    label: "Detailed",
+    desc: "Deep content — every concept covered",
+    color: "from-purple-500/20 to-indigo-500/10",
+    border: "border-purple-500/40",
+    accent: "text-purple-300",
+    ring: "ring-purple-500/30",
+    glow: "shadow-purple-500/20",
+    slides: "10 slides",
+  },
+  {
+    id: "creative",
+    label: "Creative",
+    desc: "Visual & engaging — with emojis & design",
+    color: "from-orange-500/20 to-pink-500/10",
+    border: "border-orange-500/40",
+    accent: "text-orange-300",
+    ring: "ring-orange-500/30",
+    glow: "shadow-orange-500/20",
+    slides: "10 slides",
+  },
 ];
 
+
 export function PPTGenerator() {
-  const { userId, checkAndUnlockAchievements, userStats, setUserStats, isPremium } = useApp();
-  const [topic, setTopic]           = useState("");
+  const { addPoints, userId, logActivity, checkAndUnlockAchievements, userStats, setUserStats, isPremium } = useApp();
+  const [topic, setTopic]       = useState("");
   const [classLevel, setClassLevel] = useState("");
-  const [style, setStyle]           = useState("detailed");
-  const [loading, setLoading]       = useState(false);
+  const [style, setStyle]       = useState("detailed");
+  const [loading, setLoading]   = useState(false);
   const [loadingStep, setLoadingStep] = useState("");
-  const [generated, setGenerated]   = useState(false);
+  const [generated, setGenerated] = useState(false);
   const [downloadUrl, setDownloadUrl] = useState("");
   const [slideCount, setSlideCount] = useState(0);
-  const [error, setError]           = useState("");
+  const [error, setError]       = useState("");
+
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // ✅ Filename editing + slide preview
   const [fileName, setFileName]               = useState("");
   const [editingFileName, setEditingFileName] = useState(false);
   const fileNameRef = useRef<HTMLInputElement>(null);
-  const [slidePreview, setSlidePreview] = useState<{title: string; bullets: string[]}[]>([]);
-  const [showPreview, setShowPreview]   = useState(false);
+  const [slidePreview, setSlidePreview]       = useState<{title: string; bullets: string[]}[]>([]);
+  const [showPreview, setShowPreview]         = useState(false);
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -132,12 +239,43 @@ export function PPTGenerator() {
   const selectedLabel = CLASS_LEVELS.find(c => c.value === classLevel) || null;
   const selectedStyle = PPT_STYLES.find(s => s.id === style)!;
 
+  // ── Robust JSON extractor — 4 fallback strategies ──────────────────────────
   const extractSlides = (raw: string): any[] | null => {
     const attempts = [
-      () => { const clean = raw.replace(/```json/gi, "").replace(/```/g, "").trim(); const parsed = JSON.parse(clean); return Array.isArray(parsed) ? parsed : null; },
-      () => { const s = raw.indexOf("["), e = raw.lastIndexOf("]"); if (s === -1 || e <= s) return null; const parsed = JSON.parse(raw.slice(s, e + 1)); return Array.isArray(parsed) ? parsed : null; },
-      () => { const fixed = raw.replace(/```json/gi, "").replace(/```/g, "").replace(/,\s*]/g, "]").replace(/,\s*}/g, "}").replace(/[\u201C\u201D]/g, '"').replace(/[\u2018\u2019]/g, "'"); const s = fixed.indexOf("["), e = fixed.lastIndexOf("]"); if (s === -1 || e <= s) return null; const parsed = JSON.parse(fixed.slice(s, e + 1)); return Array.isArray(parsed) ? parsed : null; },
-      () => { const objs: any[] = []; const re = /\{\s*"title"\s*:\s*"[^"]*"[^}]*"content"\s*:\s*"[^"]*"[^}]*\}/g; let m; while ((m = re.exec(raw)) !== null) { try { objs.push(JSON.parse(m[0])); } catch {} } return objs.length >= 3 ? objs : null; },
+      // 1. Direct parse after cleaning markdown fences
+      () => {
+        const clean = raw.replace(/```json/gi, "").replace(/```/g, "").trim();
+        const parsed = JSON.parse(clean);
+        return Array.isArray(parsed) ? parsed : null;
+      },
+      // 2. Find first [ to last ]
+      () => {
+        const s = raw.indexOf("["), e = raw.lastIndexOf("]");
+        if (s === -1 || e <= s) return null;
+        const parsed = JSON.parse(raw.slice(s, e + 1));
+        return Array.isArray(parsed) ? parsed : null;
+      },
+      // 3. Fix common issues: trailing commas, smart quotes, then extract array
+      () => {
+        const fixed = raw
+          .replace(/```json/gi, "").replace(/```/g, "")
+          .replace(/,\s*]/g, "]").replace(/,\s*}/g, "}")
+          .replace(/[\u201C\u201D]/g, '"').replace(/[\u2018\u2019]/g, "'");
+        const s = fixed.indexOf("["), e = fixed.lastIndexOf("]");
+        if (s === -1 || e <= s) return null;
+        const parsed = JSON.parse(fixed.slice(s, e + 1));
+        return Array.isArray(parsed) ? parsed : null;
+      },
+      // 4. Regex: extract individual {title, content} objects
+      () => {
+        const objs: any[] = [];
+        const re = /\{\s*"title"\s*:\s*"[^"]*"[^}]*"content"\s*:\s*"[^"]*"[^}]*\}/g;
+        let m;
+        while ((m = re.exec(raw)) !== null) {
+          try { objs.push(JSON.parse(m[0])); } catch {}
+        }
+        return objs.length >= 3 ? objs : null;
+      },
     ];
     for (const fn of attempts) {
       try { const r = fn(); if (r && r.length >= 3) return r; } catch {}
@@ -145,36 +283,103 @@ export function PPTGenerator() {
     return null;
   };
 
+  // ── Build a tight AI prompt for each style ─────────────────────────────────
   const buildPPTPrompt = (t: string, level: string, s: string): string => {
-    const lvl: Record<string, string> = { "8": "Class 8 (simple language, basic concepts)", "9": "Class 9 (clear explanations, standard terms)", "10": "Class 10 (CBSE/ICSE board level)", "11": "Class 11 (advanced concepts, technical terms)", "12": "Class 12 (full board level, formulas)", "Undergraduate": "Undergraduate (university depth)", "Postgraduate": "Postgraduate (research level)" };
+    const lvl: Record<string, string> = {
+      "8": "Class 8 (simple language, basic concepts)",
+      "9": "Class 9 (clear explanations, standard terms)",
+      "10": "Class 10 (CBSE/ICSE board level)",
+      "11": "Class 11 (advanced concepts, technical terms)",
+      "12": "Class 12 (full board level, formulas)",
+      "Undergraduate": "Undergraduate (university depth)",
+      "Postgraduate": "Postgraduate (research level)",
+    };
     const ctx = lvl[level] || level;
-    if (s === "simple") return `Output only a JSON array. No explanation. No markdown. Just JSON.\n\nCreate 6 PowerPoint slides about "${t}" for ${ctx}.\n\n[\n{"title":"Introduction","content":"point1\\npoint2\\npoint3"},\n{"title":"Overview","content":"point1\\npoint2\\npoint3"},\n{"title":"Key Concept 1","content":"point1\\npoint2\\npoint3"},\n{"title":"Key Concept 2","content":"point1\\npoint2\\npoint3"},\n{"title":"Key Takeaways","content":"point1\\npoint2\\npoint3"},\n{"title":"Conclusion","content":"point1\\npoint2\\npoint3"}\n]\n\nRules: max 4 bullets per slide, max 12 words each, simple clear language for ${ctx}.\nOutput the JSON array now:`;
-    if (s === "detailed") return `Output only a JSON array. No explanation. No markdown. Just JSON.\n\nCreate 10 PowerPoint slides about "${t}" for ${ctx}.\n\n[\n{"title":"Title","content":"subtitle text here"},\n{"title":"Overview & Background","content":"point1\\npoint2\\npoint3\\npoint4\\npoint5"},\n{"title":"Core Concept A","content":"point1\\npoint2\\npoint3\\npoint4\\npoint5"},\n{"title":"Core Concept B","content":"point1\\npoint2\\npoint3\\npoint4\\npoint5"},\n{"title":"Core Concept C","content":"point1\\npoint2\\npoint3\\npoint4\\npoint5"},\n{"title":"Key Definitions","content":"point1\\npoint2\\npoint3\\npoint4"},\n{"title":"Real-World Applications","content":"point1\\npoint2\\npoint3\\npoint4"},\n{"title":"Important Facts & Data","content":"point1\\npoint2\\npoint3\\npoint4"},\n{"title":"Case Study / Example","content":"point1\\npoint2\\npoint3\\npoint4"},\n{"title":"Summary & Conclusion","content":"point1\\npoint2\\npoint3\\npoint4"}\n]\n\nRules: 5-6 bullets per slide, technical depth for ${ctx}, real facts and definitions.\nOutput the JSON array now:`;
-    return `Output only a JSON array. No explanation. No markdown. Just JSON.\n\nCreate 10 creative PowerPoint slides about "${t}" for ${ctx}.\n\n[\n{"title":"🚀 Title Slide","content":"hook subtitle"},\n{"title":"💡 Did You Know?","content":"🌟 fact1\\n⚡ fact2\\n🔥 fact3"},\n{"title":"🌍 The Big Picture","content":"🎯 point1\\n💫 point2\\n🔬 point3\\n✨ point4"},\n{"title":"🔍 Deep Dive Part 1","content":"💡 point1\\n⚡ point2\\n🌟 point3\\n🎯 point4"},\n{"title":"⚡ Deep Dive Part 2","content":"🔥 point1\\n💫 point2\\n🌍 point3\\n✅ point4"},\n{"title":"🎯 Deep Dive Part 3","content":"🚀 point1\\n🔬 point2\\n💡 point3\\n⚡ point4"},\n{"title":"🖼️ Visualize It","content":"📊 point1\\n🎨 point2\\n📐 point3\\n🔭 point4"},\n{"title":"🌟 Real World Impact","content":"🏙️ point1\\n💼 point2\\n🌱 point3\\n🚀 point4"},\n{"title":"🤔 Myths vs Reality","content":"❌ myth1 → ✅ truth1\\n❌ myth2 → ✅ truth2\\n💡 fact1\\n⚡ fact2"},\n{"title":"✅ Key Takeaways","content":"🌟 takeaway1\\n💡 takeaway2\\n🎯 takeaway3\\n🚀 takeaway4"}\n]\n\nRules: use emojis, vivid engaging language, analogies for ${ctx}. 4-5 bullets per slide.\nOutput the JSON array now:`;
+
+    if (s === "simple") return `Output only a JSON array. No explanation. No markdown. Just JSON.
+
+Create 6 PowerPoint slides about "${t}" for ${ctx}.
+
+[
+{"title":"Introduction","content":"point1\\npoint2\\npoint3"},
+{"title":"Overview","content":"point1\\npoint2\\npoint3"},
+{"title":"Key Concept 1","content":"point1\\npoint2\\npoint3"},
+{"title":"Key Concept 2","content":"point1\\npoint2\\npoint3"},
+{"title":"Key Takeaways","content":"point1\\npoint2\\npoint3"},
+{"title":"Conclusion","content":"point1\\npoint2\\npoint3"}
+]
+
+Rules: max 4 bullets per slide, max 12 words each, simple clear language for ${ctx}.
+Output the JSON array now:`;
+
+    if (s === "detailed") return `Output only a JSON array. No explanation. No markdown. Just JSON.
+
+Create 10 PowerPoint slides about "${t}" for ${ctx}.
+
+[
+{"title":"Title","content":"subtitle text here"},
+{"title":"Overview & Background","content":"point1\\npoint2\\npoint3\\npoint4\\npoint5"},
+{"title":"Core Concept A","content":"point1\\npoint2\\npoint3\\npoint4\\npoint5"},
+{"title":"Core Concept B","content":"point1\\npoint2\\npoint3\\npoint4\\npoint5"},
+{"title":"Core Concept C","content":"point1\\npoint2\\npoint3\\npoint4\\npoint5"},
+{"title":"Key Definitions","content":"point1\\npoint2\\npoint3\\npoint4"},
+{"title":"Real-World Applications","content":"point1\\npoint2\\npoint3\\npoint4"},
+{"title":"Important Facts & Data","content":"point1\\npoint2\\npoint3\\npoint4"},
+{"title":"Case Study / Example","content":"point1\\npoint2\\npoint3\\npoint4"},
+{"title":"Summary & Conclusion","content":"point1\\npoint2\\npoint3\\npoint4"}
+]
+
+Rules: 5-6 bullets per slide, technical depth for ${ctx}, real facts and definitions.
+Output the JSON array now:`;
+
+    return `Output only a JSON array. No explanation. No markdown. Just JSON.
+
+Create 10 creative PowerPoint slides about "${t}" for ${ctx}.
+
+[
+{"title":"🚀 Title Slide","content":"hook subtitle"},
+{"title":"💡 Did You Know?","content":"🌟 fact1\\n⚡ fact2\\n🔥 fact3"},
+{"title":"🌍 The Big Picture","content":"🎯 point1\\n💫 point2\\n🔬 point3\\n✨ point4"},
+{"title":"🔍 Deep Dive Part 1","content":"💡 point1\\n⚡ point2\\n🌟 point3\\n🎯 point4"},
+{"title":"⚡ Deep Dive Part 2","content":"🔥 point1\\n💫 point2\\n🌍 point3\\n✅ point4"},
+{"title":"🎯 Deep Dive Part 3","content":"🚀 point1\\n🔬 point2\\n💡 point3\\n⚡ point4"},
+{"title":"🖼️ Visualize It","content":"📊 point1\\n🎨 point2\\n📐 point3\\n🔭 point4"},
+{"title":"🌟 Real World Impact","content":"🏙️ point1\\n💼 point2\\n🌱 point3\\n🚀 point4"},
+{"title":"🤔 Myths vs Reality","content":"❌ myth1 → ✅ truth1\\n❌ myth2 → ✅ truth2\\n💡 fact1\\n⚡ fact2"},
+{"title":"✅ Key Takeaways","content":"🌟 takeaway1\\n💡 takeaway2\\n🎯 takeaway3\\n🚀 takeaway4"}
+]
+
+Rules: use emojis, vivid engaging language, analogies for ${ctx}. 4-5 bullets per slide.
+Output the JSON array now:`;
   };
 
   const handleGenerate = async () => {
     if (!topic.trim()) { setError("Please enter a topic"); return; }
     if (!classLevel)   { setError("Please select a class level"); return; }
+
     setLoading(true); setError("");
+
     try {
       const token = localStorage.getItem("token");
       const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token || ""}` };
       const prompt = buildPPTPrompt(topic.trim(), classLevel, style);
 
-      // ── Step 1: Dedicated PPT content endpoint — does NOT consume AI quota ──
+      // ── Step 1: Get slide content from AI (retry up to 3 times) ────────────
       setLoadingStep("AI is building your slides…");
       let slides: any[] | null = null;
+
       for (let attempt = 1; attempt <= 3 && !slides; attempt++) {
         try {
           if (attempt > 1) setLoadingStep(`Retrying… (attempt ${attempt}/3)`);
-          const aiRes = await fetch(`${API_URL}/api/ppt/content`, {
+          const aiRes = await fetch(`${API_URL}/api/ai/ask`, {
             method: "POST", headers,
-            body: JSON.stringify({ topic: topic.trim(), classLevel, style, prompt }),
+            body: JSON.stringify({ prompt, userId }),
           });
           if (!aiRes.ok) continue;
           const aiData = await aiRes.json();
-          if (aiData.success && aiData.answer) slides = extractSlides(aiData.answer);
+          if (aiData.success && aiData.answer) {
+            slides = extractSlides(aiData.answer);
+          }
         } catch {}
       }
 
@@ -183,39 +388,48 @@ export function PPTGenerator() {
         setLoading(false); return;
       }
 
+      // Normalize slides
       const normalized = slides.map((sl: any, i: number) => ({
-        title:    String(sl.title   || sl.Title   || `Slide ${i + 1}`).trim(),
-        content:  String(sl.content || sl.Content || sl.body || "").trim(),
+        title:   String(sl.title   || sl.Title   || `Slide ${i + 1}`).trim(),
+        content: String(sl.content || sl.Content || sl.body || "").trim(),
         subtitle: String(sl.subtitle || "").trim(),
       })).filter((sl: any) => sl.title.length > 0);
 
-      // ── Step 2: Build PPTX file ──────────────────────────────────────────────
+      // ── Step 2: Build PPTX file ─────────────────────────────────────────────
       setLoadingStep(`Designing ${style} presentation…`);
       const pptRes = await fetch(`${API_URL}/api/ppt/generate`, {
         method: "POST", headers,
         body: JSON.stringify({ topic, slides: normalized, style, classLevel }),
       });
-      if (!pptRes.ok) { setError("Failed to create presentation file. Please try again."); setLoading(false); return; }
+
+      if (!pptRes.ok) {
+        setError("Failed to create presentation file. Please try again.");
+        setLoading(false); return;
+      }
 
       const blob = await pptRes.blob();
       const url  = window.URL.createObjectURL(blob);
+
       setDownloadUrl(url);
       setSlideCount(normalized.length);
       setGenerated(true);
+      // ✅ Set default filename from topic, build slide preview
       setFileName(topic.trim().replace(/[^a-zA-Z0-9 _-]/g, '').trim() || 'presentation');
       setShowPreview(false);
       setSlidePreview(normalized.map((sl: any) => ({
         title: sl.title.replace(/^[\u{1F000}-\u{1FFFF}\u{2600}-\u{27BF}✅❌💡⚡🌟🎯🔥💫🔬🎨📊📚🤖📈📱🏥🚗🌍🏙️💼🌱🚀🔍🤔]+\s*/gu, '').trim(),
         bullets: sl.content.split('\n').filter((l: string) => l.trim()).map((l: string) => l.replace(/^[-•*]\s*/, '').trim()).slice(0, 4),
       })));
-
-      // Points awarded server-side — frontend only updates achievement counters
+      // ✅ Premium users get 1.5x — base 20 → 30 pts
+      const pptPts = isPremium ? 40 : 20;
+      addPoints(pptPts);
+      logActivity("ppt_generated", `PPT: ${topic}${isPremium ? " ⚡" : ""}`, pptPts);
       const newTotal = (userStats.totalPPTsGenerated || 0) + 1;
       setUserStats({ ...userStats, totalPPTsGenerated: newTotal });
       incrementAction("ppt");
       checkAndUnlockAchievements({ totalPPTsGenerated: newTotal });
 
-    } catch {
+    } catch (err) {
       setError("Something went wrong. Please try again.");
     } finally {
       setLoading(false); setLoadingStep("");
@@ -230,6 +444,8 @@ export function PPTGenerator() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
+
+      {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-white flex items-center gap-2">
           <Presentation className="w-6 h-6 text-purple-400" /> PPT Generator
@@ -240,7 +456,10 @@ export function PPTGenerator() {
       </div>
 
       {generated ? (
+        /* ── Success State ─────────────────────────────────────────────── */
         <div className="glass rounded-2xl p-6 border border-green-500/20 animate-slide-up space-y-5">
+
+          {/* Top — icon + title */}
           <div className="text-center space-y-3 pt-2">
             <div className="relative w-16 h-16 mx-auto">
               <div className="absolute inset-0 bg-green-500/20 rounded-full animate-pulse" />
@@ -250,47 +469,61 @@ export function PPTGenerator() {
             </div>
             <div>
               <h3 className="text-xl font-bold text-white">Presentation Ready! 🎉</h3>
-              <p className="text-sm text-slate-400 mt-1">{slideCount} slides · <span className="capitalize">{style}</span> style · {selectedLabel?.label}</p>
+              <p className="text-sm text-slate-400 mt-1">
+                {slideCount} slides · <span className="capitalize">{style}</span> style · {selectedLabel?.label}
+              </p>
             </div>
             <div className="inline-flex items-center gap-1 text-xs text-green-400 bg-green-400/10 px-3 py-1 rounded-full border border-green-400/20">
               <Sparkles className="w-3 h-3" /> +{isPremium ? "40" : "20"} points earned
             </div>
           </div>
 
+          {/* ✅ Filename editor */}
           <div className="glass rounded-xl p-4 border border-white/8">
             <p className="text-xs font-semibold text-slate-400 mb-2 flex items-center gap-1.5">
               <Pencil className="w-3 h-3 text-purple-400" /> File Name
             </p>
             {editingFileName ? (
               <div className="flex items-center gap-2">
-                <input ref={fileNameRef} value={fileName}
+                <input
+                  ref={fileNameRef}
+                  value={fileName}
                   onChange={e => setFileName(e.target.value.replace(/[/\\:*?"<>|]/g, ''))}
                   onKeyDown={e => { if (e.key === 'Enter' || e.key === 'Escape') setEditingFileName(false); }}
                   onBlur={() => setEditingFileName(false)}
                   className="flex-1 bg-white/5 border border-purple-500/40 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-400"
-                  placeholder="my-presentation" autoFocus
+                  placeholder="my-presentation"
+                  autoFocus
                 />
                 <span className="text-xs text-slate-500">.pptx</span>
-                <button onClick={() => setEditingFileName(false)} className="text-slate-500 hover:text-white"><X className="w-4 h-4" /></button>
+                <button onClick={() => setEditingFileName(false)} className="text-slate-500 hover:text-white">
+                  <X className="w-4 h-4" />
+                </button>
               </div>
             ) : (
-              <button onClick={() => { setEditingFileName(true); setTimeout(() => fileNameRef.current?.select(), 50); }}
-                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-white/8 hover:border-purple-500/30 hover:bg-white/[0.03] transition-all group text-left">
+              <button
+                onClick={() => { setEditingFileName(true); setTimeout(() => fileNameRef.current?.select(), 50); }}
+                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-white/8 hover:border-purple-500/30 hover:bg-white/[0.03] transition-all group text-left"
+              >
                 <span className="flex-1 text-sm text-white font-medium truncate">{fileName || topic}.pptx</span>
                 <Pencil className="w-3.5 h-3.5 text-slate-600 group-hover:text-purple-400 transition-colors" />
               </button>
             )}
           </div>
 
+          {/* ✅ Slide preview toggle */}
           <div>
-            <button onClick={() => setShowPreview(v => !v)}
-              className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl border border-white/8 hover:border-white/15 hover:bg-white/[0.02] transition-all text-sm text-slate-400 hover:text-white">
+            <button
+              onClick={() => setShowPreview(v => !v)}
+              className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl border border-white/8 hover:border-white/15 hover:bg-white/[0.02] transition-all text-sm text-slate-400 hover:text-white"
+            >
               <span className="flex items-center gap-2">
                 {showPreview ? <EyeOff className="w-4 h-4 text-purple-400" /> : <Eye className="w-4 h-4 text-purple-400" />}
                 {showPreview ? "Hide" : "Preview"} slide outline ({slideCount} slides)
               </span>
               <ChevronDown className={`w-4 h-4 transition-transform ${showPreview ? "rotate-180" : ""}`} />
             </button>
+
             {showPreview && (
               <div className="mt-2 space-y-1.5 max-h-64 overflow-y-auto pr-1">
                 {slidePreview.map((sl, i) => (
@@ -301,7 +534,9 @@ export function PPTGenerator() {
                     </p>
                     {sl.bullets.length > 0 && (
                       <ul className="space-y-0.5 pl-7">
-                        {sl.bullets.map((b, j) => <li key={j} className="text-[11px] text-slate-500 truncate">• {b}</li>)}
+                        {sl.bullets.map((b, j) => (
+                          <li key={j} className="text-[11px] text-slate-500 truncate">• {b}</li>
+                        ))}
                       </ul>
                     )}
                   </div>
@@ -310,23 +545,32 @@ export function PPTGenerator() {
             )}
           </div>
 
+          {/* Action buttons */}
           <div className="flex flex-col sm:flex-row gap-3 pt-1">
-            <a href={downloadUrl} download={`${(fileName || topic).trim() || 'presentation'}.pptx`}
-              className="flex-1 inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-purple-500 to-blue-600 text-white font-semibold text-sm hover:opacity-90 transition-opacity glow-btn">
+            <a
+              href={downloadUrl}
+              download={`${(fileName || topic).trim() || 'presentation'}.pptx`}
+              className="flex-1 inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-purple-500 to-blue-600 text-white font-semibold text-sm hover:opacity-90 transition-opacity glow-btn"
+            >
               <ExternalLink className="w-4 h-4" /> Download Presentation
             </a>
-            <button onClick={reset} className="inline-flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl border border-white/10 text-slate-300 text-sm hover:bg-white/5 transition-colors">
+            <button onClick={reset}
+              className="inline-flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl border border-white/10 text-slate-300 text-sm hover:bg-white/5 transition-colors">
               <RotateCcw className="w-4 h-4" /> New Presentation
             </button>
           </div>
         </div>
       ) : (
+        /* ── Form ──────────────────────────────────────────────────────── */
         <div className="glass rounded-2xl p-6 space-y-6">
+
+          {/* Topic */}
           <div>
             <label className="text-sm font-medium text-slate-300 mb-2 block">Topic *</label>
             <div className="relative">
               <FileText className="absolute left-3 top-3.5 w-4 h-4 text-slate-500" />
-              <input type="text" value={topic}
+              <input
+                type="text" value={topic}
                 onChange={e => { setTopic(e.target.value); setError(""); }}
                 placeholder="e.g. Photosynthesis, French Revolution, Machine Learning…"
                 className="w-full bg-white/[0.03] border border-white/10 rounded-xl pl-10 pr-4 py-3 text-white placeholder-slate-600 focus:outline-none focus:border-purple-500/40 text-sm transition-colors"
@@ -334,17 +578,23 @@ export function PPTGenerator() {
             </div>
           </div>
 
+          {/* Class Level */}
           <div>
             <label className="text-sm font-medium text-slate-300 mb-2 block">Class Level *</label>
             <div className="relative" ref={dropdownRef}>
-              <button type="button" onClick={() => setDropdownOpen(v => !v)}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border text-sm text-left transition-all ${dropdownOpen ? "bg-white/[0.06] border-purple-500/50" : "bg-white/[0.03] border-white/10 hover:border-white/20"}`}>
+              <button
+                type="button"
+                onClick={() => setDropdownOpen(v => !v)}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border text-sm text-left transition-all
+                  ${dropdownOpen ? "bg-white/[0.06] border-purple-500/50" : "bg-white/[0.03] border-white/10 hover:border-white/20"}`}
+              >
                 <GraduationCap className="w-4 h-4 text-purple-400 flex-shrink-0" />
                 <span className={`flex-1 ${selectedLabel ? "text-white" : "text-slate-500"}`}>
                   {selectedLabel ? `${selectedLabel.emoji} ${selectedLabel.label}` : "Select class level"}
                 </span>
                 <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${dropdownOpen ? "rotate-180 text-purple-400" : ""}`} />
               </button>
+
               {dropdownOpen && (
                 <div className="absolute z-50 w-full mt-2 rounded-xl overflow-hidden"
                   style={{ background: "rgba(10,17,40,0.97)", border: "1px solid rgba(139,92,246,0.25)", boxShadow: "0 20px 60px rgba(0,0,0,0.6)", backdropFilter: "blur(20px)" }}>
@@ -354,8 +604,10 @@ export function PPTGenerator() {
                       return (
                         <button key={cls.value} type="button"
                           onClick={() => { setClassLevel(cls.value); setDropdownOpen(false); setError(""); }}
-                          className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-all text-left ${sel ? "text-purple-300" : "text-slate-300 hover:text-white hover:bg-white/[0.04]"}`}
-                          style={{ background: sel ? "linear-gradient(90deg, rgba(139,92,246,0.15), rgba(59,130,246,0.08))" : undefined }}>
+                          className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-all text-left
+                            ${sel ? "text-purple-300" : "text-slate-300 hover:text-white hover:bg-white/[0.04]"}`}
+                          style={{ background: sel ? "linear-gradient(90deg, rgba(139,92,246,0.15), rgba(59,130,246,0.08))" : undefined }}
+                        >
                           <span className="text-base">{cls.emoji}</span>
                           <span className="flex-1">{cls.label}</span>
                           {sel && <Check className="w-3.5 h-3.5 text-purple-400" />}
@@ -368,6 +620,7 @@ export function PPTGenerator() {
             </div>
           </div>
 
+          {/* Style Selector */}
           <div>
             <label className="text-sm font-medium text-slate-300 mb-3 flex items-center gap-2 block">
               <Palette className="w-4 h-4 text-purple-400" /> Presentation Style
@@ -376,42 +629,75 @@ export function PPTGenerator() {
               {PPT_STYLES.map(s => {
                 const active = style === s.id;
                 return (
-                  <button key={s.id} onClick={() => setStyle(s.id)}
-                    className={`relative p-3 sm:p-4 rounded-xl border text-center transition-all duration-300 overflow-hidden group ${active ? `bg-gradient-to-br ${s.color} ${s.border} ring-1 ${s.ring} shadow-lg ${s.glow}` : "bg-white/[0.02] border-white/5 hover:border-white/15 hover:bg-white/[0.04]"}`}>
-                    {active && <div className="absolute inset-0 bg-gradient-to-br from-transparent via-white/[0.03] to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700 pointer-events-none" />}
-                    <div className={`flex justify-center mb-3 transition-all duration-300 ${active ? "scale-110 drop-shadow-lg" : "scale-100 opacity-50 grayscale"}`}>
-                      {s.id === "simple"   && <SimpleIcon   active={active} />}
-                      {s.id === "detailed" && <DetailedIcon active={active} />}
-                      {s.id === "creative" && <CreativeIcon active={active} />}
-                    </div>
-                    <div className="text-sm font-bold text-white">{s.label}</div>
-                    <div className="text-[10px] text-slate-500 mt-0.5">{s.desc}</div>
-                    <div className={`text-[10px] mt-1.5 font-semibold ${active ? s.accent : "text-slate-600"}`}>{s.slides}</div>
-                  </button>
+                <button key={s.id} onClick={() => setStyle(s.id)}
+                  className={`relative p-3 sm:p-4 rounded-xl border text-center transition-all duration-300 overflow-hidden group
+                    ${active
+                      ? `bg-gradient-to-br ${s.color} ${s.border} ring-1 ${s.ring} shadow-lg ${s.glow}`
+                      : "bg-white/[0.02] border-white/5 hover:border-white/15 hover:bg-white/[0.04]"
+                    }`}
+                >
+                  {active && (
+                    <div className="absolute inset-0 bg-gradient-to-br from-transparent via-white/[0.03] to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700 pointer-events-none" />
+                  )}
+                  {/* Premium icon */}
+                  <div className={`flex justify-center mb-3 transition-all duration-300 ${active ? "scale-110 drop-shadow-lg" : "scale-100 opacity-50 grayscale"}`}>
+                    {s.id === "simple"   && <SimpleIcon   active={active} />}
+                    {s.id === "detailed" && <DetailedIcon active={active} />}
+                    {s.id === "creative" && <CreativeIcon active={active} />}
+                  </div>
+                  <div className="text-sm font-bold text-white">{s.label}</div>
+                  <div className="text-[10px] text-slate-500 mt-0.5">{s.desc}</div>
+                  <div className={`text-[10px] mt-1.5 font-semibold ${active ? s.accent : "text-slate-600"}`}>
+                    {s.slides}
+                  </div>
+                </button>
                 );
               })}
             </div>
           </div>
 
+          {/* What to expect */}
           {topic && classLevel && (
             <div className={`rounded-xl p-4 bg-gradient-to-br ${selectedStyle.color} border ${selectedStyle.border} animate-slide-up`}>
               <p className="text-xs font-semibold text-white mb-2">📋 What AI will generate:</p>
               <div className="text-xs text-slate-300 space-y-1">
-                {style === "simple"   && <><p>• 6-slide clean presentation for {selectedLabel?.label}</p><p>• Simple language, max 4 bullets per slide</p><p>• Cover: Intro → Core Concepts → Takeaways → Conclusion</p></>}
-                {style === "detailed" && <><p>• 10-slide comprehensive presentation for {selectedLabel?.label}</p><p>• Deep academic content, proper terminology</p><p>• Cover: Background → 3 Core Concepts → Applications → Facts → Summary</p></>}
-                {style === "creative" && <><p>• 10-slide visual & engaging presentation for {selectedLabel?.label}</p><p>• Emojis, analogies, storytelling, fun facts</p><p>• Cover: Hook → Deep Dives → Visual Ideas → Real Impact → Myths vs Reality</p></>}
+                {style === "simple" && <>
+                  <p>• 6-slide clean presentation for {selectedLabel?.label}</p>
+                  <p>• Simple language, max 4 bullets per slide</p>
+                  <p>• Cover: Intro → Core Concepts → Takeaways → Conclusion</p>
+                </>}
+                {style === "detailed" && <>
+                  <p>• 10-slide comprehensive presentation for {selectedLabel?.label}</p>
+                  <p>• Deep academic content, proper terminology</p>
+                  <p>• Cover: Background → 3 Core Concepts → Applications → Facts → Summary</p>
+                </>}
+                {style === "creative" && <>
+                  <p>• 10-slide visual & engaging presentation for {selectedLabel?.label}</p>
+                  <p>• Emojis, analogies, storytelling, fun facts</p>
+                  <p>• Cover: Hook → Deep Dives → Visual Ideas → Real Impact → Myths vs Reality</p>
+                </>}
               </div>
             </div>
           )}
 
-          {error && <div className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">{error}</div>}
+          {error && (
+            <div className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">{error}</div>
+          )}
 
-          <button onClick={handleGenerate} disabled={loading}
-            className="w-full flex items-center justify-center gap-2 px-6 py-4 rounded-xl bg-gradient-to-r from-purple-500 to-blue-600 text-white font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 transition-all glow-btn">
+          <button
+            onClick={handleGenerate} disabled={loading}
+            className="w-full flex items-center justify-center gap-2 px-6 py-4 rounded-xl bg-gradient-to-r from-purple-500 to-blue-600 text-white font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 transition-all glow-btn"
+          >
             {loading ? (
-              <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />{loadingStep || "Generating…"}</>
+              <>
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                {loadingStep || "Generating…"}
+              </>
             ) : (
-              <><Sparkles className="w-4 h-4" />Generate {selectedStyle.label} Presentation</>
+              <>
+                <Sparkles className="w-4 h-4" />
+                Generate {selectedStyle.label} Presentation
+              </>
             )}
           </button>
         </div>

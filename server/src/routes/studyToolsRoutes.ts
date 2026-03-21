@@ -7,7 +7,6 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { improveNotes, analyzePDF } from '../controllers/studyToolsController.js';
-import { authenticate } from '../middleware/authMiddleware.js';
 
 const router = Router();
 const upload = multer({
@@ -19,8 +18,7 @@ const upload = multer({
   },
 });
 
-// authenticate middleware — login required for all study tools
-router.post('/improve-notes', authenticate, improveNotes);
-router.post('/analyze-pdf',   authenticate, upload.single('file'), analyzePDF);
+router.post('/improve-notes', improveNotes);
+router.post('/analyze-pdf',   upload.single('file'), analyzePDF);
 
 export default router;
