@@ -463,7 +463,7 @@ function AppContent() {
         />
       )}
 
-      {toastAchievement && (
+      {toastAchievement && location.pathname.startsWith("/app") && (
         <AchievementToast
           achievement={toastAchievement}
           onClose={() => setToastAchievement(null)}
@@ -547,4 +547,4 @@ export function App() {
       <AppContent />
     </HashRouter>
   );
-}
+}cd
