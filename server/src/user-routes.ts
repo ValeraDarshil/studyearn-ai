@@ -259,9 +259,11 @@ router.post('/update-streak', authenticate, async (req: any, res) => {
     const user = await User.findById(req.userId);
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
-    const today     = new Date().toISOString().split('T')[0];
-    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
-    const lastDate  = user.lastActive ? new Date(user.lastActive).toISOString().split('T')[0] : null;
+    // IST-aware dates — Indian users get correct day boundary
+    const toIST = (d: Date) => new Date(d.getTime() + 5.5 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const today     = toIST(new Date());
+    const yesterday = toIST(new Date(Date.now() - 86400000));
+    const lastDate  = user.lastActive ? toIST(new Date(user.lastActive)) : null;
 
     if (lastDate === today) return res.json({ success: true, streak: user.streak, streakIncreased: false });
 

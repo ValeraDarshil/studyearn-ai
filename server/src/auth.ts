@@ -44,13 +44,17 @@ const JWT_OPTIONS = {
 
 // ─────────────────────────────────────────────────────────────
 
+// IST-aware date helper — avoids UTC midnight mismatch for Indian users
+function getISTKey(date: Date = new Date()): string {
+  const ist = new Date(date.getTime() + 5.5 * 60 * 60 * 1000);
+  return ist.toISOString().split('T')[0];
+}
+
 async function updateStreakOnLogin(user: any): Promise<{ streak: number; streakIncreased: boolean; bonusPoints: number }> {
 
-  const today     = new Date().toISOString().split('T')[0];
-
-  const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
-
-  const lastDate  = user.lastActive ? new Date(user.lastActive).toISOString().split('T')[0] : null;
+  const today     = getISTKey();
+  const yesterday = getISTKey(new Date(Date.now() - 86400000));
+  const lastDate  = user.lastActive ? getISTKey(new Date(user.lastActive)) : null;
 
 
 
