@@ -674,6 +674,7 @@ import { DashboardLayout } from "./components/DashboardLayout";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { LoadingScreen } from "./components/LoadingScreen";
 import { StreakCelebration } from "./components/StreakCelebration";
+import { PWAInstallPrompt } from "./components/PWAInstallPrompt";
 import { AppContext, UserStats } from "./context/AppContext";
 import {
   getCurrentUser,
@@ -1121,6 +1122,8 @@ function AppContent() {
           onClose={() => setShowStreakCelebration(false)}
         />
       )}
+
+      <PWAInstallPrompt />
 
       {toastAchievement && location.pathname.startsWith("/app") && (
         <AchievementToast

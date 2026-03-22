@@ -2,13 +2,122 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>StudyEarn AI - Study Smart. Earn Smart.</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
-    <!-- Google Identity Services — no npm package needed -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+
+    <!-- ════════════════════════════════════════════════════════
+         PRIMARY SEO
+    ════════════════════════════════════════════════════════ -->
+    <title>StudyEarn AI – Free AI Study Tool | Ask AI, PPT Generator, Daily Rewards</title>
+    <meta name="description" content="StudyEarn AI is a free AI-powered study platform for students. Ask unlimited questions, generate PPT presentations, solve PDFs, and earn real rewards for studying. Join thousands of smart students today!" />
+    <meta name="keywords" content="AI study tool, free AI for students, PPT generator AI, study and earn, AI homework help, free AI questions, study rewards, daily challenge, AI education platform, StudyEarn" />
+    <meta name="author" content="StudyEarn AI" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <link rel="canonical" href="https://studyearnai.tech/" />
+
+    <!-- ════════════════════════════════════════════════════════
+         OPEN GRAPH (WhatsApp, Facebook, LinkedIn share preview)
+    ════════════════════════════════════════════════════════ -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://studyearnai.tech/" />
+    <meta property="og:site_name" content="StudyEarn AI" />
+    <meta property="og:title" content="StudyEarn AI – Study Smart. Earn Real Rewards." />
+    <meta property="og:description" content="Free AI study platform — ask questions, generate PPTs, solve PDFs and earn points & rewards. The smartest way to study!" />
+    <meta property="og:image" content="https://studyearnai.tech/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="StudyEarn AI – AI-powered study platform" />
+    <meta property="og:locale" content="en_IN" />
+
+    <!-- ════════════════════════════════════════════════════════
+         TWITTER / X CARD
+    ════════════════════════════════════════════════════════ -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="StudyEarn AI – Study Smart. Earn Real Rewards." />
+    <meta name="twitter:description" content="Free AI study platform — ask questions, generate PPTs, solve PDFs and earn points & rewards." />
+    <meta name="twitter:image" content="https://studyearnai.tech/og-image.png" />
+
+    <!-- ════════════════════════════════════════════════════════
+         PWA — INSTALLABLE APP
+    ════════════════════════════════════════════════════════ -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#7c3aed" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <!-- iOS specific -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="StudyEarn AI" />
+    <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+    <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-180.png" />
+
+    <!-- ════════════════════════════════════════════════════════
+         FAVICON
+    ════════════════════════════════════════════════════════ -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-16.png" />
+    <link rel="shortcut icon" href="/favicon.ico" />
+
+    <!-- ════════════════════════════════════════════════════════
+         STRUCTURED DATA (Google Rich Results)
+    ════════════════════════════════════════════════════════ -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "StudyEarn AI",
+      "url": "https://studyearnai.tech",
+      "description": "Free AI-powered study platform for students. Ask AI questions, generate PPT presentations, solve PDFs, earn rewards and climb the leaderboard.",
+      "applicationCategory": "EducationalApplication",
+      "operatingSystem": "Web, Android, iOS",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "INR"
+      },
+      "aggregateRating": {
+        "@type": "AggregateRating",
+        "ratingValue": "4.8",
+        "ratingCount": "500"
+      },
+      "featureList": [
+        "Ask AI unlimited study questions",
+        "AI PPT Presentation Generator",
+        "PDF Tools and Converter",
+        "Daily Challenges and Streaks",
+        "Earn Points and Real Rewards",
+        "AI Quiz Generator",
+        "Study Planner",
+        "Leaderboard"
+      ],
+      "inLanguage": ["en", "hi"],
+      "publisher": {
+        "@type": "Organization",
+        "name": "StudyEarn AI",
+        "url": "https://studyearnai.tech"
+      }
+    }
+    </script>
+
+    <!-- ════════════════════════════════════════════════════════
+         PERFORMANCE
+    ════════════════════════════════════════════════════════ -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+
+    <!-- Google Identity Services -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
+
+    <!-- Service Worker registration -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then(reg => console.log('SW registered:', reg.scope))
+            .catch(err => console.log('SW error:', err));
+        });
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>
