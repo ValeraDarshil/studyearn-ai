@@ -733,4 +733,17 @@ router.post('/formula-bookmarks', authenticate, async (req: any, res) => {
   }
 });
 
+// ─────────────────────────────────────────────────────────────
+// POST /api/user/complete-onboarding
+// Marks onboarding tour as done in DB — persists across devices & refreshes
+// ─────────────────────────────────────────────────────────────
+router.post('/complete-onboarding', authenticate, async (req: any, res) => {
+  try {
+    await User.findByIdAndUpdate(req.userId, { onboardingCompleted: true });
+    res.json({ success: true });
+  } catch {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 export default router;

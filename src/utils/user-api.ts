@@ -307,3 +307,18 @@ export async function updateStreak() {
     return { success: false };
   }
 }
+
+// ─────────────────────────────────────────────────────────────
+// COMPLETE ONBOARDING — saves to DB, persists across devices
+// ─────────────────────────────────────────────────────────────
+export async function completeOnboarding() {
+  try {
+    const res = await fetch(`${AUTH_BASE}/user/complete-onboarding`, {
+      method: 'POST',
+      headers: authHeaders(),
+    });
+    return await res.json();
+  } catch {
+    return { success: false };
+  }
+}

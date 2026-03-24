@@ -698,7 +698,7 @@ import { PointsHistory } from "./pages/PointsHistory";
 import CodeLearnHome from "./pages/codelearn/CodeLearnHome";
 import CoursePage from "./pages/codelearn/CoursePage";
 import CertificatePage from "./pages/codelearn/CertificatePage";
-import { OnboardingTour, hasCompletedOnboarding, isNewAccount } from "./components/OnboardingTour";
+import { OnboardingTour, hasCompletedOnboardingLocally, isNewAccount } from "./components/OnboardingTour";
 
 // ── Achievement Unlocked — Center Modal ──────────────────────
 function AchievementToast({ achievement, onClose }: { achievement: any; onClose: () => void }) {
@@ -900,12 +900,12 @@ function AppContent() {
         setStreak(user.streak || 0);
 
         // ── Onboarding Tour — ONLY for genuinely new users ────
-        // Double guard:
-        //   1. isNewAccount() → server createdAt < 10 min (ground truth, prevents old users)
-        //   2. hasCompletedOnboarding() → localStorage flag (prevents repeat shows)
-        const accountIsNew = isNewAccount((user as any).createdAt);
-        const tourDone     = hasCompletedOnboarding(user._id);
-        if (accountIsNew && !tourDone) {
+        // Layer 1 (DB): user.onboardingCompleted — permanent, cross-device
+        // Layer 2 (localStorage): instant check, prevents flicker on refresh
+        // Both must be false for tour to show.
+        const dbSaysDone    = !!(user as any).onboardingCompleted;
+        const localSaysDone = hasCompletedOnboardingLocally(user._id);
+        if (!dbSaysDone && !localSaysDone) {
           setTimeout(() => setShowOnboarding(true), 1400);
         }
 

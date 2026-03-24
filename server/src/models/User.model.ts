@@ -121,6 +121,9 @@ const userSchema = new mongoose.Schema({
   // Array of formula IDs e.g. ['p1', 'p2', 'c5'] — cross-device sync
   formulaBookmarks: { type: [String], default: [] },
 
+  // ── Onboarding Tour ───────────────────────────────────────
+  onboardingCompleted: { type: Boolean, default: false },
+
 });
 
 
