@@ -698,6 +698,7 @@ import { PointsHistory } from "./pages/PointsHistory";
 import CodeLearnHome from "./pages/codelearn/CodeLearnHome";
 import CoursePage from "./pages/codelearn/CoursePage";
 import CertificatePage from "./pages/codelearn/CertificatePage";
+import { OnboardingTour, hasCompletedOnboarding } from "./components/OnboardingTour";
 
 // ── Achievement Unlocked — Center Modal ──────────────────────
 function AchievementToast({ achievement, onClose }: { achievement: any; onClose: () => void }) {
@@ -826,6 +827,9 @@ function AppContent() {
   const [userName, setUserName]             = useState("");
   const [loading, setLoading]               = useState(true);
 
+  // ── Onboarding Tour ───────────────────────────────────────
+  const [showOnboarding, setShowOnboarding] = useState(false);
+
   // ── Streak celebration ────────────────────────────────────
   const [showStreakCelebration, setShowStreakCelebration] = useState(false);
   const [celebrationStreak, setCelebrationStreak]         = useState(0);
@@ -894,6 +898,11 @@ function AppContent() {
         setPremiumExpiresAt(premExpiry || null);
         setQuestionsLeft(user.questionsLeft);
         setStreak(user.streak || 0);
+
+        // ── Onboarding Tour — show for new users ──────────────
+        if (!hasCompletedOnboarding(user._id)) {
+          setTimeout(() => setShowOnboarding(true), 1200);
+        }
 
         getRecentActivity().then((d) => { if (d.success) setRecentActivity(d.activities); });
 
@@ -1114,6 +1123,11 @@ function AppContent() {
     <>
       <CursorSpotlight />
       <LoadingScreen show={loading} />
+
+      {/* ── Onboarding Tour — new users only ─────────────── */}
+      {showOnboarding && !loading && location.pathname.startsWith("/app") && (
+        <OnboardingTour onComplete={() => setShowOnboarding(false)} />
+      )}
 
       {shouldShowCelebration && (
         <StreakCelebration

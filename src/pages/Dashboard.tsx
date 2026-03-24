@@ -138,7 +138,7 @@ export function Dashboard() {
   return (
     <div className="space-y-6 max-w-6xl">
       {/* Welcome */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div data-tour="dashboard-welcome" className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-white">
             Welcome back, <span className="gradient-text">{firstName}</span> 👋
@@ -146,7 +146,7 @@ export function Dashboard() {
           <p className="text-slate-400 text-sm mt-1">Ready to learn something new today?</p>
         </div>
         {/* ✅ ANIMATED STREAK BADGE */}
-        <div className="flex items-center gap-2 px-4 py-2 rounded-xl glass border border-orange-500/20">
+        <div data-tour="streak-badge" className="flex items-center gap-2 px-4 py-2 rounded-xl glass border border-orange-500/20">
           <Lottie 
             animationData={streakAnimation}
             loop={true}
@@ -177,7 +177,7 @@ export function Dashboard() {
       )}
 
       {/* Stats Row */}
-      <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4 stagger-children">
+      <div data-tour="dashboard-stats" className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4 stagger-children">
         {/* Points */}
         <div onClick={() => navigate("/app/points-history")} className="glass glass-hover card-shine rounded-2xl p-4 animate-slide-up border border-purple-500/10 hover:border-purple-500/25 hover:-translate-y-1 transition-all duration-300 group cursor-pointer" title="View Points History">
           <div className="flex items-center justify-between mb-3">
@@ -280,7 +280,7 @@ export function Dashboard() {
       </div>
 
       {/* Quick Actions */}
-      <div>
+      <div data-tour="quick-actions">
         <h2 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
           Quick Actions
         </h2>
