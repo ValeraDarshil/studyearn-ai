@@ -698,7 +698,7 @@ import { PointsHistory } from "./pages/PointsHistory";
 import CodeLearnHome from "./pages/codelearn/CodeLearnHome";
 import CoursePage from "./pages/codelearn/CoursePage";
 import CertificatePage from "./pages/codelearn/CertificatePage";
-import { OnboardingTour, hasCompletedOnboarding } from "./components/OnboardingTour";
+import { OnboardingTour, hasCompletedOnboarding, isNewAccount } from "./components/OnboardingTour";
 
 // ── Achievement Unlocked — Center Modal ──────────────────────
 function AchievementToast({ achievement, onClose }: { achievement: any; onClose: () => void }) {
@@ -899,9 +899,14 @@ function AppContent() {
         setQuestionsLeft(user.questionsLeft);
         setStreak(user.streak || 0);
 
-        // ── Onboarding Tour — show for new users ──────────────
-        if (!hasCompletedOnboarding(user._id)) {
-          setTimeout(() => setShowOnboarding(true), 1200);
+        // ── Onboarding Tour — ONLY for genuinely new users ────
+        // Double guard:
+        //   1. isNewAccount() → server createdAt < 10 min (ground truth, prevents old users)
+        //   2. hasCompletedOnboarding() → localStorage flag (prevents repeat shows)
+        const accountIsNew = isNewAccount((user as any).createdAt);
+        const tourDone     = hasCompletedOnboarding(user._id);
+        if (accountIsNew && !tourDone) {
+          setTimeout(() => setShowOnboarding(true), 1400);
         }
 
         getRecentActivity().then((d) => { if (d.success) setRecentActivity(d.activities); });
