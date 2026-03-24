@@ -465,7 +465,7 @@ export function Dashboard() {
             .ach-card-in  { animation: achCardIn 0.35s cubic-bezier(0.34,1.2,0.64,1) both; }
           `}</style>
 
-          <div className="modal-enter glass rounded-3xl border border-white/10 w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden"
+          <div className="modal-enter glass rounded-3xl border border-white/10 w-full max-w-3xl max-h-[90dvh] flex flex-col overflow-hidden"
             style={{ boxShadow: '0 40px 120px rgba(0,0,0,0.8), 0 0 60px rgba(139,92,246,0.1)' }}>
 
             {/* Modal Header */}

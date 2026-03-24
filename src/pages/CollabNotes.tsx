@@ -1025,7 +1025,7 @@ export function CollabNotes() {
 
         {/* ── Right panel ── */}
         {panel && (
-          <div className={`w-72 border-l ${c.border} flex flex-col overflow-hidden bg-[#060914] flex-shrink-0`}>
+          <div className={`fixed md:relative inset-0 md:inset-auto z-40 md:z-auto md:w-72 w-full border-l ${c.border} flex flex-col overflow-hidden bg-[#060914] md:flex-shrink-0`}>
             <div className={`flex items-center justify-between px-4 py-3 border-b ${c.border} flex-shrink-0`}>
               <h3 className="text-sm font-semibold text-white capitalize">{panel}</h3>
               <button onClick={() => setPanel(null)} className="text-slate-500 hover:text-white"><X className="w-4 h-4" /></button>
@@ -1395,7 +1395,7 @@ export function CollabNotes() {
             {/* Format picker */}
             <div>
               <p className="text-xs text-slate-500 mb-2">Format</p>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 {([['rich','✍️ Rich Text','Bold, headings, lists'],['markdown','# Markdown','Code-style writing'],['flashcards','🃏 Flashcards','Q&A study cards']] as const).map(([f,label,desc]) => (
                   <button key={f} onClick={() => setNewFormat(f)}
                     className={`p-2.5 rounded-xl border text-left transition-all ${newFormat === f ? 'bg-blue-500/20 border-blue-500/40' : 'bg-white/[0.02] border-white/8 hover:border-white/20'}`}>

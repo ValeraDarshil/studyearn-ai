@@ -183,8 +183,8 @@ export default function QuizModal({ questions, sectionTitle, courseInfo, onCompl
         </div>
 
         {/* Question */}
-        <div className="p-6">
-          <h3 className="text-white font-semibold text-lg leading-relaxed mb-6">
+        <div className="p-4 sm:p-6">
+          <h3 className="text-white font-semibold text-base sm:text-lg leading-relaxed mb-5 sm:mb-6">
             {lang === 'en' && question.q_en ? question.q_en : question.q}
           </h3>
 

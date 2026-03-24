@@ -383,7 +383,7 @@ export default function SectionViewer({
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
-      <div className="p-6 border-b border-white/5">
+      <div className="p-4 sm:p-6 border-b border-white/5">
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="text-xs text-gray-600 mb-1">Week {weekNumber} · Section {section.id?.split('-s')[1]}</div>
@@ -399,7 +399,7 @@ export default function SectionViewer({
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1 mt-4 bg-white/[0.03] border border-white/5 rounded-xl p-1 w-fit">
+        <div className="flex gap-1 mt-4 bg-white/[0.03] border border-white/5 rounded-xl p-1 overflow-x-auto scrollbar-hide w-full sm:w-fit">
           {tabs.map(tab => (
             <button key={tab.id} onClick={tab.onClick}
               title={tab.locked ? t.quizLocked : undefined}
@@ -420,7 +420,7 @@ export default function SectionViewer({
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6">
 
         {/* LEARN TAB */}
         {activeTab === 'learn' && (

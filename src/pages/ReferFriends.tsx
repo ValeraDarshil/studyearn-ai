@@ -96,7 +96,7 @@ export function ReferFriends() {
       </div>
 
       {/* Hero Card */}
-      <div className="glass rounded-2xl p-8 border border-green-500/20 bg-gradient-to-br from-green-500/5 to-emerald-500/5 relative overflow-hidden">
+      <div className="glass rounded-2xl p-5 sm:p-8 border border-green-500/20 bg-gradient-to-br from-green-500/5 to-emerald-500/5 relative overflow-hidden">
         <div className="orb w-[300px] h-[300px] bg-green-500 top-[-100px] right-[-100px]" />
 
         <div className="relative z-10">
