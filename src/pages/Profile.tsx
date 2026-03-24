@@ -124,7 +124,7 @@ function AvatarPickerModal({
 
         {/* Avatar grid */}
         <div className="px-6 pb-4">
-          <div className="grid grid-cols-4 sm:grid-cols-5 gap-2.5">
+          <div className="grid grid-cols-5 gap-2.5">
             {filtered.map((av, i) => {
               const isSelected = selected === av.id;
               const isHovered = hovered === av.id;
@@ -304,7 +304,7 @@ export function Profile() {
           }} />
         </div>
 
-        <div className="relative p-5 sm:p-8 flex flex-col sm:flex-row items-center sm:items-start gap-6">
+        <div className="relative p-8 flex flex-col sm:flex-row items-center sm:items-start gap-6">
           {/* Avatar with click-to-change */}
           <div className="relative group cursor-pointer" onClick={() => setShowPicker(true)}>
             <AvatarCircle avatarId={avatarId} initials={initials} size="lg" ring={true} />

@@ -625,7 +625,7 @@ Output the JSON array now:`;
             <label className="text-sm font-medium text-slate-300 mb-3 flex items-center gap-2 block">
               <Palette className="w-4 h-4 text-purple-400" /> Presentation Style
             </label>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               {PPT_STYLES.map(s => {
                 const active = style === s.id;
                 return (

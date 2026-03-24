@@ -623,7 +623,7 @@ export default function CodeLearnHome() {
         </div>
 
         {/* Feature highlights */}
-        <div className="mt-16 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="mt-16 grid grid-cols-2 md:grid-cols-4 gap-4">
           {t.features.map(f => (
             <div key={f.title} className="bg-white/[0.02] border border-white/5 rounded-xl p-4 text-center">
               <div className="text-2xl mb-2">{f.icon}</div>

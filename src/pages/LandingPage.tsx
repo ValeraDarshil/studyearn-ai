@@ -75,7 +75,7 @@ export function LandingPage() {
             <span className="text-xs font-medium text-purple-300">Powered by Advanced AI</span>
           </div>
           
-          <h1 className="text-4xl sm:text-6xl lg:text-8xl font-black text-white leading-tight tracking-tight mb-6">
+          <h1 className="text-5xl sm:text-6xl lg:text-8xl font-black text-white leading-tight tracking-tight mb-6">
             Study Smart.{' '}
             <span className="gradient-text neon-text">Earn Smart.</span>
           </h1>
@@ -291,7 +291,7 @@ export function LandingPage() {
       {/* CTA */}
       <section className="relative py-20 px-4 sm:px-6 lg:px-8">
         <div className="max-w-4xl mx-auto text-center">
-          <div className="glass rounded-3xl p-8 sm:p-12 border border-purple-500/20">
+          <div className="glass rounded-3xl p-12 border border-purple-500/20">
             <h2 className="text-3xl sm:text-5xl font-bold text-white mb-4">
               Ready to Start <span className="gradient-text">Earning?</span>
             </h2>

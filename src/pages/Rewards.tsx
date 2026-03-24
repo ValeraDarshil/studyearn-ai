@@ -290,7 +290,7 @@ export function Rewards() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 p-1 bg-white/[0.03] rounded-xl border border-white/5 overflow-x-auto scrollbar-hide w-full sm:w-fit">
+      <div className="flex gap-1 p-1 bg-white/[0.03] rounded-xl border border-white/5 w-fit">
         {([
           { id: "earn",         label: "Earn" },
           { id: "redeem",       label: `Redeem${points >= 1000 ? " 🎁" : ""}` },
@@ -485,7 +485,7 @@ export function Rewards() {
 
       {/* ── ACHIEVEMENTS TAB ─────────────────────────────── */}
       {activeTab === "achievements" && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
           {ACHIEVEMENTS.map(ach => {
             const unlocked = unlockedAchievements.includes(ach.id);
             const styles   = RARITY_STYLES[ach.rarity];
