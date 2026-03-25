@@ -1,22 +1,20 @@
 // ─────────────────────────────────────────────────────────────
-// StudyEarn AI — AI Controller
+// StudyEarn AI — AI Controller (AI Study OS Upgraded)
 // ─────────────────────────────────────────────────────────────
 // Route handlers: POST /api/ai/ask, POST /api/ai/solve-pdf
-// Business logic → aiService mein hai
+// Business logic → aiService / contextTutorService mein hai
 // ─────────────────────────────────────────────────────────────
 
 import { Request, Response } from 'express';
 import { solveText, solveWithVision, ChatMessage } from '../services/aiService.js';
+import { contextAwareSolve } from '../services/contextTutorService.js';
 import { parsePDFText } from '../services/pdfService.js';
 import { getUserIdFromToken } from '../middleware/authMiddleware.js';
 import { User } from '../models/User.model.js';
 import { Activity } from '../models/Activity.model.js';
+import { syncActivityToProfile } from '../services/studentProfileService.js';
 import { logger } from '../utils/logger.js';
 
-// ─────────────────────────────────────────────────────────────
-// PRIVATE HELPER — question deduct + points award
-// Server-authoritative: client pe trust nahi karte
-// ─────────────────────────────────────────────────────────────
 // ─────────────────────────────────────────────────────────────
 // PREMIUM CONSTANTS — change here, applies everywhere
 // ─────────────────────────────────────────────────────────────
@@ -124,7 +122,7 @@ async function handleQuestionUsed(
 
     await user.save();
 
-    // Clean prompt — hide internal system instructions (JSON arrays, "Output only", etc.)
+    // Clean prompt — hide internal system instructions
     const isInternalPrompt = promptText.startsWith('{') || promptText.startsWith('[') ||
       promptText.toLowerCase().startsWith('output only') ||
       promptText.toLowerCase().startsWith('create') && promptText.includes('json');
@@ -134,6 +132,9 @@ async function handleQuestionUsed(
       : 'Asked an AI question';
     await Activity.create({ userId, action: 'ask_question', details: activityDetails, pointsEarned: pts });
     logger.info(`AI question: ${user.email} | premium=${premium} | +${pts}pts | left=${(user as any).questionsLeft}`);
+
+    // ── Sync to AI Brain profile (non-blocking) ─────────────
+    syncActivityToProfile(userId, 'ask_question', pts).catch(() => {});
 
     return {
       questionsLeft:   (user as any).questionsLeft,
@@ -164,10 +165,13 @@ export async function askAI(req: Request, res: Response) {
     const imgSizeKB = image ? Math.round(image.length * 0.75 / 1024) : 0;
     logger.info(`/api/ai/ask  image=${!!image}(${imgSizeKB}KB)  prompt="${(prompt || '').substring(0, 60)}"`);
 
+    // ── Get userId for context-aware tutor ──────────────────
+    const userId = getUserIdFromToken(req) ?? '';
+
     let answer: string;
 
     if (image) {
-      // Normalize image to proper data URL format
+      // Vision questions still use solveWithVision (image context)
       let imageUrl: string;
       if (image.startsWith('data:')) {
         imageUrl = image;
@@ -181,7 +185,18 @@ export async function askAI(req: Request, res: Response) {
       if (imgSizeKB > 4000) logger.warn(`Large image: ${imgSizeKB}KB — may be slow`);
       answer = await solveWithVision(imageUrl, prompt || '');
     } else {
-      answer = await solveText(prompt, safeHistory);
+      // ── Context-Aware AI Tutor — uses student profile ──────
+      // Falls back to generic solveText if no profile found
+      if (userId) {
+        try {
+          answer = await contextAwareSolve(userId, prompt, safeHistory);
+        } catch {
+          // If context tutor fails, fall back to original solveText
+          answer = await solveText(prompt, safeHistory);
+        }
+      } else {
+        answer = await solveText(prompt, safeHistory);
+      }
     }
 
     const userAction = await handleQuestionUsed(req, String(prompt || '').substring(0, 100));
@@ -232,7 +247,7 @@ export async function solvePDF(req: Request, res: Response) {
       : `Here is the content of a PDF document/question paper:\n\n${text}\n\nFind ALL questions in this document and solve each one completely, step-by-step with full working. Number your answers to match the original question numbers.`;
 
     const answer     = await solveText(solvePrompt);
-    const userAction = await handleQuestionUsed(req, String(prompt || '').substring(0, 100));
+    const userAction = await handleQuestionUsed(req, userPrompt.substring(0, 100));
 
     res.json({
       success: true,
@@ -248,6 +263,7 @@ export async function solvePDF(req: Request, res: Response) {
     res.status(500).json({ success: false, answer: 'Failed to process PDF. Please try again.' });
   }
 }
+
 // ─────────────────────────────────────────────────────────────
 // POST /api/ai/watch-ad — fake video ad → +1 question
 // ─────────────────────────────────────────────────────────────
@@ -291,7 +307,6 @@ export async function watchAd(req: Request, res: Response) {
     // Grant +1 question by removing the oldest questionUsedAt entry
     const used: Date[] = (user as any).questionUsedAt || [];
     if (used.length > 0) {
-      // Remove oldest used timestamp → effectively refills 1 question
       used.sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
       (user as any).questionUsedAt = used.slice(1);
     }

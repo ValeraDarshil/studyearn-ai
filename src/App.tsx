@@ -15,6 +15,7 @@
 // import { ProtectedRoute } from "./components/ProtectedRoute";
 // import { LoadingScreen } from "./components/LoadingScreen";
 // import { StreakCelebration } from "./components/StreakCelebration";
+// import { PWAInstallPrompt } from "./components/PWAInstallPrompt";
 // import { AppContext, UserStats } from "./context/AppContext";
 // import {
 //   getCurrentUser,
@@ -38,15 +39,10 @@
 // import CodeLearnHome from "./pages/codelearn/CodeLearnHome";
 // import CoursePage from "./pages/codelearn/CoursePage";
 // import CertificatePage from "./pages/codelearn/CertificatePage";
+// import { OnboardingTour, hasCompletedOnboardingLocally, isNewAccount } from "./components/OnboardingTour";
 
 // // ── Achievement Unlocked — Center Modal ──────────────────────
-// function AchievementToast({
-//   achievement,
-//   onClose,
-// }: {
-//   achievement: any;
-//   onClose: () => void;
-// }) {
+// function AchievementToast({ achievement, onClose }: { achievement: any; onClose: () => void }) {
 //   const [visible, setVisible] = useState(true);
 
 //   const handleClose = useCallback(() => {
@@ -59,34 +55,11 @@
 //     return () => clearTimeout(t);
 //   }, [handleClose]);
 
-//   const rarityColors: Record<
-//     string,
-//     { border: string; glow: string; badge: string; ring: string }
-//   > = {
-//     common: {
-//       border: "border-slate-400/40",
-//       glow: "rgba(148,163,184,0.15)",
-//       badge: "bg-slate-500/20 text-slate-300",
-//       ring: "#94a3b8",
-//     },
-//     rare: {
-//       border: "border-blue-400/50",
-//       glow: "rgba(59,130,246,0.25)",
-//       badge: "bg-blue-500/20 text-blue-300",
-//       ring: "#3b82f6",
-//     },
-//     epic: {
-//       border: "border-purple-400/60",
-//       glow: "rgba(168,85,247,0.30)",
-//       badge: "bg-purple-500/20 text-purple-300",
-//       ring: "#a855f7",
-//     },
-//     legendary: {
-//       border: "border-yellow-400/70",
-//       glow: "rgba(234,179,8,0.35)",
-//       badge: "bg-yellow-500/20 text-yellow-300",
-//       ring: "#eab308",
-//     },
+//   const rarityColors: Record<string, { border: string; glow: string; badge: string; ring: string }> = {
+//     common:    { border: "border-slate-400/40",  glow: "rgba(148,163,184,0.15)", badge: "bg-slate-500/20 text-slate-300",   ring: "#94a3b8" },
+//     rare:      { border: "border-blue-400/50",   glow: "rgba(59,130,246,0.25)",  badge: "bg-blue-500/20 text-blue-300",    ring: "#3b82f6" },
+//     epic:      { border: "border-purple-400/60", glow: "rgba(168,85,247,0.30)",  badge: "bg-purple-500/20 text-purple-300",ring: "#a855f7" },
+//     legendary: { border: "border-yellow-400/70", glow: "rgba(234,179,8,0.35)",   badge: "bg-yellow-500/20 text-yellow-300",ring: "#eab308" },
 //   };
 //   const r = rarityColors[achievement.rarity || "common"];
 
@@ -108,9 +81,7 @@
 //         style={{
 //           background: "rgba(0,0,0,0.75)",
 //           backdropFilter: "blur(8px)",
-//           animation: visible
-//             ? "achBgIn 0.3s ease forwards"
-//             : "achBgOut 0.35s ease forwards",
+//           animation: visible ? "achBgIn 0.3s ease forwards" : "achBgOut 0.35s ease forwards",
 //         }}
 //         onClick={handleClose}
 //       />
@@ -119,8 +90,7 @@
 //       <div
 //         className={`fixed z-[201] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[320px] sm:w-[380px] rounded-3xl border ${r.border} overflow-hidden`}
 //         style={{
-//           background:
-//             "linear-gradient(145deg, rgba(10,12,28,0.98) 0%, rgba(15,8,35,0.98) 100%)",
+//           background: "linear-gradient(145deg, rgba(10,12,28,0.98) 0%, rgba(15,8,35,0.98) 100%)",
 //           boxShadow: `0 40px 80px rgba(0,0,0,0.8), 0 0 60px ${r.glow}, inset 0 1px 0 rgba(255,255,255,0.08)`,
 //           animation: visible
 //             ? "achCardIn 0.5s cubic-bezier(0.34,1.56,0.64,1) forwards"
@@ -129,84 +99,53 @@
 //       >
 //         {/* Shine sweep */}
 //         <div className="absolute inset-0 overflow-hidden rounded-3xl pointer-events-none">
-//           <div
-//             className="absolute top-0 bottom-0 w-16 skew-x-12 opacity-20"
-//             style={{
-//               background:
-//                 "linear-gradient(90deg, transparent, white, transparent)",
-//               animation: "achShine 2s ease 0.6s forwards",
-//               left: "-100%",
-//             }}
-//           />
+//           <div className="absolute top-0 bottom-0 w-16 skew-x-12 opacity-20"
+//             style={{ background: "linear-gradient(90deg, transparent, white, transparent)", animation: "achShine 2s ease 0.6s forwards", left: "-100%" }} />
 //         </div>
 
 //         {/* Top glow bar */}
-//         <div
-//           className="h-1 w-full"
-//           style={{
-//             background: `linear-gradient(90deg, transparent, ${r.ring}, transparent)`,
-//           }}
-//         />
+//         <div className="h-1 w-full" style={{ background: `linear-gradient(90deg, transparent, ${r.ring}, transparent)` }} />
 
 //         <div className="p-8 text-center">
-//           <div
-//             className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest mb-5 ${r.badge}`}
-//           >
+//           <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest mb-5 ${r.badge}`}>
 //             🏆 Achievement Unlocked
 //           </div>
 
 //           <div
 //             className="text-6xl mb-4 mx-auto w-24 h-24 rounded-2xl flex items-center justify-center"
 //             style={{
-//               background: `radial-gradient(circle, ${r.glow.replace("0.3", "0.15")} 0%, transparent 70%)`,
+//               background: `radial-gradient(circle, ${r.glow.replace("0.3","0.15")} 0%, transparent 70%)`,
 //               border: `2px solid ${r.ring}40`,
-//               animation:
-//                 "achIconPop 0.6s cubic-bezier(0.34,1.56,0.64,1) 0.2s both, achPulse 2s ease 1s infinite",
+//               animation: "achIconPop 0.6s cubic-bezier(0.34,1.56,0.64,1) 0.2s both, achPulse 2s ease 1s infinite",
 //             }}
 //           >
 //             {achievement.icon}
 //           </div>
 
-//           <div
-//             className={`inline-block text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full mb-3 ${r.badge}`}
-//           >
+//           <div className={`inline-block text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full mb-3 ${r.badge}`}>
 //             {achievement.rarity}
 //           </div>
 
-//           <h2 className="text-2xl font-black text-white mb-2">
-//             {achievement.name}
-//           </h2>
-//           <p className="text-sm text-slate-400 mb-4 leading-relaxed">
-//             {achievement.desc}
-//           </p>
+//           <h2 className="text-2xl font-black text-white mb-2">{achievement.name}</h2>
+//           <p className="text-sm text-slate-400 mb-4 leading-relaxed">{achievement.desc}</p>
 
 //           {achievement.reward > 0 && (
 //             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-green-500/10 border border-green-500/20 mb-5">
 //               <span className="text-lg">⚡</span>
-//               <span className="text-sm font-bold text-green-400">
-//                 +{achievement.reward} Bonus Points Earned!
-//               </span>
+//               <span className="text-sm font-bold text-green-400">+{achievement.reward} Bonus Points Earned!</span>
 //             </div>
 //           )}
 
 //           <button
 //             onClick={handleClose}
 //             className="w-full py-3 rounded-xl font-semibold text-sm text-white transition-all hover:opacity-80"
-//             style={{
-//               background: `linear-gradient(135deg, ${r.ring}80, ${r.ring}40)`,
-//               border: `1px solid ${r.ring}50`,
-//             }}
+//             style={{ background: `linear-gradient(135deg, ${r.ring}80, ${r.ring}40)`, border: `1px solid ${r.ring}50` }}
 //           >
 //             Awesome! 🎉
 //           </button>
 //         </div>
 
-//         <div
-//           className="h-0.5 w-full"
-//           style={{
-//             background: `linear-gradient(90deg, transparent, ${r.ring}60, transparent)`,
-//           }}
-//         />
+//         <div className="h-0.5 w-full" style={{ background: `linear-gradient(90deg, transparent, ${r.ring}60, transparent)` }} />
 //       </div>
 //     </>
 //   );
@@ -217,26 +156,27 @@
 //   const location = useLocation();
 
 //   // ── Core state ───────────────────────────────────────────
-//   const [points, setPoints] = useState(0);
-//   const [questionsLeft, setQuestionsLeft] = useState(15);
+//   const [points, setPoints]                 = useState(0);
+//   const [questionsLeft, setQuestionsLeft]   = useState(15);
 //   const [recentActivity, setRecentActivity] = useState<any[]>([]);
-//   const [streak, setStreak] = useState(0);
-//   const [totalXP, setTotalXP] = useState(0);
-//   const [isPremium, setIsPremium] = useState(false);
+//   const [streak, setStreak]                 = useState(0);
+//   const [totalXP, setTotalXP]               = useState(0);
+//   const [isPremium, setIsPremium]           = useState(false);
 //   const [premiumExpiresAt, setPremiumExpiresAt] = useState<string | null>(null);
-//   const [isLoggedIn, setIsLoggedIn] = useState(false);
-//   const [userId, setUserId] = useState("");
-//   const [userName, setUserName] = useState("");
-//   const [loading, setLoading] = useState(true);
+//   const [isLoggedIn, setIsLoggedIn]         = useState(false);
+//   const [userId, setUserId]                 = useState("");
+//   const [userName, setUserName]             = useState("");
+//   const [loading, setLoading]               = useState(true);
+
+//   // ── Onboarding Tour ───────────────────────────────────────
+//   const [showOnboarding, setShowOnboarding] = useState(false);
 
 //   // ── Streak celebration ────────────────────────────────────
 //   const [showStreakCelebration, setShowStreakCelebration] = useState(false);
-//   const [celebrationStreak, setCelebrationStreak] = useState(0);
+//   const [celebrationStreak, setCelebrationStreak]         = useState(0);
 
 //   // ── Achievements ─────────────────────────────────────────
-//   const [unlockedAchievements, setUnlockedAchievements] = useState<string[]>(
-//     [],
-//   );
+//   const [unlockedAchievements, setUnlockedAchievements] = useState<string[]>([]);
 //   const [userStats, setUserStats] = useState<UserStats>({
 //     totalQuestionsAsked: 0,
 //     totalPPTsGenerated: 0,
@@ -252,50 +192,38 @@
 //   });
 
 //   // ── Achievement toast queue ───────────────────────────────
-//   const [toastQueue, setToastQueue] = useState<any[]>([]);
+//   const [toastQueue, setToastQueue]           = useState<any[]>([]);
 //   const [toastAchievement, setToastAchievement] = useState<any>(null);
 
 //   // ── Refs — always latest values in callbacks ──────────────
-//   const pointsRef = useRef(points);
-//   const streakRef = useRef(streak);
+//   const pointsRef    = useRef(points);
+//   const streakRef    = useRef(streak);
 //   const userStatsRef = useRef(userStats);
-//   const unlockedRef = useRef(unlockedAchievements);
+//   const unlockedRef  = useRef(unlockedAchievements);
 
-//   useEffect(() => {
-//     pointsRef.current = points;
-//   }, [points]);
-//   useEffect(() => {
-//     streakRef.current = streak;
-//   }, [streak]);
-//   useEffect(() => {
-//     userStatsRef.current = userStats;
-//   }, [userStats]);
-//   useEffect(() => {
-//     unlockedRef.current = unlockedAchievements;
-//   }, [unlockedAchievements]);
+//   useEffect(() => { pointsRef.current    = points;               }, [points]);
+//   useEffect(() => { streakRef.current    = streak;               }, [streak]);
+//   useEffect(() => { userStatsRef.current = userStats;            }, [userStats]);
+//   useEffect(() => { unlockedRef.current  = unlockedAchievements; }, [unlockedAchievements]);
 
 //   // ── Toast queue processor ─────────────────────────────────
+//   // Achievements wait until tour is done
 //   useEffect(() => {
-//     if (!toastAchievement && toastQueue.length > 0 && !loading) {
+//     if (!toastAchievement && toastQueue.length > 0 && !loading && !showOnboarding) {
 //       const timer = setTimeout(() => {
 //         setToastAchievement(toastQueue[0]);
-//         setToastQueue((prev) => prev.slice(1));
+//         setToastQueue(prev => prev.slice(1));
 //       }, 400); // small gap between consecutive toasts
 //       return () => clearTimeout(timer);
 //     }
-//   }, [toastAchievement, toastQueue, loading]);
+//   }, [toastAchievement, toastQueue, loading, showOnboarding]);
 
-//   useEffect(() => {
-//     loadUserData();
-//   }, []);
+//   useEffect(() => { loadUserData(); }, []);
 
 //   // ── Load user data from server ────────────────────────────
 //   const loadUserData = async () => {
 //     const token = localStorage.getItem("token");
-//     if (!token) {
-//       setLoading(false);
-//       return;
-//     }
+//     if (!token) { setLoading(false); return; }
 
 //     try {
 //       const user = await getCurrentUser();
@@ -307,26 +235,35 @@
 //         setTotalXP((user as any).totalXP || user.points);
 
 //         const premExpiry = (user as any).premiumExpiresAt;
-//         const premActive =
-//           (user as any).isPremium === true &&
-//           premExpiry &&
-//           new Date(premExpiry) > new Date();
+//         const premActive = (user as any).isPremium === true && premExpiry && new Date(premExpiry) > new Date();
 //         setIsPremium(!!premActive);
 //         setPremiumExpiresAt(premExpiry || null);
 //         setQuestionsLeft(user.questionsLeft);
 //         setStreak(user.streak || 0);
 
-//         getRecentActivity().then((d) => {
-//           if (d.success) setRecentActivity(d.activities);
-//         });
+//         // ── Onboarding Tour — ONLY for genuinely new users ────
+//         // Layer 1 (DB): user.onboardingCompleted — permanent, cross-device
+//         // Layer 2 (localStorage): instant check, prevents flicker on refresh
+//         // Both must be false for tour to show.
+//         const dbSaysDone    = !!(user as any).onboardingCompleted;
+//         const localSaysDone = hasCompletedOnboardingLocally(user._id);
+//         const shouldShowTour = !dbSaysDone && !localSaysDone;
+//         if (shouldShowTour) {
+//           setTimeout(() => setShowOnboarding(true), 1400);
+//         }
 
-//         // ── Streak Celebration — 3 layer guarantee ────────────
+//         getRecentActivity().then((d) => { if (d.success) setRecentActivity(d.activities); });
+
+//         // ── Streak Celebration — delayed if tour is showing ───
+//         // New users see tour first, then streak after tour completes
+//         // Existing users see streak at normal timing
+//         const streakDelay = shouldShowTour ? 0 : 1500; // tour users: streak fires via onTourComplete
 //         const streakCelebration = sessionStorage.getItem("streakCelebration");
-//         const loginBonus = sessionStorage.getItem("loginBonus");
+//         const loginBonus        = sessionStorage.getItem("loginBonus");
 //         if (streakCelebration) {
 //           const info = JSON.parse(streakCelebration);
 //           setCelebrationStreak(info.currentStreak);
-//           setTimeout(() => setShowStreakCelebration(true), 1500);
+//           if (!shouldShowTour) setTimeout(() => setShowStreakCelebration(true), streakDelay);
 //           sessionStorage.removeItem("streakCelebration");
 //         }
 //         if (loginBonus) sessionStorage.removeItem("loginBonus");
@@ -336,7 +273,7 @@
 //           setCelebrationStreak(streakInfoFromMe.currentStreak);
 //           setPoints(user.points);
 //           setTotalXP((user as any).totalXP || user.points);
-//           setTimeout(() => setShowStreakCelebration(true), 1500);
+//           if (!shouldShowTour) setTimeout(() => setShowStreakCelebration(true), streakDelay);
 //         }
 //         if (!streakCelebration && !streakInfoFromMe?.streakIncreased) {
 //           checkStreak().catch(console.error);
@@ -347,20 +284,20 @@
 //           if (d.success) {
 //             const unlocked = d.unlockedAchievements || [];
 //             const stats: UserStats = {
-//               totalQuestionsAsked: d.totalQuestionsAsked || 0,
-//               totalPPTsGenerated: d.totalPPTsGenerated || 0,
-//               totalPDFsConverted: d.totalPDFsConverted || 0,
-//               totalQuizCompleted: d.totalQuizCompleted || 0,
-//               totalChallengesCompleted: d.totalChallengesCompleted || 0,
-//               totalChallengesCorrect: d.totalChallengesCorrect || 0,
-//               totalNotesCreated: d.totalNotesCreated || 0,
-//               totalStudyToolsUsed: d.totalStudyToolsUsed || 0,
-//               totalDaysActive: d.totalDaysActive || 0,
-//               referrals: d.totalReferrals || 0,
-//               formulaBookmarksCount: (d.formulaBookmarks || []).length,
+//               totalQuestionsAsked:      d.totalQuestionsAsked      || 0,
+//               totalPPTsGenerated:       d.totalPPTsGenerated       || 0,
+//               totalPDFsConverted:       d.totalPDFsConverted       || 0,
+//               totalQuizCompleted:       d.totalQuizCompleted       || 0,
+//               totalChallengesCompleted: d.totalChallengesCompleted  || 0,
+//               totalChallengesCorrect:   d.totalChallengesCorrect   || 0,
+//               totalNotesCreated:        d.totalNotesCreated        || 0,
+//               totalStudyToolsUsed:      d.totalStudyToolsUsed      || 0,
+//               totalDaysActive:          d.totalDaysActive          || 0,
+//               referrals:                d.totalReferrals           || 0,
+//               formulaBookmarksCount:    (d.formulaBookmarks || []).length,
 //             };
 //             setUnlockedAchievements(unlocked);
-//             unlockedRef.current = unlocked;
+//             unlockedRef.current  = unlocked;
 //             setUserStats(stats);
 //             userStatsRef.current = stats;
 
@@ -387,90 +324,79 @@
 //   };
 
 //   // ── Check & unlock achievements ───────────────────────────
-//   const checkAndUnlockAchievements = useCallback(
-//     async (
-//       override?: Partial<UserStats & { points: number; streak: number }>,
-//     ) => {
-//       const token = localStorage.getItem("token");
-//       if (!token) return;
+//   const checkAndUnlockAchievements = useCallback(async (
+//     override?: Partial<UserStats & { points: number; streak: number }>
+//   ) => {
+//     const token = localStorage.getItem("token");
+//     if (!token) return;
 
-//       const currentPoints = override?.points ?? pointsRef.current;
-//       const currentStreak = override?.streak ?? streakRef.current;
-//       const currentStats = { ...userStatsRef.current, ...override };
-//       const currentUnlocked = [...unlockedRef.current];
+//     const currentPoints   = override?.points ?? pointsRef.current;
+//     const currentStreak   = override?.streak ?? streakRef.current;
+//     const currentStats    = { ...userStatsRef.current, ...override };
+//     const currentUnlocked = [...unlockedRef.current];
 
-//       // Skip if no activity yet
-//       const hasActivity =
-//         currentPoints > 0 ||
-//         currentStreak > 0 ||
-//         Object.values(currentStats).some((v) => (v as number) > 0);
-//       if (!hasActivity) return;
+//     // Skip if no activity yet
+//     const hasActivity = currentPoints > 0 || currentStreak > 0 ||
+//       Object.values(currentStats).some(v => (v as number) > 0);
+//     if (!hasActivity) return;
 
-//       const statMap: Record<string, number> = {
-//         totalQuestionsAsked: currentStats.totalQuestionsAsked || 0,
-//         totalPPTsGenerated: currentStats.totalPPTsGenerated || 0,
-//         totalPDFsConverted: currentStats.totalPDFsConverted || 0,
-//         totalQuizCompleted: currentStats.totalQuizCompleted || 0,
-//         totalChallengesCompleted: currentStats.totalChallengesCompleted || 0,
-//         totalChallengesCorrect: currentStats.totalChallengesCorrect || 0,
-//         totalNotesCreated: currentStats.totalNotesCreated || 0,
-//         totalStudyToolsUsed: currentStats.totalStudyToolsUsed || 0,
-//         totalDaysActive: currentStats.totalDaysActive || 0,
-//         referrals: currentStats.referrals || 0,
-//         totalFormulaBookmarks: currentStats.formulaBookmarksCount || 0,
-//         streak: currentStreak || 0,
-//         points: currentPoints || 0,
-//       };
+//     const statMap: Record<string, number> = {
+//       totalQuestionsAsked:      currentStats.totalQuestionsAsked      || 0,
+//       totalPPTsGenerated:       currentStats.totalPPTsGenerated       || 0,
+//       totalPDFsConverted:       currentStats.totalPDFsConverted       || 0,
+//       totalQuizCompleted:       currentStats.totalQuizCompleted       || 0,
+//       totalChallengesCompleted: currentStats.totalChallengesCompleted  || 0,
+//       totalChallengesCorrect:   currentStats.totalChallengesCorrect   || 0,
+//       totalNotesCreated:        currentStats.totalNotesCreated        || 0,
+//       totalStudyToolsUsed:      currentStats.totalStudyToolsUsed      || 0,
+//       totalDaysActive:          currentStats.totalDaysActive          || 0,
+//       referrals:                currentStats.referrals                || 0,
+//       totalFormulaBookmarks:    currentStats.formulaBookmarksCount    || 0,
+//       streak:                   currentStreak                         || 0,
+//       points:                   currentPoints                         || 0,
+//     };
 
-//       const toUnlock = ACHIEVEMENTS.filter((ach) => {
-//         if (currentUnlocked.includes(ach.id)) return false;
-//         const val = statMap[ach.stat] ?? 0;
-//         return val >= ach.threshold;
-//       });
+//     const toUnlock = ACHIEVEMENTS.filter(ach => {
+//       if (currentUnlocked.includes(ach.id)) return false;
+//       const val = statMap[ach.stat] ?? 0;
+//       return val >= ach.threshold;
+//     });
 
-//       if (toUnlock.length === 0) return;
+//     if (toUnlock.length === 0) return;
 
-//       const newlyUnlocked: any[] = [];
+//     const newlyUnlocked: any[] = [];
 
-//       for (const ach of toUnlock) {
-//         try {
-//           const result = await unlockAchievement(ach.id);
-//           if (result.success) {
-//             unlockedRef.current = result.unlockedAchievements;
-//             setUnlockedAchievements(result.unlockedAchievements);
-//             newlyUnlocked.push(ach);
-//             if (result.rewardPoints > 0) {
-//               setPoints((prev) => prev + result.rewardPoints);
-//               setTotalXP((prev) => prev + result.rewardPoints);
-//             }
+//     for (const ach of toUnlock) {
+//       try {
+//         const result = await unlockAchievement(ach.id);
+//         if (result.success) {
+//           unlockedRef.current = result.unlockedAchievements;
+//           setUnlockedAchievements(result.unlockedAchievements);
+//           newlyUnlocked.push(ach);
+//           if (result.rewardPoints > 0) {
+//             setPoints(prev => prev + result.rewardPoints);
+//             setTotalXP(prev => prev + result.rewardPoints);
 //           }
-//         } catch (e) {
-//           console.error("unlock error", ach.id, e);
 //         }
+//       } catch (e) {
+//         console.error("unlock error", ach.id, e);
 //       }
+//     }
 
-//       if (newlyUnlocked.length > 0) {
-//         setToastQueue((prev) => [...prev, ...newlyUnlocked]);
-//       }
-//     },
-//     [],
-//   );
+//     if (newlyUnlocked.length > 0) {
+//       setToastQueue(prev => [...prev, ...newlyUnlocked]);
+//     }
+//   }, []);
 
 //   // ── Streak check (Layer 3 safety net) ────────────────────
 //   const checkStreak = async () => {
 //     try {
 //       const token = localStorage.getItem("token");
 //       if (!token) return;
-//       const res = await fetch(
-//         `${import.meta.env.VITE_API_URL as string}/api/user/update-streak`,
-//         {
-//           method: "POST",
-//           headers: {
-//             "Content-Type": "application/json",
-//             Authorization: `Bearer ${token}`,
-//           },
-//         },
-//       );
+//       const res = await fetch(`${import.meta.env.VITE_API_URL as string}/api/user/update-streak`, {
+//         method: "POST",
+//         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+//       });
 //       if (!res.ok) return;
 //       const data = await res.json();
 //       if (data.success) {
@@ -489,7 +415,7 @@
 //   const addPoints = async (amount: number) => {
 //     const newPoints = pointsRef.current + amount;
 //     setPoints(newPoints);
-//     setTotalXP((prev) => prev + amount);
+//     setTotalXP(prev => prev + amount);
 //     checkAndUnlockAchievements({ points: newPoints });
 //   };
 
@@ -499,11 +425,7 @@
 //   };
 
 //   // ── Activity log + auto-increment achievement counters ────
-//   const logActivity = async (
-//     action: string,
-//     details: string,
-//     pointsEarned: number,
-//   ) => {
+//   const logActivity = async (action: string, details: string, pointsEarned: number) => {
 //     const newActivity = {
 //       _id: Date.now().toString(),
 //       action,
@@ -515,14 +437,12 @@
 //     await logActivityAPI(action, details, pointsEarned);
 
 //     // Auto-increment counters for achievement tracking
-//     setUserStats((prev) => {
+//     setUserStats(prev => {
 //       const next = { ...prev };
-//       if (action === "quiz_completed")
-//         next.totalQuizCompleted = (prev.totalQuizCompleted || 0) + 1;
-//       if (action === "note_created")
-//         next.totalNotesCreated = (prev.totalNotesCreated || 0) + 1;
-//       if (action === "improve_notes" || action === "analyze_pdf")
-//         next.totalStudyToolsUsed = (prev.totalStudyToolsUsed || 0) + 1;
+//       if (action === "quiz_completed")  next.totalQuizCompleted    = (prev.totalQuizCompleted    || 0) + 1;
+//       if (action === "note_created")    next.totalNotesCreated     = (prev.totalNotesCreated     || 0) + 1;
+//       if (action === "improve_notes" ||
+//           action === "analyze_pdf")     next.totalStudyToolsUsed   = (prev.totalStudyToolsUsed   || 0) + 1;
 //       return next;
 //     });
 //   };
@@ -532,12 +452,9 @@
 //     const token = localStorage.getItem("token");
 //     if (!token) return;
 //     try {
-//       const res = await fetch(
-//         `${import.meta.env.VITE_API_URL as string}/api/ai/quota`,
-//         {
-//           headers: { Authorization: `Bearer ${token}` },
-//         },
-//       );
+//       const res  = await fetch(`${import.meta.env.VITE_API_URL as string}/api/ai/quota`, {
+//         headers: { Authorization: `Bearer ${token}` },
+//       });
 //       const data = await res.json();
 //       if (data.success && data.questionsLeft !== undefined) {
 //         setQuestionsLeft(data.questionsLeft);
@@ -551,8 +468,7 @@
 //     setRecentActivity([]);
 //   };
 
-//   const shouldShowCelebration =
-//     showStreakCelebration && location.pathname.startsWith("/app");
+//   const shouldShowCelebration = showStreakCelebration && location.pathname.startsWith("/app") && !loading;
 
 //   return (
 //     <>
@@ -566,6 +482,8 @@
 //           onClose={() => setShowStreakCelebration(false)}
 //         />
 //       )}
+
+//       <PWAInstallPrompt />
 
 //       {toastAchievement && location.pathname.startsWith("/app") && (
 //         <AchievementToast
@@ -611,10 +529,7 @@
 //           {/* CodeLearn — public routes */}
 //           <Route path="/codelearn" element={<CodeLearnHome />} />
 //           <Route path="/codelearn/:language" element={<CoursePage />} />
-//           <Route
-//             path="/codelearn/:language/certificate"
-//             element={<CertificatePage />}
-//           />
+//           <Route path="/codelearn/:language/certificate" element={<CertificatePage />} />
 
 //           <Route
 //             path="/app"
@@ -643,6 +558,18 @@
 //             <Route path="notes/shared/:code" element={<CollabNotes />} />
 //           </Route>
 //         </Routes>
+
+//         {/* ── Onboarding Tour — inside Provider so useApp() gets userName ── */}
+//         {showOnboarding && !loading && location.pathname.startsWith("/app") && (
+//           <OnboardingTour onComplete={() => {
+//             setShowOnboarding(false);
+//             // After tour ends, show streak celebration + achievements with delay
+//             setTimeout(() => setShowStreakCelebration(prev => {
+//               // Only show if it was queued (celebrationStreak > 0 means it was set)
+//               return celebrationStreak > 0 ? true : prev;
+//             }), 800);
+//           }} />
+//         )}
 //       </AppContext.Provider>
 //     </>
 //   );
@@ -655,6 +582,9 @@
 //     </HashRouter>
 //   );
 // }
+
+
+
 
 
 import { Login } from "./pages/Login";
@@ -698,7 +628,11 @@ import { PointsHistory } from "./pages/PointsHistory";
 import CodeLearnHome from "./pages/codelearn/CodeLearnHome";
 import CoursePage from "./pages/codelearn/CoursePage";
 import CertificatePage from "./pages/codelearn/CertificatePage";
-import { OnboardingTour, hasCompletedOnboardingLocally, isNewAccount } from "./components/OnboardingTour";
+import { OnboardingTour, hasCompletedOnboardingLocally } from "./components/OnboardingTour";
+
+// ── AI Study OS — New Pages ───────────────────────────────────
+import { Onboarding } from "./pages/Onboarding";
+import { BrainDashboard } from "./pages/BrainDashboard";
 
 // ── Achievement Unlocked — Center Modal ──────────────────────
 function AchievementToast({ achievement, onClose }: { achievement: any; onClose: () => void }) {
@@ -827,6 +761,10 @@ function AppContent() {
   const [userName, setUserName]             = useState("");
   const [loading, setLoading]               = useState(true);
 
+  // ── AI Study OS — Learner Onboarding ─────────────────────
+  // Shown once for new users: school/coding/college/self setup
+  const [showLearnerOnboarding, setShowLearnerOnboarding] = useState(false);
+
   // ── Onboarding Tour ───────────────────────────────────────
   const [showOnboarding, setShowOnboarding] = useState(false);
 
@@ -866,13 +804,12 @@ function AppContent() {
   useEffect(() => { unlockedRef.current  = unlockedAchievements; }, [unlockedAchievements]);
 
   // ── Toast queue processor ─────────────────────────────────
-  // Achievements wait until tour is done
   useEffect(() => {
     if (!toastAchievement && toastQueue.length > 0 && !loading && !showOnboarding) {
       const timer = setTimeout(() => {
         setToastAchievement(toastQueue[0]);
         setToastQueue(prev => prev.slice(1));
-      }, 400); // small gap between consecutive toasts
+      }, 400);
       return () => clearTimeout(timer);
     }
   }, [toastAchievement, toastQueue, loading, showOnboarding]);
@@ -900,10 +837,19 @@ function AppContent() {
         setQuestionsLeft(user.questionsLeft);
         setStreak(user.streak || 0);
 
+        // ── AI Study OS: Learner Onboarding ──────────────────
+        // Show after product onboarding tour, for users without brain profile
+        // Check: does user have onboardingCompleted (product tour) AND no brain profile yet?
+        // We show learner onboarding if: product tour done + brain setup not done
+        // Brain setup is tracked by a localStorage key per user
+        const brainSetupDone = localStorage.getItem(`brain_setup_${user._id}`);
+        const productTourDone = !!(user as any).onboardingCompleted;
+        // Show learner onboarding only if product tour is done and brain setup isn't done
+        if (productTourDone && !brainSetupDone) {
+          setTimeout(() => setShowLearnerOnboarding(true), 2000);
+        }
+
         // ── Onboarding Tour — ONLY for genuinely new users ────
-        // Layer 1 (DB): user.onboardingCompleted — permanent, cross-device
-        // Layer 2 (localStorage): instant check, prevents flicker on refresh
-        // Both must be false for tour to show.
         const dbSaysDone    = !!(user as any).onboardingCompleted;
         const localSaysDone = hasCompletedOnboardingLocally(user._id);
         const shouldShowTour = !dbSaysDone && !localSaysDone;
@@ -913,10 +859,7 @@ function AppContent() {
 
         getRecentActivity().then((d) => { if (d.success) setRecentActivity(d.activities); });
 
-        // ── Streak Celebration — delayed if tour is showing ───
-        // New users see tour first, then streak after tour completes
-        // Existing users see streak at normal timing
-        const streakDelay = shouldShowTour ? 0 : 1500; // tour users: streak fires via onTourComplete
+        const streakDelay = shouldShowTour ? 0 : 1500;
         const streakCelebration = sessionStorage.getItem("streakCelebration");
         const loginBonus        = sessionStorage.getItem("loginBonus");
         if (streakCelebration) {
@@ -938,7 +881,6 @@ function AppContent() {
           checkStreak().catch(console.error);
         }
 
-        // ── Load achievements + check for newly eligible ──────
         getAchievements().then((d) => {
           if (d.success) {
             const unlocked = d.unlockedAchievements || [];
@@ -994,7 +936,6 @@ function AppContent() {
     const currentStats    = { ...userStatsRef.current, ...override };
     const currentUnlocked = [...unlockedRef.current];
 
-    // Skip if no activity yet
     const hasActivity = currentPoints > 0 || currentStreak > 0 ||
       Object.values(currentStats).some(v => (v as number) > 0);
     if (!hasActivity) return;
@@ -1095,7 +1036,6 @@ function AppContent() {
     setRecentActivity((prev) => [newActivity, ...prev].slice(0, 10));
     await logActivityAPI(action, details, pointsEarned);
 
-    // Auto-increment counters for achievement tracking
     setUserStats(prev => {
       const next = { ...prev };
       if (action === "quiz_completed")  next.totalQuizCompleted    = (prev.totalQuizCompleted    || 0) + 1;
@@ -1185,6 +1125,9 @@ function AppContent() {
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/google-welcome" element={<GoogleWelcome />} />
 
+          {/* ── AI Study OS: Learner Onboarding ── */}
+          <Route path="/onboarding" element={<Onboarding />} />
+
           {/* CodeLearn — public routes */}
           <Route path="/codelearn" element={<CodeLearnHome />} />
           <Route path="/codelearn/:language" element={<CoursePage />} />
@@ -1215,6 +1158,8 @@ function AppContent() {
             <Route path="study-tools" element={<StudyTools />} />
             <Route path="notes" element={<CollabNotes />} />
             <Route path="notes/shared/:code" element={<CollabNotes />} />
+            {/* ── AI Study OS: Brain Dashboard ── */}
+            <Route path="brain" element={<BrainDashboard />} />
           </Route>
         </Routes>
 
@@ -1222,12 +1167,30 @@ function AppContent() {
         {showOnboarding && !loading && location.pathname.startsWith("/app") && (
           <OnboardingTour onComplete={() => {
             setShowOnboarding(false);
-            // After tour ends, show streak celebration + achievements with delay
             setTimeout(() => setShowStreakCelebration(prev => {
-              // Only show if it was queued (celebrationStreak > 0 means it was set)
               return celebrationStreak > 0 ? true : prev;
             }), 800);
+            // After product tour completes, check if learner onboarding needed
+            setTimeout(() => {
+              const brainSetupDone = localStorage.getItem(`brain_setup_${userId}`);
+              if (!brainSetupDone) setShowLearnerOnboarding(true);
+            }, 1500);
           }} />
+        )}
+
+        {/* ── AI Study OS: Inline Learner Onboarding Modal ── */}
+        {showLearnerOnboarding && !loading && !showOnboarding && location.pathname.startsWith("/app") && (
+          <div className="fixed inset-0 z-[150] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="w-full max-w-2xl bg-slate-950 rounded-3xl border border-slate-700 overflow-y-auto max-h-[90vh]">
+              <Onboarding
+                onComplete={() => {
+                  // Mark brain setup done in localStorage
+                  if (userId) localStorage.setItem(`brain_setup_${userId}`, '1');
+                  setShowLearnerOnboarding(false);
+                }}
+              />
+            </div>
+          </div>
         )}
       </AppContext.Provider>
     </>
