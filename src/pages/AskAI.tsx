@@ -78,8 +78,8 @@ function groupByDate(convos: ConvoSummary[]) {
 // ─── Bubbles ──────────────────────────────────────────────────
 function UserBubble({ msg }: { msg: ChatMsg }) {
   return (
-    <div className="flex justify-end gap-2 items-end">
-      <div className="max-w-[80%] space-y-2">
+    <div className="w-full flex justify-end gap-2 items-end">
+      <div className="max-w-[75%] space-y-2">
         {msg.imagePreview && (
           <div className="flex justify-end">
             <img src={msg.imagePreview} alt="uploaded"
@@ -90,7 +90,7 @@ function UserBubble({ msg }: { msg: ChatMsg }) {
           <div className="flex justify-end">
             <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-red-500/10 border border-red-500/20 text-sm text-red-300">
               <FileText className="w-3.5 h-3.5" />
-              <span className="max-w-[180px] truncate">{msg.fileName}</span>
+              <span className="max-w-[200px] truncate">{msg.fileName}</span>
             </div>
           </div>
         )}
@@ -109,13 +109,13 @@ function UserBubble({ msg }: { msg: ChatMsg }) {
 
 function AIBubble({ msg, isPremium }: { msg: ChatMsg; isPremium: boolean }) {
   return (
-    <div className="flex gap-2 items-end">
-      <div className="w-7 h-7 rounded-full bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center flex-shrink-0 mb-0.5">
+    <div className="w-full flex gap-2 items-start">
+      <div className="w-7 h-7 rounded-full bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center flex-shrink-0 mt-1">
         <Brain className="w-3.5 h-3.5 text-white" />
       </div>
-      <div className="max-w-[85%] space-y-1">
-        <div className={`rounded-2xl rounded-bl-sm px-4 py-3 border
-          ${msg.isError ? "bg-red-500/10 border-red-500/20" : "bg-white/[0.04] border-white/10"}`}>
+      <div className="flex-1 min-w-0 space-y-1">
+        <div className={`rounded-2xl rounded-tl-sm px-4 py-3 border
+          ${msg.isError ? "bg-red-500/10 border-red-500/20" : "bg-white/[0.04] border-white/8"}`}>
           {msg.isError
             ? <p className="text-sm text-red-300 leading-relaxed">{msg.content}</p>
             : <MarkdownRenderer content={msg.content} />}
@@ -130,6 +130,62 @@ function AIBubble({ msg, isPremium }: { msg: ChatMsg; isPremium: boolean }) {
       </div>
     </div>
   );
+}
+
+// ─── Greeting Detection (zero API calls) ────────────────────
+const GREETING_PATTERNS = [
+  /^(hi|hello|hey|hii|helo|hlo|heyy|heya|howdy|yo|sup)[\s!.?]*$/i,
+  /^(namaste|namaskar|jai hind|vanakkam|sat sri akal)[\s!.?]*$/i,
+  /^(good morning|good evening|good night|good afternoon)[\s!.?]*$/i,
+  /^(how are you|how r u|how are u|how do you do|how have you been)[\s!.?]*$/i,
+  /^(what'?s up|whats up|wassup|wazz?up)[\s!.?]*$/i,
+  /^(thanks|thank you|thank u|thx|ty|thankyou|shukriya|dhanyawad)[\s!.?]*$/i,
+  /^(ok|okay|okie|k|got it|understood|sure|alright|cool|nice|great|perfect|awesome)[\s!.?]*$/i,
+  /^(bye|goodbye|see you|see ya|take care|tc|later|cya|alvida)[\s!.?]*$/i,
+];
+
+const GREETING_REPLIES = [
+  "Hey there! 👋 I'm StudyEarn AI — your personal tutor. Ask me anything: Math, Science, History, Coding, or even current prices like Gold or Bitcoin! 🚀",
+  "Hello! 😊 Ready to help you learn and earn points! What subject or topic are you working on today?",
+  "Hi! 👋 Welcome to StudyEarn AI! You can ask me academic questions, request explanations, check crypto/gold prices, or anything else. What's on your mind?",
+  "Hey! Great to see you! 🌟 Ask me any question — I love explaining things step-by-step. What are you studying today?",
+  "Namaste! 🙏 Main StudyEarn AI hoon — your smart study buddy! Koi bhi question pucho, main help karunga! 😊",
+];
+
+const THANKS_REPLIES = [
+  "You're welcome! 😊 Feel free to ask more questions anytime!",
+  "Happy to help! 🌟 Keep asking great questions!",
+  "Anytime! 🙏 That's what I'm here for. Any other doubts?",
+];
+
+const BYE_REPLIES = [
+  "Goodbye! 👋 Come back whenever you need help. Keep studying! 📚",
+  "See you! 🌟 All the best with your studies!",
+  "Take care! 💪 Remember — consistency is key to success!",
+];
+
+function getGreetingReply(text: string): string | null {
+  const t = text.trim();
+  if (!t) return null;
+
+  // Bye
+  if (/^(bye|goodbye|see you|see ya|take care|tc|later|cya|alvida)/i.test(t)) {
+    return BYE_REPLIES[Math.floor(Math.random() * BYE_REPLIES.length)];
+  }
+
+  // Thanks
+  if (/^(thanks|thank you|thank u|thx|ty|thankyou|shukriya|dhanyawad)/i.test(t)) {
+    return THANKS_REPLIES[Math.floor(Math.random() * THANKS_REPLIES.length)];
+  }
+
+  // General greetings
+  for (const pattern of GREETING_PATTERNS) {
+    if (pattern.test(t)) {
+      return GREETING_REPLIES[Math.floor(Math.random() * GREETING_REPLIES.length)];
+    }
+  }
+
+  return null; // not a greeting, proceed with API call
 }
 
 const SUGGESTIONS = [
@@ -475,6 +531,27 @@ export function AskAI() {
     const text = question.trim();
     if ((!text && !uploadedFile) || loading || questionsLeft <= 0) return;
 
+    // ── Greeting shortcut — zero API calls ──────────────
+    if (!uploadedFile && text) {
+      const greetReply = getGreetingReply(text);
+      if (greetReply) {
+        const userMsg: ChatMsg = { role: "user", content: text };
+        const aiMsg: ChatMsg   = { role: "assistant", content: greetReply };
+        const newMessages = [...messages, userMsg, aiMsg];
+        setMessages(newMessages);
+        setQuestion("");
+        if (textareaRef.current) textareaRef.current.style.height = "32px";
+        // Save to conversation (no points, no question deducted)
+        let convoId = convoIdRef.current;
+        if (!convoId) {
+          convoId = await createNewConvo(text);
+          if (convoId) convoIdRef.current = convoId;
+        }
+        if (convoId) await saveMessages(convoId, [userMsg, aiMsg]);
+        return; // ← exit early, no API call
+      }
+    }
+
     // Optimistic UI — add user message immediately
     const userMsg: ChatMsg = {
       role: "user", content: text,
@@ -767,7 +844,8 @@ export function AskAI() {
         </div>
 
         {/* Messages area */}
-        <div className="flex-1 overflow-y-auto space-y-4 px-4 py-5" style={{ minHeight: 0 }}>
+        <div className="flex-1 overflow-y-auto" style={{ minHeight: 0 }}>
+          <div className="max-w-3xl mx-auto px-4 py-5 space-y-5">
 
           {/* Empty state */}
           {!hasChat && (
@@ -783,7 +861,7 @@ export function AskAI() {
                   Ask a question, upload image/PDF.<br />AI remembers context within a chat.
                 </p>
               </div>
-              <div className="w-full max-w-md grid sm:grid-cols-2 gap-2">
+              <div className="w-full max-w-xl grid sm:grid-cols-2 gap-2">
                 {SUGGESTIONS.map(q => (
                   <button key={q}
                     onClick={() => { setQuestion(q); textareaRef.current?.focus(); }}
@@ -803,7 +881,7 @@ export function AskAI() {
 
           {/* Typing indicator */}
           {loading && (
-            <div className="flex gap-2 items-end">
+            <div className="w-full flex gap-2 items-start">
               <div className="w-7 h-7 rounded-full bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center flex-shrink-0">
                 <Brain className="w-3.5 h-3.5 text-white" />
               </div>
@@ -820,11 +898,12 @@ export function AskAI() {
           )}
 
           <div ref={bottomRef} />
+          </div>
         </div>
 
         {/* ── Input box ───────────────────────────────────── */}
-        <div className="flex-shrink-0 p-3 border-t border-white/8">
-
+        <div className="flex-shrink-0 border-t border-white/8">
+          <div className="max-w-3xl mx-auto px-4 py-3">
           <div className="rounded-2xl border border-white/10 bg-white/[0.02] px-3 py-2">
 
             {/* File strip — only shown when file uploaded */}
@@ -931,6 +1010,8 @@ export function AskAI() {
         </div>
       </div>
 
+          </div>
+      </div>
       <input ref={fileRef} type="file" accept="image/*,.webp,application/pdf" className="hidden"
         onChange={e => { if (e.target.files?.[0]) handleFile(e.target.files[0]); }} />
     </div>
