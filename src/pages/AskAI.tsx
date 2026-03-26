@@ -109,8 +109,8 @@ function ModeBadge({ mode }: { mode?: SubjectMode }) {
 // ─── Bubbles ──────────────────────────────────────────────────
 function UserBubble({ msg }: { msg: ChatMsg }) {
   return (
-    <div className="flex justify-end gap-2 items-end">
-      <div className="max-w-[80%] space-y-2">
+    <div className="flex justify-end">
+      <div className="max-w-[75%] space-y-2">
         {msg.imagePreview && (
           <div className="flex justify-end">
             <img src={msg.imagePreview} alt="uploaded"
@@ -126,13 +126,10 @@ function UserBubble({ msg }: { msg: ChatMsg }) {
           </div>
         )}
         {msg.content && (
-          <div className="bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-blue-500/20 rounded-2xl rounded-br-sm px-4 py-3">
+          <div className="bg-gradient-to-br from-violet-600/30 to-blue-600/20 border border-violet-500/25 rounded-2xl rounded-tr-sm px-4 py-3">
             <p className="text-sm text-white leading-relaxed whitespace-pre-wrap">{msg.content}</p>
           </div>
         )}
-      </div>
-      <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0 mb-0.5">
-        <User className="w-3.5 h-3.5 text-white" />
       </div>
     </div>
   );
@@ -141,21 +138,21 @@ function UserBubble({ msg }: { msg: ChatMsg }) {
 function AIBubble({ msg, isPremium }: { msg: ChatMsg; isPremium: boolean }) {
   const modeConfig = SUBJECT_MODES.find(s => s.id === (msg.subjectMode || "auto"));
   return (
-    <div className="flex gap-2 items-end">
-      <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mb-0.5 bg-gradient-to-br ${modeConfig?.id === 'math' ? 'from-blue-500 to-blue-600' : modeConfig?.id === 'coding' ? 'from-green-500 to-emerald-600' : modeConfig?.id === 'science' ? 'from-cyan-500 to-cyan-600' : 'from-purple-500 to-blue-600'}`}>
+    <div className="flex gap-3 items-start w-full">
+      <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 bg-gradient-to-br ${modeConfig?.id === 'math' ? 'from-blue-500 to-blue-600' : modeConfig?.id === 'coding' ? 'from-green-500 to-emerald-600' : modeConfig?.id === 'science' ? 'from-cyan-500 to-cyan-600' : 'from-purple-500 to-blue-600'}`}>
         {modeConfig && modeConfig.id !== 'auto' && modeConfig.id !== 'general'
           ? <modeConfig.icon className="w-3.5 h-3.5 text-white" />
           : <Brain className="w-3.5 h-3.5 text-white" />}
       </div>
-      <div className="max-w-[85%] space-y-1">
-        <div className={`rounded-2xl rounded-bl-sm px-4 py-3 border ${msg.isError ? "bg-red-500/10 border-red-500/20" : "bg-white/[0.04] border-white/10"}`}>
-          {msg.subjectMode && msg.subjectMode !== 'auto' && <ModeBadge mode={msg.subjectMode} />}
+      <div className="flex-1 min-w-0 space-y-1">
+        {msg.subjectMode && msg.subjectMode !== 'auto' && <ModeBadge mode={msg.subjectMode} />}
+        <div className={`w-full ${msg.isError ? "text-red-300" : "text-white"}`}>
           {msg.isError
-            ? <p className="text-sm text-red-300 leading-relaxed">{msg.content}</p>
+            ? <p className="text-sm leading-relaxed">{msg.content}</p>
             : <MarkdownRenderer content={msg.content} />}
         </div>
         {!!msg.pointsAwarded && (
-          <div className="px-2">
+          <div>
             <span className="text-xs font-medium text-green-400">
               +{msg.pointsAwarded} pts ✓{isPremium && msg.pointsAwarded > 10 ? " ⚡" : ""}
             </span>
@@ -672,7 +669,7 @@ export function AskAI() {
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto space-y-4 px-4 py-5" style={{ minHeight: 0 }}>
+        <div className="flex-1 overflow-y-auto space-y-6 px-4 py-5" style={{ minHeight: 0 }}>
           {!hasChat && (
             <div className="flex flex-col items-center justify-center h-full gap-5 text-center px-4">
               <div className={`w-14 h-14 rounded-2xl flex items-center justify-center border ${currentMode.bg} ${currentMode.border}`}>
@@ -705,11 +702,11 @@ export function AskAI() {
           )}
 
           {loading && (
-            <div className="flex gap-2 items-end">
-              <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 bg-gradient-to-br ${currentMode.id === 'math' ? 'from-blue-500 to-blue-600' : currentMode.id === 'coding' ? 'from-green-500 to-emerald-600' : currentMode.id === 'science' ? 'from-cyan-500 to-cyan-600' : 'from-purple-500 to-blue-600'}`}>
+            <div className="flex gap-3 items-start w-full">
+              <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 bg-gradient-to-br ${currentMode.id === 'math' ? 'from-blue-500 to-blue-600' : currentMode.id === 'coding' ? 'from-green-500 to-emerald-600' : currentMode.id === 'science' ? 'from-cyan-500 to-cyan-600' : 'from-purple-500 to-blue-600'}`}>
                 <currentMode.icon className="w-3.5 h-3.5 text-white" />
               </div>
-              <div className="rounded-2xl rounded-bl-sm px-4 py-3 border border-white/10 bg-white/[0.04] flex items-center gap-3">
+              <div className="flex-1 flex items-center gap-3 pt-1">
                 <div className="flex gap-1">
                   {[0,150,300].map(d => <span key={d} className={`w-1.5 h-1.5 rounded-full animate-bounce ${currentMode.id === 'math' ? 'bg-blue-400' : currentMode.id === 'coding' ? 'bg-green-400' : currentMode.id === 'science' ? 'bg-cyan-400' : 'bg-blue-400'}`} style={{ animationDelay: `${d}ms` }} />)}
                 </div>
