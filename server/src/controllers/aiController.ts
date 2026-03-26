@@ -1,13 +1,10 @@
 // ─────────────────────────────────────────────────────────────
-// StudyEarn AI — AI Controller (AI Study OS Upgraded)
-// ─────────────────────────────────────────────────────────────
-// Route handlers: POST /api/ai/ask, POST /api/ai/solve-pdf
-// Business logic → aiService / contextTutorService mein hai
+// AI Study OS — AI Controller (v2 Upgraded)
 // ─────────────────────────────────────────────────────────────
 
 import { Request, Response } from 'express';
 import { solveText, solveWithVision, ChatMessage } from '../services/aiService.js';
-import { contextAwareSolve } from '../services/contextTutorService.js';
+import { contextAwareSolve, SubjectMode } from '../services/contextTutorService.js';
 import { parsePDFText } from '../services/pdfService.js';
 import { getUserIdFromToken } from '../middleware/authMiddleware.js';
 import { User } from '../models/User.model.js';
@@ -16,72 +13,44 @@ import { syncActivityToProfile } from '../services/studentProfileService.js';
 import { logger } from '../utils/logger.js';
 
 // ─────────────────────────────────────────────────────────────
-// PREMIUM CONSTANTS — change here, applies everywhere
+// CONSTANTS
 // ─────────────────────────────────────────────────────────────
-const BASE_AI_POINTS      = 10;   // free = 10pts, premium = 20pts
+const BASE_AI_POINTS      = 10;
 const PREMIUM_MULTIPLIER  = 2;
-const FREE_DAILY_LIMIT    = 15;   // 15 questions/day free
-const PREMIUM_DAILY_LIMIT = 30;   // 30 questions/day premium (2x)
-const REFILL_INTERVAL_MS  = 60 * 60 * 1000; // 1 hour in ms
-const MAX_VIDEO_ADS_DAY   = 5;    // max 5 bonus questions via video/day
+const FREE_DAILY_LIMIT    = 15;
+const PREMIUM_DAILY_LIMIT = 30;
+const REFILL_INTERVAL_MS  = 60 * 60 * 1000;
+const MAX_VIDEO_ADS_DAY   = 5;
 
-// ─────────────────────────────────────────────────────────────
-// Midnight IST mein din badla ya nahi
-// ─────────────────────────────────────────────────────────────
 function getTodayIST(): string {
-  // IST = UTC+5:30
   const now = new Date();
-  const istOffset = 5.5 * 60 * 60 * 1000;
-  const ist = new Date(now.getTime() + istOffset);
-  return ist.toISOString().split('T')[0]; // 'YYYY-MM-DD'
+  return new Date(now.getTime() + 5.5 * 60 * 60 * 1000).toISOString().split('T')[0];
 }
 
-// ─────────────────────────────────────────────────────────────
-// Hourly refill: questionUsedAt array check karo
-// Jo timestamps 1hr se purane hain unhe remove karo aur
-// questionsLeft ko recalculate karo
-// ─────────────────────────────────────────────────────────────
 function applyHourlyRefill(user: any, dailyLimit: number): void {
-  const now = Date.now();
-  const cutoff = now - REFILL_INTERVAL_MS;
-
-  // Sirf last 1hr ke andar use hue questions count karo
-  const recentUsed: Date[] = (user.questionUsedAt || [])
-    .filter((t: Date) => new Date(t).getTime() > cutoff);
-
-  user.questionUsedAt = recentUsed;
-
-  // questionsLeft = dailyLimit - recentUsed (can't go below 0 or above limit)
-  const used = recentUsed.length;
-  user.questionsLeft = Math.max(0, Math.min(dailyLimit, dailyLimit - used));
+  const cutoff    = Date.now() - REFILL_INTERVAL_MS;
+  const recent    = (user.questionUsedAt || []).filter((t: Date) => new Date(t).getTime() > cutoff);
+  user.questionUsedAt = recent;
+  user.questionsLeft  = Math.max(0, Math.min(dailyLimit, dailyLimit - recent.length));
 }
 
 function isPremiumValid(user: any): boolean {
-  if (!user.isPremium) return false;
-  if (!user.premiumExpiresAt) return false;
+  if (!user.isPremium || !user.premiumExpiresAt) return false;
   if (new Date(user.premiumExpiresAt) < new Date()) {
-    // expired — clear it in-place (caller must save)
-    user.isPremium = false;
-    user.premiumExpiresAt = null;
-    return false;
+    user.isPremium = false; user.premiumExpiresAt = null; return false;
   }
   return true;
 }
 
-// ─────────────────────────────────────────────────────────────
-// Next refill time — seconds until oldest used question expires
-// ─────────────────────────────────────────────────────────────
 function getNextRefillSecs(user: any): number {
   const used: Date[] = user.questionUsedAt || [];
   if (used.length === 0) return 0;
-  const oldest = Math.min(...used.map((t: Date) => new Date(t).getTime()));
-  const refillAt = oldest + REFILL_INTERVAL_MS;
-  return Math.max(0, Math.ceil((refillAt - Date.now()) / 1000));
+  const oldest  = Math.min(...used.map((t: Date) => new Date(t).getTime()));
+  return Math.max(0, Math.ceil((oldest + REFILL_INTERVAL_MS - Date.now()) / 1000));
 }
 
 async function handleQuestionUsed(
-  req: Request,
-  promptText = '',
+  req: Request, promptText = '',
 ): Promise<{ questionsLeft: number; pointsAwarded: number; nextRefillSecs: number } | null> {
   const userId = getUserIdFromToken(req);
   if (!userId) return null;
@@ -94,15 +63,13 @@ async function handleQuestionUsed(
     const today      = getTodayIST();
     const dailyLimit = premium ? PREMIUM_DAILY_LIMIT : FREE_DAILY_LIMIT;
 
-    // ── Midnight IST reset ──────────────────────────────────
     if ((user as any).questionsDate !== today) {
-      (user as any).questionsDate   = today;
-      (user as any).questionUsedAt  = [];
-      (user as any).videoAdsToday   = 0;
-      (user as any).videoAdsDate    = today;
+      (user as any).questionsDate  = today;
+      (user as any).questionUsedAt = [];
+      (user as any).videoAdsToday  = 0;
+      (user as any).videoAdsDate   = today;
     }
 
-    // ── Apply hourly refill ─────────────────────────────────
     applyHourlyRefill(user, dailyLimit);
 
     if ((user as any).questionsLeft <= 0) {
@@ -110,37 +77,29 @@ async function handleQuestionUsed(
       return { questionsLeft: 0, pointsAwarded: 0, nextRefillSecs: getNextRefillSecs(user) };
     }
 
-    // ── Deduct 1 question ───────────────────────────────────
     (user as any).questionUsedAt = [...((user as any).questionUsedAt || []), new Date()];
-    applyHourlyRefill(user, dailyLimit); // recalculate after push
+    applyHourlyRefill(user, dailyLimit);
 
-    // ── Points ──────────────────────────────────────────────
     const pts = premium ? BASE_AI_POINTS * PREMIUM_MULTIPLIER : BASE_AI_POINTS;
-    user.points                       += pts;
-    (user as any).totalXP              = ((user as any).totalXP || 0) + pts;
-    (user as any).totalQuestionsAsked  = ((user as any).totalQuestionsAsked || 0) + 1;
-
+    user.points                      += pts;
+    (user as any).totalXP             = ((user as any).totalXP || 0) + pts;
+    (user as any).totalQuestionsAsked = ((user as any).totalQuestionsAsked || 0) + 1;
     await user.save();
 
-    // Clean prompt — hide internal system instructions
-    const isInternalPrompt = promptText.startsWith('{') || promptText.startsWith('[') ||
-      promptText.toLowerCase().startsWith('output only') ||
-      promptText.toLowerCase().startsWith('create') && promptText.includes('json');
-    const cleanPrompt = isInternalPrompt ? '' : promptText.trim();
-    const activityDetails = cleanPrompt
+    const isInternal = promptText.startsWith('{') || promptText.startsWith('[') ||
+      promptText.toLowerCase().startsWith('output only');
+    const cleanPrompt   = isInternal ? '' : promptText.trim();
+    const activityDetail = cleanPrompt
       ? `Asked: ${cleanPrompt.substring(0, 80)}${cleanPrompt.length > 80 ? '…' : ''}`
       : 'Asked an AI question';
-    await Activity.create({ userId, action: 'ask_question', details: activityDetails, pointsEarned: pts });
+
+    await Activity.create({ userId, action: 'ask_question', details: activityDetail, pointsEarned: pts });
     logger.info(`AI question: ${user.email} | premium=${premium} | +${pts}pts | left=${(user as any).questionsLeft}`);
 
-    // ── Sync to AI Brain profile (non-blocking) ─────────────
+    // Sync to Brain profile (non-blocking)
     syncActivityToProfile(userId, 'ask_question', pts).catch(() => {});
 
-    return {
-      questionsLeft:   (user as any).questionsLeft,
-      pointsAwarded:   pts,
-      nextRefillSecs:  getNextRefillSecs(user),
-    };
+    return { questionsLeft: (user as any).questionsLeft, pointsAwarded: pts, nextRefillSecs: getNextRefillSecs(user) };
   } catch (err: any) {
     logger.error({ err: err.message }, 'handleQuestionUsed error');
     return null;
@@ -148,50 +107,51 @@ async function handleQuestionUsed(
 }
 
 // ─────────────────────────────────────────────────────────────
-// POST /api/ai/ask — text ya image question
+// POST /api/ai/ask
 // ─────────────────────────────────────────────────────────────
 export async function askAI(req: Request, res: Response) {
   try {
-    const { prompt, image, history = [] } = req.body;
-    // Sanitize history — only last 10 messages, only user/assistant roles
+    const {
+      prompt,
+      image,
+      history = [],
+      subjectMode,  // NEW: 'auto' | 'math' | 'coding' | 'science' | 'general'
+      stepByStep,   // NEW: boolean
+    } = req.body;
+
     const safeHistory: ChatMessage[] = (Array.isArray(history) ? history : [])
       .slice(-10)
       .filter((m: any) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
       .map((m: any) => ({ role: m.role as 'user' | 'assistant', content: m.content.slice(0, 2000) }));
+
     if (!prompt && !image) {
       return res.status(400).json({ success: false, answer: 'Please enter a question or upload an image.' });
     }
 
     const imgSizeKB = image ? Math.round(image.length * 0.75 / 1024) : 0;
-    logger.info(`/api/ai/ask  image=${!!image}(${imgSizeKB}KB)  prompt="${(prompt || '').substring(0, 60)}"`);
+    logger.info(`/api/ai/ask  image=${!!image}(${imgSizeKB}KB)  mode=${subjectMode||'auto'}  step=${!!stepByStep}  prompt="${(prompt || '').substring(0, 60)}"`);
 
-    // ── Get userId for context-aware tutor ──────────────────
     const userId = getUserIdFromToken(req) ?? '';
-
     let answer: string;
 
     if (image) {
-      // Vision questions still use solveWithVision (image context)
-      let imageUrl: string;
-      if (image.startsWith('data:')) {
-        imageUrl = image;
-      } else if (image.startsWith('/9j/') || image.startsWith('iVBOR')) {
+      // Image → vision solver (unchanged)
+      let imageUrl = image;
+      if (!image.startsWith('data:')) {
         const isJpeg = image.startsWith('/9j/');
         imageUrl = `data:image/${isJpeg ? 'jpeg' : 'png'};base64,${image}`;
-      } else {
-        imageUrl = `data:image/jpeg;base64,${image}`;
       }
-
-      if (imgSizeKB > 4000) logger.warn(`Large image: ${imgSizeKB}KB — may be slow`);
+      if (imgSizeKB > 4000) logger.warn(`Large image: ${imgSizeKB}KB`);
       answer = await solveWithVision(imageUrl, prompt || '');
     } else {
-      // ── Context-Aware AI Tutor — uses student profile ──────
-      // Falls back to generic solveText if no profile found
+      // Text → context-aware tutor with subject mode + step-by-step
       if (userId) {
         try {
-          answer = await contextAwareSolve(userId, prompt, safeHistory);
+          answer = await contextAwareSolve(userId, prompt, safeHistory, {
+            subjectMode: (subjectMode as SubjectMode) || 'auto',
+            stepByStep:  !!stepByStep,
+          });
         } catch {
-          // If context tutor fails, fall back to original solveText
           answer = await solveText(prompt, safeHistory);
         }
       } else {
@@ -217,7 +177,7 @@ export async function askAI(req: Request, res: Response) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// POST /api/ai/solve-pdf — PDF upload karke AI se solve karao
+// POST /api/ai/solve-pdf
 // ─────────────────────────────────────────────────────────────
 export async function solvePDF(req: Request, res: Response) {
   try {
@@ -231,32 +191,25 @@ export async function solvePDF(req: Request, res: Response) {
     if (!extracted || extracted.length < 20) {
       return res.json({
         success: false,
-        answer: '❌ Could not extract text from this PDF. It appears to be a scanned or image-based PDF.\n\n**Solution:** Take a screenshot of the PDF pages and upload as an image instead — AI can then read and solve it directly.',
+        answer: '❌ Could not extract text from this PDF. It appears to be a scanned or image-based PDF.\n\n**Solution:** Take a screenshot of the PDF pages and upload as an image instead.',
       });
     }
 
-    logger.info(`Extracted ${extracted.length} chars from PDF`);
-
     const MAX_CHARS = 14000;
     const text = extracted.length > MAX_CHARS
-      ? extracted.substring(0, MAX_CHARS) + '\n\n[... rest of document truncated ...]'
+      ? extracted.substring(0, MAX_CHARS) + '\n\n[... rest truncated ...]'
       : extracted;
 
     const solvePrompt = userPrompt
-      ? `The student says: "${userPrompt}"\n\nHere is the PDF content:\n\n${text}\n\nHelp the student as requested. Be complete and thorough.`
-      : `Here is the content of a PDF document/question paper:\n\n${text}\n\nFind ALL questions in this document and solve each one completely, step-by-step with full working. Number your answers to match the original question numbers.`;
+      ? `The student says: "${userPrompt}"\n\nPDF content:\n\n${text}\n\nHelp the student as requested. Be complete.`
+      : `PDF content:\n\n${text}\n\nFind ALL questions and solve each completely, step-by-step. Number answers to match questions.`;
 
     const answer     = await solveText(solvePrompt);
     const userAction = await handleQuestionUsed(req, userPrompt.substring(0, 100));
 
     res.json({
-      success: true,
-      answer,
-      ...(userAction ? {
-        questionsLeft:  userAction.questionsLeft,
-        pointsAwarded:  userAction.pointsAwarded,
-        nextRefillSecs: userAction.nextRefillSecs,
-      } : {}),
+      success: true, answer,
+      ...(userAction ? { questionsLeft: userAction.questionsLeft, pointsAwarded: userAction.pointsAwarded, nextRefillSecs: userAction.nextRefillSecs } : {}),
     });
   } catch (error: any) {
     logger.error({ err: error.message }, '/api/ai/solve-pdf error');
@@ -265,7 +218,7 @@ export async function solvePDF(req: Request, res: Response) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// POST /api/ai/watch-ad — fake video ad → +1 question
+// POST /api/ai/watch-ad
 // ─────────────────────────────────────────────────────────────
 export async function watchAd(req: Request, res: Response) {
   const userId = getUserIdFromToken(req);
@@ -279,32 +232,21 @@ export async function watchAd(req: Request, res: Response) {
     const today      = getTodayIST();
     const dailyLimit = premium ? PREMIUM_DAILY_LIMIT : FREE_DAILY_LIMIT;
 
-    // Reset if new day
     if ((user as any).videoAdsDate !== today) {
       (user as any).videoAdsToday = 0;
       (user as any).videoAdsDate  = today;
     }
 
-    // Max 5 video ads per day
     if ((user as any).videoAdsToday >= MAX_VIDEO_ADS_DAY) {
-      return res.json({
-        success: false,
-        message: `Max ${MAX_VIDEO_ADS_DAY} video bonuses per day reached. Come back tomorrow!`,
-        questionsLeft: (user as any).questionsLeft,
-      });
+      return res.json({ success: false, message: `Max ${MAX_VIDEO_ADS_DAY} video bonuses per day reached.`, questionsLeft: (user as any).questionsLeft });
     }
 
-    // Already at full quota?
     applyHourlyRefill(user, dailyLimit);
+
     if ((user as any).questionsLeft >= dailyLimit) {
-      return res.json({
-        success: false,
-        message: 'You already have full questions! No need to watch an ad.',
-        questionsLeft: (user as any).questionsLeft,
-      });
+      return res.json({ success: false, message: 'You already have full questions!', questionsLeft: (user as any).questionsLeft });
     }
 
-    // Grant +1 question by removing the oldest questionUsedAt entry
     const used: Date[] = (user as any).questionUsedAt || [];
     if (used.length > 0) {
       used.sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
@@ -313,16 +255,14 @@ export async function watchAd(req: Request, res: Response) {
 
     (user as any).videoAdsToday = ((user as any).videoAdsToday || 0) + 1;
     applyHourlyRefill(user, dailyLimit);
-
     await user.save();
 
     logger.info(`Video ad: ${(user as any).email} | +1 question | left=${(user as any).questionsLeft}`);
 
     return res.json({
-      success:       true,
-      message:       '+1 question unlocked! Keep studying! 🎓',
+      success: true, message: '+1 question unlocked! Keep studying! 🎓',
       questionsLeft: (user as any).questionsLeft,
-      videoAdsLeft:  MAX_VIDEO_ADS_DAY - (user as any).videoAdsToday,
+      videoAdsLeft: MAX_VIDEO_ADS_DAY - (user as any).videoAdsToday,
       nextRefillSecs: getNextRefillSecs(user),
     });
   } catch (err: any) {
@@ -332,7 +272,7 @@ export async function watchAd(req: Request, res: Response) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// GET /api/ai/quota — current quota status (for page load)
+// GET /api/ai/quota
 // ─────────────────────────────────────────────────────────────
 export async function getQuota(req: Request, res: Response) {
   const userId = getUserIdFromToken(req);
@@ -358,7 +298,7 @@ export async function getQuota(req: Request, res: Response) {
     await user.save();
 
     return res.json({
-      success:        true,
+      success: true,
       questionsLeft:  (user as any).questionsLeft,
       dailyLimit,
       nextRefillSecs: getNextRefillSecs(user),
