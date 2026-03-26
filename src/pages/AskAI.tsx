@@ -599,7 +599,7 @@ export function AskAI() {
   // RENDER
   // ─────────────────────────────────────────────────────────
   return (
-    <div className="flex absolute inset-0" style={{ paddingBottom: "calc(4.5rem + env(safe-area-inset-bottom))" }} data-ask-ai-root="true">
+    <div className="flex absolute inset-0">
 
       {/* Sidebar overlay */}
       {sidebarOpen && <div className="fixed inset-0 z-40 bg-black/60 md:hidden" onClick={() => setSidebarOpen(false)} />}
