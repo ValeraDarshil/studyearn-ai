@@ -475,3 +475,41 @@ html, body {
     font-size: 14px;
   }
 }
+
+/* ═══════════════════════════════════════════
+   MOBILE KEYBOARD FIX — Input never hidden behind bottom nav
+   Works on Android Chrome + iOS Safari
+═══════════════════════════════════════════ */
+
+/* When keyboard is open on Android, viewport height shrinks via dvh.
+   We hide the bottom nav so the chat input gets full space. */
+@media (max-width: 767px) {
+  /* AskAI full-screen chat — no bottom padding when keyboard visible */
+  [data-ask-ai-root="true"] {
+    /* Use dvh (dynamic viewport height) — shrinks when keyboard opens */
+    height: 100dvh;
+    padding-bottom: 0 !important;
+  }
+
+  /* Hide bottom nav when virtual keyboard is open.
+     Keyboard open = window.innerHeight < screen.height * 0.75
+     We detect this via the .keyboard-open class added by JS */
+  body.keyboard-open nav[data-bottom-nav] {
+    transform: translateY(100%) !important;
+    pointer-events: none !important;
+  }
+
+  /* When keyboard NOT open, AskAI should account for bottom nav */
+  body:not(.keyboard-open) [data-ask-ai-root="true"] {
+    padding-bottom: calc(4.5rem + env(safe-area-inset-bottom)) !important;
+  }
+}
+
+/* iOS Safari — use dvh to handle keyboard resize */
+@supports (height: 100dvh) {
+  @media (max-width: 767px) {
+    [data-ask-ai-root="true"] {
+      height: 100dvh;
+    }
+  }
+}

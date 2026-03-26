@@ -457,7 +457,7 @@
 //   );
 // }
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import {
   Brain,
@@ -498,6 +498,34 @@ export function DashboardLayout() {
   } = useApp();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profileHovered, setProfileHovered] = useState(false);
+
+  // ── Keyboard detection — hide bottom nav when virtual keyboard is open ──
+  useEffect(() => {
+    const THRESHOLD = 0.75; // if visible height < 75% of screen, keyboard is open
+
+    const handleResize = () => {
+      const isKeyboardOpen = window.visualViewport
+        ? window.visualViewport.height < window.screen.height * THRESHOLD
+        : window.innerHeight < window.screen.height * THRESHOLD;
+      document.body.classList.toggle("keyboard-open", isKeyboardOpen);
+    };
+
+    // Use visualViewport API for best results (supported on all modern mobile browsers)
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener("resize", handleResize);
+    } else {
+      window.addEventListener("resize", handleResize);
+    }
+
+    return () => {
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener("resize", handleResize);
+      } else {
+        window.removeEventListener("resize", handleResize);
+      }
+      document.body.classList.remove("keyboard-open");
+    };
+  }, []);
 
   // Bottom nav — only 5 primary items for clean mobile UX
   const bottomNavItems = [
@@ -872,6 +900,7 @@ export function DashboardLayout() {
 
       {/* Mobile Bottom Navigation */}
       <nav
+        data-bottom-nav="true"
         className={`md:hidden fixed bottom-0 left-0 right-0 z-20 border-t border-white/8 transition-transform duration-300 ${sidebarOpen ? "translate-y-full pointer-events-none" : "translate-y-0"}`}
         style={{
           paddingBottom: "env(safe-area-inset-bottom)",
