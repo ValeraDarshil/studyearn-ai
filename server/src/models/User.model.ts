@@ -1,14 +1,8 @@
 /**
-
  * StudyEarn AI — User Model
-
  */
 
-
-
 import mongoose from 'mongoose';
-
-
 
 const userSchema = new mongoose.Schema({
 
@@ -123,6 +117,12 @@ const userSchema = new mongoose.Schema({
 
   // ── Onboarding Tour ───────────────────────────────────────
   onboardingCompleted: { type: Boolean, default: false },
+
+  // ── AI Study OS — Brain Setup ─────────────────────────────
+  // true jab user ne learner category setup kar li ho (school/coding/college/self)
+  // Yeh DB mein save hota hai — localStorage pe depend nahi karte
+  // Isse bar bar onboarding nahi aata login karne par
+  brainSetupCompleted: { type: Boolean, default: false },
 
 });
 
