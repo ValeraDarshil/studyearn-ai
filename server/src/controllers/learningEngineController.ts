@@ -24,6 +24,8 @@ import {
   getDifficultySettings,
   onQuizComplete,
 } from '../services/learningSystem/personalLearningEngine.js';
+// ── Stage 4 connection ────────────────────────────────────────
+import { onActivityEvent } from '../services/progressSystem/progressAnalyzer.js';
 import { logger } from '../utils/logger.js';
 
 // ─────────────────────────────────────────────────────────────
@@ -204,6 +206,8 @@ export async function quizCompleted(req: Request, res: Response): Promise<void> 
 
   try {
     const result = await onQuizComplete(userId, topic, subject, score);
+    // Stage 4 — fire progress intelligence event (non-blocking)
+    onActivityEvent(userId, 'quiz_done', { topic, subject, score }).catch(() => {});
     res.json({
       success: true,
       recommendation:    result.recommendation,

@@ -27,6 +27,9 @@ import {
   getLatestReport,
   generateQuizAlert,
 } from '../services/progressIntelService.js';
+// ── Stage 4 connection ────────────────────────────────────────
+import { onActivityEvent } from '../services/progressSystem/progressAnalyzer.js';
+import { onQuizComplete }  from '../services/learningSystem/personalLearningEngine.js';
 import { User } from '../models/User.model.js';
 import { logger } from '../utils/logger.js';
 
@@ -283,6 +286,7 @@ export async function submitQuizResult(req: Request, res: Response): Promise<voi
   }
 
   try {
+    // Stage 1 — Update topic mastery in AI Brain
     await updateTopicMastery(userId, {
       subject,
       topic,
@@ -293,7 +297,14 @@ export async function submitQuizResult(req: Request, res: Response): Promise<voi
 
     await syncActivityToProfile(userId, 'quiz_completed', 20);
 
+    // Stage 1 — Original quiz alert
     const alert = await generateQuizAlert(userId, topic, subject, score);
+
+    // Stage 3 + 4 — Fire adaptive cycle in background (non-blocking)
+    Promise.all([
+      onQuizComplete(userId, topic, subject, score),              // Stage 3
+      onActivityEvent(userId, 'quiz_done', { topic, subject, score }), // Stage 4
+    ]).catch(() => {});
 
     res.json({ success: true, alert, masteryUpdated: true });
   } catch (err: any) {

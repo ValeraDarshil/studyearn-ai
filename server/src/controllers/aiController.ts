@@ -11,6 +11,8 @@ import { getUserIdFromToken } from '../middleware/authMiddleware.js';
 import { User } from '../models/User.model.js';
 import { Activity } from '../models/Activity.model.js';
 import { syncActivityToProfile } from '../services/studentProfileService.js';
+// ── Stage 4 connection ────────────────────────────────────────
+import { onActivityEvent } from '../services/progressSystem/progressAnalyzer.js';
 import { logger } from '../utils/logger.js';
 
 // ─────────────────────────────────────────────────────────────
@@ -99,6 +101,8 @@ async function handleQuestionUsed(
 
     // Sync to Brain profile (non-blocking)
     syncActivityToProfile(userId, 'ask_question', pts).catch(() => {});
+    // Stage 4 — fire progress event (non-blocking)
+    onActivityEvent(userId, 'ai_tutor_used', { topic: activityDetail }).catch(() => {});
 
     return { questionsLeft: (user as any).questionsLeft, pointsAwarded: pts, nextRefillSecs: getNextRefillSecs(user) };
   } catch (err: any) {
