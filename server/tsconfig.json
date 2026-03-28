@@ -8,6 +8,7 @@
     "skipLibCheck": true,
     "noEmitOnError": false,
     "resolveJsonModule": true,
+    "rootDir": "src",
     "outDir": "dist",
     "allowSyntheticDefaultImports": true,
     "typeRoots": ["./node_modules/@types", "./src/types"]

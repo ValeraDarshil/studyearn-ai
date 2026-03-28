@@ -1,10 +1,11 @@
 // ─────────────────────────────────────────────────────────────
-// AI Study OS — AI Controller (v2 Upgraded)
+// AI Study OS — AI Controller (v3 — Personal AI Tutor)
 // ─────────────────────────────────────────────────────────────
 
 import { Request, Response } from 'express';
 import { solveText, solveWithVision, ChatMessage } from '../services/aiService.js';
 import { contextAwareSolve, SubjectMode } from '../services/contextTutorService.js';
+import { personalTutorSolve }             from '../services/aiTutor/aiTutor.service.js';
 import { parsePDFText } from '../services/pdfService.js';
 import { getUserIdFromToken } from '../middleware/authMiddleware.js';
 import { User } from '../models/User.model.js';
@@ -115,8 +116,11 @@ export async function askAI(req: Request, res: Response) {
       prompt,
       image,
       history = [],
-      subjectMode,  // NEW: 'auto' | 'math' | 'coding' | 'science' | 'general'
-      stepByStep,   // NEW: boolean
+      subjectMode,    // 'auto' | 'math' | 'coding' | 'science' | 'general'
+      stepByStep,     // boolean (legacy, still supported)
+      personality,    // NEW: 'friendly' | 'strict' | 'mentor' | 'coach'
+      hintMode,       // NEW: boolean — force hint-based learning
+      recentActivity, // NEW: 'coding' | 'quiz' | 'ask' — context signal
     } = req.body;
 
     const safeHistory: ChatMessage[] = (Array.isArray(history) ? history : [])
@@ -133,6 +137,7 @@ export async function askAI(req: Request, res: Response) {
 
     const userId = getUserIdFromToken(req) ?? '';
     let answer: string;
+    let tutorMeta: { followUpQ?: string | null; learningMode?: string; hintMode?: boolean; detectedTopic?: string | null } = {};
 
     if (image) {
       // Image → vision solver (unchanged)
@@ -144,15 +149,34 @@ export async function askAI(req: Request, res: Response) {
       if (imgSizeKB > 4000) logger.warn(`Large image: ${imgSizeKB}KB`);
       answer = await solveWithVision(imageUrl, prompt || '');
     } else {
-      // Text → context-aware tutor with subject mode + step-by-step
+      // Text → Personal AI Tutor (Stage 2 upgrade)
       if (userId) {
         try {
-          answer = await contextAwareSolve(userId, prompt, safeHistory, {
-            subjectMode: (subjectMode as SubjectMode) || 'auto',
-            stepByStep:  !!stepByStep,
+          const tutorResponse = await personalTutorSolve({
+            userId,
+            message:         prompt,
+            history:         safeHistory,
+            personality:     personality || undefined,
+            hintOverride:    hintMode !== undefined ? !!hintMode : undefined,
+            recentActivity:  recentActivity || undefined,
           });
+          answer    = tutorResponse.answer;
+          tutorMeta = {
+            followUpQ:     tutorResponse.followUpQ,
+            learningMode:  tutorResponse.learningMode,
+            hintMode:      tutorResponse.hintMode,
+            detectedTopic: tutorResponse.detectedTopic,
+          };
         } catch {
-          answer = await solveText(prompt, safeHistory);
+          // Fallback: contextAwareSolve (Stage 1), then plain AI
+          try {
+            answer = await contextAwareSolve(userId, prompt, safeHistory, {
+              subjectMode: (subjectMode as SubjectMode) || 'auto',
+              stepByStep:  !!stepByStep,
+            });
+          } catch {
+            answer = await solveText(prompt, safeHistory);
+          }
         }
       } else {
         answer = await solveText(prompt, safeHistory);
@@ -164,6 +188,12 @@ export async function askAI(req: Request, res: Response) {
     res.json({
       success: true,
       answer,
+      // AI Tutor metadata (Stage 2)
+      ...(tutorMeta.followUpQ     ? { followUpQ:     tutorMeta.followUpQ }     : {}),
+      ...(tutorMeta.learningMode  ? { learningMode:  tutorMeta.learningMode }  : {}),
+      ...(tutorMeta.hintMode !== undefined ? { hintMode: tutorMeta.hintMode }  : {}),
+      ...(tutorMeta.detectedTopic ? { detectedTopic: tutorMeta.detectedTopic } : {}),
+      // Quota info
       ...(userAction ? {
         questionsLeft:  userAction.questionsLeft,
         pointsAwarded:  userAction.pointsAwarded,
