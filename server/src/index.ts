@@ -203,6 +203,7 @@ import notesRoutes       from './routes/notesRoutes.js';
 
 // ── AI Study OS — Brain System ────────────────────────────────
 import brainRoutes       from './routes/brainRoutes.js';
+import learningRoutes    from './routes/learningEngineRoutes.js';
 
 import { fixStuckRedemptions, processPendingPremiums } from './controllers/rewardsController.js';
 
@@ -269,8 +270,10 @@ app.use('/api/study',       studyToolsRoutes);
 app.use('/api/notes',       notesRoutes);
 app.use('/api/codelearn',   codelearnRoutes);
 
-// ── AI Study OS Brain System (NEW) ───────────────────────────
+// ── AI Study OS Brain System ──────────────────────────────────
 app.use('/api/brain',       brainRoutes);
+// ── AI Study OS Stage 3 — Personal Learning Engine ───────────
+app.use('/api/learn',       learningRoutes);
 
 /* ─── 9. GLOBAL ERROR HANDLER (SABSE LAST) ─────────────── */
 app.use(errorHandler);
@@ -284,7 +287,9 @@ connectDB().then(() => {
     logger.info('✅ PDF Ready       (pdf-lib + sharp)');
     logger.info('✅ Auth Ready      (JWT + bcrypt)');
     logger.info('✅ Sentry Ready    (error tracking)');
-    logger.info('✅ AI Brain Ready  (AI Study OS)');
+    logger.info('✅ AI Brain Ready  (AI Study OS Stage 1)');
+    logger.info('✅ AI Tutor Ready  (AI Study OS Stage 2)');
+    logger.info('✅ Learn Engine Ready (AI Study OS Stage 3)');
   });
 
   fixStuckRedemptions()
