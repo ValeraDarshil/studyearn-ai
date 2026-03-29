@@ -1,18 +1,20 @@
 /**
  * StudyEarn AI — Analytics Dashboard
  * Progress graphs, weak subjects tracker, study stats
- * Pure React — no external chart libraries
- * ✅ Fixed: All data from server activity feed (no localStorage)
+ * ✅ Updated: Stage 4 Progress Intelligence integrated
  */
 import { useState, useEffect, useMemo } from "react";
 import {
   TrendingUp, Brain, Presentation, FileText, Trophy,
   Flame, Target, Calendar, Award, ChevronUp, ChevronDown, Zap,
-  BookOpen, HelpCircle, BarChart2
+  BookOpen, HelpCircle, BarChart2, Sparkles, AlertTriangle,
+  ArrowUp, ArrowDown, Star, Activity as ActivityIcon
 } from "lucide-react";
 import { useApp } from "../context/AppContext";
 import { getRecentActivity } from "../utils/user-api";
 import { calculateLevel, getLevelTier, getLevelColor } from "../utils/level-utils";
+// Stage 4 — Progress Intelligence
+import { getProgressSnapshot, getInsightCards, type InsightCard, type ProgressScore } from "../utils/progress-api";
 
 // ─────────────────────────────────────────────────────────────
 // TYPES
@@ -191,13 +193,29 @@ export function Analytics() {
   const { points, totalXP, streak, userStats, unlockedAchievements, userName } = useApp();
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading]       = useState(true);
-  const [activeTab, setActiveTab]   = useState<"overview" | "subjects" | "activity">("overview");
+  const [activeTab, setActiveTab]   = useState<"overview" | "subjects" | "activity" | "ai-insights">("overview");
 
-  // Load ALL activities (server returns last 50 — enough for 7-day + 30-day stats)
+  // Stage 4 — Progress Intelligence state
+  const [progressScore,    setProgressScore]    = useState<ProgressScore | null>(null);
+  const [insightCards,     setInsightCards]      = useState<InsightCard[]>([]);
+  const [loadingInsights,  setLoadingInsights]   = useState(true);
+
+  // Load activities
   useEffect(() => {
     getRecentActivity().then((d) => {
       if (d.success) setActivities(d.activities || []);
     }).finally(() => setLoading(false));
+  }, []);
+
+  // Stage 4 — Load progress snapshot + insights
+  useEffect(() => {
+    Promise.all([
+      getProgressSnapshot(),
+      getInsightCards(),
+    ]).then(([snapRes, insightRes]) => {
+      if (snapRes.success && snapRes.score) setProgressScore(snapRes.score);
+      if (insightRes.success) setInsightCards(insightRes.cards || []);
+    }).catch(() => {}).finally(() => setLoadingInsights(false));
   }, []);
 
   // ── Derived stats ──────────────────────────────────────────
@@ -316,11 +334,11 @@ export function Analytics() {
 
       {/* Tabs */}
       <div className="flex gap-1 p-1 bg-white/[0.03] rounded-xl border border-white/5 overflow-x-auto scrollbar-hide w-full sm:w-fit">
-        {(["overview", "subjects", "activity"] as const).map(tab => (
+        {(["overview", "subjects", "activity", "ai-insights"] as const).map(tab => (
           <button key={tab} onClick={() => setActiveTab(tab)}
-            className={`px-4 py-2 rounded-lg text-xs font-semibold capitalize transition-all
+            className={`px-4 py-2 rounded-lg text-xs font-semibold capitalize transition-all whitespace-nowrap
               ${activeTab === tab ? "bg-white/10 text-white" : "text-slate-500 hover:text-slate-300"}`}>
-            {tab}
+            {tab === "ai-insights" ? "🧠 AI Insights" : tab}
           </button>
         ))}
       </div>
@@ -654,6 +672,104 @@ export function Analytics() {
           </div>
         </div>
       )}
+
+      {/* ── AI INSIGHTS TAB (Stage 4) ──────────────────────── */}
+      {activeTab === "ai-insights" && (
+        <div className="space-y-5">
+
+          {/* Progress Score Card */}
+          {loadingInsights ? (
+            <div className="h-28 rounded-2xl bg-white/[0.02] border border-white/10 animate-pulse" />
+          ) : progressScore ? (
+            <div className="p-6 rounded-2xl bg-gradient-to-br from-violet-500/10 via-slate-900 to-slate-900 border border-violet-500/20">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <div className="text-violet-400 text-sm font-medium flex items-center gap-2 mb-1">
+                    <Sparkles className="w-4 h-4" /> AI Learning Score
+                  </div>
+                  <div className="text-4xl font-black text-white">
+                    {progressScore.tierIcon} {progressScore.total}
+                    <span className="text-slate-500 text-lg font-normal">/100</span>
+                  </div>
+                  <div className="text-slate-400 text-sm mt-1">{progressScore.tierLabel}</div>
+                </div>
+                <div className="text-right">
+                  <div className={`text-sm font-semibold ${progressScore.trend === "up" ? "text-emerald-400" : progressScore.trend === "down" ? "text-red-400" : "text-slate-400"}`}>
+                    {progressScore.trend === "up" ? <ArrowUp className="w-4 h-4 inline" /> : progressScore.trend === "down" ? <ArrowDown className="w-4 h-4 inline" /> : null}
+                    {" "}{progressScore.trend}
+                  </div>
+                  <div className="text-xs text-slate-500 mt-1">Next: {progressScore.nextMilestone}</div>
+                </div>
+              </div>
+              <p className="text-slate-400 text-sm">{progressScore.message}</p>
+
+              {/* Score Breakdown */}
+              <div className="grid grid-cols-5 gap-2 mt-4">
+                {Object.entries(progressScore.breakdown).map(([key, val]) => {
+                  const maxMap: Record<string, number> = { consistency: 25, performance: 30, activity: 20, improvement: 15, completion: 10 };
+                  const pct = Math.round((val / (maxMap[key] || 25)) * 100);
+                  return (
+                    <div key={key} className="text-center">
+                      <div className="text-xs text-slate-500 capitalize mb-1">{key.slice(0, 4)}</div>
+                      <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                        <div className="h-full bg-violet-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                      </div>
+                      <div className="text-xs text-slate-400 mt-1">{val}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            <div className="p-6 rounded-2xl bg-white/[0.02] border border-white/10 text-center">
+              <Star className="w-8 h-8 text-slate-600 mx-auto mb-2" />
+              <p className="text-slate-400 text-sm">Study to unlock your AI learning score</p>
+            </div>
+          )}
+
+          {/* Insight Cards */}
+          <div>
+            <h3 className="text-white font-semibold text-sm mb-3 flex items-center gap-2">
+              <Brain className="w-4 h-4 text-violet-400" /> AI Insights
+            </h3>
+            {loadingInsights ? (
+              <div className="space-y-2">
+                {[1, 2, 3].map(i => <div key={i} className="h-16 rounded-xl bg-white/[0.02] animate-pulse" />)}
+              </div>
+            ) : insightCards.length > 0 ? (
+              <div className="space-y-2">
+                {insightCards.map(card => {
+                  const borderColor = card.priority === "critical" ? "border-red-500/30" : card.priority === "high" ? "border-orange-500/30" : "border-slate-700/50";
+                  const bgColor    = card.priority === "critical" ? "bg-red-500/5" : card.priority === "high" ? "bg-orange-500/5" : "bg-white/[0.02]";
+                  return (
+                    <div key={card.id} className={`flex items-start gap-3 p-4 rounded-xl ${bgColor} border ${borderColor}`}>
+                      <span className="text-xl flex-shrink-0">{card.icon}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-white text-sm font-medium">{card.title}</p>
+                          {card.metric && (
+                            <span className="text-xs text-violet-400 bg-violet-500/10 px-2 py-0.5 rounded-full flex-shrink-0">{card.metric}</span>
+                          )}
+                        </div>
+                        <p className="text-slate-400 text-xs mt-0.5">{card.message}</p>
+                        {card.action && (
+                          <p className="text-violet-400 text-xs mt-1 font-medium">→ {card.action}</p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <ActivityIcon className="w-8 h-8 text-slate-600 mx-auto mb-2" />
+                <p className="text-slate-400 text-sm">No insights yet — keep studying to unlock AI insights!</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

@@ -1441,6 +1441,10 @@ function AppContent() {
         }
 
         getRecentActivity().then((d) => { if (d.success) setRecentActivity(d.activities); });
+        // Stage 4 — fire login progress event (non-blocking)
+        import("./utils/progress-api").then(({ trackProgressEvent }) => {
+          trackProgressEvent("login").catch(() => {});
+        }).catch(() => {});
 
         const streakDelay = shouldShowTour ? 0 : 1500;
         const streakCelebration = sessionStorage.getItem("streakCelebration");

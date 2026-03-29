@@ -11,6 +11,8 @@ import { useApp } from "../context/AppContext";
 import { API_URL } from "../utils/api";
 import { incrementAction } from "../utils/user-api";
 import { MarkdownRenderer } from "../components/MarkdownRenderer";
+// Stage 4 — track AI tutor usage for progress intelligence
+import { trackProgressEvent } from "../utils/progress-api";
 
 // ─── Types ────────────────────────────────────────────────────
 type Role = "user" | "assistant";
@@ -488,12 +490,16 @@ export function AskAI() {
           method: "POST",
           headers: { ...headers, "Content-Type": "application/json" },
           body: JSON.stringify({
-            prompt:      text || undefined,
-            image:       imageData,
-            history:     imageData ? [] : buildHistory(),
+            prompt:         text || undefined,
+            image:          imageData,
+            history:        imageData ? [] : buildHistory(),
             userId,
-            subjectMode: imageData ? "auto" : subjectMode,  // NEW
-            stepByStep:  imageData ? false  : stepByStep,   // NEW
+            subjectMode:    imageData ? "auto" : subjectMode,
+            stepByStep:     imageData ? false  : stepByStep,
+            // Stage 2 — AI Tutor params
+            personality:    "friendly",
+            hintMode:       subjectMode === "math" || subjectMode === "coding" ? false : undefined,
+            recentActivity: subjectMode === "coding" ? "coding" : "ask",
           }),
         });
         result = await res.json();
@@ -503,7 +509,7 @@ export function AskAI() {
         role:        "assistant",
         content:     result.answer || "No answer received. Please try again.",
         isError:     !result.success,
-        subjectMode: subjectMode,  // Save mode in message
+        subjectMode: subjectMode,
       };
 
       if (result.success) {
@@ -516,6 +522,11 @@ export function AskAI() {
         setUserStats({ ...userStats, totalQuestionsAsked: newTotal });
         incrementAction("question");
         checkAndUnlockAchievements({ totalQuestionsAsked: newTotal });
+        // Stage 4 — fire progress event (non-blocking)
+        trackProgressEvent("ai_tutor_used", {
+          topic: (result as any).detectedTopic || undefined,
+          mode:  (result as any).learningMode  || subjectMode,
+        }).catch(() => {});
       }
 
       const finalMessages = [...newMessages, aiMsg];

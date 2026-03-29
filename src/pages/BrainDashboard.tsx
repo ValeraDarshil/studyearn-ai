@@ -21,7 +21,7 @@ import {
   Brain, Target, TrendingUp, Zap, CheckCircle2, Clock, RefreshCw,
   ChevronRight, AlertTriangle, ArrowUp, ArrowDown, Minus, Calendar,
   BookOpen, Code2, GraduationCap, Star, BarChart2, Flame, Trophy,
-  Sparkles, Play, Lock
+  Sparkles, Play, Lock, Activity
 } from 'lucide-react';
 import {
   getStudentProfile, getTodayFocus, getLearningPath,
@@ -31,6 +31,10 @@ import {
   type WeeklyReport, type PerformanceAlert, type HeatmapDay,
 } from '../utils/brain-api';
 import { useApp } from '../context/AppContext';
+// Stage 3 — Learning Engine
+import { getDailyPlan, getPriorityTopics, type DailyPlan, type PriorityTopic } from '../utils/learn-api';
+// Stage 4 — Progress Intelligence
+import { getProgressScore, getInsightCards, type InsightCard } from '../utils/progress-api';
 
 // ── Helpers ────────────────────────────────────────────────────
 const CATEGORY_META = {
@@ -101,6 +105,12 @@ export function BrainDashboard() {
   const [loading,    setLoading]    = useState(true);
   const [genPath,    setGenPath]    = useState(false);
   const [activeTab,  setActiveTab]  = useState<'overview' | 'path' | 'mastery' | 'insights'>('overview');
+  // Stage 3 — Learning Engine state
+  const [dailyPlan,      setDailyPlan]      = useState<DailyPlan | null>(null);
+  const [priorityTopics, setPriorityTopics] = useState<PriorityTopic[]>([]);
+  // Stage 4 — Progress Intelligence state
+  const [progressScore,  setProgressScore]  = useState<{ total: number; tierLabel: string; tierIcon: string; trend: string; message: string } | null>(null);
+  const [insightCards,   setInsightCards]   = useState<InsightCard[]>([]);
 
   const loadAll = useCallback(async () => {
     setLoading(true);
@@ -119,6 +129,19 @@ export function BrainDashboard() {
       if (rRes.success)    setReport(rRes.report);
       if (aRes.success)    setAlerts(aRes.alerts);
       if (hRes.success)    setHeatmap(hRes.heatmap);
+
+      // Stage 3 + 4 — load in parallel (non-blocking, won't fail main load)
+      Promise.all([
+        getDailyPlan(),
+        getPriorityTopics(3),
+        getProgressScore(),
+        getInsightCards(),
+      ]).then(([dpRes, ptRes, psRes, icRes]) => {
+        if (dpRes.success && dpRes.plan) setDailyPlan(dpRes.plan);
+        if (ptRes.success) setPriorityTopics(ptRes.topics || []);
+        if (psRes.success && psRes.score) setProgressScore({ total: psRes.score, tierLabel: psRes.tier, tierIcon: psRes.icon, trend: psRes.trend, message: psRes.message });
+        if (icRes.success) setInsightCards(icRes.cards || []);
+      }).catch(() => {});
     } catch (e) {
       console.error('[BrainDashboard] load error:', e);
     } finally {
@@ -232,7 +255,105 @@ export function BrainDashboard() {
       {activeTab === 'overview' && (
         <div className="space-y-6">
 
-          {/* Today's Focus */}
+          {/* ── Stage 4: Progress Score Card ───────────────── */}
+          {progressScore && (
+            <div className="flex items-center gap-4 p-4 rounded-2xl bg-gradient-to-r from-violet-500/10 to-slate-900 border border-violet-500/20">
+              <div className="text-4xl">{progressScore.tierIcon}</div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-2xl font-black text-white">{progressScore.total}</span>
+                  <span className="text-slate-500 text-sm">/100</span>
+                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${progressScore.trend === 'up' ? 'text-emerald-400 bg-emerald-500/10' : progressScore.trend === 'down' ? 'text-red-400 bg-red-500/10' : 'text-slate-400 bg-slate-800'}`}>
+                    {progressScore.trend === 'up' ? '↑' : progressScore.trend === 'down' ? '↓' : '→'} {progressScore.trend}
+                  </span>
+                </div>
+                <p className="text-slate-400 text-xs mt-0.5">{progressScore.message}</p>
+              </div>
+              <div className="text-right">
+                <div className="text-violet-400 text-xs font-medium">AI Score</div>
+                <div className="text-white text-sm font-semibold">{progressScore.tierLabel}</div>
+              </div>
+            </div>
+          )}
+
+          {/* ── Stage 4: Top Insight Card ───────────────────── */}
+          {insightCards[0] && (
+            <div className={`flex items-start gap-3 p-4 rounded-xl border ${insightCards[0].priority === 'critical' ? 'border-red-500/30 bg-red-500/5' : insightCards[0].priority === 'high' ? 'border-orange-500/30 bg-orange-500/5' : 'border-slate-700/50 bg-slate-800/30'}`}>
+              <span className="text-2xl">{insightCards[0].icon}</span>
+              <div className="flex-1">
+                <p className="text-white text-sm font-medium">{insightCards[0].title}</p>
+                <p className="text-slate-400 text-xs mt-0.5">{insightCards[0].message}</p>
+                {insightCards[0].action && <p className="text-violet-400 text-xs mt-1">→ {insightCards[0].action}</p>}
+              </div>
+              {insightCards[0].metric && <span className="text-xs text-violet-400 bg-violet-500/10 px-2 py-1 rounded-full flex-shrink-0">{insightCards[0].metric}</span>}
+            </div>
+          )}
+
+          {/* ── Stage 3: Daily Learning Plan ───────────────── */}
+          {dailyPlan && dailyPlan.tasks.length > 0 && (
+            <div className="glass rounded-2xl p-5 border border-slate-700/50">
+              <div className="flex items-center justify-between mb-1">
+                <h3 className="text-white font-semibold flex items-center gap-2 text-sm">
+                  <Calendar className="w-4 h-4 text-emerald-400" /> Today's AI Study Plan
+                </h3>
+                <span className="text-xs text-slate-500">{dailyPlan.totalMins} min total</span>
+              </div>
+              <p className="text-slate-400 text-xs mb-4">{dailyPlan.headline}</p>
+              <div className="space-y-2">
+                {dailyPlan.tasks.map(task => (
+                  <div key={task.id} className="flex items-center gap-3 p-3 rounded-xl bg-slate-800/50 hover:bg-slate-800 transition-colors">
+                    <span className="text-lg flex-shrink-0">{task.icon}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white text-sm font-medium truncate">{task.title}</p>
+                      <p className="text-slate-500 text-xs">{task.subject} · {task.durationMins} min</p>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${task.priority === 'high' ? 'text-red-400 bg-red-500/10' : task.priority === 'medium' ? 'text-amber-400 bg-amber-500/10' : 'text-slate-400 bg-slate-700'}`}>
+                        {task.priority}
+                      </span>
+                      <span className="text-xs text-violet-400">+{task.xpReward}xp</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <p className="text-slate-500 text-xs mt-3 text-center">{dailyPlan.motivationMsg}</p>
+            </div>
+          )}
+
+          {/* ── Stage 3: Priority Topics ────────────────────── */}
+          {priorityTopics.length > 0 && (
+            <div className="glass rounded-2xl p-5 border border-slate-700/50">
+              <h3 className="text-white font-semibold text-sm mb-3 flex items-center gap-2">
+                <Activity className="w-4 h-4 text-orange-400" /> Priority Focus Topics
+              </h3>
+              <div className="space-y-2">
+                {priorityTopics.map(t => (
+                  <div key={t.topic} className="flex items-center gap-3 p-3 rounded-xl bg-slate-800/50">
+                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0 ${t.urgency === 'critical' ? 'bg-red-500/20 text-red-400' : t.urgency === 'high' ? 'bg-orange-500/20 text-orange-400' : 'bg-amber-500/20 text-amber-400'}`}>
+                      #{t.rank}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-white text-sm font-medium">{t.topic}</p>
+                        <span className="text-slate-500 text-xs">{t.subject}</span>
+                      </div>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <div className="h-1 flex-1 bg-slate-700 rounded-full overflow-hidden">
+                          <div className="h-full bg-violet-500 rounded-full" style={{ width: `${t.mastery}%` }} />
+                        </div>
+                        <span className="text-xs text-slate-500 flex-shrink-0">{t.mastery}%</span>
+                      </div>
+                    </div>
+                    <span className={`text-xs px-2 py-0.5 rounded-full flex-shrink-0 font-medium ${t.urgency === 'critical' ? 'text-red-400 bg-red-500/10' : t.urgency === 'high' ? 'text-orange-400 bg-orange-500/10' : 'text-amber-400 bg-amber-500/10'}`}>
+                      {t.urgency}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Today's Focus (Stage 1 original) */}
           {focus && (
             <div className="relative overflow-hidden rounded-2xl border border-violet-500/30 bg-gradient-to-br from-violet-500/10 via-slate-900 to-slate-900 p-6">
               <div className="absolute top-0 right-0 w-40 h-40 bg-violet-500/5 rounded-full -translate-y-1/2 translate-x-1/2" />

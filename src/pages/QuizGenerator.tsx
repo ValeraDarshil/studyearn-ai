@@ -6,6 +6,12 @@ import { useState } from "react";
 import { Brain, CheckCircle, XCircle, RotateCcw, Trophy, Zap, ChevronRight, Loader2 } from "lucide-react";
 import { useApp } from "../context/AppContext";
 import { API_URL } from "../utils/api";
+// Stage 1 — update topic mastery after quiz
+import { submitQuizResult } from "../utils/brain-api";
+// Stage 3 — adaptive difficulty update
+import { notifyQuizDone } from "../utils/learn-api";
+// Stage 4 — progress intelligence event
+import { trackProgressEvent } from "../utils/progress-api";
 
 // ─────────────────────────────────────────────────────────────
 // TYPES
@@ -262,13 +268,34 @@ Rules:
     if (current + 1 >= questions.length) {
       // Calculate score and award points
       const correct = answers.filter((a, i) => a === questions[i]?.answer).length;
-      const basePts = correct * 5; // 5 pts per correct answer
-      // ✅ Premium users get 1.5x points on quiz
+      const basePts = correct * 5;
       const pts = isPremium ? basePts * 2 : basePts;
       if (pts > 0) {
         addPoints(pts);
         logActivity("quiz_completed", `Quiz: ${topic || subject} (${correct}/${questions.length})${isPremium ? " ⚡" : ""}`, pts);
       }
+
+      // ── Stage 1 + 3 + 4 — fire all adaptive events (non-blocking)
+      const scorePct    = questions.length > 0 ? Math.round((correct / questions.length) * 100) : 0;
+      const quizTopic   = topic   || "General";
+      const quizSubject = subject || "General";
+
+      // Stage 1 — update mastery in AI Brain
+      submitQuizResult({
+        subject:        quizSubject,
+        topic:          quizTopic,
+        score:          scorePct,
+        totalQuestions: questions.length,
+        correctAnswers: correct,
+        timeSpentSecs:  120,
+      }).catch(() => {});
+
+      // Stage 3 — adaptive difficulty + recommendation
+      notifyQuizDone({ topic: quizTopic, subject: quizSubject, score: scorePct }).catch(() => {});
+
+      // Stage 4 — progress intelligence
+      trackProgressEvent("quiz_done", { topic: quizTopic, subject: quizSubject, score: scorePct }).catch(() => {});
+
       setState("result");
     } else {
       setCurrent(c => c + 1);
