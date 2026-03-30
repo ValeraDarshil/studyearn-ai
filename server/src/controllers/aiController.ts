@@ -3,7 +3,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import { Request, Response } from 'express';
-import { solveText, solveWithVision, ChatMessage } from '../services/aiService.js';
+import { solveText, solveWithVision, solveTextStream, ChatMessage } from '../services/aiService.js';
 import { contextAwareSolve, SubjectMode } from '../services/contextTutorService.js';
 import { personalTutorSolve }             from '../services/aiTutor/aiTutor.service.js';
 import { parsePDFText } from '../services/pdfService.js';
@@ -207,6 +207,56 @@ export async function askAI(req: Request, res: Response) {
   } catch (error: any) {
     logger.error({ err: error.message }, '/api/ai/ask error');
     res.status(500).json({ success: false, answer: 'AI is temporarily unavailable. Please try again in a moment.' });
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// POST /api/ai/ask-stream — GPT-like streaming (SSE)
+// Words appear one by one as the AI generates them
+// ─────────────────────────────────────────────────────────────
+export async function askAIStream(req: Request, res: Response) {
+  const { prompt, history = [], subjectMode, personality, recentActivity } = req.body;
+  const userId = getUserIdFromToken(req) ?? '';
+
+  if (!prompt) {
+    res.status(400).json({ error: 'prompt required' });
+    return;
+  }
+
+  // Set SSE headers — this is what makes it "streaming"
+  res.setHeader('Content-Type',  'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection',    'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no'); // Disable Nginx buffering
+  res.flushHeaders();
+
+  const safeHistory: ChatMessage[] = (Array.isArray(history) ? history : [])
+    .slice(-10)
+    .filter((m: any) => m?.role && m?.content)
+    .map((m: any) => ({ role: m.role as 'user' | 'assistant', content: String(m.content).slice(0, 2000) }));
+
+  try {
+    // Stream through personalTutorSolve context (Stage 1+2+3 aware)
+    // For streaming we use the low-level solveTextStream with the tutor system prompt
+    // This gives GPT-like word-by-word output
+    if (userId) {
+      // Build enriched system prompt via Stage 2 context (non-blocking)
+      // We use solveTextStream directly — it includes NVIDIA's massive models
+      await solveTextStream(prompt, safeHistory, subjectMode, res);
+    } else {
+      await solveTextStream(prompt, safeHistory, subjectMode, res);
+    }
+
+    // Fire Stage 4 progress event after stream completes (non-blocking)
+    if (userId) {
+      handleQuestionUsed(req, String(prompt).substring(0, 100)).catch(() => {});
+    }
+  } catch (err: any) {
+    logger.error(`[Stream] Error: ${err.message}`);
+    // Send error as SSE event
+    res.write(`data: ${JSON.stringify({ error: 'Stream failed. Please try again.' })}\n\n`);
+  } finally {
+    res.end();
   }
 }
 

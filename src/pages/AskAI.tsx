@@ -438,7 +438,7 @@ export function AskAI() {
   const buildHistory = () => messages.filter(m => !m.isError && !m.imagePreview && !m.fileName).slice(-10).map(m => ({ role: m.role as "user" | "assistant", content: m.content }));
 
   // ─────────────────────────────────────────────────────────
-  // SEND MESSAGE
+  // SEND MESSAGE — with GPT-like streaming
   // ─────────────────────────────────────────────────────────
   const handleSend = async () => {
     const text = question.trim();
@@ -464,74 +464,173 @@ export function AskAI() {
 
     try {
       const headers = authHeaders();
-      let result: { success: boolean; answer: string; pointsAwarded?: number; questionsLeft?: number; nextRefillSecs?: number };
 
+      // ── Non-streaming: PDF and Image ─────────────────────
       if (currentFileType === "pdf" && currentFile) {
         setLoadingStep("Extracting PDF text…");
         const form = new FormData(); form.append("file", currentFile); if (text) form.append("prompt", text);
-        const res = await fetch(`${API_URL}/api/ai/solve-pdf`, { method: "POST", headers, body: form });
-        result = await res.json();
-      } else {
-        let imageData: string | undefined;
-        if (currentFileType === "image" && currentPreview) {
-          setLoadingStep("Compressing image…");
-          imageData = await compressImage(currentPreview, 1600);
-          setLoadingStep("AI is analyzing image…");
-        } else {
-          // Show mode-specific loading text
-          const modeLabels: Record<SubjectMode, string> = {
-            auto: "AI is thinking…", math: "📐 Solving step by step…",
-            coding: "💻 Writing code…", science: "🔬 Analyzing…", general: "📚 Explaining…",
-          };
-          setLoadingStep(stepByStep ? "🪜 Building step-by-step solution…" : (modeLabels[subjectMode] || "AI is thinking…"));
-        }
+        const res    = await fetch(`${API_URL}/api/ai/solve-pdf`, { method: "POST", headers, body: form });
+        const result = await res.json();
 
+        const aiMsg: ChatMsg = { role: "assistant", content: result.answer || "No answer received.", isError: !result.success, subjectMode };
+        if (result.success) {
+          const pts = result.pointsAwarded ?? (isPremium ? 20 : 10);
+          aiMsg.pointsAwarded = pts;
+          addPoints(pts);
+          if (result.questionsLeft !== undefined) setQuestionsLeft(result.questionsLeft); else useQuestion();
+          if (result.nextRefillSecs !== undefined) setNextRefillSecs(result.nextRefillSecs);
+          const newTotal = (userStats.totalQuestionsAsked || 0) + 1;
+          setUserStats({ ...userStats, totalQuestionsAsked: newTotal });
+          incrementAction("question");
+          checkAndUnlockAchievements({ totalQuestionsAsked: newTotal });
+        }
+        const finalMessages = [...newMessages, aiMsg];
+        setMessages(finalMessages);
+        if (convoId) { await saveMessages(convoId, [userMsg, aiMsg]); fetchConvos(); }
+        return;
+      }
+
+      if (currentFileType === "image" && currentPreview) {
+        setLoadingStep("AI is analyzing image…");
+        const imageData = await compressImage(currentPreview, 1600);
         const res = await fetch(`${API_URL}/api/ai/ask`, {
           method: "POST",
           headers: { ...headers, "Content-Type": "application/json" },
-          body: JSON.stringify({
-            prompt:         text || undefined,
-            image:          imageData,
-            history:        imageData ? [] : buildHistory(),
-            userId,
-            subjectMode:    imageData ? "auto" : subjectMode,
-            stepByStep:     imageData ? false  : stepByStep,
-            // Stage 2 — AI Tutor params
-            personality:    "friendly",
-            hintMode:       subjectMode === "math" || subjectMode === "coding" ? false : undefined,
-            recentActivity: subjectMode === "coding" ? "coding" : "ask",
-          }),
+          body: JSON.stringify({ prompt: text || undefined, image: imageData, history: [], userId, subjectMode: "auto", stepByStep: false, personality: "friendly" }),
         });
-        result = await res.json();
+        const result = await res.json();
+        const aiMsg: ChatMsg = { role: "assistant", content: result.answer || "No answer received.", isError: !result.success, subjectMode };
+        if (result.success) {
+          const pts = result.pointsAwarded ?? (isPremium ? 20 : 10);
+          aiMsg.pointsAwarded = pts; addPoints(pts);
+          if (result.questionsLeft !== undefined) setQuestionsLeft(result.questionsLeft); else useQuestion();
+          if (result.nextRefillSecs !== undefined) setNextRefillSecs(result.nextRefillSecs);
+          const newTotal = (userStats.totalQuestionsAsked || 0) + 1;
+          setUserStats({ ...userStats, totalQuestionsAsked: newTotal });
+          incrementAction("question"); checkAndUnlockAchievements({ totalQuestionsAsked: newTotal });
+          trackProgressEvent("ai_tutor_used", { mode: "image" }).catch(() => {});
+        }
+        const finalMessages = [...newMessages, aiMsg];
+        setMessages(finalMessages);
+        if (convoId) { await saveMessages(convoId, [userMsg, aiMsg]); fetchConvos(); }
+        return;
       }
 
-      const aiMsg: ChatMsg = {
-        role:        "assistant",
-        content:     result.answer || "No answer received. Please try again.",
-        isError:     !result.success,
-        subjectMode: subjectMode,
+      // ── STREAMING — Text questions (GPT-like word-by-word) ─
+      const modeLabels: Record<SubjectMode, string> = {
+        auto: "AI is thinking…", math: "📐 Solving step by step…",
+        coding: "💻 Writing code…", science: "🔬 Analyzing…", general: "📚 Explaining…",
       };
+      setLoadingStep(stepByStep ? "🪜 Building step-by-step solution…" : (modeLabels[subjectMode] || "AI is thinking…"));
 
-      if (result.success) {
-        const pts = result.pointsAwarded ?? (isPremium ? 20 : 10);
-        aiMsg.pointsAwarded = pts;
-        addPoints(pts);
-        if (result.questionsLeft !== undefined) setQuestionsLeft(result.questionsLeft); else useQuestion();
-        if (result.nextRefillSecs !== undefined) setNextRefillSecs(result.nextRefillSecs);
-        const newTotal = (userStats.totalQuestionsAsked || 0) + 1;
-        setUserStats({ ...userStats, totalQuestionsAsked: newTotal });
-        incrementAction("question");
-        checkAndUnlockAchievements({ totalQuestionsAsked: newTotal });
-        // Stage 4 — fire progress event (non-blocking)
-        trackProgressEvent("ai_tutor_used", {
-          topic: (result as any).detectedTopic || undefined,
-          mode:  (result as any).learningMode  || subjectMode,
-        }).catch(() => {});
+      // Add an empty assistant message that we'll fill in as tokens arrive
+      let streamedContent = "";
+      const streamMsgIndex = newMessages.length;
+      const streamPlaceholder: ChatMsg = { role: "assistant", content: "", subjectMode };
+      setMessages([...newMessages, streamPlaceholder]);
+      setLoading(false); // Stop spinner — streaming starts
+
+      const streamRes = await fetch(`${API_URL}/api/ai/ask-stream`, {
+        method: "POST",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt:         text,
+          history:        buildHistory(),
+          userId,
+          subjectMode:    subjectMode,
+          stepByStep:     stepByStep,
+          personality:    "friendly",
+          hintMode:       false,
+          recentActivity: subjectMode === "coding" ? "coding" : "ask",
+        }),
+      });
+
+      if (!streamRes.ok || !streamRes.body) {
+        // Fallback to non-streaming if stream fails
+        const fallbackRes = await fetch(`${API_URL}/api/ai/ask`, {
+          method: "POST",
+          headers: { ...headers, "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt: text, history: buildHistory(), userId, subjectMode, stepByStep, personality: "friendly" }),
+        });
+        const result = await fallbackRes.json();
+        setMessages(prev => {
+          const updated = [...prev];
+          updated[streamMsgIndex] = { role: "assistant", content: result.answer || "No answer received.", isError: !result.success, subjectMode };
+          return updated;
+        });
+        if (result.success) {
+          const pts = result.pointsAwarded ?? (isPremium ? 20 : 10);
+          addPoints(pts);
+          if (result.questionsLeft !== undefined) setQuestionsLeft(result.questionsLeft); else useQuestion();
+          if (result.nextRefillSecs !== undefined) setNextRefillSecs(result.nextRefillSecs);
+          const newTotal = (userStats.totalQuestionsAsked || 0) + 1;
+          setUserStats({ ...userStats, totalQuestionsAsked: newTotal });
+          incrementAction("question"); checkAndUnlockAchievements({ totalQuestionsAsked: newTotal });
+          trackProgressEvent("ai_tutor_used", { mode: subjectMode }).catch(() => {});
+        }
+        const fallbackMsg: ChatMsg = { role: "assistant", content: result.answer || "No answer received.", isError: !result.success, subjectMode };
+        setMessages(prev => { const u = [...prev]; u[streamMsgIndex] = fallbackMsg; return u; });
+        if (convoId) { await saveMessages(convoId, [userMsg, fallbackMsg]); fetchConvos(); }
+        return;
       }
 
-      const finalMessages = [...newMessages, aiMsg];
-      setMessages(finalMessages);
-      if (convoId) { await saveMessages(convoId, [userMsg, aiMsg]); fetchConvos(); }
+      // Read the SSE stream token by token
+      const reader  = streamRes.body.getReader();
+      const decoder = new TextDecoder();
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split("\n").filter(l => l.trim());
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          const data = line.slice(6).trim();
+          if (data === "[DONE]") break;
+
+          try {
+            const parsed = JSON.parse(data);
+            if (parsed.token) {
+              streamedContent += parsed.token;
+              // Update the message in real time — this is the GPT effect!
+              setMessages(prev => {
+                const updated = [...prev];
+                updated[streamMsgIndex] = { role: "assistant", content: streamedContent, subjectMode };
+                return updated;
+              });
+            }
+            if (parsed.error) {
+              streamedContent = parsed.error;
+              setMessages(prev => {
+                const updated = [...prev];
+                updated[streamMsgIndex] = { role: "assistant", content: streamedContent, isError: true, subjectMode };
+                return updated;
+              });
+            }
+          } catch { /* skip malformed chunks */ }
+        }
+      }
+
+      // Stream complete — update quota + points (non-blocking via separate quota fetch)
+      useQuestion();
+      const newTotal = (userStats.totalQuestionsAsked || 0) + 1;
+      setUserStats({ ...userStats, totalQuestionsAsked: newTotal });
+      incrementAction("question");
+      checkAndUnlockAchievements({ totalQuestionsAsked: newTotal });
+      trackProgressEvent("ai_tutor_used", { mode: subjectMode }).catch(() => {});
+
+      // Refresh quota from server to get accurate count
+      fetch(`${API_URL}/api/ai/quota`, { headers }).then(r => r.json()).then(d => {
+        if (d.success && d.questionsLeft !== undefined) setQuestionsLeft(d.questionsLeft);
+        if (d.nextRefillSecs !== undefined) setNextRefillSecs(d.nextRefillSecs);
+      }).catch(() => {});
+
+      // Save to conversation
+      const finalMsg: ChatMsg = { role: "assistant", content: streamedContent, subjectMode };
+      if (convoId) { await saveMessages(convoId, [userMsg, finalMsg]); fetchConvos(); }
+
     } catch {
       setMessages(prev => [...prev, { role: "assistant", content: "Connection error. Please check your internet and try again.", isError: true }]);
     } finally {
