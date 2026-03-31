@@ -1305,16 +1305,19 @@ export function AskAI() {
   function handleStop() {
     abortRef.current?.abort();
     // Commit whatever has streamed so far as the final message
-    if (streamingContent) {
-      setMessages(prev => {
-        const updated = [...prev];
-        const lastIdx = updated.length - 1;
-        if (updated[lastIdx]?.role === "assistant") {
-          updated[lastIdx] = { ...updated[lastIdx], content: streamingContent + " ▪" };
-        }
-        return updated;
-      });
-    }
+    setMessages(prev => {
+      const updated = [...prev];
+      const lastIdx = updated.length - 1;
+      if (updated[lastIdx]?.role === "assistant") {
+        const existing = updated[lastIdx].content;
+        // Only add stop marker if there was actual content
+        updated[lastIdx] = {
+          ...updated[lastIdx],
+          content: existing ? existing + " ▪" : "Generation stopped.",
+        };
+      }
+      return updated;
+    });
     setIsStreaming(false);
     setStreamingContent("");
     setLoading(false);
@@ -1432,23 +1435,30 @@ export function AskAI() {
     // ══════════════════════════════════════════════════════
     // PATH B — TEXT ONLY → SSE Streaming (/api/ai/ask-stream)
     // ══════════════════════════════════════════════════════
-    const modeLabels: Record<SubjectMode, string> = {
-      auto: "AI is thinking…", math: "📐 Solving step by step…",
-      coding: "💻 Writing code…", science: "🔬 Analyzing…", general: "📚 Explaining…",
-    };
-    setLoadingStep(stepByStep ? "🪜 Building step-by-step solution…" : (modeLabels[subjectMode] || "AI is thinking…"));
 
-    // Add a placeholder AI bubble — we'll fill it token by token
-    const placeholder: ChatMsg = { role: "assistant", content: "", subjectMode };
-    setMessages([...withUser, placeholder]);
-    setIsStreaming(true);
+    // Step 1 — Show "AI is thinking…" dots (loading=true, isStreaming=false)
+    // These stay visible until the FIRST token arrives from the server.
+    const modeLabels: Record<SubjectMode, string> = {
+      auto:    "AI is thinking…",
+      math:    "📐 Solving step by step…",
+      coding:  "💻 Writing code…",
+      science: "🔬 Analyzing…",
+      general: "📚 Explaining…",
+    };
+    setLoadingStep(
+      stepByStep ? "🪜 Building step-by-step solution…"
+                 : (modeLabels[subjectMode] || "AI is thinking…")
+    );
+    // loading=true already set above — dots will show now
+    setIsStreaming(false);    // NOT streaming yet — no bubble, just dots
     setStreamingContent("");
 
     const ctrl = new AbortController();
     abortRef.current = ctrl;
 
-    let accumulated = "";
-    let finalPoints = isPremium ? 20 : 10;
+    let accumulated  = "";
+    let finalPoints  = isPremium ? 20 : 10;
+    let firstToken   = true;   // track first token so we can flip from dots → bubble
 
     try {
       const res = await fetch(`${API_URL}/api/ai/ask-stream`, {
@@ -1456,19 +1466,17 @@ export function AskAI() {
         headers: { ...authHeaders(), "Content-Type": "application/json" },
         signal: ctrl.signal,
         body: JSON.stringify({
-          prompt:      text,
-          history:     buildHistory(),
+          prompt:         text,
+          history:        buildHistory(),
           userId,
           subjectMode,
           stepByStep,
-          personality: "friendly",
+          personality:    "friendly",
           recentActivity: subjectMode === "coding" ? "coding" : "ask",
         }),
       });
 
       if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
-
-      setLoading(false); setLoadingStep("");
 
       // ── Read SSE stream token-by-token ──────────────────
       const reader  = res.body.getReader();
@@ -1481,7 +1489,7 @@ export function AskAI() {
 
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";          // keep incomplete line for next chunk
+        buffer = lines.pop() ?? "";   // keep incomplete line for next chunk
 
         for (const line of lines) {
           const trimmed = line.trim();
@@ -1493,11 +1501,21 @@ export function AskAI() {
           try {
             const parsed = JSON.parse(raw);
 
-            // Token chunk from provider
+            // ── Token chunk ──────────────────────────────
             if (parsed.token) {
               accumulated += parsed.token;
+
+              // First token → kill the dots, show streaming bubble
+              if (firstToken) {
+                firstToken = false;
+                setLoading(false);
+                setLoadingStep("");
+                // Add empty placeholder bubble, then immediately fill it
+                setMessages([...withUser, { role: "assistant", content: "", subjectMode }]);
+                setIsStreaming(true);
+              }
+
               setStreamingContent(accumulated);
-              // Update the last (placeholder) message in real time
               setMessages(prev => {
                 const updated = [...prev];
                 const lastIdx = updated.length - 1;
@@ -1508,15 +1526,15 @@ export function AskAI() {
               });
             }
 
-            // Points / quota info that may arrive at the end
-            if (parsed.pointsAwarded) finalPoints = parsed.pointsAwarded;
+            // Points / quota piggy-backed at end of stream
+            if (parsed.pointsAwarded)              finalPoints = parsed.pointsAwarded;
             if (parsed.questionsLeft !== undefined) setQuestionsLeft(parsed.questionsLeft);
             if (parsed.nextRefillSecs !== undefined) setNextRefillSecs(parsed.nextRefillSecs);
 
-            // Error from server
+            // Server-side error
             if (parsed.error) throw new Error(parsed.error);
-          } catch (parseErr) {
-            // Skip malformed lines
+          } catch {
+            // Skip malformed SSE lines
           }
         }
       }
@@ -1749,20 +1767,23 @@ export function AskAI() {
               : <AIBubble   key={i} msg={msg} isPremium={isPremium} isStreaming={isStreaming && isLastAssistant} />;
           })}
 
-          {/* Non-streaming loading (image / PDF processing) */}
-          {loading && !isStreaming && (
+          {/* Loading dots — shown for:
+               1. Image/PDF processing (loading=true, no stream)
+               2. Waiting for first streaming token (loading=true, isStreaming=false)
+               Hidden once first token arrives (isStreaming=true flips, loading=false) */}
+          {loading && (
             <div className="flex gap-3 items-start w-full">
               <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 bg-gradient-to-br ${
-                currentMode.id === "math"    ? "from-blue-500 to-blue-600"   :
+                currentMode.id === "math"    ? "from-blue-500 to-blue-600"    :
                 currentMode.id === "coding"  ? "from-green-500 to-emerald-600" :
-                currentMode.id === "science" ? "from-cyan-500 to-cyan-600"   :
+                currentMode.id === "science" ? "from-cyan-500 to-cyan-600"    :
                 "from-purple-500 to-blue-600"
               }`}>
                 <currentMode.icon className="w-3.5 h-3.5 text-white" />
               </div>
               <div className="flex-1 flex items-center gap-3 pt-1">
                 <div className="flex gap-1">
-                  {[0,150,300].map(d => (
+                  {[0, 150, 300].map(d => (
                     <span key={d}
                       className={`w-1.5 h-1.5 rounded-full animate-bounce ${
                         currentMode.id === "math"    ? "bg-blue-400"  :
