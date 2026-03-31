@@ -378,32 +378,46 @@
 
 
 // ─────────────────────────────────────────────────────────────
-// AI Study OS — Ultra AI Service (GPT-4 Level)
-// Provider chain: NVIDIA NIM → Groq → OpenRouter
-// Supports: streaming, vision, smart model routing
+// StudyEarn AI — AI Service  (UPGRADED v4)
+// ─────────────────────────────────────────────────────────────
+// Text   → GROQ → OpenRouter  (unchanged, fast)
+// Image  → NVIDIA Vision (primary) → Groq Vision → OR Vision
+// PDF    → pdfService text extract → NVIDIA Text
+//          scanned PDF → NVIDIA Vision (page-by-page)
 // ─────────────────────────────────────────────────────────────
 
-import { Response } from 'express';
-import { logger }   from '../utils/logger.js';
+import { logger } from '../utils/logger.js';
 
-export type ChatMessage = { role: 'user' | 'assistant'; content: string };
+// ─────────────────────────────────────────────────────────────
+// ENV KEYS
+// ─────────────────────────────────────────────────────────────
+const NVIDIA_KEY      = process.env.NVIDIA_API_KEY      || '';
+const GROQ_KEY        = process.env.GROQ_API_KEY        || '';
+const OPENROUTER_KEY  = process.env.OPENROUTER_API_KEY  || '';
 
-const NVIDIA_KEY     = process.env.NVIDIA_API_KEY     || '';
-const GROQ_KEY       = process.env.GROQ_API_KEY       || '';
-const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY || '';
-const AI_TIMEOUT_MS  = 45_000;
-const NVIDIA_BASE    = 'https://integrate.api.nvidia.com/v1';
+const AI_TIMEOUT_MS   = 45_000;
+const NVIDIA_BASE     = 'https://integrate.api.nvidia.com/v1';
 
-// ── Model roster ──────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────
+// MODEL ROSTERS
+// ─────────────────────────────────────────────────────────────
+
+// NVIDIA text models — subject-aware routing
 const NVIDIA_MODELS = {
-  ultra:  'nvidia/llama-3.1-nemotron-ultra-253b-v1',
-  math:   'deepseek-ai/deepseek-r1',
-  coding: 'nvidia/llama-3.3-nemotron-super-49b-v1',
-  fast:   'meta/llama-3.3-70b-instruct',
-  stem:   'microsoft/phi-4',
-  reason: 'qwen/qwq-32b',
+  ultra:   'meta/llama-3.1-405b-instruct',      // best quality
+  math:    'deepseek-ai/deepseek-r1',            // math/reasoning
+  coding:  'nvidia/llama-3.3-nemotron-super-49b-v1', // coding
+  fast:    'meta/llama-3.3-70b-instruct',        // fast fallback
+  stem:    'microsoft/phi-4',                    // science/STEM
 };
 
+// NVIDIA vision models (for images + scanned PDFs) — free tier
+const NVIDIA_VISION_MODELS = [
+  'meta/llama-3.2-11b-vision-instruct',          // best free vision
+  'microsoft/phi-3.5-vision-instruct',           // backup vision
+];
+
+// Groq text models
 const GROQ_MODELS = [
   'llama-3.3-70b-versatile',
   'llama-3.1-70b-versatile',
@@ -411,6 +425,10 @@ const GROQ_MODELS = [
   'gemma2-9b-it',
 ];
 
+// Groq vision model
+const GROQ_VISION_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct';
+
+// OpenRouter text models (free)
 const OR_MODELS = [
   'meta-llama/llama-3.3-70b-instruct:free',
   'deepseek/deepseek-r1-0528:free',
@@ -419,7 +437,8 @@ const OR_MODELS = [
   'mistralai/mistral-small-3.1-24b-instruct:free',
 ];
 
-const VISION_MODELS = [
+// OpenRouter vision models (free)
+const OR_VISION_MODELS = [
   'qwen/qwen2.5-vl-72b-instruct:free',
   'qwen/qwen2.5-vl-7b-instruct:free',
   'meta-llama/llama-3.2-11b-vision-instruct:free',
@@ -427,25 +446,54 @@ const VISION_MODELS = [
   'google/gemini-2.0-flash-exp:free',
 ];
 
-// ── System prompts ────────────────────────────────────────────
-const BASE_PROMPT = `You are AI Study OS — an ultra-intelligent personal tutor for Indian students (CBSE, ICSE, JEE, NEET, State boards, Class 8-12 and college).
+// ─────────────────────────────────────────────────────────────
+// SYSTEM PROMPTS
+// ─────────────────────────────────────────────────────────────
+const BASE_PROMPT = `You are StudyEarn AI — an expert academic tutor for Indian students (CBSE, ICSE, JEE, NEET, State boards, Class 8-12 and college).
 
-You are as capable as GPT-4, Gemini Pro, and Claude. Your goal: give complete, accurate, deeply helpful answers.
+Your responses must be RICH and STRUCTURED like ChatGPT/Gemini/Claude:
 
-RULES:
+FORMATTING RULES (ALWAYS follow these):
+• Use **bold** for important terms, key answers, formulas, definitions
+• Use emojis naturally: 📌 for key points, 💡 for tips/insights, ⚠️ for warnings/cautions, ✅ for correct answers, ❌ for wrong approaches, 🔥 for important exam topics, 📐 for math, 💻 for coding, 🔬 for science
+• Use ## for section headings, ### for sub-headings
+• Use - bullet points for lists
+• Use numbered lists 1. 2. 3. for steps
+• Use > blockquote for important notes or warnings
+• Wrap ALL code in triple backticks with language: \`\`\`python ... \`\`\`
+• For warnings or dangerous concepts: start with ⚠️ **Warning:**
+• For most important points: use > **📌 Key Point:** inside a blockquote
+
+ANSWER RULES:
 • Answer COMPLETELY — never truncate, never say "I'll leave this as exercise"
 • For multiple questions: answer EACH with its number, fully
-• Math: formula → substitution → every step → boxed final answer
+• Math: formula → substitution → every step → **boxed final answer**
 • Coding: complete runnable code with inline comments + expected output
 • Science: state law/formula → substitute → solve → real-world example
 • If the student writes in Hinglish, reply in Hinglish naturally
 • Indian exam style: thorough, structured, marks-worthy
-• Be encouraging — build confidence, not just answer questions
-• Think deeply before answering. Quality over speed.`;
+• Be encouraging — add a motivational emoji at the end 🎯`;
 
-const MATH_PROMPT   = BASE_PROMPT + '\n\nMATH MODE: Show formula → substitution → every step. Verify answer. Use proper notation.';
-const CODING_PROMPT = BASE_PROMPT + '\n\nCODING MODE: Complete runnable code always. Comments on every line. Show output. Explain WHY.';
-const SCIENCE_PROMPT = BASE_PROMPT + '\n\nSCIENCE MODE: State law/formula first. Substitute with units. Real-world example after.';
+const MATH_PROMPT = BASE_PROMPT + '\n\n📐 **MATH MODE:** Show formula → substitution → every step. Verify answer. Use **bold** for final answer. Box the result.';
+const CODING_PROMPT = BASE_PROMPT + '\n\n💻 **CODING MODE:** Complete runnable code always. Comment every line. Show expected output. Explain WHY each part works.';
+const SCIENCE_PROMPT = BASE_PROMPT + '\n\n🔬 **SCIENCE MODE:** State law/formula first. Substitute with units. Real-world example after. Use diagrams in text if helpful.';
+
+const VISION_PROMPT = `You are StudyEarn AI — an expert tutor. A student has shared an image (exam paper, homework, diagram, or problem).
+
+FORMATTING RULES:
+• Use **bold** for important terms and answers
+• Use emojis: 📌 💡 ⚠️ ✅ ❌ 🔥 naturally
+• Use ## headings for sections
+• Wrap all code in triple backticks
+• Use numbered steps for solutions
+• Use > blockquote for key notes
+
+YOUR JOB:
+1. READ the image carefully — identify ALL text, numbers, diagrams, equations
+2. Solve EVERY question/problem you see, completely and step-by-step
+3. If it's a diagram: explain what it shows, label all parts
+4. If it's text/theory: summarize and explain key concepts
+5. Be thorough — Indian exam style`;
 
 function getSystemPrompt(subjectMode?: string): string {
   if (subjectMode === 'math')    return MATH_PROMPT;
@@ -461,81 +509,119 @@ function pickNvidiaModel(subjectMode?: string): string {
   return NVIDIA_MODELS.ultra;
 }
 
-function fetchWithTimeout(url: string, options: RequestInit, ms = AI_TIMEOUT_MS): Promise<globalThis.Response> {
-  const ctrl  = new AbortController();
+// ─────────────────────────────────────────────────────────────
+// FETCH HELPER
+// ─────────────────────────────────────────────────────────────
+function fetchWithTimeout(url: string, options: RequestInit, ms = AI_TIMEOUT_MS): Promise<Response> {
+  const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), ms);
   return fetch(url, { ...options, signal: ctrl.signal }).finally(() => clearTimeout(timer));
 }
 
 // ─────────────────────────────────────────────────────────────
-// Non-streaming text calls
+// TYPES
+// ─────────────────────────────────────────────────────────────
+export type ChatMessage = { role: 'user' | 'assistant'; content: string };
+
+// ─────────────────────────────────────────────────────────────
+// TEXT: NVIDIA (non-streaming)
 // ─────────────────────────────────────────────────────────────
 async function nvidiaText(msgs: ChatMessage[], sys: string, mode?: string): Promise<string> {
   if (!NVIDIA_KEY) throw new Error('No NVIDIA key');
-  const tryModels = [pickNvidiaModel(mode), NVIDIA_MODELS.fast, NVIDIA_MODELS.reason];
+  const tryModels = [pickNvidiaModel(mode), NVIDIA_MODELS.fast];
   for (const model of tryModels) {
     try {
       const res = await fetchWithTimeout(`${NVIDIA_BASE}/chat/completions`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${NVIDIA_KEY}` },
-        body: JSON.stringify({ model, temperature: 0.4, max_tokens: 4096, messages: [{ role: 'system', content: sys }, ...msgs] }),
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${NVIDIA_KEY}` },
+        body: JSON.stringify({
+          model,
+          temperature: 0.4,
+          max_tokens: 4096,
+          messages: [{ role: 'system', content: sys }, ...msgs],
+        }),
       }, 55_000);
       if (!res.ok) { logger.debug(`[NVIDIA] ${model} HTTP ${res.status}`); continue; }
       const data = await res.json();
-      const ans  = data.choices?.[0]?.message?.content?.trim();
-      if (ans && ans.length > 20) { logger.info(`[NVIDIA] ✅ ${model}`); return ans; }
-    } catch (e: any) { logger.debug(`[NVIDIA] ${model}: ${e.message}`); }
+      const ans = data.choices?.[0]?.message?.content?.trim();
+      if (ans && ans.length > 20) { logger.info(`[NVIDIA text] ✅ ${model}`); return ans; }
+    } catch (e: any) {
+      logger.debug(`[NVIDIA text] ${model}: ${e.message}`);
+    }
   }
-  throw new Error('NVIDIA: all models failed');
+  throw new Error('NVIDIA text: all models failed');
 }
 
+// ─────────────────────────────────────────────────────────────
+// TEXT: GROQ (non-streaming)
+// ─────────────────────────────────────────────────────────────
 async function groqText(msgs: ChatMessage[], sys: string): Promise<string> {
   if (!GROQ_KEY) throw new Error('No Groq key');
   for (const model of GROQ_MODELS) {
     try {
       const res = await fetchWithTimeout('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_KEY}` },
-        body: JSON.stringify({ model, temperature: 0.4, max_tokens: 4096, messages: [{ role: 'system', content: sys }, ...msgs] }),
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${GROQ_KEY}` },
+        body: JSON.stringify({
+          model, temperature: 0.4, max_tokens: 4096,
+          messages: [{ role: 'system', content: sys }, ...msgs],
+        }),
       });
       if (!res.ok) continue;
       const data = await res.json();
-      const ans  = data.choices?.[0]?.message?.content?.trim();
-      if (ans && ans.length > 20) { logger.info(`[Groq] ✅ ${model}`); return ans; }
-    } catch (e: any) { logger.debug(`[Groq] ${model}: ${e.message}`); }
+      const ans = data.choices?.[0]?.message?.content?.trim();
+      if (ans && ans.length > 20) { logger.info(`[Groq text] ✅ ${model}`); return ans; }
+    } catch (e: any) {
+      logger.debug(`[Groq text] ${model}: ${e.message}`);
+    }
   }
   throw new Error('Groq: all models failed');
 }
 
+// ─────────────────────────────────────────────────────────────
+// TEXT: OPENROUTER (non-streaming)
+// ─────────────────────────────────────────────────────────────
 async function openRouterText(msgs: ChatMessage[], sys: string): Promise<string> {
   if (!OPENROUTER_KEY) throw new Error('No OpenRouter key');
   for (const model of OR_MODELS) {
     try {
       const res = await fetchWithTimeout('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${OPENROUTER_KEY}`, 'HTTP-Referer': process.env.FRONTEND_URL || 'https://studyearnai.tech', 'X-Title': 'AI Study OS' },
-        body: JSON.stringify({ model, temperature: 0.4, max_tokens: 4096, messages: [{ role: 'system', content: sys }, ...msgs] }),
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${OPENROUTER_KEY}`,
+          'HTTP-Referer': process.env.FRONTEND_URL || 'https://studyearnai.tech',
+          'X-Title': 'StudyEarn AI',
+        },
+        body: JSON.stringify({
+          model, temperature: 0.4, max_tokens: 4096,
+          messages: [{ role: 'system', content: sys }, ...msgs],
+        }),
       });
       if (!res.ok) continue;
       const data = await res.json();
-      const ans  = data.choices?.[0]?.message?.content?.trim();
-      if (ans && ans.length > 20) { logger.info(`[OR] ✅ ${model}`); return ans; }
-    } catch (e: any) { logger.debug(`[OR] ${model}: ${e.message}`); }
+      const ans = data.choices?.[0]?.message?.content?.trim();
+      if (ans && ans.length > 20) { logger.info(`[OR text] ✅ ${model}`); return ans; }
+    } catch (e: any) {
+      logger.debug(`[OR text] ${model}: ${e.message}`);
+    }
   }
   throw new Error('OpenRouter: all models failed');
 }
 
 // ─────────────────────────────────────────────────────────────
-// Streaming helpers
+// STREAMING HELPERS
 // ─────────────────────────────────────────────────────────────
-async function pipeStream(response: globalThis.Response, res: Response): Promise<void> {
-  const reader  = response.body!.getReader();
+import type { Response as ExpressResponse } from 'express';
+
+async function pipeStream(response: Response, res: ExpressResponse): Promise<void> {
+  const reader = (response.body as any).getReader();
   const decoder = new TextDecoder();
   try {
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
-      const lines = decoder.decode(value, { stream: true }).split('\n').filter(l => l.trim());
+      const lines = decoder.decode(value, { stream: true }).split('\n').filter((l: string) => l.trim());
       for (const line of lines) {
         if (!line.startsWith('data: ')) continue;
         const data = line.slice(6).trim();
@@ -546,157 +632,362 @@ async function pipeStream(response: globalThis.Response, res: Response): Promise
         } catch { /* skip malformed */ }
       }
     }
-  } finally { reader.releaseLock(); }
+  } finally {
+    reader.releaseLock();
+  }
 }
 
-async function nvidiaStream(msgs: ChatMessage[], sys: string, mode: string | undefined, res: Response): Promise<void> {
+async function nvidiaStream(msgs: ChatMessage[], sys: string, mode: string | undefined, res: ExpressResponse): Promise<void> {
   if (!NVIDIA_KEY) throw new Error('No NVIDIA key');
   const response = await fetchWithTimeout(`${NVIDIA_BASE}/chat/completions`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${NVIDIA_KEY}` },
-    body: JSON.stringify({ model: pickNvidiaModel(mode), temperature: 0.4, max_tokens: 4096, stream: true, messages: [{ role: 'system', content: sys }, ...msgs] }),
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${NVIDIA_KEY}` },
+    body: JSON.stringify({
+      model: pickNvidiaModel(mode),
+      temperature: 0.4, max_tokens: 4096, stream: true,
+      messages: [{ role: 'system', content: sys }, ...msgs],
+    }),
   }, 60_000);
   if (!response.ok) throw new Error(`NVIDIA stream HTTP ${response.status}`);
   logger.info(`[NVIDIA stream] ✅ ${pickNvidiaModel(mode)}`);
   await pipeStream(response, res);
 }
 
-async function groqStream(msgs: ChatMessage[], sys: string, res: Response): Promise<void> {
+async function groqStream(msgs: ChatMessage[], sys: string, res: ExpressResponse): Promise<void> {
   if (!GROQ_KEY) throw new Error('No Groq key');
   for (const model of GROQ_MODELS) {
     try {
       const response = await fetchWithTimeout('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_KEY}` },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${GROQ_KEY}` },
         body: JSON.stringify({ model, temperature: 0.4, max_tokens: 4096, stream: true, messages: [{ role: 'system', content: sys }, ...msgs] }),
       });
       if (!response.ok) continue;
       logger.info(`[Groq stream] ✅ ${model}`);
       await pipeStream(response, res);
       return;
-    } catch (e: any) { logger.debug(`[Groq stream] ${model}: ${e.message}`); }
+    } catch (e: any) {
+      logger.debug(`[Groq stream] ${model}: ${e.message}`);
+    }
   }
   throw new Error('Groq stream: all failed');
 }
 
-async function openRouterStream(msgs: ChatMessage[], sys: string, res: Response): Promise<void> {
+async function openRouterStream(msgs: ChatMessage[], sys: string, res: ExpressResponse): Promise<void> {
   if (!OPENROUTER_KEY) throw new Error('No OR key');
   for (const model of OR_MODELS.slice(0, 3)) {
     try {
       const response = await fetchWithTimeout('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${OPENROUTER_KEY}`, 'HTTP-Referer': process.env.FRONTEND_URL || 'https://studyearnai.tech', 'X-Title': 'AI Study OS' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${OPENROUTER_KEY}`,
+          'HTTP-Referer': process.env.FRONTEND_URL || 'https://studyearnai.tech',
+          'X-Title': 'StudyEarn AI',
+        },
         body: JSON.stringify({ model, temperature: 0.4, max_tokens: 4096, stream: true, messages: [{ role: 'system', content: sys }, ...msgs] }),
       });
       if (!response.ok) continue;
       logger.info(`[OR stream] ✅ ${model}`);
       await pipeStream(response, res);
       return;
-    } catch (e: any) { logger.debug(`[OR stream] ${model}: ${e.message}`); }
+    } catch (e: any) {
+      logger.debug(`[OR stream] ${model}: ${e.message}`);
+    }
   }
   throw new Error('OpenRouter stream: all failed');
 }
 
 // ─────────────────────────────────────────────────────────────
-// PUBLIC API
+// VISION: NVIDIA (PRIMARY for images)
 // ─────────────────────────────────────────────────────────────
+async function nvidiaVision(imageUrl: string, userPrompt: string): Promise<string> {
+  if (!NVIDIA_KEY) throw new Error('No NVIDIA key');
 
-/** Non-streaming: NVIDIA → Groq → OpenRouter */
-export async function solveText(prompt: string, history: ChatMessage[] = [], subjectMode?: string): Promise<string> {
-  const sys  = getSystemPrompt(subjectMode);
-  const msgs = [...history, { role: 'user' as const, content: prompt }];
-  if (NVIDIA_KEY)     { try { return await nvidiaText(msgs, sys, subjectMode); }       catch (e: any) { logger.warn(`NVIDIA→Groq: ${e.message}`); } }
-  if (GROQ_KEY)       { try { return await groqText(msgs, sys); }                      catch (e: any) { logger.warn(`Groq→OR: ${e.message}`); } }
-  if (OPENROUTER_KEY) { try { return await openRouterText(msgs, sys); }                catch (e: any) { logger.warn(`OR failed: ${e.message}`); } }
-  throw new Error('All AI providers failed');
-}
+  const prompt = userPrompt?.trim()
+    ? `${VISION_PROMPT}\n\nStudent's question: "${userPrompt}"\n\nAnalyze the image and answer completely.`
+    : `${VISION_PROMPT}\n\nAnalyze this image completely. Identify and solve all questions/problems shown.`;
 
-/** Streaming SSE: NVIDIA → Groq → OpenRouter */
-export async function solveTextStream(prompt: string, history: ChatMessage[], subjectMode: string | undefined, res: Response): Promise<void> {
-  const sys  = getSystemPrompt(subjectMode);
-  const msgs = [...history, { role: 'user' as const, content: prompt }];
-  if (NVIDIA_KEY)     { try { await nvidiaStream(msgs, sys, subjectMode, res); return; } catch (e: any) { logger.warn(`NVIDIA stream→Groq: ${e.message}`); } }
-  if (GROQ_KEY)       { try { await groqStream(msgs, sys, res); return; }                catch (e: any) { logger.warn(`Groq stream→OR: ${e.message}`); } }
-  if (OPENROUTER_KEY) { try { await openRouterStream(msgs, sys, res); return; }          catch (e: any) { logger.warn(`OR stream failed: ${e.message}`); } }
-  throw new Error('All streaming providers failed');
-}
-
-/** Vision: Groq → OpenRouter vision models → text fallback */
-export async function solveWithVision(imageUrl: string, userPrompt: string): Promise<string> {
-  const BAD = ["i don't see any image","no image was provided","i cannot see","no picture","can't view","please provide the image"];
-  const isBad = (t: string) => BAD.some(p => t.toLowerCase().includes(p));
-  const vPrompt = userPrompt?.trim()
-    ? `You are an expert tutor. Student says: "${userPrompt}". Read the image and solve completely step-by-step.`
-    : 'You are an expert tutor. Read this exam/homework image and solve everything step-by-step with full working.';
-
-  // Groq vision
-  if (GROQ_KEY) {
+  for (const model of NVIDIA_VISION_MODELS) {
     try {
-      const res = await fetchWithTimeout('https://api.groq.com/openai/v1/chat/completions', {
+      const res = await fetchWithTimeout(`${NVIDIA_BASE}/chat/completions`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_KEY}` },
-        body: JSON.stringify({ model: 'meta-llama/llama-4-scout-17b-16e-instruct', messages: [{ role: 'user', content: [{ type: 'image_url', image_url: { url: imageUrl } }, { type: 'text', text: vPrompt }] }], temperature: 0.2, max_tokens: 4096 }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        const ans  = data.choices?.[0]?.message?.content?.trim();
-        if (ans && ans.length > 20 && !isBad(ans)) { logger.info('[Vision] ✅ Groq'); return ans; }
-      }
-    } catch (e: any) { logger.warn(`[Vision] Groq: ${e.message}`); }
-  }
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${NVIDIA_KEY}` },
+        body: JSON.stringify({
+          model,
+          temperature: 0.2,
+          max_tokens: 4096,
+          messages: [{
+            role: 'user',
+            content: [
+              { type: 'image_url', image_url: { url: imageUrl } },
+              { type: 'text', text: prompt },
+            ],
+          }],
+        }),
+      }, 60_000);
 
-  // OpenRouter vision models
-  for (const model of VISION_MODELS) {
+      if (!res.ok) { logger.debug(`[NVIDIA vision] ${model} HTTP ${res.status}`); continue; }
+      const data = await res.json();
+      const ans = data.choices?.[0]?.message?.content?.trim();
+      const BAD = ["i don't see", "no image", "cannot see", "no picture", "can't view", "please provide", "i'm unable to see", "not visible"];
+      if (ans && ans.length > 20 && !BAD.some(b => ans.toLowerCase().includes(b))) {
+        logger.info(`[NVIDIA vision] ✅ ${model}`);
+        return ans;
+      }
+    } catch (e: any) {
+      logger.warn(`[NVIDIA vision] ${model}: ${e.message}`);
+    }
+  }
+  throw new Error('NVIDIA vision: all models failed');
+}
+
+// ─────────────────────────────────────────────────────────────
+// VISION: GROQ (secondary)
+// ─────────────────────────────────────────────────────────────
+async function groqVision(imageUrl: string, userPrompt: string): Promise<string> {
+  if (!GROQ_KEY) throw new Error('No Groq key');
+
+  const prompt = userPrompt?.trim()
+    ? `Student's question: "${userPrompt}". Analyze the image and answer completely step-by-step.`
+    : 'Analyze this exam/homework image and solve everything step-by-step with full working.';
+
+  const res = await fetchWithTimeout('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${GROQ_KEY}` },
+    body: JSON.stringify({
+      model: GROQ_VISION_MODEL,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'image_url', image_url: { url: imageUrl } },
+          { type: 'text', text: prompt },
+        ],
+      }],
+      temperature: 0.2, max_tokens: 4096,
+    }),
+  });
+
+  if (!res.ok) throw new Error(`Groq vision HTTP ${res.status}`);
+  const data = await res.json();
+  const ans = data.choices?.[0]?.message?.content?.trim();
+  const BAD = ["i don't see", "no image", "cannot see", "no picture", "can't view", "please provide"];
+  if (!ans || ans.length < 20 || BAD.some(b => ans.toLowerCase().includes(b))) {
+    throw new Error('Groq vision: bad response');
+  }
+  logger.info(`[Groq vision] ✅`);
+  return ans;
+}
+
+// ─────────────────────────────────────────────────────────────
+// VISION: OPENROUTER (tertiary)
+// ─────────────────────────────────────────────────────────────
+async function openRouterVision(imageUrl: string, userPrompt: string): Promise<string> {
+  if (!OPENROUTER_KEY) throw new Error('No OR key');
+
+  const prompt = userPrompt?.trim()
+    ? `Student says: "${userPrompt}". Read the image and answer completely.`
+    : 'Read this exam/homework image and solve everything step-by-step.';
+
+  for (const model of OR_VISION_MODELS) {
     try {
       const res = await fetchWithTimeout('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${OPENROUTER_KEY}`, 'HTTP-Referer': process.env.FRONTEND_URL || 'https://studyearnai.tech', 'X-Title': 'AI Study OS' },
-        body: JSON.stringify({ model, messages: [{ role: 'user', content: [{ type: 'text', text: vPrompt }, { type: 'image_url', image_url: { url: imageUrl } }] }], temperature: 0.2, max_tokens: 4096 }),
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${OPENROUTER_KEY}`,
+          'HTTP-Referer': process.env.FRONTEND_URL || 'https://studyearnai.tech',
+          'X-Title': 'StudyEarn AI',
+        },
+        body: JSON.stringify({
+          model,
+          messages: [{
+            role: 'user',
+            content: [
+              { type: 'text', text: prompt },
+              { type: 'image_url', image_url: { url: imageUrl } },
+            ],
+          }],
+          temperature: 0.2, max_tokens: 4096,
+        }),
       });
       if (!res.ok) continue;
       const data = await res.json();
-      const ans  = data.choices?.[0]?.message?.content?.trim();
-      if (ans && ans.length > 20 && !isBad(ans)) { logger.info(`[Vision] ✅ ${model}`); return ans; }
-    } catch (e: any) { logger.warn(`[Vision] ${model}: ${e.message}`); }
+      const ans = data.choices?.[0]?.message?.content?.trim();
+      const BAD = ["i don't see", "no image", "cannot see", "no picture", "can't view", "please provide"];
+      if (ans && ans.length > 20 && !BAD.some(b => ans.toLowerCase().includes(b))) {
+        logger.info(`[OR vision] ✅ ${model}`);
+        return ans;
+      }
+    } catch (e: any) {
+      logger.warn(`[OR vision] ${model}: ${e.message}`);
+    }
   }
-
-  // Text fallback
-  try {
-    const ans = await solveText(userPrompt?.trim() ? `Student has an image with this question: "${userPrompt}". Please answer completely.` : 'Student uploaded an exam image. Provide comprehensive study guide.');
-    return `Note: Could not read your image directly, but here is help:\n\n${ans}`;
-  } catch {}
-  return 'Unable to process this image. Please try typing the question manually or upload a clearer image.';
+  throw new Error('OR vision: all models failed');
 }
 
-/** PPT content generation */
+// ─────────────────────────────────────────────────────────────
+// PUBLIC API — solveText
+// NVIDIA → GROQ → OpenRouter  (text only)
+// ─────────────────────────────────────────────────────────────
+export async function solveText(prompt: string, history: ChatMessage[] = [], subjectMode?: string): Promise<string> {
+  const sys = getSystemPrompt(subjectMode);
+  const msgs: ChatMessage[] = [...history, { role: 'user', content: prompt }];
+
+  if (NVIDIA_KEY) {
+    try { return await nvidiaText(msgs, sys, subjectMode); }
+    catch (e: any) { logger.warn(`NVIDIA→Groq: ${e.message}`); }
+  }
+  if (GROQ_KEY) {
+    try { return await groqText(msgs, sys); }
+    catch (e: any) { logger.warn(`Groq→OR: ${e.message}`); }
+  }
+  if (OPENROUTER_KEY) {
+    try { return await openRouterText(msgs, sys); }
+    catch (e: any) { logger.warn(`OR failed: ${e.message}`); }
+  }
+  throw new Error('All AI providers failed');
+}
+
+// ─────────────────────────────────────────────────────────────
+// PUBLIC API — solveTextStream
+// Streaming SSE: NVIDIA → GROQ → OpenRouter
+// ─────────────────────────────────────────────────────────────
+export async function solveTextStream(
+  prompt: string,
+  history: ChatMessage[],
+  subjectMode: string | undefined,
+  res: ExpressResponse,
+): Promise<void> {
+  const sys = getSystemPrompt(subjectMode);
+  const msgs: ChatMessage[] = [...history, { role: 'user', content: prompt }];
+
+  if (NVIDIA_KEY) {
+    try { await nvidiaStream(msgs, sys, subjectMode, res); return; }
+    catch (e: any) { logger.warn(`NVIDIA stream→Groq: ${e.message}`); }
+  }
+  if (GROQ_KEY) {
+    try { await groqStream(msgs, sys, res); return; }
+    catch (e: any) { logger.warn(`Groq stream→OR: ${e.message}`); }
+  }
+  if (OPENROUTER_KEY) {
+    try { await openRouterStream(msgs, sys, res); return; }
+    catch (e: any) { logger.warn(`OR stream failed: ${e.message}`); }
+  }
+  throw new Error('All streaming providers failed');
+}
+
+// ─────────────────────────────────────────────────────────────
+// PUBLIC API — solveWithVision
+// NVIDIA Vision (PRIMARY) → Groq Vision → OR Vision → text fallback
+// ─────────────────────────────────────────────────────────────
+export async function solveWithVision(imageUrl: string, userPrompt: string): Promise<string> {
+  // 1. NVIDIA Vision (best quality, our primary free model)
+  if (NVIDIA_KEY) {
+    try { return await nvidiaVision(imageUrl, userPrompt); }
+    catch (e: any) { logger.warn(`NVIDIA vision→Groq: ${e.message}`); }
+  }
+
+  // 2. Groq Vision (secondary)
+  if (GROQ_KEY) {
+    try { return await groqVision(imageUrl, userPrompt); }
+    catch (e: any) { logger.warn(`Groq vision→OR: ${e.message}`); }
+  }
+
+  // 3. OpenRouter Vision (tertiary)
+  if (OPENROUTER_KEY) {
+    try { return await openRouterVision(imageUrl, userPrompt); }
+    catch (e: any) { logger.warn(`OR vision failed: ${e.message}`); }
+  }
+
+  // 4. Text-only fallback
+  try {
+    const fallback = await solveText(
+      userPrompt?.trim()
+        ? `A student uploaded an image and asked: "${userPrompt}". Answer this question completely.`
+        : 'A student uploaded an exam/homework image. Provide a comprehensive study guide on common topics.'
+    );
+    return `⚠️ **Note:** Could not read image directly, but here is help:\n\n${fallback}`;
+  } catch { /* ignore */ }
+
+  return '❌ Unable to process this image. Please try uploading a clearer image or type the question manually.';
+}
+
+// ─────────────────────────────────────────────────────────────
+// PUBLIC API — solveWithVisionForPDF
+// For scanned PDFs: convert page to base64 image → NVIDIA vision
+// ─────────────────────────────────────────────────────────────
+export async function solveWithVisionForPDF(pageImageBase64: string, userPrompt: string, pageNum: number): Promise<string> {
+  const imageUrl = `data:image/jpeg;base64,${pageImageBase64}`;
+  const prompt = userPrompt?.trim()
+    ? `This is page ${pageNum} of a PDF. Student asks: "${userPrompt}". Analyze and answer completely.`
+    : `This is page ${pageNum} of a PDF. Extract all text, solve all questions shown, explain all diagrams.`;
+
+  logger.info(`[PDF Vision] Processing page ${pageNum}`);
+  return solveWithVision(imageUrl, prompt);
+}
+
+// ─────────────────────────────────────────────────────────────
+// PUBLIC API — generatePPTContent (unchanged)
+// ─────────────────────────────────────────────────────────────
 export async function generatePPTContent(system: string, user: string): Promise<string> {
   const msgs: ChatMessage[] = [{ role: 'user', content: user }];
+
   if (NVIDIA_KEY) {
     try {
       const res = await fetchWithTimeout(`${NVIDIA_BASE}/chat/completions`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${NVIDIA_KEY}` },
-        body: JSON.stringify({ model: NVIDIA_MODELS.fast, messages: [{ role: 'system', content: system }, ...msgs], temperature: 0.3, max_tokens: 3000 }),
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${NVIDIA_KEY}` },
+        body: JSON.stringify({
+          model: NVIDIA_MODELS.fast,
+          messages: [{ role: 'system', content: system }, ...msgs],
+          temperature: 0.3, max_tokens: 3000,
+        }),
       });
-      if (res.ok) { const d = await res.json(); const a = d.choices?.[0]?.message?.content; if (a && a.length > 50) return a; }
-    } catch {}
+      if (res.ok) {
+        const d = await res.json();
+        const a = d.choices?.[0]?.message?.content;
+        if (a && a.length > 50) return a;
+      }
+    } catch { /* fall through */ }
   }
-  for (const model of [...GROQ_MODELS.slice(0, 2)]) {
-    try {
-      if (!GROQ_KEY) break;
-      const res = await fetchWithTimeout('https://api.groq.com/openai/v1/chat/completions', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_KEY}` }, body: JSON.stringify({ model, messages: [{ role: 'system', content: system }, { role: 'user', content: user }], temperature: 0.3, max_tokens: 3000 }) });
-      if (!res.ok) continue;
-      const d = await res.json(); const a = d.choices?.[0]?.message?.content;
-      if (a && a.length > 50) return a;
-    } catch {}
+
+  if (GROQ_KEY) {
+    for (const model of GROQ_MODELS.slice(0, 2)) {
+      try {
+        const res = await fetchWithTimeout('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${GROQ_KEY}` },
+          body: JSON.stringify({ model, messages: [{ role: 'system', content: system }, { role: 'user', content: user }], temperature: 0.3, max_tokens: 3000 }),
+        });
+        if (!res.ok) continue;
+        const d = await res.json();
+        const a = d.choices?.[0]?.message?.content;
+        if (a && a.length > 50) return a;
+      } catch { /* try next */ }
+    }
   }
-  for (const model of OR_MODELS.slice(0, 3)) {
-    try {
-      if (!OPENROUTER_KEY) break;
-      const res = await fetchWithTimeout('https://openrouter.ai/api/v1/chat/completions', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${OPENROUTER_KEY}`, 'HTTP-Referer': process.env.FRONTEND_URL || 'https://studyearnai.tech', 'X-Title': 'AI Study OS' }, body: JSON.stringify({ model, messages: [{ role: 'system', content: system }, { role: 'user', content: user }], temperature: 0.3, max_tokens: 3000 }) });
-      if (!res.ok) continue;
-      const d = await res.json(); const a = d.choices?.[0]?.message?.content;
-      if (a && a.length > 50) return a;
-    } catch {}
+
+  if (OPENROUTER_KEY) {
+    for (const model of OR_MODELS.slice(0, 3)) {
+      try {
+        const res = await fetchWithTimeout('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${OPENROUTER_KEY}`,
+            'HTTP-Referer': process.env.FRONTEND_URL || 'https://studyearnai.tech',
+            'X-Title': 'StudyEarn AI',
+          },
+          body: JSON.stringify({ model, messages: [{ role: 'system', content: system }, { role: 'user', content: user }], temperature: 0.3, max_tokens: 3000 }),
+        });
+        if (!res.ok) continue;
+        const d = await res.json();
+        const a = d.choices?.[0]?.message?.content;
+        if (a && a.length > 50) return a;
+      } catch { /* try next */ }
+    }
   }
+
   throw new Error('PPT: all providers failed');
 }

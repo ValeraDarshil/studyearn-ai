@@ -1,10 +1,14 @@
 /**
- * AI Study OS — Context-Aware AI Tutor Service (v3 — NVIDIA Powered)
+ * AI Study OS — Context-Aware AI Tutor Service (v2 Upgraded)
+ * ─────────────────────────────────────────────────────────────
+ * Upgrades:
+ *   1. Auto Language Detection — Hinglish → Hinglish, English → English
+ *   2. Subject Modes — Math, Coding, Science, General
+ *   3. Step-by-Step Mode — forced structured solving
+ *   4. Student Profile Context — weak topics, class, personality
  */
 
 import { getTutorContext, updateTopicMastery } from './studentProfileService.js';
-import { getAITutorContext } from './aiBrain/aiBrain.service.js';
-import { solveText, ChatMessage as AIChatMessage } from './aiService.js';
 import { logger } from '../utils/logger.js';
 
 const GROQ_KEY       = process.env.GROQ_API_KEY       || '';
@@ -297,17 +301,12 @@ export async function contextAwareSolve(
     { role: 'user', content: userPrompt },
   ];
 
-  // Call AI — now powered by NVIDIA NIM (253B model) → Groq → OpenRouter
+  // Call AI
   let answer: string;
   try {
-    // Pass the full system prompt + history as a single enriched call
-    // solveText now routes to NVIDIA NIM automatically
-    const fullPrompt = `[SYSTEM CONTEXT INJECTED]\n${systemPrompt}\n\n[USER QUESTION]\n${userPrompt}`;
-    const chatHistory = history.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }));
-    answer = await solveText(userPrompt, chatHistory, subjectMode === 'auto' ? autoDetectSubject(userPrompt) : subjectMode);
-  } catch (err: any) {
-    logger.error(`[ContextTutor] All providers failed: ${err.message}`);
-    answer = 'AI is temporarily unavailable. Please try again in a moment.';
+    answer = await callGroq(messages);
+  } catch {
+    answer = await callOpenRouter(messages);
   }
 
   // Update topic mastery in background (non-blocking)
