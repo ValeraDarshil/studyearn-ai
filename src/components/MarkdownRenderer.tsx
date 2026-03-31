@@ -283,450 +283,408 @@
 
 
 /**
- * StudyEarn AI — Ultra Markdown Renderer (v4)
+ * StudyEarn AI — MarkdownRenderer v5 (Ultra Premium)
  * ─────────────────────────────────────────────────────────────
- * ChatGPT / Gemini / Claude jaisi rendering:
- *
- * ✅ Emoji rendering (auto-detect and display)
- * ✅ Code blocks with syntax highlight + COPY button
- * ✅ Warning lines → red highlight (⚠️ text)
- * ✅ Important/key points → yellow/amber highlight (📌 💡 🔥)
- * ✅ Bold (**text**), Italic (*text*), Inline code (`code`)
- * ✅ Headings H1 / H2 / H3 with icons
- * ✅ Bullet lists & numbered lists (beautiful styling)
- * ✅ Blockquotes (> text) — styled callout boxes
- * ✅ Tables with alternating rows
- * ✅ LaTeX math via KaTeX ($inline$ and $$block$$)
- * ✅ Horizontal rules
- * ✅ Strikethrough ~~text~~
- * ✅ Links
- * ✅ Dark theme — perfect on StudyEarn's dark UI
+ * ChatGPT / Gemini / Claude style rendering:
+ * ✅ Syntax-colored code (Python, JS, HTML, CSS, C, Java, SQL, Bash)
+ * ✅ Working COPY button (clipboard API + textarea fallback)
+ * ✅ ⚠️ Warning lines → red pill highlight
+ * ✅ 📌 💡 🔥 Key lines → amber pill highlight
+ * ✅ ✅ Success lines → green pill highlight
+ * ✅ Bold **text** → white & bright
+ * ✅ Headings with colored left border accent
+ * ✅ Blockquotes → styled callout cards
+ * ✅ Tables with zebra stripes
+ * ✅ LaTeX math via KaTeX
+ * ✅ Bullet & numbered lists — premium style
  */
 
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback } from "react";
 
 // ─────────────────────────────────────────────────────────────
-// KATEX LOADER (math rendering)
+// KaTeX loader
 // ─────────────────────────────────────────────────────────────
 let katexLoaded = false;
-let katexLoadPromise: Promise<void> | null = null;
-
+let katexPromise: Promise<void> | null = null;
 function loadKatex(): Promise<void> {
   if (katexLoaded) return Promise.resolve();
-  if (katexLoadPromise) return katexLoadPromise;
-  katexLoadPromise = new Promise((resolve) => {
+  if (katexPromise) return katexPromise;
+  katexPromise = new Promise((resolve) => {
     if (!document.querySelector('link[href*="katex"]')) {
-      const link = document.createElement('link');
-      link.rel  = 'stylesheet';
-      link.href = 'https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css';
+      const link = document.createElement("link");
+      link.rel = "stylesheet";
+      link.href = "https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css";
       document.head.appendChild(link);
     }
-    const script = document.createElement('script');
-    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js';
-    script.onload = () => { katexLoaded = true; resolve(); };
-    script.onerror = () => resolve();
-    document.head.appendChild(script);
+    const s = document.createElement("script");
+    s.src = "https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js";
+    s.onload = () => { katexLoaded = true; resolve(); };
+    s.onerror = () => resolve();
+    document.head.appendChild(s);
   });
-  return katexLoadPromise;
+  return katexPromise;
 }
-
-function renderMath(latex: string, displayMode = false): string {
+function renderMath(latex: string, display = false): string {
   try {
-    const katex = (window as any).katex;
-    if (!katex) return latex;
-    return katex.renderToString(latex, { displayMode, throwOnError: false, errorColor: '#ff6b6b' });
-  } catch {
-    return latex;
+    const k = (window as any).katex;
+    if (!k) return latex;
+    return k.renderToString(latex, { displayMode: display, throwOnError: false, errorColor: "#f87171" });
+  } catch { return latex; }
+}
+
+// ─────────────────────────────────────────────────────────────
+// SYNTAX HIGHLIGHTER — pure regex, no library needed
+// ─────────────────────────────────────────────────────────────
+function syntaxHighlight(code: string, lang: string): string {
+  let c = code
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+
+  const l = lang.toLowerCase();
+
+  if (l === "python" || l === "py") {
+    c = c
+      .replace(/("""[\s\S]*?"""|'''[\s\S]*?'''|"[^"\n]*"|'[^'\n]*')/g, '<span class="syn-str">$1</span>')
+      .replace(/\b(def|class|import|from|return|if|elif|else|for|while|in|not|and|or|is|None|True|False|try|except|finally|with|as|pass|break|continue|raise|lambda|yield|async|await|global|nonlocal|del|assert)\b/g, '<span class="syn-kw">$1</span>')
+      .replace(/\b(print|input|len|range|type|int|float|str|list|dict|set|tuple|bool|open|sum|max|min|abs|round|sorted|enumerate|zip|map|filter|super|self|cls)\b/g, '<span class="syn-builtin">$1</span>')
+      .replace(/(@\w+)/g, '<span class="syn-deco">$1</span>')
+      .replace(/\b(\d+\.?\d*)\b/g, '<span class="syn-num">$1</span>')
+      .replace(/(#[^\n]*)/g, '<span class="syn-comment">$1</span>');
+  } else if (["js","javascript","ts","typescript","jsx","tsx"].includes(l)) {
+    c = c
+      .replace(/(`[^`]*`|"[^"\n]*"|'[^'\n]*')/g, '<span class="syn-str">$1</span>')
+      .replace(/\b(const|let|var|function|return|if|else|for|while|do|switch|case|break|continue|new|class|extends|import|export|default|from|async|await|try|catch|finally|throw|typeof|instanceof|in|of|this|super|static|null|undefined|true|false|void|delete|yield)\b/g, '<span class="syn-kw">$1</span>')
+      .replace(/\b(console|document|window|Math|Array|Object|String|Number|Boolean|Promise|JSON|Date|Error|Map|Set|fetch|setTimeout|clearTimeout|setInterval|parseInt|parseFloat)\b/g, '<span class="syn-builtin">$1</span>')
+      .replace(/\b(\d+\.?\d*)\b/g, '<span class="syn-num">$1</span>')
+      .replace(/(\/\/[^\n]*)/g, '<span class="syn-comment">$1</span>')
+      .replace(/(\/\*[\s\S]*?\*\/)/g, '<span class="syn-comment">$1</span>');
+  } else if (l === "html" || l === "xml") {
+    c = c
+      .replace(/=("[\s\S]*?"|'[\s\S]*?')/g, '=<span class="syn-str">$1</span>')
+      .replace(/(&lt;\/?)([\w-]+)/g, '$1<span class="syn-tag">$2</span>')
+      .replace(/\s([\w-]+)=/g, ' <span class="syn-attr">$1</span>=')
+      .replace(/(&lt;!--[\s\S]*?--&gt;)/g, '<span class="syn-comment">$1</span>');
+  } else if (l === "css" || l === "scss") {
+    c = c
+      .replace(/(:[^;{}\n]+)/g, '<span class="syn-str">$1</span>')
+      .replace(/\b(\d+\.?\d*(px|em|rem|%|vh|vw|s|ms)?)\b/g, '<span class="syn-num">$1</span>')
+      .replace(/(\/\*[\s\S]*?\*\/)/g, '<span class="syn-comment">$1</span>');
+  } else if (["c","cpp","c++"].includes(l)) {
+    c = c
+      .replace(/(".*?"|'.*?')/g, '<span class="syn-str">$1</span>')
+      .replace(/\b(int|float|double|char|void|bool|long|short|unsigned|signed|struct|class|return|if|else|for|while|do|switch|case|break|continue|include|define|typedef|enum|const|static|extern|auto|NULL|true|false|new|delete|namespace|using|public|private|protected|virtual)\b/g, '<span class="syn-kw">$1</span>')
+      .replace(/(#\w+)/g, '<span class="syn-deco">$1</span>')
+      .replace(/\b(\d+\.?\d*[fFlL]?)\b/g, '<span class="syn-num">$1</span>')
+      .replace(/(\/\/[^\n]*)/g, '<span class="syn-comment">$1</span>')
+      .replace(/(\/\*[\s\S]*?\*\/)/g, '<span class="syn-comment">$1</span>');
+  } else if (l === "java") {
+    c = c
+      .replace(/(".*?"|'.*?')/g, '<span class="syn-str">$1</span>')
+      .replace(/\b(public|private|protected|class|interface|extends|implements|import|package|return|if|else|for|while|do|switch|case|break|continue|new|void|static|final|abstract|try|catch|finally|throw|throws|instanceof|this|super|null|true|false|int|float|double|char|boolean|long|short|byte|String)\b/g, '<span class="syn-kw">$1</span>')
+      .replace(/\b(\d+\.?\d*[fFlL]?)\b/g, '<span class="syn-num">$1</span>')
+      .replace(/(\/\/[^\n]*)/g, '<span class="syn-comment">$1</span>')
+      .replace(/(\/\*[\s\S]*?\*\/)/g, '<span class="syn-comment">$1</span>');
+  } else if (l === "sql") {
+    c = c
+      .replace(/('.*?')/g, '<span class="syn-str">$1</span>')
+      .replace(/\b(SELECT|FROM|WHERE|JOIN|LEFT|RIGHT|INNER|OUTER|ON|GROUP|ORDER|BY|HAVING|INSERT|INTO|VALUES|UPDATE|SET|DELETE|CREATE|TABLE|DROP|ALTER|INDEX|PRIMARY|KEY|FOREIGN|REFERENCES|NOT|NULL|AND|OR|IN|LIKE|BETWEEN|AS|DISTINCT|COUNT|SUM|AVG|MAX|MIN|LIMIT|OFFSET|UNION|ALL|EXISTS|CASE|WHEN|THEN|ELSE|END)\b/gi, '<span class="syn-kw">$1</span>')
+      .replace(/\b(\d+\.?\d*)\b/g, '<span class="syn-num">$1</span>')
+      .replace(/(--[^\n]*)/g, '<span class="syn-comment">$1</span>');
+  } else if (["bash","sh","shell","zsh"].includes(l)) {
+    c = c
+      .replace(/(".*?"|'.*?')/g, '<span class="syn-str">$1</span>')
+      .replace(/\b(if|then|else|elif|fi|for|while|do|done|case|esac|function|return|exit|echo|cd|ls|mkdir|rm|cp|mv|grep|sed|awk|cat|chmod|chown|export|source|alias)\b/g, '<span class="syn-kw">$1</span>')
+      .replace(/(\$\{?[\w]+\}?)/g, '<span class="syn-builtin">$1</span>')
+      .replace(/(#[^\n]*)/g, '<span class="syn-comment">$1</span>');
   }
+
+  return c;
 }
 
 // ─────────────────────────────────────────────────────────────
-// HELPERS
+// LINE TYPE DETECTOR
 // ─────────────────────────────────────────────────────────────
-
-/** Escape HTML special chars safely */
-function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
-/** Detect if a line is a warning (⚠️) or key point (📌 💡 🔥) */
-function getLineType(line: string): 'warning' | 'key' | 'success' | 'error' | 'normal' {
+type LineType = "warning"|"key"|"success"|"error"|"normal";
+function lineType(line: string): LineType {
   const t = line.trim();
-  if (t.startsWith('⚠️') || t.toLowerCase().startsWith('⚠') || t.toLowerCase().includes('warning:')) return 'warning';
-  if (t.startsWith('📌') || t.startsWith('💡') || t.startsWith('🔥') || t.startsWith('🎯')) return 'key';
-  if (t.startsWith('✅') || t.startsWith('🟢')) return 'success';
-  if (t.startsWith('❌') || t.startsWith('🔴')) return 'error';
-  return 'normal';
+  if (t.startsWith("⚠️") || t.includes("Warning:") || t.includes("warning:")) return "warning";
+  if (t.startsWith("📌") || t.startsWith("💡") || t.startsWith("🔥") || t.startsWith("🎯") || t.startsWith("🚀")) return "key";
+  if (t.startsWith("✅") || t.startsWith("🟢")) return "success";
+  if (t.startsWith("❌") || t.startsWith("🔴") || t.startsWith("🚫")) return "error";
+  return "normal";
 }
 
 // ─────────────────────────────────────────────────────────────
-// INLINE RENDERER — bold, italic, code, math, emoji, links
+// INLINE RENDERER
 // ─────────────────────────────────────────────────────────────
-function renderInlineHTML(text: string): string {
+function renderInline(text: string): string {
   return text
-    // Inline math: $...$ (not $$)
-    .replace(/\$([^$\n]+?)\$/g, (_, math) =>
-      `<span class="katex-inline">${renderMath(math, false)}</span>`)
-    // Bold+italic: ***text***
-    .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
-    // Bold: **text**
-    .replace(/\*\*(.+?)\*\*/g, '<strong class="md-bold">$1</strong>')
-    // Italic: *text*
-    .replace(/\*(?!\*)(.+?)(?<!\*)\*/g, '<em class="md-italic">$1</em>')
-    // Inline code: `code`
-    .replace(/`([^`]+)`/g,
-      '<code class="md-inline-code">$1</code>')
-    // Strikethrough: ~~text~~
-    .replace(/~~(.+?)~~/g, '<del class="md-del">$1</del>')
-    // Links: [text](url)
-    .replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g,
-      '<a href="$2" target="_blank" rel="noopener" class="md-link">$1 ↗</a>');
+    .replace(/\$([^$\n]+?)\$/g, (_, m) => `<span class="katex-inline">${renderMath(m, false)}</span>`)
+    .replace(/\*\*\*(.+?)\*\*\*/g, "<strong><em>$1</em></strong>")
+    .replace(/\*\*(.+?)\*\*/g, '<strong class="syn-bold">$1</strong>')
+    .replace(/\*(?!\*)(.+?)(?<!\*)\*/g, '<em class="syn-italic">$1</em>')
+    .replace(/`([^`]+)`/g, '<code class="syn-icode">$1</code>')
+    .replace(/~~(.+?)~~/g, '<del class="syn-del">$1</del>')
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g, '<a href="$2" target="_blank" rel="noopener" class="syn-link">$1 ↗</a>');
 }
 
 // ─────────────────────────────────────────────────────────────
-// COPY BUTTON INJECTOR
-// Called after HTML is inserted into DOM
+// COPY BUTTON — attach after render
 // ─────────────────────────────────────────────────────────────
-function attachCopyButtons(container: HTMLElement) {
-  container.querySelectorAll<HTMLElement>('.md-copy-btn').forEach((btn) => {
-    // Remove old listener to avoid duplicates
-    const fresh = btn.cloneNode(true) as HTMLElement;
-    btn.parentNode?.replaceChild(fresh, btn);
-
-    fresh.addEventListener('click', () => {
-      const codeEl = fresh.closest('.md-code-block')?.querySelector('code');
-      if (!codeEl) return;
-      const text = codeEl.innerText;
-      navigator.clipboard.writeText(text).then(() => {
-        fresh.textContent = '✓ Copied!';
-        fresh.classList.add('md-copy-btn--done');
-        setTimeout(() => {
-          fresh.textContent = 'Copy';
-          fresh.classList.remove('md-copy-btn--done');
-        }, 2000);
-      }).catch(() => {
-        // Fallback for older browsers
-        const ta = document.createElement('textarea');
-        ta.value = text;
-        ta.style.position = 'fixed';
-        ta.style.opacity = '0';
-        document.body.appendChild(ta);
-        ta.select();
-        document.execCommand('copy');
-        document.body.removeChild(ta);
-        fresh.textContent = '✓ Copied!';
-        setTimeout(() => { fresh.textContent = 'Copy'; }, 2000);
-      });
+function attachCopyButtons(root: HTMLElement) {
+  root.querySelectorAll<HTMLButtonElement>("[data-cpb]").forEach((btn) => {
+    const clone = btn.cloneNode(true) as HTMLButtonElement;
+    btn.replaceWith(clone);
+    clone.addEventListener("click", () => {
+      const block = clone.closest("[data-cb]");
+      const code  = block?.querySelector("code");
+      if (!code) return;
+      const text = code.innerText;
+      const done = () => {
+        clone.textContent = "✓ Copied!";
+        clone.setAttribute("data-done", "1");
+        setTimeout(() => { clone.textContent = "Copy"; clone.removeAttribute("data-done"); }, 2000);
+      };
+      if (navigator.clipboard?.writeText) {
+        navigator.clipboard.writeText(text).then(done).catch(() => fbCopy(text, done));
+      } else {
+        fbCopy(text, done);
+      }
     });
   });
 }
 
-// ─────────────────────────────────────────────────────────────
-// PARSE MARKDOWN → HTML
-// ─────────────────────────────────────────────────────────────
-function parseMarkdown(text: string): string {
-  const lines = text.split('\n');
-  const html: string[] = [];
-  let i = 0;
-  let inList = false;
-  let listType = '';
-  let listDepth = 0;
+function fbCopy(text: string, done: () => void) {
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  ta.style.cssText = "position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;pointer-events:none";
+  document.body.appendChild(ta);
+  ta.focus(); ta.select();
+  try { document.execCommand("copy"); done(); } catch {}
+  document.body.removeChild(ta);
+}
 
-  const closeList = () => {
-    if (inList) {
-      html.push(listType === 'ul' ? '</ul>' : '</ol>');
-      inList = false; listType = ''; listDepth = 0;
-    }
-  };
+// ─────────────────────────────────────────────────────────────
+// MARKDOWN → HTML
+// ─────────────────────────────────────────────────────────────
+function parse(md: string): string {
+  const lines = md.split("\n");
+  const out: string[] = [];
+  let i = 0, inUl = false, inOl = false;
+
+  const closeUl = () => { if (inUl) { out.push("</ul>"); inUl = false; } };
+  const closeOl = () => { if (inOl) { out.push("</ol>"); inOl = false; } };
+  const closeLists = () => { closeUl(); closeOl(); };
 
   while (i < lines.length) {
-    const line = lines[i];
-    const trimmed = line.trim();
+    const raw = lines[i];
+    const t = raw.trim();
 
-    // ── Block math: $$...$$ ────────────────────────────────
-    if (trimmed.startsWith('$$')) {
-      closeList();
-      let mathContent = trimmed.slice(2);
-      i++;
-      while (i < lines.length && !lines[i].trim().endsWith('$$')) {
-        mathContent += '\n' + lines[i];
-        i++;
-      }
-      if (i < lines.length) mathContent += '\n' + lines[i].trim().slice(0, -2);
-      html.push(`<div class="md-math-block">${renderMath(mathContent.trim(), true)}</div>`);
+    // block math
+    if (t.startsWith("$$")) {
+      closeLists();
+      let math = t.slice(2); i++;
+      while (i < lines.length && !lines[i].trim().endsWith("$$")) { math += "\n" + lines[i]; i++; }
+      if (i < lines.length) math += "\n" + lines[i].trim().slice(0, -2);
+      out.push(`<div class="md-math">${renderMath(math.trim(), true)}</div>`);
       i++; continue;
     }
 
-    // ── Code block: ```lang ────────────────────────────────
-    if (trimmed.startsWith('```')) {
-      closeList();
-      const lang = trimmed.slice(3).trim() || 'code';
-      const codeLines: string[] = [];
-      i++;
-      while (i < lines.length && !lines[i].trim().startsWith('```')) {
-        codeLines.push(escapeHtml(lines[i]));
-        i++;
-      }
-      const codeContent = codeLines.join('\n');
-      html.push(`
-<div class="md-code-block">
-  <div class="md-code-header">
-    <span class="md-code-lang">${lang}</span>
-    <button class="md-copy-btn">Copy</button>
-  </div>
-  <pre class="md-pre"><code class="md-code lang-${lang}">${codeContent}</code></pre>
-</div>`);
+    // code block
+    if (t.startsWith("```")) {
+      closeLists();
+      const lang = t.slice(3).trim() || "code";
+      const codeLines: string[] = []; i++;
+      while (i < lines.length && !lines[i].trim().startsWith("```")) { codeLines.push(lines[i]); i++; }
+      const highlighted = syntaxHighlight(codeLines.join("\n"), lang);
+      out.push(`<div class="md-cb" data-cb><div class="md-cbh"><span class="md-lang">${lang}</span><button class="md-cpb" data-cpb>Copy</button></div><pre class="md-pre"><code class="md-code">${highlighted}</code></pre></div>`);
       i++; continue;
     }
 
-    // ── Horizontal rule ────────────────────────────────────
-    if (trimmed.match(/^[-*_]{3,}$/) && trimmed.length <= 10) {
-      closeList();
-      html.push('<hr class="md-hr" />');
+    // HR
+    if (t.match(/^[-*_]{3,}$/) && t.length <= 10) { closeLists(); out.push('<hr class="md-hr">'); i++; continue; }
+
+    // Headings
+    if (raw.startsWith("# "))   { closeLists(); out.push(`<h1 class="md-h1">${renderInline(raw.slice(2))}</h1>`); i++; continue; }
+    if (raw.startsWith("## "))  { closeLists(); out.push(`<h2 class="md-h2">${renderInline(raw.slice(3))}</h2>`); i++; continue; }
+    if (raw.startsWith("### ")) { closeLists(); out.push(`<h3 class="md-h3">${renderInline(raw.slice(4))}</h3>`); i++; continue; }
+
+    // Blockquote
+    if (raw.startsWith("> ")) {
+      closeLists();
+      const ct = raw.slice(2);
+      const lt = lineType(ct);
+      const mod = lt==="warning"?" md-bq-w":lt==="key"?" md-bq-k":lt==="success"?" md-bq-s":lt==="error"?" md-bq-e":"";
+      out.push(`<blockquote class="md-bq${mod}">${renderInline(ct)}</blockquote>`);
       i++; continue;
     }
 
-    // ── H1 ─────────────────────────────────────────────────
-    if (line.startsWith('# ')) {
-      closeList();
-      html.push(`<h1 class="md-h1">${renderInlineHTML(line.slice(2))}</h1>`);
-      i++; continue;
-    }
-
-    // ── H2 ─────────────────────────────────────────────────
-    if (line.startsWith('## ')) {
-      closeList();
-      html.push(`<h2 class="md-h2">${renderInlineHTML(line.slice(3))}</h2>`);
-      i++; continue;
-    }
-
-    // ── H3 ─────────────────────────────────────────────────
-    if (line.startsWith('### ')) {
-      closeList();
-      html.push(`<h3 class="md-h3">${renderInlineHTML(line.slice(4))}</h3>`);
-      i++; continue;
-    }
-
-    // ── Blockquote (> text) — styled callout ───────────────
-    if (line.startsWith('> ')) {
-      closeList();
-      const content = line.slice(2);
-      const type    = getLineType(content);
-      let cls = 'md-blockquote';
-      if (type === 'warning') cls += ' md-blockquote--warning';
-      else if (type === 'key') cls += ' md-blockquote--key';
-      else if (type === 'success') cls += ' md-blockquote--success';
-      else if (type === 'error') cls += ' md-blockquote--error';
-      html.push(`<blockquote class="${cls}">${renderInlineHTML(content)}</blockquote>`);
-      i++; continue;
-    }
-
-    // ── Table ──────────────────────────────────────────────
-    if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
-      closeList();
-      const tableLines: string[] = [];
-      while (i < lines.length && lines[i].trim().startsWith('|')) {
-        tableLines.push(lines[i]);
-        i++;
-      }
-      if (tableLines.length >= 2) {
-        const headerCells = tableLines[0].split('|').filter(c => c.trim());
-        const bodyRows    = tableLines.slice(2);
-        html.push(`
-<div class="md-table-wrap">
-  <table class="md-table">
-    <thead><tr>${headerCells.map(c =>
-      `<th class="md-th">${renderInlineHTML(c.trim())}</th>`
-    ).join('')}</tr></thead>
-    <tbody>${bodyRows.map((row, ri) => {
-      const cells = row.split('|').filter(c => c.trim());
-      return `<tr class="${ri % 2 === 0 ? 'md-tr-even' : 'md-tr-odd'}">${
-        cells.map(c => `<td class="md-td">${renderInlineHTML(c.trim())}</td>`).join('')
-      }</tr>`;
-    }).join('')}</tbody>
-  </table>
-</div>`);
+    // Table
+    if (t.startsWith("|") && t.endsWith("|")) {
+      closeLists();
+      const rows: string[] = [];
+      while (i < lines.length && lines[i].trim().startsWith("|")) { rows.push(lines[i]); i++; }
+      if (rows.length >= 2) {
+        const heads = rows[0].split("|").slice(1,-1).map(c=>c.trim());
+        const body  = rows.slice(2);
+        out.push(`<div class="md-tw"><table class="md-tbl"><thead><tr>${heads.map(h=>`<th class="md-th">${renderInline(h)}</th>`).join("")}</tr></thead><tbody>${body.map((r,ri)=>{const cells=r.split("|").slice(1,-1).map(c=>c.trim());return`<tr class="${ri%2===0?"md-ta":"md-tb"}">${cells.map(c=>`<td class="md-td">${renderInline(c)}</td>`).join("")}</tr>`;}).join("")}</tbody></table></div>`);
       }
       continue;
     }
 
-    // ── Bullet list ────────────────────────────────────────
-    if (trimmed.match(/^[-*+] /)) {
-      if (!inList || listType !== 'ul') {
-        closeList();
-        html.push('<ul class="md-ul">');
-        inList = true; listType = 'ul';
-      }
-      const content  = trimmed.replace(/^[-*+] /, '');
-      const lineType = getLineType(content);
-      let itemCls = 'md-li';
-      if (lineType === 'warning') itemCls += ' md-li--warning';
-      else if (lineType === 'key') itemCls += ' md-li--key';
-      html.push(`<li class="${itemCls}"><span class="md-bullet">●</span><span class="md-li-text">${renderInlineHTML(content)}</span></li>`);
+    // Bullet list
+    if (t.match(/^[-*+] /)) {
+      closeOl();
+      if (!inUl) { out.push('<ul class="md-ul">'); inUl = true; }
+      const ct = t.slice(2);
+      const lt = lineType(ct);
+      const dc = lt==="warning"?"md-dw":lt==="key"?"md-dk":lt==="success"?"md-ds":lt==="error"?"md-de":"md-d";
+      out.push(`<li class="md-li"><span class="${dc}">●</span><span class="md-lt">${renderInline(ct)}</span></li>`);
       i++; continue;
     }
 
-    // ── Numbered list ──────────────────────────────────────
-    if (trimmed.match(/^\d+\. /)) {
-      if (!inList || listType !== 'ol') {
-        closeList();
-        html.push('<ol class="md-ol">');
-        inList = true; listType = 'ol';
-      }
-      const num     = trimmed.match(/^(\d+)\./)?.[1];
-      const content = trimmed.replace(/^\d+\. /, '');
-      html.push(`<li class="md-li md-li-num"><span class="md-num">${num}.</span><span class="md-li-text">${renderInlineHTML(content)}</span></li>`);
+    // Numbered list
+    if (t.match(/^\d+\. /)) {
+      closeUl();
+      if (!inOl) { out.push('<ol class="md-ol">'); inOl = true; }
+      const num = t.match(/^(\d+)/)?.[1];
+      const ct  = t.replace(/^\d+\. /, "");
+      out.push(`<li class="md-li"><span class="md-n">${num}.</span><span class="md-lt">${renderInline(ct)}</span></li>`);
       i++; continue;
     }
 
-    // ── Empty line ─────────────────────────────────────────
-    if (!trimmed) {
-      closeList();
-      html.push('<div class="md-spacer"></div>');
-      i++; continue;
-    }
+    // Empty line
+    if (!t) { closeLists(); out.push('<div class="md-gap"></div>'); i++; continue; }
 
-    // ── Paragraph (with special line highlighting) ─────────
-    closeList();
-    const lineType = getLineType(line);
-    if (lineType === 'warning') {
-      html.push(`<p class="md-p md-p--warning">${renderInlineHTML(line)}</p>`);
-    } else if (lineType === 'key') {
-      html.push(`<p class="md-p md-p--key">${renderInlineHTML(line)}</p>`);
-    } else if (lineType === 'success') {
-      html.push(`<p class="md-p md-p--success">${renderInlineHTML(line)}</p>`);
-    } else if (lineType === 'error') {
-      html.push(`<p class="md-p md-p--error">${renderInlineHTML(line)}</p>`);
-    } else {
-      html.push(`<p class="md-p">${renderInlineHTML(line)}</p>`);
-    }
+    // Paragraph with line type highlighting
+    closeLists();
+    const lt = lineType(raw);
+    const mod = lt==="warning"?" md-pw":lt==="key"?" md-pk":lt==="success"?" md-ps":lt==="error"?" md-pe":"";
+    out.push(`<p class="md-p${mod}">${renderInline(raw)}</p>`);
     i++;
   }
 
-  closeList();
-  return html.join('\n');
+  closeLists();
+  return out.join("\n");
 }
 
 // ─────────────────────────────────────────────────────────────
-// CSS STYLES — injected once into <head>
+// CSS — injected once
 // ─────────────────────────────────────────────────────────────
-const MD_STYLES = `
-/* ── MarkdownRenderer v4 styles ── */
-.md-content { font-size: 14px; line-height: 1.75; color: #cbd5e1; }
+const CSS = `
+.md-root{font-size:14px;line-height:1.8;color:#cbd5e1;word-break:break-word}
 
 /* Headings */
-.md-h1 { font-size: 1.25rem; font-weight: 700; color: #fff; margin: 1.25rem 0 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 0.35rem; }
-.md-h2 { font-size: 1.1rem; font-weight: 700; color: #93c5fd; margin: 1rem 0 0.4rem; }
-.md-h3 { font-size: 0.95rem; font-weight: 700; color: #c4b5fd; margin: 0.85rem 0 0.3rem; }
+.md-h1{font-size:1.2rem;font-weight:700;color:#fff;margin:1.2rem 0 .5rem;padding-left:.75rem;border-left:3px solid #7c3aed;line-height:1.4}
+.md-h2{font-size:1.05rem;font-weight:700;color:#93c5fd;margin:.9rem 0 .4rem;padding-left:.6rem;border-left:3px solid #3b82f6;line-height:1.4}
+.md-h3{font-size:.95rem;font-weight:700;color:#c4b5fd;margin:.75rem 0 .3rem;padding-left:.5rem;border-left:3px solid #8b5cf6;line-height:1.4}
 
-/* Paragraphs */
-.md-p { color: #cbd5e1; margin: 0.25rem 0; line-height: 1.75; font-size: 0.875rem; }
-.md-p--warning { background: rgba(239,68,68,0.08); border-left: 3px solid #ef4444; padding: 0.4rem 0.75rem; border-radius: 0 6px 6px 0; color: #fca5a5; margin: 0.35rem 0; }
-.md-p--key     { background: rgba(245,158,11,0.08); border-left: 3px solid #f59e0b; padding: 0.4rem 0.75rem; border-radius: 0 6px 6px 0; color: #fde68a; margin: 0.35rem 0; }
-.md-p--success { background: rgba(34,197,94,0.08);  border-left: 3px solid #22c55e; padding: 0.4rem 0.75rem; border-radius: 0 6px 6px 0; color: #86efac; margin: 0.35rem 0; }
-.md-p--error   { background: rgba(239,68,68,0.06);  border-left: 3px solid #f87171; padding: 0.4rem 0.75rem; border-radius: 0 6px 6px 0; color: #fca5a5; margin: 0.35rem 0; }
+/* Paragraph + specials */
+.md-p{font-size:.875rem;color:#cbd5e1;margin:.2rem 0;line-height:1.8}
+.md-p.md-pw{background:rgba(239,68,68,.08);border-left:3px solid #ef4444;padding:.4rem .8rem;border-radius:0 6px 6px 0;color:#fca5a5;margin:.35rem 0}
+.md-p.md-pk{background:rgba(245,158,11,.08);border-left:3px solid #f59e0b;padding:.4rem .8rem;border-radius:0 6px 6px 0;color:#fde68a;margin:.35rem 0;font-weight:600}
+.md-p.md-ps{background:rgba(34,197,94,.08);border-left:3px solid #22c55e;padding:.4rem .8rem;border-radius:0 6px 6px 0;color:#86efac;margin:.35rem 0}
+.md-p.md-pe{background:rgba(239,68,68,.07);border-left:3px solid #f87171;padding:.4rem .8rem;border-radius:0 6px 6px 0;color:#fca5a5;margin:.35rem 0}
 
-/* Inline styles */
-.md-bold        { font-weight: 700; color: #fff; }
-.md-italic      { font-style: italic; color: #e2e8f0; }
-.md-del         { text-decoration: line-through; color: #64748b; }
-.md-inline-code { background: rgba(99,102,241,0.15); color: #a5b4fc; padding: 0.15em 0.45em; border-radius: 5px; font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace; font-size: 0.82em; border: 1px solid rgba(99,102,241,0.2); }
-.md-link        { color: #60a5fa; text-decoration: underline; text-underline-offset: 2px; }
-.md-link:hover  { color: #93c5fd; }
+/* Inline */
+.syn-bold   {font-weight:700;color:#fff}
+.syn-italic {font-style:italic;color:#e2e8f0}
+.syn-del    {text-decoration:line-through;color:#4b5563}
+.syn-icode  {background:rgba(99,102,241,.18);color:#a5b4fc;padding:.1em .4em;border-radius:4px;font-family:'JetBrains Mono','Fira Code',monospace;font-size:.82em;border:1px solid rgba(99,102,241,.25)}
+.syn-link   {color:#60a5fa;text-decoration:underline;text-underline-offset:2px}
+.syn-link:hover{color:#93c5fd}
 
 /* Code blocks */
-.md-code-block  { background: #0d1117; border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; overflow: hidden; margin: 0.75rem 0; }
-.md-code-header { display: flex; align-items: center; justify-content: space-between; padding: 0.4rem 1rem; background: rgba(255,255,255,0.04); border-bottom: 1px solid rgba(255,255,255,0.06); }
-.md-code-lang   { font-size: 0.75rem; font-family: monospace; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; }
-.md-copy-btn    { font-size: 0.72rem; font-weight: 600; color: #94a3b8; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 5px; padding: 0.2rem 0.6rem; cursor: pointer; transition: all 0.15s; }
-.md-copy-btn:hover { color: #fff; background: rgba(255,255,255,0.12); }
-.md-copy-btn--done { color: #4ade80 !important; border-color: rgba(74,222,128,0.3) !important; }
-.md-pre         { padding: 1rem; overflow-x: auto; margin: 0; }
-.md-code        { font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace; font-size: 0.82rem; line-height: 1.7; color: #e2e8f0; display: block; white-space: pre; }
+.md-cb  {background:#0d1117;border:1px solid rgba(255,255,255,.09);border-radius:10px;overflow:hidden;margin:.75rem 0}
+.md-cbh {display:flex;align-items:center;justify-content:space-between;padding:.35rem .85rem;background:rgba(255,255,255,.04);border-bottom:1px solid rgba(255,255,255,.07)}
+.md-lang{font-size:.7rem;font-family:monospace;color:#475569;text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+.md-cpb {font-size:.72rem;font-weight:600;color:#64748b;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:5px;padding:.18rem .55rem;cursor:pointer;transition:all .15s;user-select:none;line-height:1.5}
+.md-cpb:hover{color:#fff;background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.2)}
+.md-cpb[data-done]{color:#4ade80;border-color:rgba(74,222,128,.35)}
+.md-pre {margin:0;padding:.9rem 1rem;overflow-x:auto}
+.md-code{font-family:'JetBrains Mono','Fira Code','Courier New',monospace;font-size:.8rem;line-height:1.75;color:#e2e8f0;display:block;white-space:pre}
+
+/* Syntax token colors */
+.syn-kw      {color:#c792ea;font-weight:600}
+.syn-str     {color:#c3e88d}
+.syn-num     {color:#f78c6c}
+.syn-comment {color:#546e7a;font-style:italic}
+.syn-builtin {color:#82aaff}
+.syn-deco    {color:#ffcb6b}
+.syn-tag     {color:#f07178}
+.syn-attr    {color:#c792ea}
 
 /* Blockquotes */
-.md-blockquote          { border-left: 3px solid #4f46e5; background: rgba(79,70,229,0.08); padding: 0.5rem 0.85rem; border-radius: 0 8px 8px 0; margin: 0.5rem 0; color: #c7d2fe; font-size: 0.875rem; }
-.md-blockquote--warning { border-left-color: #ef4444; background: rgba(239,68,68,0.08); color: #fca5a5; }
-.md-blockquote--key     { border-left-color: #f59e0b; background: rgba(245,158,11,0.08); color: #fde68a; }
-.md-blockquote--success { border-left-color: #22c55e; background: rgba(34,197,94,0.08);  color: #86efac; }
-.md-blockquote--error   { border-left-color: #f87171; background: rgba(239,68,68,0.06);  color: #fca5a5; }
+.md-bq   {border-left:3px solid #4f46e5;background:rgba(79,70,229,.08);padding:.5rem .85rem;border-radius:0 8px 8px 0;margin:.5rem 0;color:#c7d2fe;font-size:.875rem;line-height:1.7}
+.md-bq-w {border-left-color:#ef4444;background:rgba(239,68,68,.08);color:#fca5a5}
+.md-bq-k {border-left-color:#f59e0b;background:rgba(245,158,11,.08);color:#fde68a;font-weight:600}
+.md-bq-s {border-left-color:#22c55e;background:rgba(34,197,94,.08);color:#86efac}
+.md-bq-e {border-left-color:#f87171;background:rgba(239,68,68,.07);color:#fca5a5}
 
 /* Lists */
-.md-ul, .md-ol { margin: 0.4rem 0; padding: 0; list-style: none; }
-.md-li         { display: flex; gap: 0.5rem; align-items: flex-start; padding: 0.15rem 0; }
-.md-li--warning .md-li-text { color: #fca5a5; }
-.md-li--key     .md-li-text { color: #fde68a; font-weight: 600; }
-.md-bullet     { color: #7c3aed; font-size: 8px; flex-shrink: 0; margin-top: 7px; }
-.md-num        { color: #60a5fa; font-weight: 700; font-size: 0.875rem; flex-shrink: 0; min-width: 1.4rem; padding-top: 1px; }
-.md-li-text    { font-size: 0.875rem; color: #cbd5e1; line-height: 1.7; }
+.md-ul,.md-ol{margin:.35rem 0;padding:0;list-style:none}
+.md-li {display:flex;gap:.5rem;align-items:flex-start;padding:.12rem 0}
+.md-lt {font-size:.875rem;color:#cbd5e1;line-height:1.75}
+.md-d  {color:#7c3aed;font-size:7px;flex-shrink:0;margin-top:8px}
+.md-dw {color:#ef4444;font-size:7px;flex-shrink:0;margin-top:8px}
+.md-dk {color:#f59e0b;font-size:7px;flex-shrink:0;margin-top:8px}
+.md-ds {color:#22c55e;font-size:7px;flex-shrink:0;margin-top:8px}
+.md-de {color:#f87171;font-size:7px;flex-shrink:0;margin-top:8px}
+.md-n  {color:#60a5fa;font-weight:700;font-size:.875rem;flex-shrink:0;min-width:1.4rem;padding-top:1px}
 
 /* Tables */
-.md-table-wrap { overflow-x: auto; margin: 0.75rem 0; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08); }
-.md-table      { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-.md-th         { padding: 0.5rem 0.85rem; text-align: left; font-weight: 600; font-size: 0.78rem; color: #94a3b8; background: rgba(255,255,255,0.04); border-bottom: 1px solid rgba(255,255,255,0.08); text-transform: uppercase; letter-spacing: 0.04em; }
-.md-td         { padding: 0.45rem 0.85rem; color: #cbd5e1; border-bottom: 1px solid rgba(255,255,255,0.04); }
-.md-tr-even    { background: rgba(255,255,255,0.01); }
-.md-tr-odd     { background: rgba(255,255,255,0.03); }
+.md-tw {overflow-x:auto;margin:.7rem 0;border-radius:10px;border:1px solid rgba(255,255,255,.09)}
+.md-tbl{width:100%;border-collapse:collapse;font-size:.85rem}
+.md-th {padding:.45rem .8rem;text-align:left;font-weight:600;font-size:.75rem;color:#94a3b8;background:rgba(255,255,255,.04);border-bottom:1px solid rgba(255,255,255,.08);text-transform:uppercase;letter-spacing:.04em}
+.md-td {padding:.4rem .8rem;color:#cbd5e1;border-bottom:1px solid rgba(255,255,255,.04)}
+.md-ta {background:rgba(255,255,255,.01)}
+.md-tb {background:rgba(255,255,255,.033)}
 
 /* Misc */
-.md-hr      { border: none; border-top: 1px solid rgba(255,255,255,0.08); margin: 1rem 0; }
-.md-spacer  { height: 0.35rem; }
-.md-math-block { overflow-x: auto; text-align: center; margin: 0.75rem 0; padding: 0.5rem; background: rgba(255,255,255,0.02); border-radius: 8px; }
+.md-hr  {border:none;border-top:1px solid rgba(255,255,255,.08);margin:.9rem 0}
+.md-gap {height:.3rem}
+.md-math{overflow-x:auto;text-align:center;margin:.7rem 0;padding:.5rem;background:rgba(255,255,255,.02);border-radius:8px}
 `;
 
-let stylesInjected = false;
-function injectStyles() {
-  if (stylesInjected || typeof document === 'undefined') return;
-  const style = document.createElement('style');
-  style.id    = 'studyearn-md-styles';
-  style.textContent = MD_STYLES;
-  document.head.appendChild(style);
-  stylesInjected = true;
+let cssInjected = false;
+function injectCSS() {
+  if (cssInjected || typeof document === "undefined") return;
+  const el = document.createElement("style");
+  el.id = "sea-md-v5";
+  el.textContent = CSS;
+  document.head.appendChild(el);
+  cssInjected = true;
 }
 
 // ─────────────────────────────────────────────────────────────
 // REACT COMPONENT
 // ─────────────────────────────────────────────────────────────
-interface MarkdownRendererProps {
-  content: string;
-  className?: string;
-}
+interface Props { content: string; className?: string; }
 
-export function MarkdownRenderer({ content, className = '' }: MarkdownRendererProps) {
+export function MarkdownRenderer({ content, className = "" }: Props) {
   const ref = useRef<HTMLDivElement>(null);
 
   const render = useCallback(() => {
     if (!ref.current) return;
-    ref.current.innerHTML = parseMarkdown(content);
+    ref.current.innerHTML = parse(content);
     attachCopyButtons(ref.current);
   }, [content]);
 
-  useEffect(() => {
-    injectStyles();
-  }, []);
+  useEffect(() => { injectCSS(); }, []);
 
   useEffect(() => {
     render();
-
-    // Load KaTeX if math is present, then re-render
-    if (content.includes('$')) {
-      loadKatex().then(() => {
-        if (ref.current && (window as any).katex) {
-          render();
-        }
-      });
+    if (content.includes("$")) {
+      loadKatex().then(() => { if (ref.current && (window as any).katex) render(); });
     }
   }, [content, render]);
 
   return (
     <div
       ref={ref}
-      className={`md-content ${className}`}
-      dangerouslySetInnerHTML={{ __html: parseMarkdown(content) }}
+      className={`md-root ${className}`}
+      dangerouslySetInnerHTML={{ __html: parse(content) }}
     />
   );
 }
