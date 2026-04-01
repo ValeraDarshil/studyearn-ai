@@ -1126,6 +1126,7 @@ export function AskAI() {
   const convoIdRef  = useRef<string | null>(null);
   const bottomRef   = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const withUserRef = useRef<ChatMsg[]>([]);  // snapshot for streaming closure
 
   // ── Fetch conversations ──────────────────────────────────
   const fetchConvos = useCallback(async () => {
@@ -1362,6 +1363,9 @@ export function AskAI() {
     };
     const withUser = [...messages, userMsg];
     setMessages(withUser);
+    // Store snapshot in ref so streaming closure always sees the correct value
+    // (avoids stale state in the firstToken callback)
+    withUserRef.current = withUser;
     setQuestion("");
     if (textareaRef.current) textareaRef.current.style.height = "32px";
     setLoading(true);
@@ -1421,7 +1425,7 @@ export function AskAI() {
           checkAndUnlockAchievements({ totalQuestionsAsked: newTotal });
           trackProgressEvent("ai_tutor_used", { mode: subjectMode }).catch(() => {});
         }
-        const finalMsgs = [...withUser, aiMsg];
+        const finalMsgs = [...withUserRef.current, aiMsg];
         setMessages(finalMsgs);
         if (convoId) { await saveMessages(convoId, [userMsg, aiMsg]); fetchConvos(); }
       } catch {
@@ -1510,8 +1514,8 @@ export function AskAI() {
                 firstToken = false;
                 setLoading(false);
                 setLoadingStep("");
-                // Add empty placeholder bubble, then immediately fill it
-                setMessages([...withUser, { role: "assistant", content: "", subjectMode }]);
+                // Use ref snapshot — safe from stale closure
+                setMessages([...withUserRef.current, { role: "assistant", content: "", subjectMode }]);
                 setIsStreaming(true);
               }
 

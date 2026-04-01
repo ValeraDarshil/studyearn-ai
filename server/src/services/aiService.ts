@@ -1376,6 +1376,7 @@
 // }
 
 
+
 // ─────────────────────────────────────────────────────────────
 // StudyEarn AI — AI Service  (UPGRADED v4)
 // ─────────────────────────────────────────────────────────────
@@ -1471,7 +1472,22 @@ ANSWER RULES:
 • Science: state law/formula → substitute → solve → real-world example
 • If the student writes in Hinglish, reply in Hinglish naturally
 • Indian exam style: thorough, structured, marks-worthy
-• Be encouraging — add a motivational emoji at the end 🎯`;
+• Be encouraging — add a motivational emoji at the end 🎯
+ 
+FOLLOW-UP SUGGESTIONS (mandatory at end of every answer):
+After your answer, always add this section:
+ 
+---
+💬 **Want to explore more?**
+- [Specific follow-up 1 — related concept or common confusion]
+- [Specific follow-up 2 — harder extension or next step]
+- [Specific follow-up 3 — practice problems or real application]
+ 
+Make suggestions SPECIFIC to the topic just answered. Examples:
+- Python sets answered: suggest 'Dictionary vs Set differences', '10 set practice problems', 'Set comprehension examples'
+- Newton laws answered: suggest 'Solve 5 F=ma numericals', 'Friction problems', 'Why weightlessness in space?'
+- Recursion answered: suggest 'Trace Fibonacci recursion', 'Recursion vs Iteration', 'Tower of Hanoi'`;
+ 
  
 const MATH_PROMPT = BASE_PROMPT + '\n\n📐 **MATH MODE:** Show formula → substitution → every step. Verify answer. Use **bold** for final answer. Box the result.';
 const CODING_PROMPT = BASE_PROMPT + '\n\n💻 **CODING MODE:** Complete runnable code always. Comment every line. Show expected output. Explain WHY each part works.';
@@ -1624,10 +1640,10 @@ async function pipeStream(response: Response, res: ExpressResponse): Promise<voi
       for (const line of lines) {
         if (!line.startsWith('data: ')) continue;
         const data = line.slice(6).trim();
-        if (data === '[DONE]') { res.write('data: [DONE]\n\n'); return; }
+        if (data === '[DONE]') { res.write('data: [DONE]\n\n'); (res as any).flush?.(); return; }
         try {
           const delta = JSON.parse(data).choices?.[0]?.delta?.content;
-          if (delta) res.write(`data: ${JSON.stringify({ token: delta })}\n\n`);
+          if (delta) { res.write(`data: ${JSON.stringify({ token: delta })}\n\n`); (res as any).flush?.(); }
         } catch { /* skip malformed */ }
       }
     }
@@ -1833,8 +1849,6 @@ export async function solveText(prompt: string, history: ChatMessage[] = [], sub
   const sys = getSystemPrompt(subjectMode);
   const msgs: ChatMessage[] = [...history, { role: 'user', content: prompt }];
  
-  // TEXT: GROQ first (fast) → OpenRouter fallback
-  // NVIDIA is reserved exclusively for image/PDF vision
   if (GROQ_KEY) {
     try { return await groqText(msgs, sys); }
     catch (e: any) { logger.warn(`Groq→OR: ${e.message}`); }
@@ -1843,7 +1857,7 @@ export async function solveText(prompt: string, history: ChatMessage[] = [], sub
     try { return await openRouterText(msgs, sys); }
     catch (e: any) { logger.warn(`OR failed: ${e.message}`); }
   }
-  throw new Error('All text AI providers failed');
+  throw new Error('All AI providers failed');
 }
  
 // ─────────────────────────────────────────────────────────────
@@ -1859,8 +1873,6 @@ export async function solveTextStream(
   const sys = getSystemPrompt(subjectMode);
   const msgs: ChatMessage[] = [...history, { role: 'user', content: prompt }];
  
-  // STREAM TEXT: GROQ first (fastest streaming) → OpenRouter fallback
-  // NVIDIA is reserved exclusively for image/PDF vision
   if (GROQ_KEY) {
     try { await groqStream(msgs, sys, res); return; }
     catch (e: any) { logger.warn(`Groq stream→OR: ${e.message}`); }
