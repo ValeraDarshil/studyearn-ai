@@ -348,21 +348,26 @@
 
 
 // ─────────────────────────────────────────────────────────────
-// StudyEarn AI — AI Controller (v4 — Ultra Powerful AskAI)
+// StudyEarn AI — AI Controller (v5)
 // ─────────────────────────────────────────────────────────────
 // Routes:
 //  POST /api/ai/ask        → text or image questions
-//  POST /api/ai/solve-pdf  → PDF analysis (text + scanned)
-//  POST /api/ai/ask-stream → SSE streaming
+//  POST /api/ai/ask-stream → SSE streaming (text only)
+//  POST /api/ai/solve-pdf  → PDF analysis (digital + scanned)
 //  POST /api/ai/watch-ad   → +1 question bonus
 //  GET  /api/ai/quota      → quota info
+//
+// Provider routing:
+//  TEXT questions  → GROQ → OpenRouter (NVIDIA NOT used)
+//  IMAGE questions → NVIDIA Vision → GROQ Vision → OR Vision
+//  Digital PDF     → text extracted → GROQ → OpenRouter
+//  Scanned PDF     → NVIDIA Vision → GROQ Vision → OR Vision
 // ─────────────────────────────────────────────────────────────
 
 import { Request, Response } from 'express';
 import {
   solveText,
   solveWithVision,
-  solveWithVisionForPDF,
   solveTextStream,
   ChatMessage,
 } from '../services/aiService.js';
@@ -449,9 +454,9 @@ async function handleQuestionUsed(
     applyHourlyRefill(user, dailyLimit);
 
     const pts = premium ? BASE_AI_POINTS * PREMIUM_MULTIPLIER : BASE_AI_POINTS;
-    user.points                       += pts;
-    (user as any).totalXP              = ((user as any).totalXP || 0) + pts;
-    (user as any).totalQuestionsAsked  = ((user as any).totalQuestionsAsked || 0) + 1;
+    user.points  = (user.points  || 0) + pts;
+    (user as any).totalXP             = ((user as any).totalXP || 0) + pts;
+    (user as any).totalQuestionsAsked = ((user as any).totalQuestionsAsked || 0) + 1;
     await user.save();
 
     const isInternal = promptText.startsWith('{') || promptText.startsWith('[') ||
@@ -462,7 +467,7 @@ async function handleQuestionUsed(
       : 'Asked an AI question';
 
     await Activity.create({ userId, action: 'ask_question', details: activityDetail, pointsEarned: pts });
-    logger.info(`AI question: ${user.email} | premium=${premium} | +${pts}pts | left=${(user as any).questionsLeft}`);
+    logger.info(`AI question: ${(user as any).email} | premium=${premium} | +${pts}pts | left=${(user as any).questionsLeft}`);
 
     syncActivityToProfile(userId, 'ask_question', pts).catch(() => {});
     onActivityEvent(userId, 'ai_tutor_used', { topic: activityDetail }).catch(() => {});
@@ -480,7 +485,8 @@ async function handleQuestionUsed(
 
 // ─────────────────────────────────────────────────────────────
 // POST /api/ai/ask
-// Handles: text questions + image uploads
+// Text questions  → GROQ → OpenRouter  (via personalTutorSolve)
+// Image questions → NVIDIA Vision → GROQ Vision → OR Vision
 // ─────────────────────────────────────────────────────────────
 export async function askAI(req: Request, res: Response) {
   try {
@@ -516,7 +522,7 @@ export async function askAI(req: Request, res: Response) {
       detectedTopic?: string | null;
     } = {};
 
-    // ── IMAGE → NVIDIA Vision (primary) ──────────────────────
+    // ── IMAGE → Vision (NVIDIA → GROQ → OR) ──────────────────
     if (image) {
       let imageUrl = image;
       if (!image.startsWith('data:')) {
@@ -526,7 +532,7 @@ export async function askAI(req: Request, res: Response) {
       if (imgSizeKB > 4000) logger.warn(`Large image: ${imgSizeKB}KB`);
       answer = await solveWithVision(imageUrl, prompt || '');
 
-    // ── TEXT → Personal AI Tutor (Stage 2) ───────────────────
+    // ── TEXT → Personal AI Tutor → GROQ → OR ─────────────────
     } else {
       if (userId) {
         try {
@@ -582,10 +588,11 @@ export async function askAI(req: Request, res: Response) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// POST /api/ai/ask-stream  (SSE streaming)
+// POST /api/ai/ask-stream  (SSE streaming — text only)
+// GROQ → OpenRouter  (NVIDIA NOT used for text)
 // ─────────────────────────────────────────────────────────────
 export async function askAIStream(req: Request, res: Response) {
-  const { prompt, history = [], subjectMode, personality, recentActivity } = req.body;
+  const { prompt, history = [], subjectMode } = req.body;
   const userId = getUserIdFromToken(req) ?? '';
 
   if (!prompt) { res.status(400).json({ error: 'prompt required' }); return; }
@@ -616,124 +623,135 @@ export async function askAIStream(req: Request, res: Response) {
 
 // ─────────────────────────────────────────────────────────────
 // POST /api/ai/solve-pdf
-// ─────────────────────────────────────────────────────────────
-// Smart routing:
-//   1. Try text extraction (pdf-parse) — works for digital PDFs
-//   2. If extracted text < 50 chars → it's a SCANNED PDF
-//      → Convert first page to image → NVIDIA Vision
-//   3. Build a rich summary/solution answer
+//
+// Routing logic:
+//  1. Try pdf-parse text extraction
+//  2a. Digital PDF (text >= 80 chars) → GROQ → OpenRouter
+//  2b. Scanned PDF (no text)          → NVIDIA Vision → GROQ Vision → OR Vision
+//
+// Student ko kabhi "text extract karo" ya "image upload karo"
+// bolne ki zaroorat nahi — sab automatic handle hota hai.
 // ─────────────────────────────────────────────────────────────
 export async function solvePDF(req: Request, res: Response) {
   try {
-    if (!req.file) return res.status(400).json({ success: false, answer: '❌ No file uploaded.' });
+    if (!req.file) {
+      return res.status(400).json({ success: false, answer: '❌ No file uploaded.' });
+    }
 
     const userPrompt = (req.body.prompt || '').trim();
     logger.info(`/api/ai/solve-pdf  size=${req.file.size}bytes  prompt="${userPrompt.substring(0, 60)}"`);
 
-    // ── Step 1: Try text extraction ───────────────────────────
+    // ── STEP 1: Extract text ──────────────────────────────────
     let extracted = '';
     try {
       extracted = await parsePDFText(req.file.buffer);
+      logger.info(`PDF text extracted: ${extracted.length} chars`);
     } catch (e: any) {
-      logger.warn(`PDF text parse failed: ${e.message}`);
+      logger.warn(`PDF text extraction failed: ${e.message}`);
     }
 
-    // ── Step 2: Digital PDF (text found) ─────────────────────
-    if (extracted && extracted.trim().length >= 100) {
-      logger.info(`PDF: text-based (${extracted.length} chars)`);
+    // ── STEP 2A: Digital PDF → GROQ / OpenRouter ──────────────
+    // Text is readable — send to GROQ (fast, cheap, no vision needed)
+    if (extracted && extracted.trim().length >= 80) {
+      logger.info(`PDF: digital (${extracted.length} chars) → GROQ/OR`);
 
-      const MAX_CHARS = 14000;
-      const text = extracted.length > MAX_CHARS
-        ? extracted.substring(0, MAX_CHARS) + '\n\n[... document continues ...]'
-        : extracted;
-
-      // Build a rich prompt for complete PDF analysis
-      const solvePrompt = userPrompt
-        ? `📄 **PDF Content:**\n\n${text}\n\n---\n\n**Student asks:** "${userPrompt}"\n\nAnswer the student's request completely. If they want a summary, give a structured summary with headings. If they want solutions, solve every question step-by-step.`
-        : `📄 **PDF Content:**\n\n${text}\n\n---\n\nAnalyze this PDF completely:\n1. Give a brief **summary** of what this document is about\n2. Identify and **solve ALL questions** found, step-by-step, numbered\n3. Highlight **key concepts** and important formulas\n4. Give **study tips** for this topic`;
-
-      const answer     = await solveText(solvePrompt);
-      const userAction = await handleQuestionUsed(req, userPrompt.substring(0, 100));
-
-      return res.json({
-        success: true,
-        answer,
-        pdfType: 'text',
-        ...(userAction ? {
-          questionsLeft:  userAction.questionsLeft,
-          pointsAwarded:  userAction.pointsAwarded,
-          nextRefillSecs: userAction.nextRefillSecs,
-        } : {}),
-      });
-    }
-
-    // ── Step 3: Scanned PDF → NVIDIA Vision ──────────────────
-    logger.info('PDF: scanned/image-based → using NVIDIA Vision');
-
-    try {
-      // Convert PDF buffer to base64 image using sharp/canvas approach
-      // We use the pdf buffer as-is and send it as a data URL to vision
-      const pdfBase64 = req.file.buffer.toString('base64');
-      const pdfDataUrl = `data:application/pdf;base64,${pdfBase64}`;
-
-      // Try NVIDIA vision with the PDF directly (some models accept PDF)
-      // If not, fall back to instructing user
-      const visionPrompt = userPrompt
-        ? `This is a scanned PDF document. Student asks: "${userPrompt}". Read all text visible and answer completely.`
-        : 'This is a scanned PDF document. Extract all visible text, identify all questions, solve them completely step-by-step. Give a full analysis.';
-
-      let answer: string;
-
-      // Try vision with pdf data url first
-      try {
-        answer = await solveWithVision(pdfDataUrl, visionPrompt);
-      } catch {
-        // Fallback: ask user to upload as image
-        answer = [
-          '⚠️ **Scanned PDF Detected**',
-          '',
-          'This PDF contains scanned images instead of text, so I cannot read it directly.',
-          '',
-          '## 📸 How to get the answer:',
-          '1. **Take a screenshot** of the PDF pages',
-          '2. **Upload the screenshot** as an image instead',
-          '3. I will then read and solve it using **AI Vision** 🔍',
-          '',
-          userPrompt
-            ? `> 📌 Your question was: **"${userPrompt}"** — I\'ll answer it once you upload the image!`
-            : '> 💡 You can also type the question manually in the text box.',
-        ].join('\n');
+      // Chunk: first 12k + last 2k chars for large documents
+      const MAX_CHARS = 12000;
+      let text: string;
+      if (extracted.length > MAX_CHARS + 2000) {
+        const omitted = Math.round((extracted.length - MAX_CHARS - 2000) / 1000);
+        text = extracted.substring(0, MAX_CHARS)
+          + `\n\n[... ~${omitted}k chars omitted for length ...]\n\n`
+          + extracted.substring(extracted.length - 2000);
+      } else {
+        text = extracted;
       }
 
-      const userAction = await handleQuestionUsed(req, userPrompt.substring(0, 100));
+      // Build smart prompt based on what student asked
+      const solvePrompt = userPrompt
+        ? `You are analyzing a PDF document for a student.
+
+## PDF Content:
+${text}
+
+---
+**Student's request:** "${userPrompt}"
+
+Answer COMPLETELY based on the PDF content above. Be thorough and structured with headings, bullet points, and step-by-step solutions where needed. Indian exam style.`
+        : `You are analyzing a PDF document for a student. Provide a COMPLETE analysis:
+
+## PDF Content:
+${text}
+
+---
+Do ALL of the following in your response:
+
+## 1. Summary
+Clear summary of what this document is about (2-3 paragraphs).
+
+## 2. Questions & Solutions
+Find EVERY question, problem, or exercise in the PDF. Solve each one completely, step-by-step, numbered. Show all working.
+
+## 3. Key Concepts & Formulas
+List the most important concepts, definitions, and formulas from this document.
+
+## 4. Study Tips
+Give 3-4 specific study tips for this topic based on what is covered.`;
+
+      const answer     = await solveText(solvePrompt);
+      const userAction = await handleQuestionUsed(req, userPrompt || 'PDF analysis');
 
       return res.json({
-        success: true,
+        success:  true,
         answer,
-        pdfType: 'scanned',
+        pdfType:  'digital',
         ...(userAction ? {
           questionsLeft:  userAction.questionsLeft,
           pointsAwarded:  userAction.pointsAwarded,
           nextRefillSecs: userAction.nextRefillSecs,
         } : {}),
       });
-    } catch (visionErr: any) {
-      logger.error(`PDF vision failed: ${visionErr.message}`);
-      return res.json({
-        success: false,
-        answer: [
-          '❌ **Could not process this PDF**',
-          '',
-          'This appears to be a scanned (image-based) PDF. Please try:',
-          '- 📸 Taking a screenshot of the pages and uploading as an image',
-          '- ✍️ Typing the question manually',
-          '- 📋 Copying the text and pasting it here',
-        ].join('\n'),
-      });
     }
+
+    // ── STEP 2B: Scanned / Image PDF → NVIDIA Vision ─────────
+    // No readable text found — must use vision model to read the image
+    logger.info('PDF: scanned/image-based → NVIDIA Vision → GROQ Vision → OR Vision');
+
+    const pdfBase64  = req.file.buffer.toString('base64');
+    const pdfDataUrl = `data:application/pdf;base64,${pdfBase64}`;
+
+    const visionPrompt = userPrompt
+      ? `This is a scanned PDF document. The student asks: "${userPrompt}".
+
+Read every page carefully. Extract all visible text, equations, diagrams, and tables. Then answer the student's question completely with step-by-step working. Indian exam style.`
+      : `This is a scanned PDF document.
+
+1. Read and extract ALL visible text from every page.
+2. Identify EVERY question, problem, or exercise shown.
+3. Solve each one completely, step-by-step, numbered.
+4. Explain key concepts and formulas clearly.
+5. Indian exam style — be thorough and structured.`;
+
+    const answer     = await solveWithVision(pdfDataUrl, visionPrompt);
+    const userAction = await handleQuestionUsed(req, userPrompt || 'Scanned PDF analysis');
+
+    return res.json({
+      success:  true,
+      answer,
+      pdfType:  'scanned',
+      ...(userAction ? {
+        questionsLeft:  userAction.questionsLeft,
+        pointsAwarded:  userAction.pointsAwarded,
+        nextRefillSecs: userAction.nextRefillSecs,
+      } : {}),
+    });
+
   } catch (error: any) {
     logger.error({ err: error.message }, '/api/ai/solve-pdf error');
-    res.status(500).json({ success: false, answer: '❌ Failed to process PDF. Please try again.' });
+    res.status(500).json({
+      success: false,
+      answer: '❌ Failed to process PDF. Please try again.',
+    });
   }
 }
 
