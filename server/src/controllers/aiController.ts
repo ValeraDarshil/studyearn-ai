@@ -347,21 +347,21 @@
 
 
 
+// latest version 
 // ─────────────────────────────────────────────────────────────
-// StudyEarn AI — AI Controller (v5)
-// ─────────────────────────────────────────────────────────────
+// StudyEarn AI — AI Controller (v5 — AI Mentor)
 // Routes:
-//  POST /api/ai/ask        → text or image questions
-//  POST /api/ai/ask-stream → SSE streaming (text only)
-//  POST /api/ai/solve-pdf  → PDF analysis (digital + scanned)
-//  POST /api/ai/watch-ad   → +1 question bonus
-//  GET  /api/ai/quota      → quota info
+//  POST /api/ai/ask        -> text or image questions
+//  POST /api/ai/ask-stream -> SSE streaming with mentor context
+//  POST /api/ai/solve-pdf  -> PDF analysis (digital + scanned)
+//  POST /api/ai/watch-ad   -> +1 question bonus
+//  GET  /api/ai/quota      -> quota info
 //
 // Provider routing:
-//  TEXT questions  → GROQ → OpenRouter (NVIDIA NOT used)
-//  IMAGE questions → NVIDIA Vision → GROQ Vision → OR Vision
-//  Digital PDF     → text extracted → GROQ → OpenRouter
-//  Scanned PDF     → NVIDIA Vision → GROQ Vision → OR Vision
+//  TEXT    -> GROQ -> OpenRouter
+//  IMAGE   -> NVIDIA Vision -> GROQ Vision -> OR Vision
+//  PDF dig -> GROQ -> OpenRouter (text extracted)
+//  PDF scan-> NVIDIA Vision -> GROQ Vision -> OR Vision
 // ─────────────────────────────────────────────────────────────
 
 import { Request, Response } from 'express';
@@ -369,21 +369,20 @@ import {
   solveText,
   solveWithVision,
   solveTextStream,
+  solveTextStreamWithContext,
   ChatMessage,
 } from '../services/aiService.js';
 import { contextAwareSolve, SubjectMode } from '../services/contextTutorService.js';
 import { personalTutorSolve }             from '../services/aiTutor/aiTutor.service.js';
-import { parsePDFText }                    from '../services/pdfService.js';
-import { getUserIdFromToken }              from '../middleware/authMiddleware.js';
-import { User }                            from '../models/User.model.js';
-import { Activity }                        from '../models/Activity.model.js';
-import { syncActivityToProfile }           from '../services/studentProfileService.js';
-import { onActivityEvent }                 from '../services/progressSystem/progressAnalyzer.js';
-import { logger }                          from '../utils/logger.js';
+import { buildTutorContext }              from '../services/aiTutor/tutorContextManager.js';
+import { parsePDFText }                   from '../services/pdfService.js';
+import { getUserIdFromToken }             from '../middleware/authMiddleware.js';
+import { User }                           from '../models/User.model.js';
+import { Activity }                       from '../models/Activity.model.js';
+import { syncActivityToProfile }          from '../services/studentProfileService.js';
+import { onActivityEvent }                from '../services/progressSystem/progressAnalyzer.js';
+import { logger }                         from '../utils/logger.js';
 
-// ─────────────────────────────────────────────────────────────
-// CONSTANTS
-// ─────────────────────────────────────────────────────────────
 const BASE_AI_POINTS      = 10;
 const PREMIUM_MULTIPLIER  = 2;
 const FREE_DAILY_LIMIT    = 15;
@@ -391,9 +390,6 @@ const PREMIUM_DAILY_LIMIT = 30;
 const REFILL_INTERVAL_MS  = 60 * 60 * 1000;
 const MAX_VIDEO_ADS_DAY   = 5;
 
-// ─────────────────────────────────────────────────────────────
-// HELPERS
-// ─────────────────────────────────────────────────────────────
 function getTodayIST(): string {
   const now = new Date();
   return new Date(now.getTime() + 5.5 * 60 * 60 * 1000).toISOString().split('T')[0];
@@ -427,56 +423,40 @@ async function handleQuestionUsed(
 ): Promise<{ questionsLeft: number; pointsAwarded: number; nextRefillSecs: number } | null> {
   const userId = getUserIdFromToken(req);
   if (!userId) return null;
-
   try {
     const user = await User.findById(userId);
     if (!user) return null;
-
     const premium    = isPremiumValid(user);
     const today      = getTodayIST();
     const dailyLimit = premium ? PREMIUM_DAILY_LIMIT : FREE_DAILY_LIMIT;
-
     if ((user as any).questionsDate !== today) {
       (user as any).questionsDate  = today;
       (user as any).questionUsedAt = [];
       (user as any).videoAdsToday  = 0;
       (user as any).videoAdsDate   = today;
     }
-
     applyHourlyRefill(user, dailyLimit);
-
     if ((user as any).questionsLeft <= 0) {
       await user.save();
       return { questionsLeft: 0, pointsAwarded: 0, nextRefillSecs: getNextRefillSecs(user) };
     }
-
     (user as any).questionUsedAt = [...((user as any).questionUsedAt || []), new Date()];
     applyHourlyRefill(user, dailyLimit);
-
     const pts = premium ? BASE_AI_POINTS * PREMIUM_MULTIPLIER : BASE_AI_POINTS;
-    user.points  = (user.points  || 0) + pts;
+    user.points                      += pts;
     (user as any).totalXP             = ((user as any).totalXP || 0) + pts;
     (user as any).totalQuestionsAsked = ((user as any).totalQuestionsAsked || 0) + 1;
     await user.save();
-
-    const isInternal = promptText.startsWith('{') || promptText.startsWith('[') ||
-      promptText.toLowerCase().startsWith('output only');
+    const isInternal     = promptText.startsWith('{') || promptText.startsWith('[') || promptText.toLowerCase().startsWith('output only');
     const cleanPrompt    = isInternal ? '' : promptText.trim();
     const activityDetail = cleanPrompt
-      ? `Asked: ${cleanPrompt.substring(0, 80)}${cleanPrompt.length > 80 ? '…' : ''}`
+      ? 'Asked: ' + cleanPrompt.substring(0, 80) + (cleanPrompt.length > 80 ? '...' : '')
       : 'Asked an AI question';
-
     await Activity.create({ userId, action: 'ask_question', details: activityDetail, pointsEarned: pts });
-    logger.info(`AI question: ${(user as any).email} | premium=${premium} | +${pts}pts | left=${(user as any).questionsLeft}`);
-
+    logger.info('AI question: ' + (user as any).email + ' | premium=' + premium + ' | +' + pts + 'pts | left=' + (user as any).questionsLeft);
     syncActivityToProfile(userId, 'ask_question', pts).catch(() => {});
     onActivityEvent(userId, 'ai_tutor_used', { topic: activityDetail }).catch(() => {});
-
-    return {
-      questionsLeft:  (user as any).questionsLeft,
-      pointsAwarded:  pts,
-      nextRefillSecs: getNextRefillSecs(user),
-    };
+    return { questionsLeft: (user as any).questionsLeft, pointsAwarded: pts, nextRefillSecs: getNextRefillSecs(user) };
   } catch (err: any) {
     logger.error({ err: err.message }, 'handleQuestionUsed error');
     return null;
@@ -485,21 +465,10 @@ async function handleQuestionUsed(
 
 // ─────────────────────────────────────────────────────────────
 // POST /api/ai/ask
-// Text questions  → GROQ → OpenRouter  (via personalTutorSolve)
-// Image questions → NVIDIA Vision → GROQ Vision → OR Vision
 // ─────────────────────────────────────────────────────────────
 export async function askAI(req: Request, res: Response) {
   try {
-    const {
-      prompt,
-      image,
-      history      = [],
-      subjectMode,
-      stepByStep,
-      personality,
-      hintMode,
-      recentActivity,
-    } = req.body;
+    const { prompt, image, history = [], subjectMode, stepByStep, personality, hintMode, recentActivity } = req.body;
 
     const safeHistory: ChatMessage[] = (Array.isArray(history) ? history : [])
       .slice(-10)
@@ -511,52 +480,34 @@ export async function askAI(req: Request, res: Response) {
     }
 
     const imgSizeKB = image ? Math.round(image.length * 0.75 / 1024) : 0;
-    logger.info(`/api/ai/ask  image=${!!image}(${imgSizeKB}KB)  mode=${subjectMode || 'auto'}  prompt="${(prompt || '').substring(0, 60)}"`);
+    logger.info('/api/ai/ask  image=' + (!!image) + '(' + imgSizeKB + 'KB)  mode=' + (subjectMode || 'auto') + '  prompt="' + (prompt || '').substring(0, 60) + '"');
 
     const userId = getUserIdFromToken(req) ?? '';
     let answer: string;
-    let tutorMeta: {
-      followUpQ?: string | null;
-      learningMode?: string;
-      hintMode?: boolean;
-      detectedTopic?: string | null;
-    } = {};
+    let tutorMeta: { followUpQ?: string | null; learningMode?: string; hintMode?: boolean; detectedTopic?: string | null } = {};
 
-    // ── IMAGE → Vision (NVIDIA → GROQ → OR) ──────────────────
     if (image) {
       let imageUrl = image;
       if (!image.startsWith('data:')) {
         const isJpeg = image.startsWith('/9j/');
-        imageUrl = `data:image/${isJpeg ? 'jpeg' : 'png'};base64,${image}`;
+        imageUrl = 'data:image/' + (isJpeg ? 'jpeg' : 'png') + ';base64,' + image;
       }
-      if (imgSizeKB > 4000) logger.warn(`Large image: ${imgSizeKB}KB`);
+      if (imgSizeKB > 4000) logger.warn('Large image: ' + imgSizeKB + 'KB');
       answer = await solveWithVision(imageUrl, prompt || '');
-
-    // ── TEXT → Personal AI Tutor → GROQ → OR ─────────────────
     } else {
       if (userId) {
         try {
           const tutorResponse = await personalTutorSolve({
-            userId,
-            message:        prompt,
-            history:        safeHistory,
-            personality:    personality || undefined,
-            hintOverride:   hintMode !== undefined ? !!hintMode : undefined,
+            userId, message: prompt, history: safeHistory,
+            personality: personality || undefined,
+            hintOverride: hintMode !== undefined ? !!hintMode : undefined,
             recentActivity: recentActivity || undefined,
           });
           answer    = tutorResponse.answer;
-          tutorMeta = {
-            followUpQ:     tutorResponse.followUpQ,
-            learningMode:  tutorResponse.learningMode,
-            hintMode:      tutorResponse.hintMode,
-            detectedTopic: tutorResponse.detectedTopic,
-          };
+          tutorMeta = { followUpQ: tutorResponse.followUpQ, learningMode: tutorResponse.learningMode, hintMode: tutorResponse.hintMode, detectedTopic: tutorResponse.detectedTopic };
         } catch {
           try {
-            answer = await contextAwareSolve(userId, prompt, safeHistory, {
-              subjectMode: (subjectMode as SubjectMode) || 'auto',
-              stepByStep:  !!stepByStep,
-            });
+            answer = await contextAwareSolve(userId, prompt, safeHistory, { subjectMode: (subjectMode as SubjectMode) || 'auto', stepByStep: !!stepByStep });
           } catch {
             answer = await solveText(prompt, safeHistory, subjectMode);
           }
@@ -567,32 +518,26 @@ export async function askAI(req: Request, res: Response) {
     }
 
     const userAction = await handleQuestionUsed(req, String(prompt || '').substring(0, 100));
-
     res.json({
-      success: true,
-      answer,
+      success: true, answer,
       ...(tutorMeta.followUpQ     ? { followUpQ:     tutorMeta.followUpQ }     : {}),
       ...(tutorMeta.learningMode  ? { learningMode:  tutorMeta.learningMode }  : {}),
       ...(tutorMeta.hintMode !== undefined ? { hintMode: tutorMeta.hintMode }  : {}),
       ...(tutorMeta.detectedTopic ? { detectedTopic: tutorMeta.detectedTopic } : {}),
-      ...(userAction ? {
-        questionsLeft:  userAction.questionsLeft,
-        pointsAwarded:  userAction.pointsAwarded,
-        nextRefillSecs: userAction.nextRefillSecs,
-      } : {}),
+      ...(userAction ? { questionsLeft: userAction.questionsLeft, pointsAwarded: userAction.pointsAwarded, nextRefillSecs: userAction.nextRefillSecs } : {}),
     });
   } catch (error: any) {
     logger.error({ err: error.message }, '/api/ai/ask error');
-    res.status(500).json({ success: false, answer: '❌ AI is temporarily unavailable. Please try again in a moment.' });
+    res.status(500).json({ success: false, answer: 'AI is temporarily unavailable. Please try again.' });
   }
 }
 
 // ─────────────────────────────────────────────────────────────
-// POST /api/ai/ask-stream  (SSE streaming — text only)
-// GROQ → OpenRouter  (NVIDIA NOT used for text)
+// POST /api/ai/ask-stream — SSE streaming with AI Mentor context
+// GROQ -> OpenRouter  (NVIDIA NOT used for text)
 // ─────────────────────────────────────────────────────────────
 export async function askAIStream(req: Request, res: Response) {
-  const { prompt, history = [], subjectMode } = req.body;
+  const { prompt, history = [], subjectMode, stepByStep } = req.body;
   const userId = getUserIdFromToken(req) ?? '';
 
   if (!prompt) { res.status(400).json({ error: 'prompt required' }); return; }
@@ -609,13 +554,45 @@ export async function askAIStream(req: Request, res: Response) {
     .map((m: any) => ({ role: m.role as 'user' | 'assistant', content: String(m.content).slice(0, 2000) }));
 
   try {
-    await solveTextStream(prompt, safeHistory, subjectMode, res);
+    let systemPrompt: string | undefined;
+
+    if (userId) {
+      try {
+        const tutorCtx = await buildTutorContext(userId, prompt, 'ask', undefined).catch(() => null);
+        if (tutorCtx?.systemPromptBlock) {
+          const skillNote = tutorCtx.skillLevel === 'beginner'
+            ? '\n\nEXPLANATION LEVEL: BEGINNER. Use simple language, real-world analogies, build from basics. Avoid jargon.'
+            : tutorCtx.skillLevel === 'advanced'
+            ? '\n\nEXPLANATION LEVEL: ADVANCED. Skip basics, go deep, include edge cases and best practices.'
+            : '\n\nEXPLANATION LEVEL: INTERMEDIATE. Balance theory with practical examples.';
+
+          const modeNote = subjectMode === 'math'    ? '\n\nMATH MODE: Show formula, substitution, every step, boxed final answer.'
+            : subjectMode === 'coding'  ? '\n\nCODING MODE: Complete runnable code, comment every line, show expected output.'
+            : subjectMode === 'science' ? '\n\nSCIENCE MODE: State law/formula, substitute with units, give real example.'
+            : '';
+
+          const stepNote = stepByStep ? '\n\nSTEP MODE: Break solution into numbered steps, show each calculation explicitly.' : '';
+
+          systemPrompt = tutorCtx.systemPromptBlock + skillNote + modeNote + stepNote;
+          logger.info('Stream mentor ctx: skill=' + tutorCtx.skillLevel + ' mode=' + tutorCtx.learningMode);
+        }
+      } catch (ctxErr: any) {
+        logger.warn('Stream context build failed, using default: ' + ctxErr.message);
+      }
+    }
+
+    if (systemPrompt) {
+      await solveTextStreamWithContext(prompt, safeHistory, systemPrompt, res);
+    } else {
+      await solveTextStream(prompt, safeHistory, subjectMode, res);
+    }
+
     if (userId) {
       handleQuestionUsed(req, String(prompt).substring(0, 100)).catch(() => {});
     }
   } catch (err: any) {
-    logger.error(`[Stream] Error: ${err.message}`);
-    res.write(`data: ${JSON.stringify({ error: 'Stream failed. Please try again.' })}\n\n`);
+    logger.error('Stream error: ' + err.message);
+    res.write('data: ' + JSON.stringify({ error: 'Stream failed. Please try again.' }) + '\n\n');
   } finally {
     res.end();
   }
@@ -623,135 +600,62 @@ export async function askAIStream(req: Request, res: Response) {
 
 // ─────────────────────────────────────────────────────────────
 // POST /api/ai/solve-pdf
-//
-// Routing logic:
-//  1. Try pdf-parse text extraction
-//  2a. Digital PDF (text >= 80 chars) → GROQ → OpenRouter
-//  2b. Scanned PDF (no text)          → NVIDIA Vision → GROQ Vision → OR Vision
-//
-// Student ko kabhi "text extract karo" ya "image upload karo"
-// bolne ki zaroorat nahi — sab automatic handle hota hai.
+// Digital PDF  -> GROQ/OpenRouter (text extracted, >= 80 chars)
+// Scanned PDF  -> NVIDIA Vision -> GROQ Vision -> OR Vision
 // ─────────────────────────────────────────────────────────────
 export async function solvePDF(req: Request, res: Response) {
   try {
-    if (!req.file) {
-      return res.status(400).json({ success: false, answer: '❌ No file uploaded.' });
-    }
+    if (!req.file) return res.status(400).json({ success: false, answer: 'No file uploaded.' });
 
     const userPrompt = (req.body.prompt || '').trim();
-    logger.info(`/api/ai/solve-pdf  size=${req.file.size}bytes  prompt="${userPrompt.substring(0, 60)}"`);
+    logger.info('/api/ai/solve-pdf  size=' + req.file.size + 'bytes');
 
-    // ── STEP 1: Extract text ──────────────────────────────────
     let extracted = '';
     try {
       extracted = await parsePDFText(req.file.buffer);
-      logger.info(`PDF text extracted: ${extracted.length} chars`);
+      logger.info('PDF text extracted: ' + extracted.length + ' chars');
     } catch (e: any) {
-      logger.warn(`PDF text extraction failed: ${e.message}`);
+      logger.warn('PDF text extraction failed: ' + e.message);
     }
 
-    // ── STEP 2A: Digital PDF → GROQ / OpenRouter ──────────────
-    // Text is readable — send to GROQ (fast, cheap, no vision needed)
     if (extracted && extracted.trim().length >= 80) {
-      logger.info(`PDF: digital (${extracted.length} chars) → GROQ/OR`);
-
-      // Chunk: first 12k + last 2k chars for large documents
+      logger.info('PDF: digital -> GROQ/OR');
       const MAX_CHARS = 12000;
       let text: string;
       if (extracted.length > MAX_CHARS + 2000) {
         const omitted = Math.round((extracted.length - MAX_CHARS - 2000) / 1000);
-        text = extracted.substring(0, MAX_CHARS)
-          + `\n\n[... ~${omitted}k chars omitted for length ...]\n\n`
-          + extracted.substring(extracted.length - 2000);
+        text = extracted.substring(0, MAX_CHARS) + '\n\n[... ~' + omitted + 'k chars omitted ...]\n\n' + extracted.substring(extracted.length - 2000);
       } else {
         text = extracted;
       }
 
-      // Build smart prompt based on what student asked
       const solvePrompt = userPrompt
-        ? `You are analyzing a PDF document for a student.
-
-## PDF Content:
-${text}
-
----
-**Student's request:** "${userPrompt}"
-
-Answer COMPLETELY based on the PDF content above. Be thorough and structured with headings, bullet points, and step-by-step solutions where needed. Indian exam style.`
-        : `You are analyzing a PDF document for a student. Provide a COMPLETE analysis:
-
-## PDF Content:
-${text}
-
----
-Do ALL of the following in your response:
-
-## 1. Summary
-Clear summary of what this document is about (2-3 paragraphs).
-
-## 2. Questions & Solutions
-Find EVERY question, problem, or exercise in the PDF. Solve each one completely, step-by-step, numbered. Show all working.
-
-## 3. Key Concepts & Formulas
-List the most important concepts, definitions, and formulas from this document.
-
-## 4. Study Tips
-Give 3-4 specific study tips for this topic based on what is covered.`;
+        ? 'You are analyzing a PDF for a student.\n\n## PDF Content:\n' + text + '\n\n---\nStudent\'s request: "' + userPrompt + '"\n\nAnswer COMPLETELY. Be thorough with headings and step-by-step solutions. Indian exam style.'
+        : 'Analyze this PDF completely for a student:\n\n## PDF Content:\n' + text + '\n\n---\n\n## 1. Summary\nClear summary of what this document covers.\n\n## 2. Questions and Solutions\nFind EVERY question or exercise. Solve each completely, step-by-step, numbered.\n\n## 3. Key Concepts\nList important concepts and formulas.\n\n## 4. Study Tips\nGive 3-4 specific study tips for this topic.';
 
       const answer     = await solveText(solvePrompt);
       const userAction = await handleQuestionUsed(req, userPrompt || 'PDF analysis');
-
       return res.json({
-        success:  true,
-        answer,
-        pdfType:  'digital',
-        ...(userAction ? {
-          questionsLeft:  userAction.questionsLeft,
-          pointsAwarded:  userAction.pointsAwarded,
-          nextRefillSecs: userAction.nextRefillSecs,
-        } : {}),
+        success: true, answer, pdfType: 'digital',
+        ...(userAction ? { questionsLeft: userAction.questionsLeft, pointsAwarded: userAction.pointsAwarded, nextRefillSecs: userAction.nextRefillSecs } : {}),
       });
     }
 
-    // ── STEP 2B: Scanned / Image PDF → NVIDIA Vision ─────────
-    // No readable text found — must use vision model to read the image
-    logger.info('PDF: scanned/image-based → NVIDIA Vision → GROQ Vision → OR Vision');
-
-    const pdfBase64  = req.file.buffer.toString('base64');
-    const pdfDataUrl = `data:application/pdf;base64,${pdfBase64}`;
-
+    logger.info('PDF: scanned -> NVIDIA Vision');
+    const pdfDataUrl = 'data:application/pdf;base64,' + req.file.buffer.toString('base64');
     const visionPrompt = userPrompt
-      ? `This is a scanned PDF document. The student asks: "${userPrompt}".
-
-Read every page carefully. Extract all visible text, equations, diagrams, and tables. Then answer the student's question completely with step-by-step working. Indian exam style.`
-      : `This is a scanned PDF document.
-
-1. Read and extract ALL visible text from every page.
-2. Identify EVERY question, problem, or exercise shown.
-3. Solve each one completely, step-by-step, numbered.
-4. Explain key concepts and formulas clearly.
-5. Indian exam style — be thorough and structured.`;
+      ? 'Scanned PDF. Student asks: "' + userPrompt + '". Read every page, extract all text/equations/diagrams. Answer completely step-by-step. Indian exam style.'
+      : 'Scanned PDF. Read and extract ALL visible text from every page. Identify EVERY question or problem. Solve each completely, step-by-step, numbered. Explain key concepts clearly.';
 
     const answer     = await solveWithVision(pdfDataUrl, visionPrompt);
     const userAction = await handleQuestionUsed(req, userPrompt || 'Scanned PDF analysis');
-
     return res.json({
-      success:  true,
-      answer,
-      pdfType:  'scanned',
-      ...(userAction ? {
-        questionsLeft:  userAction.questionsLeft,
-        pointsAwarded:  userAction.pointsAwarded,
-        nextRefillSecs: userAction.nextRefillSecs,
-      } : {}),
+      success: true, answer, pdfType: 'scanned',
+      ...(userAction ? { questionsLeft: userAction.questionsLeft, pointsAwarded: userAction.pointsAwarded, nextRefillSecs: userAction.nextRefillSecs } : {}),
     });
-
   } catch (error: any) {
     logger.error({ err: error.message }, '/api/ai/solve-pdf error');
-    res.status(500).json({
-      success: false,
-      answer: '❌ Failed to process PDF. Please try again.',
-    });
+    res.status(500).json({ success: false, answer: 'Failed to process PDF. Please try again.' });
   }
 }
 
@@ -761,53 +665,27 @@ Read every page carefully. Extract all visible text, equations, diagrams, and ta
 export async function watchAd(req: Request, res: Response) {
   const userId = getUserIdFromToken(req);
   if (!userId) return res.status(401).json({ success: false, message: 'Login required' });
-
   try {
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
-
     const premium    = isPremiumValid(user);
     const today      = getTodayIST();
     const dailyLimit = premium ? PREMIUM_DAILY_LIMIT : FREE_DAILY_LIMIT;
-
-    if ((user as any).videoAdsDate !== today) {
-      (user as any).videoAdsToday = 0;
-      (user as any).videoAdsDate  = today;
-    }
-
+    if ((user as any).videoAdsDate !== today) { (user as any).videoAdsToday = 0; (user as any).videoAdsDate = today; }
     if ((user as any).videoAdsToday >= MAX_VIDEO_ADS_DAY) {
-      return res.json({
-        success: false,
-        message: `Max ${MAX_VIDEO_ADS_DAY} video bonuses per day reached.`,
-        questionsLeft: (user as any).questionsLeft,
-      });
+      return res.json({ success: false, message: 'Max ' + MAX_VIDEO_ADS_DAY + ' video bonuses per day reached.', questionsLeft: (user as any).questionsLeft });
     }
-
     applyHourlyRefill(user, dailyLimit);
-
     if ((user as any).questionsLeft >= dailyLimit) {
       return res.json({ success: false, message: 'You already have full questions!', questionsLeft: (user as any).questionsLeft });
     }
-
     const used: Date[] = (user as any).questionUsedAt || [];
-    if (used.length > 0) {
-      used.sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
-      (user as any).questionUsedAt = used.slice(1);
-    }
-
+    if (used.length > 0) { used.sort((a, b) => new Date(a).getTime() - new Date(b).getTime()); (user as any).questionUsedAt = used.slice(1); }
     (user as any).videoAdsToday = ((user as any).videoAdsToday || 0) + 1;
     applyHourlyRefill(user, dailyLimit);
     await user.save();
-
-    logger.info(`Video ad: ${(user as any).email} | +1 question | left=${(user as any).questionsLeft}`);
-
-    return res.json({
-      success: true,
-      message: '+1 question unlocked! Keep studying! 🎓',
-      questionsLeft: (user as any).questionsLeft,
-      videoAdsLeft:  MAX_VIDEO_ADS_DAY - (user as any).videoAdsToday,
-      nextRefillSecs: getNextRefillSecs(user),
-    });
+    logger.info('Video ad: ' + (user as any).email + ' | +1 question | left=' + (user as any).questionsLeft);
+    return res.json({ success: true, message: '+1 question unlocked! Keep studying!', questionsLeft: (user as any).questionsLeft, videoAdsLeft: MAX_VIDEO_ADS_DAY - (user as any).videoAdsToday, nextRefillSecs: getNextRefillSecs(user) });
   } catch (err: any) {
     logger.error({ err: err.message }, 'watchAd error');
     return res.status(500).json({ success: false, message: 'Server error' });
@@ -820,15 +698,12 @@ export async function watchAd(req: Request, res: Response) {
 export async function getQuota(req: Request, res: Response) {
   const userId = getUserIdFromToken(req);
   if (!userId) return res.status(401).json({ success: false });
-
   try {
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ success: false });
-
     const premium    = isPremiumValid(user);
     const today      = getTodayIST();
     const dailyLimit = premium ? PREMIUM_DAILY_LIMIT : FREE_DAILY_LIMIT;
-
     if ((user as any).questionsDate !== today) {
       (user as any).questionsDate  = today;
       (user as any).questionUsedAt = [];
@@ -836,18 +711,9 @@ export async function getQuota(req: Request, res: Response) {
       (user as any).videoAdsDate   = today;
       await user.save();
     }
-
     applyHourlyRefill(user, dailyLimit);
     await user.save();
-
-    return res.json({
-      success:        true,
-      questionsLeft:  (user as any).questionsLeft,
-      dailyLimit,
-      nextRefillSecs: getNextRefillSecs(user),
-      videoAdsLeft:   MAX_VIDEO_ADS_DAY - Math.min((user as any).videoAdsToday || 0, MAX_VIDEO_ADS_DAY),
-      isPremium:      premium,
-    });
+    return res.json({ success: true, questionsLeft: (user as any).questionsLeft, dailyLimit, nextRefillSecs: getNextRefillSecs(user), videoAdsLeft: MAX_VIDEO_ADS_DAY - Math.min((user as any).videoAdsToday || 0, MAX_VIDEO_ADS_DAY), isPremium: premium });
   } catch (err: any) {
     logger.error({ err: err.message }, 'getQuota error');
     return res.status(500).json({ success: false });
