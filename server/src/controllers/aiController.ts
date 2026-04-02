@@ -349,19 +349,13 @@
 
 // latest version 
 // ─────────────────────────────────────────────────────────────
-// StudyEarn AI — AI Controller (v5 — AI Mentor)
+// AI Study OS — AI Controller (v5 — AI Mentor + Stage 5)
 // Routes:
 //  POST /api/ai/ask        -> text or image questions
-//  POST /api/ai/ask-stream -> SSE streaming with mentor context
+//  POST /api/ai/ask-stream -> SSE streaming with mentor + Stage 5 context
 //  POST /api/ai/solve-pdf  -> PDF analysis (digital + scanned)
 //  POST /api/ai/watch-ad   -> +1 question bonus
 //  GET  /api/ai/quota      -> quota info
-//
-// Provider routing:
-//  TEXT    -> GROQ -> OpenRouter
-//  IMAGE   -> NVIDIA Vision -> GROQ Vision -> OR Vision
-//  PDF dig -> GROQ -> OpenRouter (text extracted)
-//  PDF scan-> NVIDIA Vision -> GROQ Vision -> OR Vision
 // ─────────────────────────────────────────────────────────────
 
 import { Request, Response } from 'express';
@@ -382,6 +376,10 @@ import { Activity }                       from '../models/Activity.model.js';
 import { syncActivityToProfile }          from '../services/studentProfileService.js';
 import { onActivityEvent }                from '../services/progressSystem/progressAnalyzer.js';
 import { logger }                         from '../utils/logger.js';
+
+// ── STAGE 5: AI Orchestrator context injection ─────────────────
+import { getFusedContextForAI } from '../services/aiCore/aiOrchestrator.js';
+// ─────────────────────────────────────────────────────────────
 
 const BASE_AI_POINTS      = 10;
 const PREMIUM_MULTIPLIER  = 2;
@@ -490,7 +488,7 @@ export async function askAI(req: Request, res: Response) {
       let imageUrl = image;
       if (!image.startsWith('data:')) {
         const isJpeg = image.startsWith('/9j/');
-        imageUrl = 'data:image/' + (isJpeg ? 'jpeg' : 'png') + ';base64,' + image;
+        imageUrl     = 'data:image/' + (isJpeg ? 'jpeg' : 'png') + ';base64,' + image;
       }
       if (imgSizeKB > 4000) logger.warn('Large image: ' + imgSizeKB + 'KB');
       answer = await solveWithVision(imageUrl, prompt || '');
@@ -499,15 +497,23 @@ export async function askAI(req: Request, res: Response) {
         try {
           const tutorResponse = await personalTutorSolve({
             userId, message: prompt, history: safeHistory,
-            personality: personality || undefined,
-            hintOverride: hintMode !== undefined ? !!hintMode : undefined,
+            personality:    personality || undefined,
+            hintOverride:   hintMode !== undefined ? !!hintMode : undefined,
             recentActivity: recentActivity || undefined,
           });
           answer    = tutorResponse.answer;
-          tutorMeta = { followUpQ: tutorResponse.followUpQ, learningMode: tutorResponse.learningMode, hintMode: tutorResponse.hintMode, detectedTopic: tutorResponse.detectedTopic };
+          tutorMeta = {
+            followUpQ:     tutorResponse.followUpQ,
+            learningMode:  tutorResponse.learningMode,
+            hintMode:      tutorResponse.hintMode,
+            detectedTopic: tutorResponse.detectedTopic,
+          };
         } catch {
           try {
-            answer = await contextAwareSolve(userId, prompt, safeHistory, { subjectMode: (subjectMode as SubjectMode) || 'auto', stepByStep: !!stepByStep });
+            answer = await contextAwareSolve(userId, prompt, safeHistory, {
+              subjectMode: (subjectMode as SubjectMode) || 'auto',
+              stepByStep:  !!stepByStep,
+            });
           } catch {
             answer = await solveText(prompt, safeHistory, subjectMode);
           }
@@ -519,12 +525,17 @@ export async function askAI(req: Request, res: Response) {
 
     const userAction = await handleQuestionUsed(req, String(prompt || '').substring(0, 100));
     res.json({
-      success: true, answer,
+      success: true,
+      answer,
       ...(tutorMeta.followUpQ     ? { followUpQ:     tutorMeta.followUpQ }     : {}),
       ...(tutorMeta.learningMode  ? { learningMode:  tutorMeta.learningMode }  : {}),
       ...(tutorMeta.hintMode !== undefined ? { hintMode: tutorMeta.hintMode }  : {}),
       ...(tutorMeta.detectedTopic ? { detectedTopic: tutorMeta.detectedTopic } : {}),
-      ...(userAction ? { questionsLeft: userAction.questionsLeft, pointsAwarded: userAction.pointsAwarded, nextRefillSecs: userAction.nextRefillSecs } : {}),
+      ...(userAction ? {
+        questionsLeft:  userAction.questionsLeft,
+        pointsAwarded:  userAction.pointsAwarded,
+        nextRefillSecs: userAction.nextRefillSecs,
+      } : {}),
     });
   } catch (error: any) {
     logger.error({ err: error.message }, '/api/ai/ask error');
@@ -533,8 +544,7 @@ export async function askAI(req: Request, res: Response) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// POST /api/ai/ask-stream — SSE streaming with AI Mentor context
-// GROQ -> OpenRouter  (NVIDIA NOT used for text)
+// POST /api/ai/ask-stream — SSE streaming with Stage 5 context
 // ─────────────────────────────────────────────────────────────
 export async function askAIStream(req: Request, res: Response) {
   const { prompt, history = [], subjectMode, stepByStep } = req.body;
@@ -559,6 +569,7 @@ export async function askAIStream(req: Request, res: Response) {
     if (userId) {
       try {
         const tutorCtx = await buildTutorContext(userId, prompt, 'ask', undefined).catch(() => null);
+
         if (tutorCtx?.systemPromptBlock) {
           const skillNote = tutorCtx.skillLevel === 'beginner'
             ? '\n\nEXPLANATION LEVEL: BEGINNER. Use simple language, real-world analogies, build from basics. Avoid jargon.'
@@ -566,15 +577,34 @@ export async function askAIStream(req: Request, res: Response) {
             ? '\n\nEXPLANATION LEVEL: ADVANCED. Skip basics, go deep, include edge cases and best practices.'
             : '\n\nEXPLANATION LEVEL: INTERMEDIATE. Balance theory with practical examples.';
 
-          const modeNote = subjectMode === 'math'    ? '\n\nMATH MODE: Show formula, substitution, every step, boxed final answer.'
-            : subjectMode === 'coding'  ? '\n\nCODING MODE: Complete runnable code, comment every line, show expected output.'
-            : subjectMode === 'science' ? '\n\nSCIENCE MODE: State law/formula, substitute with units, give real example.'
+          const modeNote = subjectMode === 'math'
+            ? '\n\nMATH MODE: Show formula, substitution, every step, boxed final answer.'
+            : subjectMode === 'coding'
+            ? '\n\nCODING MODE: Complete runnable code, comment every line, show expected output.'
+            : subjectMode === 'science'
+            ? '\n\nSCIENCE MODE: State law/formula, substitute with units, give real example.'
             : '';
 
-          const stepNote = stepByStep ? '\n\nSTEP MODE: Break solution into numbered steps, show each calculation explicitly.' : '';
+          const stepNote = stepByStep
+            ? '\n\nSTEP MODE: Break solution into numbered steps, show each calculation explicitly.'
+            : '';
 
-          systemPrompt = tutorCtx.systemPromptBlock + skillNote + modeNote + stepNote;
-          logger.info('Stream mentor ctx: skill=' + tutorCtx.skillLevel + ' mode=' + tutorCtx.learningMode);
+          // ── STAGE 5: Get fused AI context from Orchestrator ────
+          // Uses 5-min cache — near-zero latency overhead
+          // Fails silently — never breaks existing functionality
+          const fusedCtx    = await getFusedContextForAI(userId).catch(() => null);
+          const stage5Prefix = fusedCtx?.systemPromptPrefix ?? '';
+          // ───────────────────────────────────────────────────────
+
+          // Stage 5 context prepended before existing tutor context
+          systemPrompt = stage5Prefix + tutorCtx.systemPromptBlock + skillNote + modeNote + stepNote;
+
+          logger.info(
+            'Stream ctx: skill=' + tutorCtx.skillLevel +
+            ' mode=' + tutorCtx.learningMode +
+            ' stage5=' + (!!stage5Prefix) +
+            ' state=' + (fusedCtx?.currentState ?? 'none')
+          );
         }
       } catch (ctxErr: any) {
         logger.warn('Stream context build failed, using default: ' + ctxErr.message);
@@ -600,8 +630,6 @@ export async function askAIStream(req: Request, res: Response) {
 
 // ─────────────────────────────────────────────────────────────
 // POST /api/ai/solve-pdf
-// Digital PDF  -> GROQ/OpenRouter (text extracted, >= 80 chars)
-// Scanned PDF  -> NVIDIA Vision -> GROQ Vision -> OR Vision
 // ─────────────────────────────────────────────────────────────
 export async function solvePDF(req: Request, res: Response) {
   try {
@@ -641,9 +669,9 @@ export async function solvePDF(req: Request, res: Response) {
       });
     }
 
-    logger.info('PDF: scanned -> NVIDIA Vision');
-    const pdfDataUrl = 'data:application/pdf;base64,' + req.file.buffer.toString('base64');
-    const visionPrompt = userPrompt
+    logger.info('PDF: scanned -> Vision');
+    const pdfDataUrl    = 'data:application/pdf;base64,' + req.file.buffer.toString('base64');
+    const visionPrompt  = userPrompt
       ? 'Scanned PDF. Student asks: "' + userPrompt + '". Read every page, extract all text/equations/diagrams. Answer completely step-by-step. Indian exam style.'
       : 'Scanned PDF. Read and extract ALL visible text from every page. Identify EVERY question or problem. Solve each completely, step-by-step, numbered. Explain key concepts clearly.';
 
@@ -680,12 +708,21 @@ export async function watchAd(req: Request, res: Response) {
       return res.json({ success: false, message: 'You already have full questions!', questionsLeft: (user as any).questionsLeft });
     }
     const used: Date[] = (user as any).questionUsedAt || [];
-    if (used.length > 0) { used.sort((a, b) => new Date(a).getTime() - new Date(b).getTime()); (user as any).questionUsedAt = used.slice(1); }
+    if (used.length > 0) {
+      used.sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+      (user as any).questionUsedAt = used.slice(1);
+    }
     (user as any).videoAdsToday = ((user as any).videoAdsToday || 0) + 1;
     applyHourlyRefill(user, dailyLimit);
     await user.save();
     logger.info('Video ad: ' + (user as any).email + ' | +1 question | left=' + (user as any).questionsLeft);
-    return res.json({ success: true, message: '+1 question unlocked! Keep studying!', questionsLeft: (user as any).questionsLeft, videoAdsLeft: MAX_VIDEO_ADS_DAY - (user as any).videoAdsToday, nextRefillSecs: getNextRefillSecs(user) });
+    return res.json({
+      success:       true,
+      message:       '+1 question unlocked! Keep studying!',
+      questionsLeft: (user as any).questionsLeft,
+      videoAdsLeft:  MAX_VIDEO_ADS_DAY - (user as any).videoAdsToday,
+      nextRefillSecs: getNextRefillSecs(user),
+    });
   } catch (err: any) {
     logger.error({ err: err.message }, 'watchAd error');
     return res.status(500).json({ success: false, message: 'Server error' });
@@ -713,7 +750,14 @@ export async function getQuota(req: Request, res: Response) {
     }
     applyHourlyRefill(user, dailyLimit);
     await user.save();
-    return res.json({ success: true, questionsLeft: (user as any).questionsLeft, dailyLimit, nextRefillSecs: getNextRefillSecs(user), videoAdsLeft: MAX_VIDEO_ADS_DAY - Math.min((user as any).videoAdsToday || 0, MAX_VIDEO_ADS_DAY), isPremium: premium });
+    return res.json({
+      success:        true,
+      questionsLeft:  (user as any).questionsLeft,
+      dailyLimit,
+      nextRefillSecs: getNextRefillSecs(user),
+      videoAdsLeft:   MAX_VIDEO_ADS_DAY - Math.min((user as any).videoAdsToday || 0, MAX_VIDEO_ADS_DAY),
+      isPremium:      premium,
+    });
   } catch (err: any) {
     logger.error({ err: err.message }, 'getQuota error');
     return res.status(500).json({ success: false });
