@@ -349,6 +349,10 @@ import brainRoutes       from './routes/brainRoutes.js';
 import learningRoutes    from './routes/learningEngineRoutes.js';
 import progressRoutes    from './routes/progressRoutes.js';
 
+// ── Stage 6: AI Mentor ────────────────────────────────────────
+import mentorRoutes      from './routes/mentorRoutes.js';
+import { mentorScheduler } from './services/aiMentor/mentorScheduler.js';
+
 import { fixStuckRedemptions, processPendingPremiums } from './controllers/rewardsController.js';
 
 /* ─── 3. PROCESS ERROR HANDLERS ────────────────────────── */
@@ -389,12 +393,9 @@ app.use(helmet({
 }));
 
 // ─── FIX: SSE route pe compression SKIP karo ─────────────────
-// compression(gzip) SSE tokens ko buffer kar leta hai — isliye
-// sab tokens ek saath aate hain instead of word-by-word.
-// /api/ai/ask-stream ko skip karke baaki sab compress karo.
 app.use(compression({
   filter: (req: Request, _res: Response) => {
-    if (req.path === '/api/ai/ask-stream') return false;  // ← SSE route skip
+    if (req.path === '/api/ai/ask-stream') return false;
     return compression.filter(req, _res);
   },
 }));
@@ -424,6 +425,8 @@ app.use('/api/codelearn',   codelearnRoutes);
 app.use('/api/brain',       brainRoutes);
 app.use('/api/learn',       learningRoutes);
 app.use('/api/progress',    progressRoutes);
+// ── Stage 6: AI Mentor ────────────────────────────────────────
+app.use('/api/mentor',      mentorRoutes);
 
 /* ─── 9. GLOBAL ERROR HANDLER ───────────────────────────── */
 app.use(errorHandler);
@@ -441,6 +444,7 @@ connectDB().then(() => {
     logger.info('✅ AI Tutor Ready     (Stage 2)');
     logger.info('✅ Learn Engine Ready (Stage 3)');
     logger.info('✅ Progress Ready     (Stage 4)');
+    logger.info('✅ AI Mentor Ready    (Stage 6 — Proactive Mentor)');
   });
 
   fixStuckRedemptions()
@@ -448,4 +452,7 @@ connectDB().then(() => {
     .catch((e: unknown) => logger.error({ err: e }, 'background task failed'));
 
   setInterval(processPendingPremiums, 5 * 60 * 1000);
+
+  // ── Stage 6: Start AI Mentor Scheduler ───────────────────
+  mentorScheduler.start();
 });

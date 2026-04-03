@@ -1,5 +1,5 @@
 /**
- * AI Study OS — Progress Intelligence Controller (Stage 4)
+ * AI Study OS — Progress Intelligence Controller (Stage 4 + Stage 6)
  * ─────────────────────────────────────────────────────────────
  * REST API endpoints for the AI Progress Intelligence System.
  *
@@ -11,6 +11,10 @@
  *   GET  /api/progress/weekly      Weekly AI report
  *   GET  /api/progress/trends      Trend analysis
  *   POST /api/progress/event       Activity event trigger
+ *
+ * Stage 6 additions:
+ *   - AI Mentor trigger after quiz_done event
+ *   - AI Mentor trigger after step_completed event
  */
 
 import { Request, Response } from 'express';
@@ -26,6 +30,9 @@ import { capturePerformance }     from '../services/progressSystem/performanceTr
 import { calculateProgressScore } from '../services/progressSystem/progressScoreCalculator.js';
 import { analyzeTrends }          from '../services/progressSystem/learningTrendAnalyzer.js';
 import { logger }                 from '../utils/logger.js';
+
+// ── Stage 6: AI Mentor ────────────────────────────────────────
+import { aiMentorEngine } from '../services/aiMentor/aiMentorEngine.js';
 
 // ─────────────────────────────────────────────────────────────
 // GET /api/progress/analysis
@@ -181,6 +188,8 @@ export async function getTrends(req: Request, res: Response): Promise<void> {
 // Activity event → triggers adaptive insight update
 // Body: { eventType, topic?, subject?, score?, mode? }
 // Called by: quiz system, coding system, AI tutor, learning steps
+//
+// Stage 6: After quiz_done / step_completed → AI Mentor check
 // ─────────────────────────────────────────────────────────────
 export async function trackEvent(req: Request, res: Response): Promise<void> {
   const userId = getUserIdFromToken(req);
@@ -199,11 +208,24 @@ export async function trackEvent(req: Request, res: Response): Promise<void> {
 
   try {
     const result = await onActivityEvent(userId, eventType, { topic, subject, score, mode });
+
     res.json({
       success:     true,
       insight:     result.insight,
       scoreUpdate: result.scoreUpdate,
     });
+
+    // ── Stage 6: Trigger AI Mentor after quiz or lesson complete ──
+    // Non-blocking — runs after response is already sent
+    if (eventType === 'quiz_done' || eventType === 'step_completed' || eventType === 'coding_done') {
+      const mentorTrigger = eventType === 'quiz_done' ? 'quiz_complete' : 'lesson_complete';
+      setImmediate(() => {
+        aiMentorEngine.runAIMentor(userId, { trigger: mentorTrigger as any }).catch((err: any) => {
+          logger.warn({ userId, err }, '[ProgressController] Mentor trigger failed (non-critical)');
+        });
+      });
+    }
+
   } catch (err: any) {
     logger.error(`[ProgressController] trackEvent: ${err.message}`);
     res.status(500).json({ success: false, message: 'Failed to track event.' });

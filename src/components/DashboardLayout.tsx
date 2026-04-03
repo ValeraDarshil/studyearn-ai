@@ -457,7 +457,7 @@
 //   );
 // }
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import {
   Brain,
@@ -480,11 +480,14 @@ import {
   Users,
   Code2,
   Cpu,
+  Bot,
 } from "lucide-react";
 import { useApp } from "../context/AppContext";
 import Lottie from "lottie-react";
 import streakAnimation from "../assets/animations/streak-fire.json";
 import profileIconAnimation from "../assets/animations/profile-icon.json";
+// ── Stage 6: AI Mentor unread badge ──────────────────────────
+import { mentorApi } from "../utils/mentor-api";
 
 export function DashboardLayout() {
   const navigate = useNavigate();
@@ -499,20 +502,41 @@ export function DashboardLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profileHovered, setProfileHovered] = useState(false);
 
+  // ── Stage 6: Mentor unread count ─────────────────────────
+  const [mentorUnread, setMentorUnread] = useState(0);
+
+  useEffect(() => {
+    // Fetch mentor unread count on mount
+    mentorApi.getState()
+      .then((s) => setMentorUnread(s.unreadCount ?? 0))
+      .catch(() => {});
+
+    // Re-check every 5 minutes
+    const interval = setInterval(() => {
+      mentorApi.getState()
+        .then((s) => setMentorUnread(s.unreadCount ?? 0))
+        .catch(() => {});
+    }, 5 * 60 * 1000);
+
+    return () => clearInterval(interval);
+  }, []);
+
   // Bottom nav — only 5 primary items for clean mobile UX
   const bottomNavItems = [
     { icon: Sparkles, label: "Home",      path: "/app" },
     { icon: Brain,    label: "Ask AI",    path: "/app/ask" },
     { icon: HelpCircle, label: "Quiz",    path: "/app/quiz" },
     { icon: FlameIcon,  label: "Challenge", path: "/app/challenge" },
-    { icon: Gift,     label: "Points",    path: "/app/rewards" },
+    { icon: Bot,      label: "Mentor",    path: "/app/mentor" },
   ];
 
   // Sidebar — full list
   const navItemsFull = [
     { icon: Sparkles,     label: "Dashboard",      path: "/app" },
-    // ── AI Study OS Brain (NEW) ──────────────────────────────
+    // ── AI Study OS Brain (Stage 1) ──────────────────────────────
     { icon: Cpu,          label: "AI Brain",        path: "/app/brain",        badge: "NEW" },
+    // ── Stage 6: AI Mentor ──────────────────────────────────────
+    { icon: Bot,          label: "AI Mentor",       path: "/app/mentor",       badge: "S6" },
     { icon: Brain,        label: "Ask AI",          path: "/app/ask" },
     { icon: HelpCircle,   label: "AI Quiz",         path: "/app/quiz" },
     { icon: FlameIcon,    label: "Daily Challenge", path: "/app/challenge" },
@@ -672,8 +696,9 @@ export function DashboardLayout() {
                 `relative flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 group/nav ${
                   isActive
                     ? item.path === "/app/brain"
-                      // AI Brain gets special violet active style
                       ? "bg-gradient-to-r from-violet-500/15 to-purple-500/15 text-white border border-violet-500/30"
+                      : item.path === "/app/mentor"
+                      ? "bg-gradient-to-r from-emerald-500/15 to-teal-500/15 text-white border border-emerald-500/30"
                       : "bg-gradient-to-r from-blue-500/10 to-purple-500/10 text-white border border-blue-500/20"
                     : "text-slate-400 hover:text-white hover:bg-white/[0.03] border border-transparent"
                 }`
@@ -683,21 +708,49 @@ export function DashboardLayout() {
                 <>
                   {isActive && (
                     <span className={`absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-r-full bg-gradient-to-b ${
-                      item.path === "/app/brain" ? "from-violet-400 to-purple-500" : "from-blue-400 to-purple-500"
+                      item.path === "/app/brain"
+                        ? "from-violet-400 to-purple-500"
+                        : item.path === "/app/mentor"
+                        ? "from-emerald-400 to-teal-500"
+                        : "from-blue-400 to-purple-500"
                     }`} />
                   )}
                   <item.icon
                     className={`w-4 h-4 flex-shrink-0 transition-all duration-200 ${
                       isActive
-                        ? item.path === "/app/brain" ? "text-violet-400" : "text-blue-400"
+                        ? item.path === "/app/brain"
+                          ? "text-violet-400"
+                          : item.path === "/app/mentor"
+                          ? "text-emerald-400"
+                          : "text-blue-400"
                         : "group-hover/nav:text-white"
                     }`}
                   />
                   <span className="truncate flex-1">{item.label}</span>
-                  {"badge" in item && item.badge && !isActive && (
+
+                  {/* ── Stage 6: Mentor unread badge ─────── */}
+                  {item.path === "/app/mentor" && mentorUnread > 0 && !isActive && (
+                    <span
+                      style={{
+                        background: "#ef4444",
+                        color: "#fff",
+                        fontSize: 10,
+                        fontWeight: 800,
+                        borderRadius: 99,
+                        padding: "1px 6px",
+                        minWidth: 18,
+                        textAlign: "center",
+                        flexShrink: 0,
+                      }}
+                    >
+                      {mentorUnread}
+                    </span>
+                  )}
+
+                  {"badge" in item && item.badge && !isActive && item.path !== "/app/mentor" && (
                     <span
                       className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0 ${
-                        item.badge === "NEW"
+                        item.badge === "NEW" || item.badge === "S6"
                           ? "bg-violet-500/15 text-violet-400 border border-violet-500/20"
                           : "bg-green-500/15 text-green-400 border border-green-500/20"
                       }`}
@@ -763,6 +816,34 @@ export function DashboardLayout() {
                 {points} pts
               </span>
             </div>
+
+            {/* AI Mentor unread badge — top bar quick access */}
+            {mentorUnread > 0 && (
+              <NavLink
+                to="/app/mentor"
+                className="relative flex items-center gap-1.5 px-2 py-1.5 rounded-lg glass border border-emerald-500/20"
+                title="AI Mentor has a message for you"
+              >
+                <Bot className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
+                <span className="text-[11px] font-semibold text-emerald-300 whitespace-nowrap hidden sm:inline">
+                  Mentor
+                </span>
+                <span
+                  style={{
+                    background: "#ef4444",
+                    color: "#fff",
+                    fontSize: 9,
+                    fontWeight: 800,
+                    borderRadius: 99,
+                    padding: "1px 5px",
+                    minWidth: 16,
+                    textAlign: "center",
+                  }}
+                >
+                  {mentorUnread}
+                </span>
+              </NavLink>
+            )}
 
             {/* Premium Badge */}
             {isPremium && (
@@ -897,9 +978,24 @@ export function DashboardLayout() {
               {({ isActive }) => (
                 <>
                   <div
-                    className={`p-1.5 rounded-xl transition-all ${isActive ? "bg-gradient-to-br from-blue-500/25 to-purple-500/25 border border-blue-500/30" : ""}`}
+                    className={`p-1.5 rounded-xl transition-all relative ${isActive ? "bg-gradient-to-br from-blue-500/25 to-purple-500/25 border border-blue-500/30" : ""}`}
                   >
                     <item.icon className="w-[18px] h-[18px]" />
+                    {/* Mentor unread dot on mobile */}
+                    {item.path === "/app/mentor" && mentorUnread > 0 && !isActive && (
+                      <span
+                        style={{
+                          position: "absolute",
+                          top: 2,
+                          right: 2,
+                          width: 8,
+                          height: 8,
+                          background: "#ef4444",
+                          borderRadius: "50%",
+                          border: "1px solid rgba(3,7,18,0.9)",
+                        }}
+                      />
+                    )}
                   </div>
                   <span className="text-[10px] font-medium leading-none mt-0.5">
                     {item.label}

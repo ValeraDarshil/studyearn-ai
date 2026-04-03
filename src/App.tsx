@@ -1254,6 +1254,9 @@ import { OnboardingTour, hasCompletedOnboardingLocally } from "./components/Onbo
 import { Onboarding } from "./pages/Onboarding";
 import { BrainDashboard } from "./pages/BrainDashboard";
 
+// ── Stage 6: AI Mentor ────────────────────────────────────────
+import AIMentor from "./pages/AIMentor";
+
 // ── Achievement Unlocked — Center Modal ──────────────────────
 function AchievementToast({ achievement, onClose }: { achievement: any; onClose: () => void }) {
   const [visible, setVisible] = useState(true);
@@ -1671,6 +1674,8 @@ function AppContent() {
             <Route path="notes/shared/:code" element={<CollabNotes />} />
             {/* AI Study OS — Brain Dashboard */}
             <Route path="brain"       element={<BrainDashboard />} />
+            {/* ── Stage 6: AI Mentor ───────────────────────── */}
+            <Route path="mentor"      element={<AIMentor />} />
           </Route>
         </Routes>
 

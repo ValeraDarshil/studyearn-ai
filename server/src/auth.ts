@@ -1355,6 +1355,9 @@ import crypto from 'crypto';
 
 // ── STAGE 5: AI Orchestrator — post-login hook ────────────────
 import { triggerPostLoginOrchestration } from './services/aiCore/aiOrchestrator.js';
+
+// ── STAGE 6: AI Mentor — proactive mentor trigger ─────────────
+import { aiMentorEngine } from './services/aiMentor/aiMentorEngine.js';
 // ─────────────────────────────────────────────────────────────
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID!;
@@ -1546,6 +1549,11 @@ router.post('/signup', authLimiter, validateSignup, async (req, res) => {
     // ── STAGE 5: Trigger AI Orchestration after signup (non-blocking) ──
     triggerPostLoginOrchestration(String(user._id));
 
+    // ── STAGE 6: Trigger AI Mentor after signup (non-blocking) ──
+    setImmediate(() => {
+      aiMentorEngine.runAIMentor(String(user._id), { trigger: 'login' }).catch(() => {});
+    });
+
   } catch (error: any) {
     logger.error({ err: error }, 'Signup error');
     res.status(500).json({ success: false, message: 'Server error' });
@@ -1633,6 +1641,11 @@ router.post('/login', authLimiter, validateLogin, async (req, res) => {
 
     // ── STAGE 5: Trigger AI Orchestration after login (non-blocking) ──
     triggerPostLoginOrchestration(String(user._id));
+
+    // ── STAGE 6: Trigger AI Mentor after login (non-blocking) ──
+    setImmediate(() => {
+      aiMentorEngine.runAIMentor(String(user._id), { trigger: 'login' }).catch(() => {});
+    });
 
   } catch (error) {
     logger.error({ err: error }, 'Login error');
@@ -1959,6 +1972,11 @@ router.post('/google', authLimiter, async (req, res) => {
 
     // ── STAGE 5: Trigger AI Orchestration after Google login (non-blocking) ──
     triggerPostLoginOrchestration(String(user._id));
+
+    // ── STAGE 6: Trigger AI Mentor after Google login (non-blocking) ──
+    setImmediate(() => {
+      aiMentorEngine.runAIMentor(String(user._id), { trigger: 'login' }).catch(() => {});
+    });
 
   } catch (error: any) {
     logger.error({ err: error }, 'Google auth error: ' + (error?.message || String(error)));
