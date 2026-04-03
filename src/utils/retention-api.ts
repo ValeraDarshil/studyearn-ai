@@ -4,6 +4,9 @@
  * Frontend utility to communicate with the Retention Engine backend.
  */
 
+import { Server } from "lucide-react";
+import { build } from "vite";
+
 const API_URL = import.meta.env.VITE_API_URL as string;
 
 function getAuthHeader(): Record<string, string> {
