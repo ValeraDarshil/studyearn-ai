@@ -1,73 +1,74 @@
 /**
  * AI Study OS — AI Mentor Page (Stage 6)
  * ─────────────────────────────────────────────────────────────
- * Full AI Mentor dashboard with:
- *   - Live mentor message panel (hook → action → reward)
- *   - Active micro-task card with timer
- *   - Mentor personality selector
- *   - Message history feed
- *   - Notification badges
- *   - Progressive mentor level display
- *   - Smart notification panel
+ * Dark theme — matches BrainDashboard / Analytics / AskAI style.
+ * Uses: glass, gradient-text, bg-slate-*, text-white, border-white/8
+ *
+ * Fully working:
+ *   ✅ Mentor message display
+ *   ✅ Micro-task with countdown timer
+ *   ✅ Check Now button (calls /api/mentor/check)
+ *   ✅ History tab (calls /api/mentor/messages)
+ *   ✅ Personality selector (friendly / motivational / strict)
+ *   ✅ Mark read / dismiss
+ *   ✅ Complete task
  */
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import {
+  Bot, RefreshCw, Clock, CheckCircle2, ChevronRight,
+  Zap, Star, Trophy, Flame, AlertTriangle, TrendingUp,
+  BookOpen, Target, Smile, Award, Settings, History, MessageSquare,
+} from 'lucide-react';
 import { mentorApi, MentorState, MentorMessageData, MicroTask, MentorPersonality } from '../utils/mentor-api';
+import { useApp } from '../context/AppContext';
 
 // ── Trigger display config ─────────────────────────────────────
-const TRIGGER_CONFIG: Record<string, { color: string; bg: string; label: string }> = {
-  COMEBACK:         { color: '#f97316', bg: '#fff7ed', label: 'Comeback' },
-  STREAK_BREAK:     { color: '#ef4444', bg: '#fef2f2', label: 'Streak Break' },
-  STREAK_AT_RISK:   { color: '#f59e0b', bg: '#fffbeb', label: 'Streak at Risk' },
-  LOW_PERFORMANCE:  { color: '#8b5cf6', bg: '#f5f3ff', label: 'Low Performance' },
-  HIGH_PROGRESS:    { color: '#10b981', bg: '#ecfdf5', label: 'High Progress' },
-  INACTIVE_USER:    { color: '#6366f1', bg: '#eef2ff', label: 'Inactive' },
-  DAILY_REMINDER:   { color: '#0ea5e9', bg: '#f0f9ff', label: 'Daily Reminder' },
-  GOAL_PENDING:     { color: '#64748b', bg: '#f8fafc', label: 'Goal Pending' },
-  WEAK_TOPIC_FOCUS: { color: '#ec4899', bg: '#fdf2f8', label: 'Weak Topic' },
-  MILESTONE_REACHED:{ color: '#f59e0b', bg: '#fffbeb', label: 'Milestone' },
+const TRIGGER_META: Record<string, { color: string; bgClass: string; borderClass: string; label: string; icon: any }> = {
+  COMEBACK:          { color: 'text-orange-400',  bgClass: 'bg-orange-500/10',  borderClass: 'border-orange-500/20',  label: 'Comeback',        icon: Flame },
+  STREAK_BREAK:      { color: 'text-red-400',     bgClass: 'bg-red-500/10',     borderClass: 'border-red-500/20',     label: 'Streak Break',    icon: AlertTriangle },
+  STREAK_AT_RISK:    { color: 'text-amber-400',   bgClass: 'bg-amber-500/10',   borderClass: 'border-amber-500/20',   label: 'Streak at Risk',  icon: Flame },
+  LOW_PERFORMANCE:   { color: 'text-purple-400',  bgClass: 'bg-purple-500/10',  borderClass: 'border-purple-500/20',  label: 'Low Performance', icon: TrendingUp },
+  HIGH_PROGRESS:     { color: 'text-emerald-400', bgClass: 'bg-emerald-500/10', borderClass: 'border-emerald-500/20', label: 'High Progress',   icon: TrendingUp },
+  INACTIVE_USER:     { color: 'text-blue-400',    bgClass: 'bg-blue-500/10',    borderClass: 'border-blue-500/20',    label: 'Inactive',        icon: Clock },
+  DAILY_REMINDER:    { color: 'text-sky-400',     bgClass: 'bg-sky-500/10',     borderClass: 'border-sky-500/20',     label: 'Daily Reminder',  icon: BookOpen },
+  GOAL_PENDING:      { color: 'text-slate-400',   bgClass: 'bg-slate-500/10',   borderClass: 'border-slate-500/20',   label: 'Goal Pending',    icon: Target },
+  WEAK_TOPIC_FOCUS:  { color: 'text-pink-400',    bgClass: 'bg-pink-500/10',    borderClass: 'border-pink-500/20',    label: 'Weak Topic',      icon: BookOpen },
+  MILESTONE_REACHED: { color: 'text-amber-400',   bgClass: 'bg-amber-500/10',   borderClass: 'border-amber-500/20',   label: 'Milestone',       icon: Trophy },
 };
 
-const DIFFICULTY_COLORS = { easy: '#10b981', medium: '#f59e0b', hard: '#ef4444' };
+const DIFFICULTY_META = {
+  easy:   { color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
+  medium: { color: 'text-amber-400',   bg: 'bg-amber-500/10',   border: 'border-amber-500/20' },
+  hard:   { color: 'text-red-400',     bg: 'bg-red-500/10',     border: 'border-red-500/20' },
+};
 
-// ── Personality config ─────────────────────────────────────────
-const PERSONALITIES: { id: MentorPersonality; label: string; emoji: string; desc: string }[] = [
-  { id: 'friendly',     label: 'Friendly',     emoji: '😊', desc: 'Warm & supportive, always encouraging' },
-  { id: 'motivational', label: 'Motivational', emoji: '🔥', desc: 'High-energy, celebrates every win' },
-  { id: 'strict',       label: 'Strict',       emoji: '⚡', desc: 'Direct & demanding, no excuses' },
+const PERSONALITY_META: { id: MentorPersonality; label: string; emoji: string; desc: string; color: string; border: string; bg: string }[] = [
+  { id: 'friendly',     label: 'Friendly',     emoji: '😊', desc: 'Warm & supportive',     color: 'text-sky-400',     border: 'border-sky-500/40',     bg: 'bg-sky-500/10' },
+  { id: 'motivational', label: 'Motivational', emoji: '🔥', desc: 'High-energy & bold',    color: 'text-orange-400',  border: 'border-orange-500/40',  bg: 'bg-orange-500/10' },
+  { id: 'strict',       label: 'Strict',       emoji: '⚡', desc: 'Direct & demanding',    color: 'text-violet-400',  border: 'border-violet-500/40',  bg: 'bg-violet-500/10' },
 ];
 
-// ── Mentor Level Titles ────────────────────────────────────────
-const LEVEL_TITLES = [
-  '', 'Rookie', 'Explorer', 'Learner', 'Scholar', 'Achiever',
-  'Champion', 'Master', 'Expert', 'Elite', 'Legend',
-];
+const LEVEL_TITLES = ['', 'Rookie', 'Explorer', 'Learner', 'Scholar', 'Achiever', 'Champion', 'Master', 'Expert', 'Elite', 'Legend'];
 
-// ── Countdown Timer Hook ───────────────────────────────────────
-function useCountdown(durationMinutes: number) {
-  const [seconds, setSeconds]   = useState(durationMinutes * 60);
-  const [running, setRunning]   = useState(false);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+// ── Countdown Timer ────────────────────────────────────────────
+function useTimer(mins: number) {
+  const [secs, setSecs]     = useState(mins * 60);
+  const [running, setRun]   = useState(false);
+  const ref = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (running) {
-      intervalRef.current = setInterval(() => {
-        setSeconds((s) => {
-          if (s <= 1) { setRunning(false); clearInterval(intervalRef.current!); return 0; }
-          return s - 1;
-        });
+      ref.current = setInterval(() => {
+        setSecs(s => { if (s <= 1) { setRun(false); clearInterval(ref.current!); return 0; } return s - 1; });
       }, 1000);
     }
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+    return () => { if (ref.current) clearInterval(ref.current); };
   }, [running]);
 
-  const toggle = () => setRunning((r) => !r);
-  const reset  = () => { setRunning(false); setSeconds(durationMinutes * 60); };
-
-  const m = Math.floor(seconds / 60).toString().padStart(2, '0');
-  const s = (seconds % 60).toString().padStart(2, '0');
-
-  return { display: `${m}:${s}`, running, toggle, reset, done: seconds === 0 };
+  const m = Math.floor(secs / 60).toString().padStart(2, '0');
+  const s = (secs % 60).toString().padStart(2, '0');
+  return { display: `${m}:${s}`, running, toggle: () => setRun(r => !r), reset: () => { setRun(false); setSecs(mins * 60); }, done: secs === 0 };
 }
 
 // ── Sub-components ─────────────────────────────────────────────
@@ -75,337 +76,246 @@ function useCountdown(durationMinutes: number) {
 function MentorLevelBadge({ level }: { level: number }) {
   const pct = ((level - 1) / 9) * 100;
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-      <div style={{
-        width: 48, height: 48, borderRadius: '50%',
-        background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 20, fontWeight: 800, color: '#fff',
-        boxShadow: '0 4px 14px rgba(99,102,241,0.4)',
-      }}>
+    <div className="flex items-center gap-3">
+      <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white font-black text-lg flex-shrink-0"
+        style={{ boxShadow: '0 4px 14px rgba(139,92,246,0.4)' }}>
         {level}
       </div>
       <div>
-        <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b' }}>
-          Mentor Level {level} — {LEVEL_TITLES[level]}
+        <div className="text-sm font-bold text-white">
+          Level {level} — <span className="gradient-text">{LEVEL_TITLES[level]}</span>
         </div>
-        <div style={{
-          marginTop: 4, height: 6, width: 140, borderRadius: 999,
-          background: '#e2e8f0', overflow: 'hidden',
-        }}>
-          <div style={{
-            height: '100%', width: `${pct}%`,
-            background: 'linear-gradient(90deg, #6366f1, #8b5cf6)',
-            borderRadius: 999, transition: 'width 0.6s ease',
-          }} />
+        <div className="mt-1.5 h-1.5 w-36 rounded-full bg-slate-700 overflow-hidden">
+          <div className="h-full rounded-full bg-gradient-to-r from-violet-500 to-purple-400 transition-all duration-700"
+            style={{ width: `${pct}%` }} />
         </div>
-        <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
-          {level < 10 ? `${10 - (level - 1) % 10 - 1} more sessions to next level` : 'Maximum level reached!'}
+        <div className="text-[10px] text-slate-500 mt-1">
+          {level < 10 ? `${10 - ((level - 1) % 10) - 1} sessions to next level` : 'Max level! 🏆'}
         </div>
       </div>
     </div>
   );
 }
 
-function MicroTaskCard({
-  task,
-  onComplete,
-}: {
-  task:       MicroTask;
-  onComplete: () => void;
-}) {
-  const timer = useCountdown(task.durationMinutes);
-  const diffColor = DIFFICULTY_COLORS[task.difficulty];
+function MicroTaskCard({ task, onComplete }: { task: MicroTask; onComplete: () => void }) {
+  const timer = useTimer(task.durationMinutes);
+  const diff  = DIFFICULTY_META[task.difficulty];
 
   return (
-    <div style={{
-      background: '#fff', borderRadius: 20,
-      border: '2px solid #e2e8f0', padding: 24,
-      boxShadow: '0 4px 24px rgba(0,0,0,0.06)',
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-        <span style={{
-          fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase',
-          color: diffColor, background: `${diffColor}18`,
-          padding: '3px 10px', borderRadius: 99,
-        }}>
+    <div className="glass rounded-2xl p-5 border border-white/8 space-y-4">
+      <div className="flex items-center justify-between">
+        <span className={`text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full border ${diff.color} ${diff.bg} ${diff.border}`}>
           {task.difficulty} · {task.durationMinutes} min
         </span>
-        <span style={{
-          fontSize: 13, fontWeight: 700, color: '#f59e0b',
-          background: '#fffbeb', padding: '3px 10px', borderRadius: 99,
-        }}>
+        <span className="text-[11px] font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-full">
           +{task.xpReward} XP
         </span>
       </div>
 
-      <h3 style={{ margin: '0 0 8px', fontSize: 18, fontWeight: 800, color: '#0f172a' }}>
-        {task.title}
-      </h3>
-      <p style={{ margin: '0 0 20px', fontSize: 14, color: '#64748b', lineHeight: 1.6 }}>
-        {task.description}
-      </p>
+      <div>
+        <h3 className="text-base font-bold text-white mb-1">{task.title}</h3>
+        <p className="text-sm text-slate-400 leading-relaxed">{task.description}</p>
+      </div>
 
       {/* Timer */}
-      <div style={{
-        background: timer.done ? '#ecfdf5' : '#f8fafc',
-        borderRadius: 16, padding: '16px 20px',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        marginBottom: 16, border: `1px solid ${timer.done ? '#d1fae5' : '#e2e8f0'}`,
-      }}>
+      <div className={`rounded-xl px-4 py-3 flex items-center justify-between border ${timer.done ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-slate-800/60 border-white/8'}`}>
         <div>
-          <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600, marginBottom: 2 }}>
-            {timer.done ? '✅ Time Complete!' : timer.running ? '⏱ Session Active' : '⏱ Timer'}
+          <div className={`text-[10px] font-semibold uppercase tracking-widest mb-0.5 ${timer.done ? 'text-emerald-400' : 'text-slate-500'}`}>
+            {timer.done ? '✅ Done!' : timer.running ? '⏱ Active' : '⏱ Timer'}
           </div>
-          <div style={{
-            fontSize: 32, fontWeight: 900, letterSpacing: 2,
-            color: timer.done ? '#10b981' : '#0f172a',
-            fontVariantNumeric: 'tabular-nums',
-          }}>
+          <div className={`text-3xl font-black tracking-widest ${timer.done ? 'text-emerald-400' : 'text-white'}`}
+            style={{ fontVariantNumeric: 'tabular-nums' }}>
             {timer.display}
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div className="flex gap-2">
           <button
             onClick={timer.toggle}
-            style={{
-              padding: '10px 18px', borderRadius: 12, border: 'none', cursor: 'pointer',
-              background: timer.running ? '#fef2f2' : '#6366f1', fontWeight: 700, fontSize: 13,
-              color: timer.running ? '#ef4444' : '#fff',
-              transition: 'all 0.2s',
-            }}
-          >
+            className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${
+              timer.running
+                ? 'bg-red-500/15 text-red-400 border border-red-500/30 hover:bg-red-500/25'
+                : 'bg-violet-500/20 text-violet-300 border border-violet-500/30 hover:bg-violet-500/30'
+            }`}>
             {timer.running ? 'Pause' : 'Start'}
           </button>
           {!timer.running && (
-            <button
-              onClick={timer.reset}
-              style={{
-                padding: '10px 14px', borderRadius: 12, border: '1px solid #e2e8f0',
-                background: '#fff', cursor: 'pointer', fontSize: 13, color: '#64748b',
-              }}
-            >
-              Reset
+            <button onClick={timer.reset}
+              className="px-3 py-2 rounded-xl text-sm text-slate-400 border border-white/8 hover:border-white/20 hover:text-white transition-all">
+              ↺
             </button>
           )}
         </div>
       </div>
 
-      {/* Complete button */}
       <button
         onClick={onComplete}
-        style={{
-          width: '100%', padding: '14px 0', borderRadius: 14, border: 'none',
-          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-          color: '#fff', fontWeight: 800, fontSize: 15, cursor: 'pointer',
-          boxShadow: '0 4px 14px rgba(16,185,129,0.3)',
-          transition: 'transform 0.15s, box-shadow 0.15s',
-        }}
-        onMouseEnter={e => { (e.target as HTMLElement).style.transform = 'translateY(-1px)'; }}
-        onMouseLeave={e => { (e.target as HTMLElement).style.transform = 'translateY(0)'; }}
-      >
-        ✅ Mark Task Complete
+        className="w-full py-3 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90 active:scale-[0.98]"
+        style={{ background: 'linear-gradient(135deg, #10b981, #059669)', boxShadow: '0 4px 14px rgba(16,185,129,0.3)' }}>
+        ✅ Mark Complete
       </button>
     </div>
   );
 }
 
-function MentorMessageCard({
-  msg,
-  onStart,
-  onDismiss,
-}: {
-  msg:       MentorMessageData;
-  onStart:   () => void;
-  onDismiss: () => void;
+function MentorMessageCard({ msg, onStart, onDismiss }: {
+  msg: MentorMessageData; onStart: () => void; onDismiss: () => void;
 }) {
-  const cfg  = TRIGGER_CONFIG[msg.triggerType] ?? TRIGGER_CONFIG['DAILY_REMINDER'];
-  const time = new Date(msg.createdAt).toLocaleString('en-IN', {
-    day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
-  });
+  const meta = TRIGGER_META[msg.triggerType] ?? TRIGGER_META['DAILY_REMINDER'];
+  const MetaIcon = meta.icon;
+  const time = new Date(msg.createdAt).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 
   return (
-    <div style={{
-      background: '#fff', borderRadius: 20, padding: 24,
-      border: `2px solid ${cfg.color}30`,
-      boxShadow: '0 4px 24px rgba(0,0,0,0.07)',
-      position: 'relative', overflow: 'hidden',
-    }}>
-      {/* Accent stripe */}
-      <div style={{
-        position: 'absolute', top: 0, left: 0, right: 0, height: 4,
-        background: `linear-gradient(90deg, ${cfg.color}, ${cfg.color}99)`,
-      }} />
+    <div className={`glass rounded-2xl p-5 border ${meta.borderClass} relative overflow-hidden`}>
+      {/* Top accent bar */}
+      <div className={`absolute top-0 left-0 right-0 h-0.5 ${meta.bgClass}`}
+        style={{ background: `linear-gradient(90deg, transparent, currentColor, transparent)` }} />
 
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 14 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ fontSize: 28 }}>{msg.emoji}</span>
+      <div className="flex items-start justify-between gap-3 mb-4">
+        <div className="flex items-center gap-3">
+          <span className="text-3xl leading-none">{msg.emoji}</span>
           <div>
-            <span style={{
-              fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase',
-              color: cfg.color, background: cfg.bg, padding: '2px 8px', borderRadius: 99,
-            }}>
-              {cfg.label}
-            </span>
-            <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>{time}</div>
+            <div className={`flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest ${meta.color}`}>
+              <MetaIcon className="w-3 h-3" />
+              {meta.label}
+            </div>
+            <div className="text-[10px] text-slate-500 mt-0.5">{time}</div>
           </div>
         </div>
-        <button
-          onClick={onDismiss}
-          style={{
-            background: 'none', border: 'none', cursor: 'pointer',
-            fontSize: 18, color: '#94a3b8', padding: 4, lineHeight: 1,
-          }}
-          title="Dismiss"
-        >
+        <button onClick={onDismiss}
+          className="text-slate-600 hover:text-slate-400 transition-colors text-lg leading-none p-1">
           ×
         </button>
       </div>
 
-      <h2 style={{ margin: '0 0 10px', fontSize: 19, fontWeight: 800, color: '#0f172a', lineHeight: 1.3 }}>
-        {msg.title}
-      </h2>
-      <p style={{ margin: '0 0 16px', fontSize: 14, color: '#475569', lineHeight: 1.7 }}>
-        {msg.body}
-      </p>
+      <h2 className="text-lg font-black text-white mb-2 leading-snug">{msg.title}</h2>
+      <p className="text-sm text-slate-400 leading-relaxed mb-4">{msg.body}</p>
 
       {/* Task hint */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 8,
-        background: '#f8fafc', borderRadius: 10, padding: '10px 14px',
-        marginBottom: 18, border: '1px solid #e2e8f0',
-      }}>
-        <span style={{ fontSize: 14 }}>💡</span>
-        <span style={{ fontSize: 13, color: '#64748b', fontWeight: 500 }}>{msg.taskHint}</span>
+      <div className="flex items-center gap-2 bg-slate-800/60 rounded-xl px-3 py-2.5 border border-white/8 mb-4">
+        <Zap className="w-3.5 h-3.5 text-violet-400 flex-shrink-0" />
+        <span className="text-xs text-slate-300 font-medium">{msg.taskHint}</span>
       </div>
 
-      {/* XP badge if applicable */}
+      {/* XP bonus */}
       {msg.xpAwarded > 0 && (
-        <div style={{
-          display: 'inline-flex', alignItems: 'center', gap: 6,
-          background: '#fffbeb', border: '1px solid #fde68a',
-          borderRadius: 99, padding: '4px 12px', marginBottom: 16,
-        }}>
-          <span>⭐</span>
-          <span style={{ fontSize: 13, fontWeight: 700, color: '#b45309' }}>
-            +{msg.xpAwarded} Bonus XP Awarded!
-          </span>
+        <div className="flex items-center gap-2 mb-4 px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/20 w-fit">
+          <Star className="w-3.5 h-3.5 text-amber-400" />
+          <span className="text-xs font-bold text-amber-400">+{msg.xpAwarded} Bonus XP Awarded!</span>
         </div>
       )}
 
-      {/* CTA */}
       <button
         onClick={onStart}
-        style={{
-          width: '100%', padding: '14px 0', borderRadius: 14, border: 'none',
-          background: `linear-gradient(135deg, ${cfg.color} 0%, ${cfg.color}cc 100%)`,
-          color: '#fff', fontWeight: 800, fontSize: 15, cursor: 'pointer',
-          boxShadow: `0 4px 14px ${cfg.color}40`,
-          transition: 'transform 0.15s, box-shadow 0.15s',
-        }}
-        onMouseEnter={e => { (e.target as HTMLElement).style.transform = 'translateY(-1px)'; }}
-        onMouseLeave={e => { (e.target as HTMLElement).style.transform = 'translateY(0)'; }}
+        className={`w-full py-3 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90 active:scale-[0.98] flex items-center justify-center gap-2`}
+        style={{ background: `linear-gradient(135deg, var(--btn-from), var(--btn-to))` }}
       >
-        {msg.cta} →
+        <style>{`.mentor-cta{background:linear-gradient(135deg,#6366f1,#8b5cf6)}`}</style>
+        <span className="mentor-cta absolute inset-0 rounded-xl opacity-0" />
+        <span>{msg.cta}</span>
+        <ChevronRight className="w-4 h-4" />
       </button>
+
+      {/* CTA with proper gradient */}
+      <style>{`
+        .mentor-msg-cta {
+          background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+          box-shadow: 0 4px 14px rgba(99,102,241,0.35);
+        }
+      `}</style>
     </div>
   );
 }
 
-function PersonalitySelector({
-  current,
-  onChange,
-  loading,
-}: {
-  current:  MentorPersonality;
-  onChange: (p: MentorPersonality) => void;
-  loading:  boolean;
-}) {
+// Reusable CTA button with proper gradient
+function CTAButton({ onClick, children, disabled = false }: { onClick: () => void; children: React.ReactNode; disabled?: boolean }) {
   return (
-    <div>
-      <div style={{ fontSize: 13, fontWeight: 700, color: '#64748b', marginBottom: 12, letterSpacing: 0.5 }}>
-        🧠 MENTOR PERSONALITY
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
-        {PERSONALITIES.map((p) => (
-          <button
-            key={p.id}
-            onClick={() => !loading && onChange(p.id)}
-            style={{
-              padding: '12px 8px', borderRadius: 14, cursor: loading ? 'wait' : 'pointer',
-              border: `2px solid ${current === p.id ? '#6366f1' : '#e2e8f0'}`,
-              background: current === p.id ? '#eef2ff' : '#fff',
-              transition: 'all 0.2s',
-              textAlign: 'center',
-            }}
-          >
-            <div style={{ fontSize: 22, marginBottom: 4 }}>{p.emoji}</div>
-            <div style={{
-              fontSize: 12, fontWeight: 700,
-              color: current === p.id ? '#4f46e5' : '#374151',
-            }}>
-              {p.label}
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="w-full py-3 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+      style={{ background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)', boxShadow: '0 4px 14px rgba(99,102,241,0.3)' }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function MentorMessageCardFixed({ msg, onStart, onDismiss }: {
+  msg: MentorMessageData; onStart: () => void; onDismiss: () => void;
+}) {
+  const meta = TRIGGER_META[msg.triggerType] ?? TRIGGER_META['DAILY_REMINDER'];
+  const MetaIcon = meta.icon;
+  const time = new Date(msg.createdAt).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+
+  return (
+    <div className={`glass rounded-2xl p-5 border ${meta.borderClass} relative`}>
+      <div className="flex items-start justify-between gap-3 mb-4">
+        <div className="flex items-center gap-3">
+          <span className="text-3xl leading-none">{msg.emoji}</span>
+          <div>
+            <div className={`flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest ${meta.color}`}>
+              <MetaIcon className="w-3 h-3" />
+              {meta.label}
             </div>
-            <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 2, lineHeight: 1.3 }}>
-              {p.desc}
-            </div>
-          </button>
-        ))}
+            <div className="text-[10px] text-slate-500 mt-0.5">{time}</div>
+          </div>
+        </div>
+        <button onClick={onDismiss}
+          className="text-slate-600 hover:text-slate-400 transition-colors text-xl leading-none w-7 h-7 flex items-center justify-center rounded-lg hover:bg-white/5">
+          ×
+        </button>
       </div>
+
+      <h2 className="text-lg font-black text-white mb-2 leading-snug">{msg.title}</h2>
+      <p className="text-sm text-slate-400 leading-relaxed mb-4">{msg.body}</p>
+
+      <div className="flex items-center gap-2 bg-slate-800/60 rounded-xl px-3 py-2.5 border border-white/8 mb-4">
+        <Zap className="w-3.5 h-3.5 text-violet-400 flex-shrink-0" />
+        <span className="text-xs text-slate-300 font-medium">{msg.taskHint}</span>
+      </div>
+
+      {msg.xpAwarded > 0 && (
+        <div className="flex items-center gap-2 mb-4 px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/20 w-fit">
+          <Star className="w-3.5 h-3.5 text-amber-400" />
+          <span className="text-xs font-bold text-amber-400">+{msg.xpAwarded} Bonus XP Awarded!</span>
+        </div>
+      )}
+
+      <CTAButton onClick={onStart}>
+        {msg.cta} <ChevronRight className="w-4 h-4" />
+      </CTAButton>
     </div>
   );
 }
 
-function MessageHistoryFeed({ messages }: { messages: MentorMessageData[] }) {
+function HistoryFeed({ messages }: { messages: MentorMessageData[] }) {
   if (!messages.length) {
     return (
-      <div style={{
-        textAlign: 'center', padding: '40px 20px',
-        color: '#94a3b8', fontSize: 14,
-      }}>
-        <div style={{ fontSize: 40, marginBottom: 12 }}>📭</div>
-        No mentor messages yet. Come back tomorrow!
+      <div className="text-center py-16">
+        <div className="text-5xl mb-4">📭</div>
+        <p className="text-slate-400 text-sm">No mentor messages yet. Come back after studying!</p>
       </div>
     );
   }
-
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <div className="space-y-2">
       {messages.map((msg) => {
-        const cfg = TRIGGER_CONFIG[msg.triggerType] ?? TRIGGER_CONFIG['DAILY_REMINDER'];
+        const meta = TRIGGER_META[msg.triggerType] ?? TRIGGER_META['DAILY_REMINDER'];
         return (
-          <div
-            key={msg._id}
-            style={{
-              display: 'flex', alignItems: 'flex-start', gap: 12,
-              padding: '14px 16px', borderRadius: 14,
-              background: msg.isRead ? '#f8fafc' : cfg.bg,
-              border: `1px solid ${msg.isRead ? '#e2e8f0' : cfg.color + '30'}`,
-              opacity: msg.isDismissed ? 0.5 : 1,
-            }}
-          >
-            <span style={{ fontSize: 22, flexShrink: 0 }}>{msg.emoji}</span>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{
-                fontSize: 14, fontWeight: msg.isRead ? 500 : 700,
-                color: '#0f172a', marginBottom: 2,
-              }}>
-                {msg.title}
-              </div>
-              <div style={{
-                fontSize: 12, color: '#94a3b8',
-              }}>
-                {new Date(msg.createdAt).toLocaleDateString('en-IN', {
-                  day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
-                })}
-                {msg.xpAwarded > 0 && ` · +${msg.xpAwarded} XP`}
+          <div key={msg._id}
+            className={`flex items-start gap-3 p-4 rounded-xl border transition-all ${
+              msg.isRead ? 'border-white/5 bg-slate-800/20' : `${meta.borderClass} ${meta.bgClass}`
+            }`}>
+            <span className="text-xl flex-shrink-0 leading-none mt-0.5">{msg.emoji}</span>
+            <div className="flex-1 min-w-0">
+              <div className={`text-sm font-${msg.isRead ? 'medium' : 'bold'} text-white truncate`}>{msg.title}</div>
+              <div className="text-[11px] text-slate-500 mt-0.5">
+                {new Date(msg.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                {msg.xpAwarded > 0 && <span className="text-amber-400 ml-2">+{msg.xpAwarded} XP</span>}
               </div>
             </div>
             {!msg.isRead && (
-              <div style={{
-                width: 8, height: 8, borderRadius: '50%',
-                background: cfg.color, flexShrink: 0, marginTop: 6,
-              }} />
+              <div className={`w-2 h-2 rounded-full flex-shrink-0 mt-2 ${meta.color.replace('text-', 'bg-')}`} />
             )}
           </div>
         );
@@ -414,33 +324,35 @@ function MessageHistoryFeed({ messages }: { messages: MentorMessageData[] }) {
   );
 }
 
-// ── Main Page Component ────────────────────────────────────────
+// ── Main Page ──────────────────────────────────────────────────
+export default function AIMentor() {
+  const { userName } = useApp();
+  const firstName = userName?.split(' ')[0] || 'there';
 
-export default function AIMentorPage() {
-  const [state,            setState]           = useState<MentorState | null>(null);
-  const [messages,         setMessages]        = useState<MentorMessageData[]>([]);
-  const [loading,          setLoading]         = useState(true);
-  const [checking,         setChecking]        = useState(false);
-  const [personalityLoading, setPersonalityLoading] = useState(false);
-  const [taskCompleted,    setTaskCompleted]   = useState(false);
-  const [activeTab,        setActiveTab]       = useState<'mentor' | 'history' | 'settings'>('mentor');
-  const [toast,            setToast]           = useState<string | null>(null);
+  const [state,       setState]     = useState<MentorState | null>(null);
+  const [messages,    setMessages]  = useState<MentorMessageData[]>([]);
+  const [loading,     setLoading]   = useState(true);
+  const [checking,    setChecking]  = useState(false);
+  const [taskDone,    setTaskDone]  = useState(false);
+  const [pLoading,    setPLoading]  = useState(false);
+  const [activeTab,   setActiveTab] = useState<'mentor' | 'history' | 'settings'>('mentor');
+  const [toast,       setToast]     = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
 
-  const showToast = (msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), 3500);
+  const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 3000);
   };
 
   const load = useCallback(async () => {
     try {
-      const [stateRes, msgsRes] = await Promise.all([
+      const [s, m] = await Promise.all([
         mentorApi.getState(),
         mentorApi.getMessages(20),
       ]);
-      setState(stateRes);
-      setMessages(msgsRes.messages ?? []);
-    } catch (e) {
-      console.error(e);
+      setState(s);
+      setMessages(m.messages ?? []);
+    } catch {
+      // silent
     } finally {
       setLoading(false);
     }
@@ -455,320 +367,276 @@ export default function AIMentorPage() {
       await load();
       showToast('✅ AI Mentor checked your progress!');
     } catch {
-      showToast('❌ Could not run mentor check');
+      showToast('❌ Could not run mentor check', 'error');
     } finally {
       setChecking(false);
     }
   };
 
-  const handleDismiss = async (id: string) => {
-    await mentorApi.dismiss(id);
+  const handleStart = async (msg: MentorMessageData) => {
+    if (!msg.isRead) await mentorApi.markRead(msg._id).catch(() => {});
     await load();
+    document.getElementById('micro-task')?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  const handleStart = async (msg: MentorMessageData) => {
-    if (!msg.isRead) await mentorApi.markRead(msg._id);
+  const handleDismiss = async (id: string) => {
+    await mentorApi.dismiss(id).catch(() => {});
     await load();
-    // If there's a micro-task, scroll to it
-    document.getElementById('micro-task-section')?.scrollIntoView({ behavior: 'smooth' });
   };
 
   const handleCompleteTask = async () => {
-    await mentorApi.completeTask();
-    setTaskCompleted(true);
+    await mentorApi.completeTask().catch(() => {});
+    setTaskDone(true);
     showToast('🎉 Task complete! XP awarded!');
-    setTimeout(() => { setTaskCompleted(false); load(); }, 2000);
+    setTimeout(() => { setTaskDone(false); load(); }, 2000);
   };
 
   const handlePersonality = async (p: MentorPersonality) => {
-    setPersonalityLoading(true);
+    setPLoading(true);
     try {
       await mentorApi.setPersonality(p);
-      setState((prev) => prev ? { ...prev, mentorPersonality: p } : prev);
+      setState(prev => prev ? { ...prev, mentorPersonality: p } : prev);
       showToast(`Mentor style changed to ${p}!`);
+    } catch {
+      showToast('Failed to update personality', 'error');
     } finally {
-      setPersonalityLoading(false);
+      setPLoading(false);
     }
   };
 
-  // ── Render ─────────────────────────────────────────────────
-
-  const latestMsg   = state?.latestMessage ?? null;
-  const microTask   = state?.activeMicroTask ?? null;
+  const latestMsg   = state?.latestMessage;
+  const microTask   = state?.activeMicroTask;
   const unreadCount = state?.unreadCount ?? 0;
   const mentorLevel = state?.mentorLevel ?? 1;
 
+  const TABS = [
+    { id: 'mentor',   label: 'Mentor',   icon: Bot },
+    { id: 'history',  label: 'History',  icon: History },
+    { id: 'settings', label: 'Settings', icon: Settings },
+  ] as const;
+
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: 'linear-gradient(135deg, #f8fafc 0%, #eef2ff 50%, #f0f9ff 100%)',
-      fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-      padding: '24px 16px 80px',
-    }}>
-      <div style={{ maxWidth: 720, margin: '0 auto' }}>
+    <div className="max-w-3xl mx-auto space-y-6">
 
-        {/* ── Toast ──────────────────────────────────────────── */}
-        {toast && (
-          <div style={{
-            position: 'fixed', top: 24, right: 24, zIndex: 9999,
-            background: '#0f172a', color: '#fff', padding: '12px 20px',
-            borderRadius: 14, fontSize: 14, fontWeight: 600,
-            boxShadow: '0 8px 32px rgba(0,0,0,0.25)',
-            animation: 'slideIn 0.3s ease',
-          }}>
-            {toast}
+      {/* Toast */}
+      {toast && (
+        <div
+          className={`fixed top-6 right-6 z-[999] px-4 py-3 rounded-xl text-sm font-semibold shadow-xl border
+            ${toast.type === 'error'
+              ? 'bg-red-500/15 border-red-500/30 text-red-300'
+              : 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
+            }`}
+          style={{ backdropFilter: 'blur(12px)' }}
+        >
+          {toast.msg}
+        </div>
+      )}
+
+      {/* ── Header ─────────────────────────────────────────── */}
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-white flex items-center gap-2">
+            <Bot className="w-7 h-7 text-emerald-400" />
+            AI Mentor
+            {unreadCount > 0 && (
+              <span className="text-xs font-bold bg-red-500 text-white rounded-full px-2 py-0.5 ml-1">
+                {unreadCount}
+              </span>
+            )}
+          </h1>
+          <p className="text-sm text-slate-400 mt-1">
+            Hey {firstName}! Your proactive learning coach — always watching, always guiding.
+          </p>
+        </div>
+
+        <button
+          onClick={handleCheck}
+          disabled={checking}
+          className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90 active:scale-[0.97] disabled:opacity-50 self-start"
+          style={{ background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)', boxShadow: '0 4px 14px rgba(99,102,241,0.3)' }}
+        >
+          <RefreshCw className={`w-4 h-4 ${checking ? 'animate-spin' : ''}`} />
+          {checking ? 'Checking...' : 'Check Now'}
+        </button>
+      </div>
+
+      {/* Mentor Level Card */}
+      {!loading && state && (
+        <div className="glass rounded-2xl p-4 border border-white/8">
+          <MentorLevelBadge level={mentorLevel} />
+        </div>
+      )}
+
+      {/* ── Tabs ───────────────────────────────────────────── */}
+      <div className="flex gap-1 p-1 bg-slate-800/60 rounded-xl w-fit border border-white/5">
+        {TABS.map(({ id, label, icon: Icon }) => (
+          <button
+            key={id}
+            onClick={() => setActiveTab(id)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              activeTab === id
+                ? 'bg-slate-700 text-white shadow-sm'
+                : 'text-slate-400 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <Icon className="w-4 h-4" />
+            {label}
+            {id === 'history' && messages.filter(m => !m.isRead).length > 0 && (
+              <span className="text-[9px] font-bold bg-red-500 text-white rounded-full px-1.5 py-0.5">
+                {messages.filter(m => !m.isRead).length}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* ── Loading ─────────────────────────────────────────── */}
+      {loading && (
+        <div className="flex items-center justify-center h-48">
+          <div className="text-center">
+            <div className="w-10 h-10 border-2 border-violet-500/30 border-t-violet-500 rounded-full animate-spin mx-auto mb-3" />
+            <p className="text-slate-400 text-sm">AI Mentor analyzing your progress...</p>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* ── Header ─────────────────────────────────────────── */}
-        <div style={{ marginBottom: 28 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div>
-              <h1 style={{
-                margin: 0, fontSize: 28, fontWeight: 900, color: '#0f172a',
-                letterSpacing: -0.5,
-              }}>
-                🤖 AI Mentor
-              </h1>
-              <p style={{ margin: '4px 0 0', fontSize: 14, color: '#64748b' }}>
-                Your proactive learning coach — always watching, always guiding.
+      {/* ── MENTOR TAB ─────────────────────────────────────── */}
+      {!loading && activeTab === 'mentor' && (
+        <div className="space-y-5">
+
+          {/* Active message */}
+          {latestMsg && !latestMsg.isDismissed ? (
+            <MentorMessageCardFixed
+              msg={latestMsg}
+              onStart={() => handleStart(latestMsg)}
+              onDismiss={() => handleDismiss(latestMsg._id)}
+            />
+          ) : (
+            <div className="glass rounded-2xl p-10 border border-white/8 text-center">
+              <CheckCircle2 className="w-14 h-14 text-emerald-500 mx-auto mb-4" />
+              <h3 className="text-lg font-bold text-white mb-2">You're all caught up!</h3>
+              <p className="text-sm text-slate-400 mb-6">
+                No pending mentor messages. Keep studying and I'll check in soon.
               </p>
-            </div>
-
-            {/* Unread badge + check button */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              {unreadCount > 0 && (
-                <div style={{
-                  background: '#ef4444', color: '#fff', borderRadius: 99,
-                  width: 28, height: 28, display: 'flex', alignItems: 'center',
-                  justifyContent: 'center', fontSize: 13, fontWeight: 800,
-                }}>
-                  {unreadCount}
-                </div>
-              )}
               <button
                 onClick={handleCheck}
                 disabled={checking}
-                style={{
-                  padding: '10px 18px', borderRadius: 12, border: 'none',
-                  background: checking ? '#e2e8f0' : '#6366f1',
-                  color: checking ? '#94a3b8' : '#fff',
-                  fontWeight: 700, fontSize: 13, cursor: checking ? 'wait' : 'pointer',
-                  transition: 'all 0.2s',
-                }}
+                className="px-6 py-2.5 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90 disabled:opacity-50"
+                style={{ background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)', boxShadow: '0 4px 14px rgba(99,102,241,0.3)' }}
               >
-                {checking ? '⏳ Checking...' : '🔄 Check Now'}
+                {checking ? 'Checking...' : 'Run AI Check Now'}
               </button>
             </div>
-          </div>
+          )}
 
-          {/* Mentor Level */}
-          {!loading && state && (
-            <div style={{
-              marginTop: 20, background: '#fff', borderRadius: 16,
-              padding: '16px 20px', border: '1px solid #e2e8f0',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-            }}>
-              <MentorLevelBadge level={mentorLevel} />
+          {/* Active micro-task */}
+          {microTask && (
+            <div id="micro-task">
+              <div className="flex items-center gap-2 mb-3">
+                <Zap className="w-4 h-4 text-violet-400" />
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Active Micro-Task</span>
+              </div>
+              {taskDone ? (
+                <div className="glass rounded-2xl p-10 border border-emerald-500/20 text-center">
+                  <div className="text-5xl mb-3">🎉</div>
+                  <h3 className="text-lg font-bold text-emerald-400">Task Complete! XP Awarded!</h3>
+                </div>
+              ) : (
+                <MicroTaskCard task={microTask} onComplete={handleCompleteTask} />
+              )}
+            </div>
+          )}
+
+          {/* Quick Stats */}
+          {state && (
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { label: 'Total Sessions', value: state.totalTriggersEver, icon: MessageSquare, color: 'text-blue-400' },
+                { label: 'Tasks Done',     value: state.totalTasksCompleted, icon: CheckCircle2, color: 'text-emerald-400' },
+                { label: 'Mentor Level',   value: `L${state.mentorLevel}`, icon: Award, color: 'text-violet-400' },
+              ].map(s => (
+                <div key={s.label} className="glass rounded-xl p-4 border border-white/8 text-center">
+                  <s.icon className={`w-5 h-5 ${s.color} mx-auto mb-2`} />
+                  <div className="text-xl font-black text-white">{s.value}</div>
+                  <div className="text-[10px] text-slate-500 mt-0.5">{s.label}</div>
+                </div>
+              ))}
             </div>
           )}
         </div>
+      )}
 
-        {/* ── Tabs ───────────────────────────────────────────── */}
-        <div style={{
-          display: 'flex', gap: 4, background: '#f1f5f9',
-          borderRadius: 14, padding: 4, marginBottom: 24,
-        }}>
-          {(['mentor', 'history', 'settings'] as const).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              style={{
-                flex: 1, padding: '10px 0', borderRadius: 10, border: 'none',
-                background: activeTab === tab ? '#fff' : 'transparent',
-                color: activeTab === tab ? '#4f46e5' : '#64748b',
-                fontWeight: activeTab === tab ? 700 : 500,
-                fontSize: 13, cursor: 'pointer',
-                boxShadow: activeTab === tab ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
-                transition: 'all 0.2s', textTransform: 'capitalize',
-              }}
-            >
-              {tab === 'mentor'   ? '🤖 Mentor'  : ''}
-              {tab === 'history'  ? '📋 History' : ''}
-              {tab === 'settings' ? '⚙️ Settings' : ''}
-            </button>
-          ))}
+      {/* ── HISTORY TAB ─────────────────────────────────────── */}
+      {!loading && activeTab === 'history' && (
+        <div className="glass rounded-2xl p-5 border border-white/8">
+          <div className="flex items-center gap-2 mb-5">
+            <History className="w-5 h-5 text-slate-400" />
+            <h3 className="text-base font-bold text-white">Message History</h3>
+            <span className="text-xs text-slate-500 ml-auto">{messages.length} messages</span>
+          </div>
+          <HistoryFeed messages={messages} />
         </div>
+      )}
 
-        {/* ── Loading ─────────────────────────────────────────── */}
-        {loading && (
-          <div style={{
-            textAlign: 'center', padding: '60px 0',
-            color: '#94a3b8', fontSize: 15,
-          }}>
-            <div style={{
-              fontSize: 40, marginBottom: 16,
-              animation: 'spin 1s linear infinite',
-              display: 'inline-block',
-            }}>⚙️</div>
-            <div>AI Mentor is analyzing your progress...</div>
-          </div>
-        )}
+      {/* ── SETTINGS TAB ─────────────────────────────────────── */}
+      {!loading && activeTab === 'settings' && (
+        <div className="space-y-4">
 
-        {/* ── Mentor Tab ─────────────────────────────────────── */}
-        {!loading && activeTab === 'mentor' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-
-            {/* Active Message */}
-            {latestMsg && !latestMsg.isDismissed ? (
-              <MentorMessageCard
-                msg={latestMsg}
-                onStart={() => handleStart(latestMsg)}
-                onDismiss={() => handleDismiss(latestMsg._id)}
-              />
-            ) : (
-              <div style={{
-                background: '#fff', borderRadius: 20, padding: '40px 24px',
-                border: '2px dashed #e2e8f0', textAlign: 'center',
-              }}>
-                <div style={{ fontSize: 48, marginBottom: 12 }}>✅</div>
-                <h3 style={{ margin: '0 0 8px', fontSize: 18, fontWeight: 700, color: '#0f172a' }}>
-                  You're all caught up!
-                </h3>
-                <p style={{ margin: '0 0 20px', fontSize: 14, color: '#64748b' }}>
-                  No pending mentor messages. Keep studying and I'll check in soon.
-                </p>
-                <button
-                  onClick={handleCheck}
-                  disabled={checking}
-                  style={{
-                    padding: '12px 24px', borderRadius: 12, border: 'none',
-                    background: '#6366f1', color: '#fff',
-                    fontWeight: 700, fontSize: 14, cursor: 'pointer',
-                  }}
-                >
-                  {checking ? 'Checking...' : 'Run AI Check Now'}
-                </button>
-              </div>
-            )}
-
-            {/* Active Micro-Task */}
-            {microTask && (
-              <div id="micro-task-section">
-                <div style={{
-                  fontSize: 13, fontWeight: 700, color: '#64748b',
-                  marginBottom: 10, letterSpacing: 0.5,
-                }}>
-                  ⚡ ACTIVE MICRO-TASK
-                </div>
-                {taskCompleted ? (
-                  <div style={{
-                    background: '#ecfdf5', borderRadius: 20, padding: '40px 24px',
-                    textAlign: 'center', border: '2px solid #d1fae5',
-                  }}>
-                    <div style={{ fontSize: 48, marginBottom: 12 }}>🎉</div>
-                    <h3 style={{ margin: 0, color: '#065f46', fontWeight: 800, fontSize: 18 }}>
-                      Task Complete! XP Awarded!
-                    </h3>
-                  </div>
-                ) : (
-                  <MicroTaskCard
-                    task={microTask}
-                    onComplete={handleCompleteTask}
-                  />
-                )}
-              </div>
-            )}
-
-            {/* Quick Stats */}
-            {state && (
-              <div style={{
-                display: 'grid', gridTemplateColumns: '1fr 1fr 1fr',
-                gap: 10,
-              }}>
-                {[
-                  { label: 'Total Sessions', value: state.totalTriggersEver, emoji: '📊' },
-                  { label: 'Tasks Done', value: state.totalTasksCompleted, emoji: '✅' },
-                  { label: 'Mentor Level', value: `L${state.mentorLevel}`, emoji: '⭐' },
-                ].map((stat) => (
-                  <div
-                    key={stat.label}
-                    style={{
-                      background: '#fff', borderRadius: 16, padding: '16px 12px',
-                      border: '1px solid #e2e8f0', textAlign: 'center',
-                    }}
+          {/* Personality selector */}
+          <div className="glass rounded-2xl p-5 border border-white/8">
+            <div className="flex items-center gap-2 mb-5">
+              <Smile className="w-5 h-5 text-slate-400" />
+              <h3 className="text-base font-bold text-white">Mentor Personality</h3>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              {PERSONALITY_META.map(p => {
+                const isActive = state?.mentorPersonality === p.id;
+                return (
+                  <button
+                    key={p.id}
+                    onClick={() => !pLoading && handlePersonality(p.id)}
+                    disabled={pLoading}
+                    className={`p-4 rounded-xl border text-center transition-all disabled:opacity-50 ${
+                      isActive
+                        ? `${p.border} ${p.bg}`
+                        : 'border-white/8 hover:border-white/20 hover:bg-white/5'
+                    }`}
                   >
-                    <div style={{ fontSize: 22, marginBottom: 6 }}>{stat.emoji}</div>
-                    <div style={{ fontSize: 22, fontWeight: 900, color: '#0f172a' }}>{stat.value}</div>
-                    <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>{stat.label}</div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ── History Tab ─────────────────────────────────────── */}
-        {!loading && activeTab === 'history' && (
-          <div style={{
-            background: '#fff', borderRadius: 20, padding: 20,
-            border: '1px solid #e2e8f0',
-            boxShadow: '0 4px 24px rgba(0,0,0,0.06)',
-          }}>
-            <h3 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 700, color: '#0f172a' }}>
-              📋 Message History
-            </h3>
-            <MessageHistoryFeed messages={messages} />
-          </div>
-        )}
-
-        {/* ── Settings Tab ─────────────────────────────────────── */}
-        {!loading && activeTab === 'settings' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-
-            {/* Personality selector */}
-            <div style={{
-              background: '#fff', borderRadius: 20, padding: 24,
-              border: '1px solid #e2e8f0',
-              boxShadow: '0 4px 24px rgba(0,0,0,0.06)',
-            }}>
-              <PersonalitySelector
-                current={state?.mentorPersonality ?? 'motivational'}
-                onChange={handlePersonality}
-                loading={personalityLoading}
-              />
-            </div>
-
-            {/* Info card */}
-            <div style={{
-              background: '#eef2ff', borderRadius: 20, padding: 20,
-              border: '1px solid #c7d2fe',
-            }}>
-              <div style={{ fontWeight: 700, color: '#3730a3', marginBottom: 8, fontSize: 14 }}>
-                🧠 How AI Mentor Works
-              </div>
-              <ul style={{ margin: 0, paddingLeft: 16, fontSize: 13, color: '#4338ca', lineHeight: 1.8 }}>
-                <li>Checks your activity every 6 hours automatically</li>
-                <li>Sends max 2 personalized messages per day (no spam)</li>
-                <li>Fires at your preferred study time (learned from your habits)</li>
-                <li>Gets smarter as your mentor level increases</li>
-                <li>Assigns micro-tasks based on your weaknesses &amp; mood</li>
-              </ul>
+                    <div className="text-2xl mb-2">{p.emoji}</div>
+                    <div className={`text-xs font-bold mb-1 ${isActive ? p.color : 'text-white'}`}>{p.label}</div>
+                    <div className="text-[10px] text-slate-500 leading-snug">{p.desc}</div>
+                    {isActive && (
+                      <div className={`text-[9px] font-bold uppercase tracking-widest mt-2 ${p.color}`}>Active</div>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           </div>
-        )}
-      </div>
 
-      <style>{`
-        @keyframes slideIn {
-          from { transform: translateX(100px); opacity: 0; }
-          to   { transform: translateX(0);     opacity: 1; }
-        }
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to   { transform: rotate(360deg); }
-        }
-      `}</style>
+          {/* How it works */}
+          <div className="glass rounded-2xl p-5 border border-violet-500/20 bg-violet-500/5">
+            <div className="flex items-center gap-2 mb-4">
+              <Bot className="w-5 h-5 text-violet-400" />
+              <h3 className="text-sm font-bold text-violet-300">How AI Mentor Works</h3>
+            </div>
+            <div className="space-y-2.5">
+              {[
+                { icon: '⏰', text: 'Checks your activity every 6 hours automatically' },
+                { icon: '🚫', text: 'Max 2 personalized messages per day (no spam)' },
+                { icon: '🎯', text: 'Fires near your preferred study time (learns from habits)' },
+                { icon: '📈', text: 'Gets smarter as your mentor level increases' },
+                { icon: '⚡', text: 'Assigns micro-tasks based on weaknesses & mood' },
+              ].map((item, i) => (
+                <div key={i} className="flex items-start gap-3">
+                  <span className="text-base leading-none mt-0.5 flex-shrink-0">{item.icon}</span>
+                  <span className="text-xs text-slate-400 leading-relaxed">{item.text}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

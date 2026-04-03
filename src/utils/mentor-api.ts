@@ -2,21 +2,26 @@
  * AI Study OS — Mentor API (Stage 6 Frontend)
  * ─────────────────────────────────────────────────────────────
  * Frontend utility to communicate with AI Mentor backend.
+ * Uses VITE_API_URL — same as rest of the project.
  */
 
-const BASE = '/api/mentor';
+const API_URL = import.meta.env.VITE_API_URL as string;
+
+function getAuthHeader(): Record<string, string> {
+  const token = localStorage.getItem('token');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
 
 async function req<T>(
   path:    string,
   method = 'GET',
   body?:   object,
 ): Promise<T> {
-  const token = localStorage.getItem('token');
-  const res   = await fetch(`${BASE}${path}`, {
+  const res = await fetch(`${API_URL}/api/mentor${path}`, {
     method,
     headers: {
       'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...getAuthHeader(),
     },
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
@@ -61,27 +66,27 @@ export interface MentorMessageData {
 }
 
 export interface MentorState {
-  hasActiveMessage:  boolean;
-  latestMessage:     MentorMessageData | null;
-  activeMicroTask:   MicroTask | null;
-  mentorLevel:       number;
-  mentorPersonality: MentorPersonality;
-  unreadCount:       number;
-  lastFiredAt:       string | null;
-  totalTriggersEver: number;
+  hasActiveMessage:    boolean;
+  latestMessage:       MentorMessageData | null;
+  activeMicroTask:     MicroTask | null;
+  mentorLevel:         number;
+  mentorPersonality:   MentorPersonality;
+  unreadCount:         number;
+  lastFiredAt:         string | null;
+  totalTriggersEver:   number;
   totalTasksCompleted: number;
 }
 
 // ── API Methods ────────────────────────────────────────────────
 
 export const mentorApi = {
-  getState:         ()                               => req<MentorState & { success: boolean }>('/state'),
-  check:            (opts?: { forceRun?: boolean; personality?: string }) =>
-                                                        req('/check', 'POST', opts ?? {}),
-  markRead:         (id: string)                     => req(`/message/${id}/read`, 'POST'),
-  dismiss:          (id: string)                     => req(`/message/${id}/dismiss`, 'POST'),
-  completeTask:     ()                               => req('/task/complete', 'POST'),
-  setPersonality:   (personality: MentorPersonality) => req('/personality', 'PUT', { personality }),
-  getMessages:      (limit = 20, unreadOnly = false) =>
+  getState:       ()                               => req<MentorState & { success: boolean }>('/state'),
+  check:          (opts?: { forceRun?: boolean; personality?: string }) =>
+                                                      req('/check', 'POST', opts ?? {}),
+  markRead:       (id: string)                     => req(`/message/${id}/read`, 'POST'),
+  dismiss:        (id: string)                     => req(`/message/${id}/dismiss`, 'POST'),
+  completeTask:   ()                               => req('/task/complete', 'POST'),
+  setPersonality: (personality: MentorPersonality) => req('/personality', 'PUT', { personality }),
+  getMessages:    (limit = 20, unreadOnly = false) =>
     req<{ success: boolean; messages: MentorMessageData[] }>(`/messages?limit=${limit}&unreadOnly=${unreadOnly}`),
 };
