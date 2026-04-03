@@ -31,7 +31,7 @@ router.use(authenticate);
 // ─────────────────────────────────────────────────────────────
 router.get('/state', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = (req as any).user.id;
+    const userId = req.userId as string;  // ✅ FIX: was (req as any).user.id
     const state  = await aiMentorEngine.getMentorState(userId);
 
     if (!state) {
@@ -59,7 +59,7 @@ router.get('/state', async (req: Request, res: Response, next: NextFunction) => 
 // ─────────────────────────────────────────────────────────────
 router.post('/check', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = (req as any).user.id;
+    const userId = req.userId as string;  // ✅ FIX: was (req as any).user.id
     const { forceRun, personality } = req.body ?? {};
 
     const result = await aiMentorEngine.runAIMentor(userId, {
@@ -79,8 +79,8 @@ router.post('/check', async (req: Request, res: Response, next: NextFunction) =>
 // ─────────────────────────────────────────────────────────────
 router.post('/message/:id/read', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId    = (req as any).user.id as string;
-    const messageId = String(req.params.id);   // ← FIX: string[] guard
+    const userId    = req.userId as string;  // ✅ FIX: was (req as any).user.id
+    const messageId = String(req.params.id);
     await aiMentorEngine.markMessageRead(userId, messageId);
     return res.json({ success: true });
   } catch (err) {
@@ -93,8 +93,8 @@ router.post('/message/:id/read', async (req: Request, res: Response, next: NextF
 // ─────────────────────────────────────────────────────────────
 router.post('/message/:id/dismiss', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId    = (req as any).user.id as string;
-    const messageId = String(req.params.id);   // ← FIX: string[] guard
+    const userId    = req.userId as string;  // ✅ FIX: was (req as any).user.id
+    const messageId = String(req.params.id);
     await aiMentorEngine.dismissMessage(userId, messageId);
     return res.json({ success: true });
   } catch (err) {
@@ -108,7 +108,7 @@ router.post('/message/:id/dismiss', async (req: Request, res: Response, next: Ne
 // ─────────────────────────────────────────────────────────────
 router.post('/task/complete', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = (req as any).user.id as string;
+    const userId = req.userId as string;  // ✅ FIX: was (req as any).user.id
     await aiMentorEngine.completeMicroTask(userId);
     return res.json({ success: true, message: 'Task completed! XP awarded.' });
   } catch (err) {
@@ -122,7 +122,7 @@ router.post('/task/complete', async (req: Request, res: Response, next: NextFunc
 // ─────────────────────────────────────────────────────────────
 router.put('/personality', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId          = (req as any).user.id as string;
+    const userId          = req.userId as string;  // ✅ FIX: was (req as any).user.id
     const { personality } = req.body ?? {};
 
     if (!['friendly', 'strict', 'motivational'].includes(personality)) {
@@ -141,7 +141,7 @@ router.put('/personality', async (req: Request, res: Response, next: NextFunctio
 // ─────────────────────────────────────────────────────────────
 router.get('/messages', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId     = (req as any).user.id as string;
+    const userId     = req.userId as string;  // ✅ FIX: was (req as any).user.id
     const limit      = Math.min(parseInt(String(req.query.limit ?? '20')), 50);
     const unreadOnly = req.query.unreadOnly === 'true';
 
