@@ -353,6 +353,9 @@ import progressRoutes    from './routes/progressRoutes.js';
 import mentorRoutes      from './routes/mentorRoutes.js';
 import { mentorScheduler } from './services/aiMentor/mentorScheduler.js';
 
+// ── Stage 7: Retention Engine ─────────────────────────────────
+import retentionRoutes   from './routes/retentionRoutes.js';
+
 import { fixStuckRedemptions, processPendingPremiums } from './controllers/rewardsController.js';
 
 /* ─── 3. PROCESS ERROR HANDLERS ────────────────────────── */
@@ -427,6 +430,8 @@ app.use('/api/learn',       learningRoutes);
 app.use('/api/progress',    progressRoutes);
 // ── Stage 6: AI Mentor ────────────────────────────────────────
 app.use('/api/mentor',      mentorRoutes);
+// ── Stage 7: Retention Engine ─────────────────────────────────
+app.use('/api/retention',   retentionRoutes);
 
 /* ─── 9. GLOBAL ERROR HANDLER ───────────────────────────── */
 app.use(errorHandler);
@@ -435,16 +440,17 @@ app.use(errorHandler);
 connectDB().then(() => {
   app.listen(PORT, () => {
     logger.info(`🚀 Server running on port ${PORT}`);
-    logger.info('✅ AI Ready           (NVIDIA + Groq + OpenRouter)');
-    logger.info('✅ Streaming Ready    (SSE — compression bypassed)');
-    logger.info('✅ PPT Ready          (pptxgenjs)');
-    logger.info('✅ PDF Ready          (pdf-lib + sharp)');
-    logger.info('✅ Auth Ready         (JWT + bcrypt)');
-    logger.info('✅ AI Brain Ready     (Stage 1)');
-    logger.info('✅ AI Tutor Ready     (Stage 2)');
-    logger.info('✅ Learn Engine Ready (Stage 3)');
-    logger.info('✅ Progress Ready     (Stage 4)');
-    logger.info('✅ AI Mentor Ready    (Stage 6 — Proactive Mentor)');
+    logger.info('✅ AI Ready              (NVIDIA + Groq + OpenRouter)');
+    logger.info('✅ Streaming Ready       (SSE — compression bypassed)');
+    logger.info('✅ PPT Ready             (pptxgenjs)');
+    logger.info('✅ PDF Ready             (pdf-lib + sharp)');
+    logger.info('✅ Auth Ready            (JWT + bcrypt)');
+    logger.info('✅ AI Brain Ready        (Stage 1)');
+    logger.info('✅ AI Tutor Ready        (Stage 2)');
+    logger.info('✅ Learn Engine Ready    (Stage 3)');
+    logger.info('✅ Progress Ready        (Stage 4)');
+    logger.info('✅ AI Mentor Ready       (Stage 6 — Proactive Mentor)');
+    logger.info('✅ Retention Engine Ready (Stage 7 — Streaks + Comeback)');
   });
 
   fixStuckRedemptions()

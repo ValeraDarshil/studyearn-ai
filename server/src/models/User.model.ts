@@ -124,6 +124,29 @@ const userSchema = new mongoose.Schema({
   // Isse bar bar onboarding nahi aata login karne par
   brainSetupCompleted: { type: Boolean, default: false },
 
+  // ── Stage 7: Retention Engine ─────────────────────────────
+ 
+  // Streak Recovery System
+  // Stores one-chance recovery session when streak is broken.
+  // Schema: {
+  //   state:           'available' | 'pending' | 'completed' | 'expired'
+  //   previousStreak:  number
+  //   initiatedAt:     ISO string
+  //   expiresAt:       ISO string (24h window)
+  //   completedAt?:    ISO string
+  //   method?:         'task' | 'quiz' | 'lesson'
+  // }
+  streakRecovery: { type: mongoose.Schema.Types.Mixed, default: null },
+ 
+  // Notification Engine
+  // Stores in-app notifications + daily send counter (max 2/day).
+  // Schema: {
+  //   notifications:  AppNotification[]   (max 20 kept, expired auto-pruned)
+  //   sentToday:      number
+  //   lastSentDate:   'YYYY-MM-DD' (IST)
+  //   lastSentAt:     ISO string | null
+  // }
+  notificationRecord: { type: mongoose.Schema.Types.Mixed, default: null },
 });
 
 

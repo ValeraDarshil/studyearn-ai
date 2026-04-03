@@ -481,13 +481,19 @@ import {
   Code2,
   Cpu,
   Bot,
+  Bell,
 } from "lucide-react";
 import { useApp } from "../context/AppContext";
 import Lottie from "lottie-react";
 import streakAnimation from "../assets/animations/streak-fire.json";
 import profileIconAnimation from "../assets/animations/profile-icon.json";
+
 // ── Stage 6: AI Mentor unread badge ──────────────────────────
 import { mentorApi } from "../utils/mentor-api";
+
+// ── Stage 7: Retention — Notification Bell ───────────────────
+import { getNotifications } from "../utils/retention-api";
+import { NotificationPanel } from "./retention/NotificationPanel";
 
 export function DashboardLayout() {
   const navigate = useNavigate();
@@ -505,16 +511,30 @@ export function DashboardLayout() {
   // ── Stage 6: Mentor unread count ─────────────────────────
   const [mentorUnread, setMentorUnread] = useState(0);
 
+  // ── Stage 7: Notification panel ──────────────────────────
+  const [showNotifPanel, setShowNotifPanel] = useState(false);
+  const [notifCount,     setNotifCount]     = useState(0);
+
   useEffect(() => {
     // Fetch mentor unread count on mount
     mentorApi.getState()
       .then((s) => setMentorUnread(s.unreadCount ?? 0))
       .catch(() => {});
 
+    // ── Stage 7: Fetch retention notification count ───────
+    getNotifications()
+      .then((d) => { if (d.success) setNotifCount(d.count); })
+      .catch(() => {});
+
     // Re-check every 5 minutes
     const interval = setInterval(() => {
       mentorApi.getState()
         .then((s) => setMentorUnread(s.unreadCount ?? 0))
+        .catch(() => {});
+
+      // Also refresh retention notification count
+      getNotifications()
+        .then((d) => { if (d.success) setNotifCount(d.count); })
         .catch(() => {});
     }, 5 * 60 * 1000);
 
@@ -845,6 +865,22 @@ export function DashboardLayout() {
               </NavLink>
             )}
 
+            {/* ── Stage 7: Notification Bell ────────────────── */}
+            <button
+              onClick={() => setShowNotifPanel(true)}
+              className="relative w-8 h-8 rounded-lg glass border border-white/10 hover:border-purple-500/30 flex items-center justify-center transition-all active:scale-95"
+              title="Notifications"
+            >
+              <Bell className="w-3.5 h-3.5 text-slate-400" />
+              {notifCount > 0 && (
+                <span
+                  className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-purple-500 text-white text-[9px] font-bold flex items-center justify-center border border-[#030712]"
+                >
+                  {notifCount > 9 ? "9+" : notifCount}
+                </span>
+              )}
+            </button>
+
             {/* Premium Badge */}
             {isPremium && (
               <div
@@ -1019,6 +1055,23 @@ export function DashboardLayout() {
           </button>
         </div>
       </nav>
+
+      {/* ── Stage 7: Notification Panel (inside DashboardLayout) ── */}
+      <NotificationPanel
+        isOpen={showNotifPanel}
+        onClose={() => {
+          setShowNotifPanel(false);
+          setNotifCount(0); // reset badge after opening
+        }}
+        onCtaClick={(action) => {
+          setShowNotifPanel(false);
+          if (action === "streak_save" || action === "streak_recovery") navigate("/app/ask");
+          else if (action === "comeback") navigate("/app");
+          else if (action === "achievements") navigate("/app/profile");
+          else if (action === "mentor") navigate("/app/mentor");
+          else if (action === "dashboard") navigate("/app");
+        }}
+      />
     </div>
   );
 }

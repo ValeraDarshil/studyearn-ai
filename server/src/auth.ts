@@ -1340,6 +1340,8 @@
 
 // export default router;
 
+
+
 import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
@@ -1358,6 +1360,9 @@ import { triggerPostLoginOrchestration } from './services/aiCore/aiOrchestrator.
 
 // ── STAGE 6: AI Mentor — proactive mentor trigger ─────────────
 import { aiMentorEngine } from './services/aiMentor/aiMentorEngine.js';
+
+// ── STAGE 7: Retention Engine — post-login retention run ──────
+import { retentionEngine } from './services/retentionEngine/retentionEngine.js';
 // ─────────────────────────────────────────────────────────────
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID!;
@@ -1554,6 +1559,11 @@ router.post('/signup', authLimiter, validateSignup, async (req, res) => {
       aiMentorEngine.runAIMentor(String(user._id), { trigger: 'login' }).catch(() => {});
     });
 
+    // ── STAGE 7: Trigger Retention Engine after signup (non-blocking) ──
+    setImmediate(() => {
+      retentionEngine.runRetentionEngine(String(user._id), { trigger: 'login' }).catch(() => {});
+    });
+
   } catch (error: any) {
     logger.error({ err: error }, 'Signup error');
     res.status(500).json({ success: false, message: 'Server error' });
@@ -1645,6 +1655,11 @@ router.post('/login', authLimiter, validateLogin, async (req, res) => {
     // ── STAGE 6: Trigger AI Mentor after login (non-blocking) ──
     setImmediate(() => {
       aiMentorEngine.runAIMentor(String(user._id), { trigger: 'login' }).catch(() => {});
+    });
+
+    // ── STAGE 7: Trigger Retention Engine after login (non-blocking) ──
+    setImmediate(() => {
+      retentionEngine.runRetentionEngine(String(user._id), { trigger: 'login' }).catch(() => {});
     });
 
   } catch (error) {
@@ -1976,6 +1991,11 @@ router.post('/google', authLimiter, async (req, res) => {
     // ── STAGE 6: Trigger AI Mentor after Google login (non-blocking) ──
     setImmediate(() => {
       aiMentorEngine.runAIMentor(String(user._id), { trigger: 'login' }).catch(() => {});
+    });
+
+    // ── STAGE 7: Trigger Retention Engine after Google login (non-blocking) ──
+    setImmediate(() => {
+      retentionEngine.runRetentionEngine(String(user._id), { trigger: 'login' }).catch(() => {});
     });
 
   } catch (error: any) {

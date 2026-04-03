@@ -1257,6 +1257,13 @@ import { BrainDashboard } from "./pages/BrainDashboard";
 // ── Stage 6: AI Mentor ────────────────────────────────────────
 import AIMentor from "./pages/AIMentor";
 
+// ── Stage 7: Retention Engine ─────────────────────────────────
+import { useRetention } from "./hooks/useRetention";
+import { StreakAlertPopup } from "./components/retention/StreakAlertPopup";
+import { StreakRecoveryUI } from "./components/retention/StreakRecoveryUI";
+import { ComebackScreen } from "./components/retention/ComebackScreen";
+import { NotificationPanel } from "./components/retention/NotificationPanel";
+
 // ── Achievement Unlocked — Center Modal ──────────────────────
 function AchievementToast({ achievement, onClose }: { achievement: any; onClose: () => void }) {
   const [visible, setVisible] = useState(true);
@@ -1355,9 +1362,6 @@ function AppContent() {
   const [loading, setLoading]               = useState(true);
 
   // ── AI Study OS — Learner Onboarding ─────────────────────
-  // ✅ FIXED: DB field se check karte hain, localStorage se NAHI
-  // brainSetupCompleted = false  → onboarding dikhao (sirf ek baar)
-  // brainSetupCompleted = true   → kabhi dobara mat dikhao (koi bhi device)
   const [showLearnerOnboarding, setShowLearnerOnboarding] = useState(false);
 
   // ── Onboarding Tour ───────────────────────────────────────
@@ -1421,21 +1425,13 @@ function AppContent() {
         setQuestionsLeft(user.questionsLeft);
         setStreak(user.streak || 0);
 
-        // ✅ FIXED — Sirf DB field check karo
-        // localStorage.getItem(`brain_setup_${user._id}`) HATA DIYA
-        // Ab sirf user.brainSetupCompleted DB field pe depend karte hain
-        // Chahe naya device ho, naya browser ho — sahi kaam karega
-        const brainSetupDone = !!(user as any).brainSetupCompleted;
+        const brainSetupDone  = !!(user as any).brainSetupCompleted;
         const productTourDone = !!(user as any).onboardingCompleted;
 
-        // Learner onboarding tab dikhao jab:
-        //   1. Product tour ho chuka ho (ya new user ke liye tour ke baad)
-        //   2. Brain setup abhi nahi hui ho
         if (productTourDone && !brainSetupDone) {
           setTimeout(() => setShowLearnerOnboarding(true), 2000);
         }
 
-        // ── Onboarding Tour — new users ke liye ──────────────
         const dbSaysDone    = !!(user as any).onboardingCompleted;
         const localSaysDone = hasCompletedOnboardingLocally(user._id);
         const shouldShowTour = !dbSaysDone && !localSaysDone;
@@ -1444,6 +1440,7 @@ function AppContent() {
         }
 
         getRecentActivity().then((d) => { if (d.success) setRecentActivity(d.activities); });
+
         // Stage 4 — fire login progress event (non-blocking)
         import("./utils/progress-api").then(({ trackProgressEvent }) => {
           trackProgressEvent("login").catch(() => {});
@@ -1615,6 +1612,23 @@ function AppContent() {
 
   const shouldShowCelebration = showStreakCelebration && location.pathname.startsWith("/app") && !loading;
 
+  // ── Stage 7: Retention Engine Hook ───────────────────────
+  const retention = useRetention(isLoggedIn);
+
+  const handleRetentionCta = (action: string) => {
+    if (action === "streak_save" || action === "streak_recovery") {
+      retention.handleSaveStreak();
+    } else if (action === "comeback") {
+      retention.closeComebackScreen();
+    } else if (action === "achievements") {
+      window.location.hash = "/app/profile";
+    } else if (action === "mentor") {
+      window.location.hash = "/app/mentor";
+    } else {
+      window.location.hash = "/app";
+    }
+  };
+
   return (
     <>
       <CursorSpotlight />
@@ -1684,28 +1698,60 @@ function AppContent() {
           <OnboardingTour onComplete={() => {
             setShowOnboarding(false);
             setTimeout(() => setShowStreakCelebration(prev => celebrationStreak > 0 ? true : prev), 800);
-            // Tour khatam → brain setup check karo (DB se already loaded hai)
-            // Agar brainSetupCompleted false hai toh onboarding dikhao
-            // loadUserData mein already set ho chuka hai showLearnerOnboarding
           }} />
         )}
 
         {/* ── AI Study OS: Learner Onboarding Modal ────────── */}
-        {/* ✅ FIXED: Sirf tab dikhao jab DB mein brainSetupCompleted = false ho */}
-        {/* Setup complete hone par brainController DB update karta hai */}
-        {/* Agla login pe /me se brainSetupCompleted: true aayega → modal nahi aayega */}
         {showLearnerOnboarding && !loading && !showOnboarding && location.pathname.startsWith("/app") && (
           <div className="fixed inset-0 z-[150] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
             <div className="w-full max-w-2xl bg-slate-950 rounded-3xl border border-slate-700 overflow-y-auto max-h-[90vh]">
               <Onboarding
                 onComplete={() => {
-                  // ✅ Sirf state update karo — DB already brainController ne update kar diya
-                  // localStorage.setItem hata diya — koi zaroorat nahi
                   setShowLearnerOnboarding(false);
                 }}
               />
             </div>
           </div>
+        )}
+
+        {/* ── Stage 7: Retention Engine UI ─────────────────── */}
+        {/* Only show inside /app routes, not on login/landing */}
+        {location.pathname.startsWith("/app") && !loading && (
+          <>
+            {/* 1. Streak Alert Popup — floats at bottom when streak at risk */}
+            {retention.showAlertPopup && (
+              <StreakAlertPopup
+                urgency={retention.urgency}
+                onSaveStreak={retention.handleSaveStreak}
+                onDismiss={retention.closeAlertPopup}
+              />
+            )}
+
+            {/* 2. Streak Recovery UI — full modal when streak is broken */}
+            {retention.showRecoveryUI && retention.recovery && (
+              <StreakRecoveryUI
+                recovery={retention.recovery}
+                onComplete={retention.handleCompleteRecovery}
+                onDismiss={retention.closeRecoveryUI}
+              />
+            )}
+
+            {/* 3. Comeback Screen — for users back after 48h+ */}
+            {retention.showComebackScreen && retention.comeback && retention.comeback.intensity !== "none" && (
+              <ComebackScreen
+                plan={retention.comeback}
+                onStartTask={retention.handleStartComebackTask}
+                onDismiss={retention.closeComebackScreen}
+              />
+            )}
+
+            {/* 4. Notification Panel — slide-in from right */}
+            <NotificationPanel
+              isOpen={retention.showNotifPanel}
+              onClose={retention.closeNotifPanel}
+              onCtaClick={handleRetentionCta}
+            />
+          </>
         )}
       </AppContext.Provider>
     </>
