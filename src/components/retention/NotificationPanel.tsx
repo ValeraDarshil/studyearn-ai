@@ -21,8 +21,8 @@ import { X, Bell, BellOff, Flame, Trophy, Star, Brain, Clock, ChevronRight } fro
 import {
   getNotifications,
   markNotificationsRead,
-} from '../utils/retention-api';
-import type { AppNotification, NotificationType } from '../utils/retention-api';
+} from '../../utils/retention-api';
+import type { AppNotification, NotificationType } from '../../utils/retention-api';
 
 interface Props {
   isOpen:      boolean;
