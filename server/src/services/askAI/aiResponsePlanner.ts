@@ -1,7 +1,12 @@
 // ─────────────────────────────────────────────────────────────
 // AskAI — aiResponsePlanner.ts
-// Thinking layer: analyzes user intent before answering.
-// Flow: input → intent → difficulty → response strategy → output
+//
+// ROUTE: server/src/services/askAI/aiResponsePlanner.ts
+//
+// What changed in v8:
+//   - turnCount? added to ResponsePlan interface
+//   - buildResponsePlan now returns turnCount in the plan object
+//     (used by detectEmotionalState in askAIService)
 // ─────────────────────────────────────────────────────────────
 
 export type Intent =
@@ -30,6 +35,7 @@ export interface ResponsePlan {
   followUpQuestion: boolean;  // should AI end with a question?
   correctGently:    boolean;  // is user likely wrong? correct softly
   boostConfidence:  boolean;  // encourage the student
+  turnCount?:       number;   // ← NEW: current session turn (for emotional state detection)
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -88,7 +94,6 @@ export function detectIntent(message: string): Intent {
   for (const { intent, patterns } of INTENT_PATTERNS) {
     if (patterns.some(p => p.test(trimmed))) return intent;
   }
-  // Short messages in a session are likely follow-ups
   if (trimmed.split(' ').length <= 5) return 'FOLLOWUP';
   return 'GENERAL';
 }
@@ -97,19 +102,18 @@ export function detectIntent(message: string): Intent {
 // Strategy Selector
 // ─────────────────────────────────────────────────────────────
 export function selectStrategy(
-  intent:        Intent,
-  skillLevel:    'beginner' | 'intermediate' | 'advanced',
-  isStruggling:  boolean,
-  turnCount:     number,
+  intent:       Intent,
+  skillLevel:   'beginner' | 'intermediate' | 'advanced',
+  isStruggling: boolean,
+  turnCount:    number,
 ): ResponseStrategy {
 
-  if (intent === 'QUIZ')   return 'QUIZ';
-  if (intent === 'DEBUG')  return 'STEP_BY_STEP';
-  if (intent === 'FOLLOWUP' && turnCount > 0) return 'SHORT';
+  if (intent === 'QUIZ')                          return 'QUIZ';
+  if (intent === 'DEBUG')                         return 'STEP_BY_STEP';
+  if (intent === 'FOLLOWUP' && turnCount > 0)     return 'SHORT';
 
   if (isStruggling) {
-    // Student is struggling → guide them, don't just give answer
-    if (intent === 'SOLVE') return 'STEP_BY_STEP';
+    if (intent === 'SOLVE')   return 'STEP_BY_STEP';
     if (intent === 'EXPLAIN') return 'TEACH';
     return 'GUIDE';
   }
@@ -125,17 +129,17 @@ export function selectStrategy(
 }
 
 // ─────────────────────────────────────────────────────────────
-// buildPlan  (main export)
+// buildResponsePlan  (main export)
 // ─────────────────────────────────────────────────────────────
 export function buildResponsePlan(
-  message:      string,
-  skillLevel:   'beginner' | 'intermediate' | 'advanced',
+  message:       string,
+  skillLevel:    'beginner' | 'intermediate' | 'advanced',
   mistakeTopics: string[],
-  turnCount:    number,
+  turnCount:     number,
 ): ResponsePlan {
-  const intent        = detectIntent(message);
-  const isStruggling  = mistakeTopics.length > 0;
-  const strategy      = selectStrategy(intent, skillLevel, isStruggling, turnCount);
+  const intent       = detectIntent(message);
+  const isStruggling = mistakeTopics.length > 0;
+  const strategy     = selectStrategy(intent, skillLevel, isStruggling, turnCount);
 
   return {
     intent,
@@ -143,5 +147,6 @@ export function buildResponsePlan(
     followUpQuestion: strategy !== 'QUIZ' && strategy !== 'SHORT' && strategy !== 'FULL_SOLUTION',
     correctGently:    isStruggling,
     boostConfidence:  isStruggling || turnCount > 3,
+    turnCount,   // ← NEW: pass through for emotional state detection
   };
 }

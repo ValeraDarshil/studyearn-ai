@@ -348,6 +348,17 @@
 
 
 // latest version 
+// ─────────────────────────────────────────────────────────────
+// AI Controller  (v8 — Ultra-Powerful AskAI)
+//
+// ROUTE: server/src/controllers/aiController.ts
+//
+// What changed in v8:
+//   - detectEmotionalState imported from askAIService
+//   - emotionalState emitted as part of first SSE metadata event
+//   - Dead commented-out code removed (cleaner file)
+// ─────────────────────────────────────────────────────────────
+
 import { Request, Response } from 'express';
 import {
   solveText,
@@ -366,32 +377,39 @@ import { Activity }                       from '../models/Activity.model.js';
 import { syncActivityToProfile }          from '../services/studentProfileService.js';
 import { onActivityEvent }                from '../services/progressSystem/progressAnalyzer.js';
 import { logger }                         from '../utils/logger.js';
- 
-// ── STAGE 5: AI Orchestrator context injection ─────────────────
+
+// ── Stage 5: AI Orchestrator ───────────────────────────────────
 import { getFusedContextForAI } from '../services/aiCore/aiOrchestrator.js';
-// ── Stage 6: ChatGPT-level AskAI pipeline ────────────────────
-import { buildMasterPrompt, afterResponse, validateAndLog } from '../services/askAI/askAIService.js';
+
+// ── Stage 6 / v8: ChatGPT-level AskAI pipeline ────────────────
+import {
+  buildMasterPrompt,
+  afterResponse,
+  validateAndLog,
+  detectEmotionalState,   // ← NEW in v8
+} from '../services/askAI/askAIService.js';
+
 // ─────────────────────────────────────────────────────────────
- 
+
 const BASE_AI_POINTS      = 10;
 const PREMIUM_MULTIPLIER  = 2;
 const FREE_DAILY_LIMIT    = 15;
 const PREMIUM_DAILY_LIMIT = 30;
 const REFILL_INTERVAL_MS  = 60 * 60 * 1000;
 const MAX_VIDEO_ADS_DAY   = 5;
- 
+
 function getTodayIST(): string {
   const now = new Date();
   return new Date(now.getTime() + 5.5 * 60 * 60 * 1000).toISOString().split('T')[0];
 }
- 
+
 function applyHourlyRefill(user: any, dailyLimit: number): void {
   const cutoff = Date.now() - REFILL_INTERVAL_MS;
   const recent = (user.questionUsedAt || []).filter((t: Date) => new Date(t).getTime() > cutoff);
   user.questionUsedAt = recent;
   user.questionsLeft  = Math.max(0, Math.min(dailyLimit, dailyLimit - recent.length));
 }
- 
+
 function isPremiumValid(user: any): boolean {
   if (!user.isPremium || !user.premiumExpiresAt) return false;
   if (new Date(user.premiumExpiresAt) < new Date()) {
@@ -399,14 +417,14 @@ function isPremiumValid(user: any): boolean {
   }
   return true;
 }
- 
+
 function getNextRefillSecs(user: any): number {
   const used: Date[] = user.questionUsedAt || [];
   if (used.length === 0) return 0;
   const oldest = Math.min(...used.map((t: Date) => new Date(t).getTime()));
   return Math.max(0, Math.ceil((oldest + REFILL_INTERVAL_MS - Date.now()) / 1000));
 }
- 
+
 async function handleQuestionUsed(
   req: Request,
   promptText = '',
@@ -452,30 +470,30 @@ async function handleQuestionUsed(
     return null;
   }
 }
- 
+
 // ─────────────────────────────────────────────────────────────
-// POST /api/ai/ask
+// POST /api/ai/ask  (non-streaming — used for image/PDF)
 // ─────────────────────────────────────────────────────────────
 export async function askAI(req: Request, res: Response) {
   try {
     const { prompt, image, history = [], subjectMode, stepByStep, personality, hintMode, recentActivity } = req.body;
- 
+
     const safeHistory: ChatMessage[] = (Array.isArray(history) ? history : [])
       .slice(-10)
       .filter((m: any) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
       .map((m: any) => ({ role: m.role as 'user' | 'assistant', content: m.content.slice(0, 2000) }));
- 
+
     if (!prompt && !image) {
       return res.status(400).json({ success: false, answer: 'Please enter a question or upload an image.' });
     }
- 
+
     const imgSizeKB = image ? Math.round(image.length * 0.75 / 1024) : 0;
     logger.info('/api/ai/ask  image=' + (!!image) + '(' + imgSizeKB + 'KB)  mode=' + (subjectMode || 'auto') + '  prompt="' + (prompt || '').substring(0, 60) + '"');
- 
+
     const userId = getUserIdFromToken(req) ?? '';
     let answer: string;
     let tutorMeta: { followUpQ?: string | null; learningMode?: string; hintMode?: boolean; detectedTopic?: string | null } = {};
- 
+
     if (image) {
       let imageUrl = image;
       if (!image.startsWith('data:')) {
@@ -514,7 +532,7 @@ export async function askAI(req: Request, res: Response) {
         answer = await solveText(prompt, safeHistory, subjectMode);
       }
     }
- 
+
     const userAction = await handleQuestionUsed(req, String(prompt || '').substring(0, 100));
     res.json({
       success: true,
@@ -534,18 +552,10 @@ export async function askAI(req: Request, res: Response) {
     res.status(500).json({ success: false, answer: 'AI is temporarily unavailable. Please try again.' });
   }
 }
- 
+
 // ─────────────────────────────────────────────────────────────
+// POST /api/ai/ask-stream  (v8 — with emotionalState SSE)
 // ─────────────────────────────────────────────────────────────
-// POST /api/ai/ask-stream — STAGE 6: ChatGPT-level pipeline
-// ─────────────────────────────────────────────────────────────
-// New pipeline (server/src/services/askAI/):
-//   conversationMemoryEngine → contextEnhancer →
-//   aiResponsePlanner → difficultyAdapter →
-//   mentorTeachingMode → aiPersonalityEngine →
-//   aiModelRouter → responseValidator
-// ─────────────────────────────────────────────────────────────
- 
 export async function askAIStream(req: Request, res: Response) {
   const {
     prompt,
@@ -554,19 +564,19 @@ export async function askAIStream(req: Request, res: Response) {
     stepByStep  = false,
   } = req.body;
   const userId = getUserIdFromToken(req) ?? '';
- 
+
   if (!prompt) { res.status(400).json({ error: 'prompt required' }); return; }
- 
+
   res.setHeader('Content-Type',      'text/event-stream');
   res.setHeader('Cache-Control',     'no-cache');
   res.setHeader('Connection',        'keep-alive');
   res.setHeader('X-Accel-Buffering', 'no');
   res.flushHeaders();
- 
+
   let fullResponse = '';
- 
+
   try {
-    // ── Stage 6 Pipeline: Build ChatGPT-level master prompt ──
+    // ── Build v8 master prompt ────────────────────────────
     const pkg = await buildMasterPrompt({
       userId,
       message:    prompt,
@@ -574,31 +584,40 @@ export async function askAIStream(req: Request, res: Response) {
       stepByStep: !!stepByStep,
       history:    Array.isArray(history) ? history : [],
     });
- 
+
     logger.info(
-      'AskAI stream v7 | intent='  + pkg.plan.intent +
+      'AskAI stream v8 | intent='  + pkg.plan.intent +
       ' strategy=' + pkg.plan.strategy +
       ' skill='    + pkg.context.skillLevel +
       ' model='    + pkg.modelConfig.modelId +
       ' userId='   + (userId ? userId.slice(-6) : 'anon')
     );
- 
-    // ── Emit mentor metadata as first SSE event ───────────────
-    // Frontend reads this to update MentorIntelligenceBar before
-    // the first token arrives — zero latency cost.
+
+    // ── Emit metadata (intent + strategy + skill + emotional state) ──
+    // This arrives BEFORE the first token — zero latency.
+    // Frontend uses this to:
+    //   1. Update MentorIntelligenceBar
+    //   2. Show emotional toast (correct / confused / frustrated / motivated)
     const isWeakTopic = pkg.detectedTopic
       ? pkg.context.weakTopics.includes(pkg.detectedTopic)
       : false;
- 
+
+    // ← NEW v8: detect how the student is feeling right now
+    const emotionalState = detectEmotionalState(
+      prompt,
+      pkg.plan.turnCount ?? 0,
+    );
+
     res.write('data: ' + JSON.stringify({
       intent:        pkg.plan.intent,
       strategy:      pkg.plan.strategy,
       skillLevel:    pkg.context.skillLevel,
       detectedTopic: pkg.detectedTopic,
       isWeakTopic,
+      emotionalState,   // ← NEW v8
     }) + '\n\n');
- 
-    // ── Capture tokens for memory update ─────────────────────
+
+    // ── Capture tokens while streaming ───────────────────
     const captureWrite = (chunk: any): boolean => {
       try {
         const str = typeof chunk === 'string' ? chunk : chunk.toString('utf8');
@@ -614,8 +633,7 @@ export async function askAIStream(req: Request, res: Response) {
       } catch { /* ignore */ }
       return res.write(chunk);
     };
- 
-    // Proxy the response to capture tokens while streaming
+
     const proxyRes = new Proxy(res, {
       get(target, prop) {
         if (prop === 'write') return captureWrite;
@@ -623,48 +641,46 @@ export async function askAIStream(req: Request, res: Response) {
         return typeof val === 'function' ? val.bind(target) : val;
       },
     });
- 
-    // ── Stream with master system prompt ─────────────────────
+
+    // ── Stream AI response ────────────────────────────────
     await solveTextStreamWithContext(
       pkg.userMessage,
       pkg.history as ChatMessage[],
       pkg.systemPrompt,
       proxyRes as any,
     );
- 
-    // ── Post-stream: validate + update memory + persist to DB ─
+
+    // ── Post-stream: validate + memory + DB persist ───────
     if (fullResponse && userId) {
-      // FIX v7: validate response quality (non-blocking log only)
       validateAndLog(fullResponse, pkg.plan.intent, prompt, userId);
-      // Update in-session memory + persist topic data to StudentProfile DB
       afterResponse(userId, prompt, fullResponse, pkg.detectedTopic);
     }
- 
-    // ── Award points (non-blocking) ───────────────────────────
+
+    // ── Award points (non-blocking) ───────────────────────
     if (userId) {
       handleQuestionUsed(req, String(prompt).substring(0, 100)).catch(() => {});
     }
- 
+
   } catch (err: any) {
     if (!res.writableEnded) {
-      logger.error('AskAI stream v6 error: ' + err.message);
+      logger.error('AskAI stream v8 error: ' + err.message);
       res.write('data: ' + JSON.stringify({ error: 'Stream failed. Please try again.' }) + '\n\n');
     }
   } finally {
     if (!res.writableEnded) res.end();
   }
 }
- 
+
 // ─────────────────────────────────────────────────────────────
 // POST /api/ai/solve-pdf
 // ─────────────────────────────────────────────────────────────
 export async function solvePDF(req: Request, res: Response) {
   try {
     if (!req.file) return res.status(400).json({ success: false, answer: 'No file uploaded.' });
- 
+
     const userPrompt = (req.body.prompt || '').trim();
     logger.info('/api/ai/solve-pdf  size=' + req.file.size + 'bytes');
- 
+
     let extracted = '';
     try {
       extracted = await parsePDFText(req.file.buffer);
@@ -672,7 +688,7 @@ export async function solvePDF(req: Request, res: Response) {
     } catch (e: any) {
       logger.warn('PDF text extraction failed: ' + e.message);
     }
- 
+
     if (extracted && extracted.trim().length >= 80) {
       logger.info('PDF: digital -> GROQ/OR');
       const MAX_CHARS = 12000;
@@ -683,11 +699,11 @@ export async function solvePDF(req: Request, res: Response) {
       } else {
         text = extracted;
       }
- 
+
       const solvePrompt = userPrompt
         ? 'You are analyzing a PDF for a student.\n\n## PDF Content:\n' + text + '\n\n---\nStudent\'s request: "' + userPrompt + '"\n\nAnswer COMPLETELY. Be thorough with headings and step-by-step solutions. Indian exam style.'
         : 'Analyze this PDF completely for a student:\n\n## PDF Content:\n' + text + '\n\n---\n\n## 1. Summary\nClear summary of what this document covers.\n\n## 2. Questions and Solutions\nFind EVERY question or exercise. Solve each completely, step-by-step, numbered.\n\n## 3. Key Concepts\nList important concepts and formulas.\n\n## 4. Study Tips\nGive 3-4 specific study tips for this topic.';
- 
+
       const answer     = await solveText(solvePrompt);
       const userAction = await handleQuestionUsed(req, userPrompt || 'PDF analysis');
       return res.json({
@@ -695,13 +711,13 @@ export async function solvePDF(req: Request, res: Response) {
         ...(userAction ? { questionsLeft: userAction.questionsLeft, pointsAwarded: userAction.pointsAwarded, nextRefillSecs: userAction.nextRefillSecs } : {}),
       });
     }
- 
+
     logger.info('PDF: scanned -> Vision');
-    const pdfDataUrl    = 'data:application/pdf;base64,' + req.file.buffer.toString('base64');
-    const visionPrompt  = userPrompt
+    const pdfDataUrl   = 'data:application/pdf;base64,' + req.file.buffer.toString('base64');
+    const visionPrompt = userPrompt
       ? 'Scanned PDF. Student asks: "' + userPrompt + '". Read every page, extract all text/equations/diagrams. Answer completely step-by-step. Indian exam style.'
       : 'Scanned PDF. Read and extract ALL visible text from every page. Identify EVERY question or problem. Solve each completely, step-by-step, numbered. Explain key concepts clearly.';
- 
+
     const answer     = await solveWithVision(pdfDataUrl, visionPrompt);
     const userAction = await handleQuestionUsed(req, userPrompt || 'Scanned PDF analysis');
     return res.json({
@@ -713,7 +729,7 @@ export async function solvePDF(req: Request, res: Response) {
     res.status(500).json({ success: false, answer: 'Failed to process PDF. Please try again.' });
   }
 }
- 
+
 // ─────────────────────────────────────────────────────────────
 // POST /api/ai/watch-ad
 // ─────────────────────────────────────────────────────────────
@@ -744,10 +760,10 @@ export async function watchAd(req: Request, res: Response) {
     await user.save();
     logger.info('Video ad: ' + (user as any).email + ' | +1 question | left=' + (user as any).questionsLeft);
     return res.json({
-      success:       true,
-      message:       '+1 question unlocked! Keep studying!',
-      questionsLeft: (user as any).questionsLeft,
-      videoAdsLeft:  MAX_VIDEO_ADS_DAY - (user as any).videoAdsToday,
+      success:        true,
+      message:        '+1 question unlocked! Keep studying!',
+      questionsLeft:  (user as any).questionsLeft,
+      videoAdsLeft:   MAX_VIDEO_ADS_DAY - (user as any).videoAdsToday,
       nextRefillSecs: getNextRefillSecs(user),
     });
   } catch (err: any) {
@@ -755,7 +771,7 @@ export async function watchAd(req: Request, res: Response) {
     return res.status(500).json({ success: false, message: 'Server error' });
   }
 }
- 
+
 // ─────────────────────────────────────────────────────────────
 // GET /api/ai/quota
 // ─────────────────────────────────────────────────────────────
