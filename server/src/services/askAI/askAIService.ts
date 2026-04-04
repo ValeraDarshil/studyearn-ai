@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-// AskAI — askAIService.ts
+// AskAI — askAIService.ts  (v7 — Production-Grade Pipeline)
 // MAIN ORCHESTRATOR — ChatGPT-level pipeline
 //
 // Flow:
@@ -12,9 +12,15 @@
 //   ↓ aiPersonalityEngine (consistent tone)
 //   ↓ aiModelRouter      (best model for this query)
 //   ↓ AI response generate
-//   ↓ responseValidator
+//   ↓ responseValidator  ← FIX: now actually called
 //   ↓ conversationMemoryEngine.addMessage
+//   ↓ persistLearningData ← FIX: now writes to DB
 //   ↓ Final Output
+//
+// Changes v7:
+//   1. validateResponse() is now CALLED after AI response
+//   2. afterResponse() now persists topic data to StudentProfile DB
+//   3. Both changes are non-blocking (won't delay the response)
 // ─────────────────────────────────────────────────────────────
 
 import {
@@ -56,6 +62,7 @@ import {
 
 import {
   validateResponse,
+  type ValidationResult,
 } from './responseValidator.js';
 
 import {
@@ -98,16 +105,15 @@ export async function buildMasterPrompt(
   const { userId, message, subjectMode, stepByStep } = input;
 
   // ── Step 1: Memory ──────────────────────────────────────
-  const memory       = getOrCreateMemory(userId);
+  const memory        = getOrCreateMemory(userId);
   const mistakeTopics = getMistakeTopics(userId);
-  const memHistory   = getRecentHistory(userId, 10);
+  const memHistory    = getRecentHistory(userId, 10);
 
   // ── Step 2: Rich context from all systems ──────────────
   let context: EnhancedContext;
   try {
     context = await buildEnhancedContext(userId, message);
   } catch {
-    // Graceful fallback
     const fallbackLevel = detectSkillLevelFromMessage(message);
     context = {
       skillLevel:    fallbackLevel,
@@ -152,8 +158,8 @@ export async function buildMasterPrompt(
   const detectedTopic = detectTopic(message, subjectMode);
 
   // ── Step 6: Personality ─────────────────────────────────
-  const personality   = inferPersonality(message);
-  const isFirstTurn   = memory.turnCount === 0;
+  const personality = inferPersonality(message);
+  const isFirstTurn = memory.turnCount === 0;
 
   // ── Step 7: Build Master System Prompt ─────────────────
   const sections: string[] = [
@@ -220,8 +226,38 @@ export async function buildMasterPrompt(
 }
 
 // ─────────────────────────────────────────────────────────────
+// validateAndLog
+// FIX: Actually validates the AI response and logs issues.
+// Call this AFTER the AI has finished streaming (non-blocking).
+// ─────────────────────────────────────────────────────────────
+export function validateAndLog(
+  aiResponse:  string,
+  intent:      string,
+  userPrompt:  string,
+  userId:      string,
+): ValidationResult {
+  const result = validateResponse(aiResponse, intent, userPrompt);
+
+  if (!result.isValid) {
+    logger.warn(
+      `[AskAI] Response validation failed | userId=${userId.slice(-6)} ` +
+      `intent=${intent} score=${result.score} issues=${result.issues.join(', ')}`
+    );
+  } else if (result.issues.length > 0) {
+    logger.info(
+      `[AskAI] Response validation passed with warnings | userId=${userId.slice(-6)} ` +
+      `score=${result.score} warnings=${result.issues.join(', ')}`
+    );
+  }
+
+  return result;
+}
+
+// ─────────────────────────────────────────────────────────────
 // afterResponse  (call after AI generates response)
-// Stores both messages in memory for next turn context
+// FIX: Now persists learning data to DB in addition to in-memory update.
+// Stores both messages in memory for next turn context.
+// Writes topic + mistake data to StudentProfile (non-blocking).
 // ─────────────────────────────────────────────────────────────
 export function afterResponse(
   userId:       string,
@@ -229,18 +265,146 @@ export function afterResponse(
   aiResponse:   string,
   topic?:       string | null,
 ): void {
+  // 1. Update in-session memory (sync)
   try {
     addMessage(userId, 'user',      userMessage, topic ?? undefined);
     addMessage(userId, 'assistant', aiResponse,  topic ?? undefined);
   } catch (e: any) {
     logger.warn('afterResponse memory update failed: ' + e.message);
   }
+
+  // 2. Persist learning data to DB (async, non-blocking — won't delay response)
+  if (userId && topic) {
+    persistLearningData(userId, userMessage, topic).catch((e: any) => {
+      logger.warn('afterResponse DB persist failed (non-blocking): ' + e.message);
+    });
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// persistLearningData  (PRIVATE — called by afterResponse)
+// FIX: Writes topic interaction to StudentProfile.topicMastery
+//      and updates dailyLogs.questionsAsked in the DB.
+// This is what makes long-term memory actually persist.
+// ─────────────────────────────────────────────────────────────
+async function persistLearningData(
+  userId:       string,
+  userMessage:  string,
+  topic:        string,
+): Promise<void> {
+  try {
+    // Dynamic import so this file doesn't add a hard DB dependency at startup
+    const { StudentProfile } = await import('../../models/StudentProfile.model.js');
+
+    const now          = new Date();
+    const todayStr     = now.toISOString().split('T')[0]; // 'YYYY-MM-DD'
+    const isConfusion  = /don't understand|confused|not clear|samajh nahi|kya matlab|phir se|not getting/i.test(userMessage);
+    const isMastery    = /got it|makes sense|understand now|clear hai|samajh gaya|samajh gayi/i.test(userMessage);
+
+    // Update topicMastery for this topic (upsert-style with $set on existing or $push for new)
+    const profile = await StudentProfile.findOne({ userId }).select('topicMastery dailyLogs recentMistakes').lean() as any;
+
+    if (!profile) return; // No profile yet — skip
+
+    const existingIdx = (profile.topicMastery || []).findIndex(
+      (t: any) => t.topic?.toLowerCase() === topic.toLowerCase()
+    );
+
+    if (existingIdx >= 0) {
+      // Topic exists — update it
+      const updateKey = `topicMastery.${existingIdx}`;
+      await StudentProfile.updateOne(
+        { userId },
+        {
+          $inc: {
+            [`${updateKey}.totalAttempts`]:   1,
+            [`${updateKey}.correctAttempts`]: isMastery ? 1 : 0,
+          },
+          $set: {
+            [`${updateKey}.lastAttemptedAt`]: now,
+            [`${updateKey}.trend`]: isConfusion ? 'declining' : isMastery ? 'improving' : 'stable',
+          },
+        }
+      );
+    } else {
+      // New topic — push it in
+      await StudentProfile.updateOne(
+        { userId },
+        {
+          $push: {
+            topicMastery: {
+              topic,
+              subject:         detectSubject(topic),
+              category:        'self',
+              masteryLevel:    isMastery ? 30 : 10,
+              correctAttempts: isMastery ? 1 : 0,
+              totalAttempts:   1,
+              lastAttemptedAt: now,
+              isWeak:          true,
+              isStrong:        false,
+              trend:           isConfusion ? 'declining' : isMastery ? 'improving' : 'stable',
+            },
+          },
+        }
+      );
+    }
+
+    // Update recentMistakes if student showed confusion
+    if (isConfusion) {
+      await StudentProfile.updateOne(
+        { userId },
+        {
+          $push: {
+            recentMistakes: {
+              $each:  [topic],
+              $slice: -10,  // keep only last 10
+            },
+          },
+        }
+      );
+    }
+
+    // Increment today's questionsAsked in dailyLogs
+    const todayLogIdx = (profile.dailyLogs || []).findIndex((d: any) => d.date === todayStr);
+    if (todayLogIdx >= 0) {
+      await StudentProfile.updateOne(
+        { userId },
+        { $inc: { [`dailyLogs.${todayLogIdx}.questionsAsked`]: 1 } }
+      );
+    } else {
+      // First question today — create a new daily log entry
+      await StudentProfile.updateOne(
+        { userId },
+        {
+          $push: {
+            dailyLogs: {
+              $each: [{
+                date:                     todayStr,
+                minutesStudied:           0,
+                questionsAsked:           1,
+                quizzesCompleted:         0,
+                codingSectionsCompleted:  0,
+                xpEarned:                 0,
+                topicsCovered:            [topic],
+              }],
+              $slice: -90, // keep last 90 days
+            },
+          },
+        }
+      );
+    }
+
+    logger.info(`[AskAI] Persisted learning data for ${userId.slice(-6)} | topic: ${topic} | confusion: ${isConfusion}`);
+  } catch (err: any) {
+    // Re-throw so the caller (afterResponse) can log it as a warning
+    throw new Error(`persistLearningData: ${err.message}`);
+  }
 }
 
 // ─────────────────────────────────────────────────────────────
 // detectTopic  (heuristic — maps message to a topic name)
 // ─────────────────────────────────────────────────────────────
-function detectTopic(message: string, subjectMode: string): string | null {
+export function detectTopic(message: string, subjectMode: string): string | null {
   const lower = message.toLowerCase();
 
   const TOPIC_MAP: [RegExp, string][] = [
@@ -257,13 +421,30 @@ function detectTopic(message: string, subjectMode: string): string | null {
     [/\bphotos(ynthesis)?\b/,                             'photosynthesis'],
     [/\bnewton(s)?\b|\bgravity\b|\bforce\b/,              'Newtonian mechanics'],
     [/\bchemistry\b|\belement\b|\bperiodic\b|\bbond\b/,   'chemistry'],
+    [/\balgebra\b|\bequation\b|\bpolynomial\b/,           'algebra'],
+    [/\bpython\b/,                                        'Python'],
+    [/\bjavascript\b|\bjs\b|\bnode\.?js\b/,              'JavaScript'],
+    [/\breact\b|\bnext\.?js\b/,                           'React'],
+    [/\bsql\b|\bdatabase\b|\bmysql\b|\bpostgres\b/,       'databases'],
   ];
 
   for (const [pattern, topic] of TOPIC_MAP) {
     if (pattern.test(lower)) return topic;
   }
 
-  // Fall back to subject mode
   if (subjectMode && subjectMode !== 'auto') return subjectMode;
   return null;
+}
+
+// ─────────────────────────────────────────────────────────────
+// detectSubject  (maps topic to subject for StudentProfile)
+// ─────────────────────────────────────────────────────────────
+function detectSubject(topic: string): string {
+  const t = topic.toLowerCase();
+  if (['loops', 'arrays', 'functions', 'recursion', 'oop', 'sorting', 'pointers'].includes(t)) return 'Programming';
+  if (['python', 'javascript', 'react', 'databases'].includes(t)) return t.charAt(0).toUpperCase() + t.slice(1);
+  if (['algebra', 'calculus', 'trigonometry', 'probability'].includes(t)) return 'Mathematics';
+  if (['newtonian mechanics', 'electricity'].includes(t)) return 'Physics';
+  if (['chemistry', 'photosynthesis'].includes(t)) return 'Chemistry';
+  return 'General';
 }

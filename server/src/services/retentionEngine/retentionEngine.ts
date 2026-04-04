@@ -10,7 +10,7 @@
  *       ↓
  *   triggerRetentionAction
  *       ↓
- *   sendNotification (notificationEngine)
+ *   sendNotification (notificationEngine)  ← now uses Emotional AI message
  *       ↓
  *   assignRecoveryTask (streakRecoverySystem)
  *       ↓
@@ -29,6 +29,8 @@ import { streakRecoverySystem, RecoveryStatus }         from './streakRecoverySy
 import { comebackEngine, ComebackPlan }                 from './comebackEngine.js';
 import { notificationEngine }                           from './notificationEngine.js';
 import { rewardTriggerSystem }                          from './rewardTriggerSystem.js';
+// ── Stage 7 Advanced: Emotional AI Merge ─────────────────────
+import { mergeEmotionalAI }                             from './emotionalAIMerge.js';
 import { User }                                         from '../../models/User.model.js';
 import { logger }                                       from '../../utils/logger.js';
 
@@ -50,14 +52,14 @@ export interface RetentionRunOptions {
 }
 
 export interface RetentionStatus {
-  userId:          string;
-  urgency:         UrgencyReport;
-  recovery:        RecoveryStatus;
-  comeback:        ComebackPlan | null;
+  userId:           string;
+  urgency:          UrgencyReport;
+  recovery:         RecoveryStatus;
+  comeback:         ComebackPlan | null;
   actionsTriggered: string[];
   notificationSent: boolean;
-  executedAt:      string;
-  executionMs:     number;
+  executedAt:       string;
+  executionMs:      number;
 }
 
 // ── Core Engine ────────────────────────────────────────────────
@@ -85,14 +87,10 @@ export async function runRetentionEngine(
     ]);
 
     // ── Step 2: Determine actions based on risk level ──────────
-
     if (options.trigger === 'login' || options.trigger === 'activity_complete') {
-      // Update streak on activity
       const streakResult = await streakManager.updateStreak(userId);
       if (streakResult.success && streakResult.xpAwarded > 0) {
         actionsTriggered.push('streak_updated');
-
-        // Check for streak milestone reward
         await rewardTriggerSystem.triggerStreakMilestoneReward(userId, streakResult.newStreak);
         if (streakResult.newStreak % 7 === 0) {
           actionsTriggered.push('milestone_reward');
@@ -102,7 +100,6 @@ export async function runRetentionEngine(
 
     // ── Step 3: Streak is broken — initiate recovery ──────────
     if (urgency.level === 'critical' && recovery.state === 'not_needed') {
-      // First time detecting break — initiate recovery
       await streakRecoverySystem.initiateRecovery(userId);
       actionsTriggered.push('recovery_initiated');
     }
@@ -114,36 +111,50 @@ export async function runRetentionEngine(
       actionsTriggered.push('comeback_plan_generated');
     }
 
-    // ── Step 5: Send notification if needed ───────────────────
+    // ── Step 5: Send notification ─────────────────────────────
+    // ADVANCED LAYER: First try Emotional AI merge (personalized message)
+    // Falls back to generic notification if AI merge fails or is skipped
     if (urgency.shouldNotify || shouldComeback) {
-      let notif;
 
-      if (urgency.level === 'critical' || urgency.level === 'high') {
-        // Streak alert
-        notif = notificationEngine.buildStreakAlertNotification(
-          userId,
-          urgency.streakStatus.currentStreak,
-          urgency.hoursLeft,
-        );
-      } else if (shouldComeback && comeback) {
-        // Comeback notification
-        const user = await User.findById(userId).select('name').lean() as any;
-        const userName = user?.name?.split(' ')[0] ?? 'there';
-        notif = notificationEngine.buildComebackNotification(
-          userId,
-          userName,
-          Math.floor((urgency.streakStatus.hoursSinceLast ?? 0) / 24),
-        );
+      // ── 5a. Try Emotional AI merge first ─────────────────
+      const emotionalResult = await mergeEmotionalAI(userId, urgency, recovery);
+
+      if (emotionalResult.notifSent) {
+        notificationSent = true;
+        actionsTriggered.push('emotional_ai_notification_sent');
+      } else {
+        // ── 5b. Fallback: generic notification ───────────
+        let notif;
+
+        if (urgency.level === 'critical' || urgency.level === 'high') {
+          notif = notificationEngine.buildStreakAlertNotification(
+            userId,
+            urgency.streakStatus.currentStreak,
+            urgency.hoursLeft,
+          );
+        } else if (shouldComeback && comeback) {
+          const user = await User.findById(userId).select('name').lean() as any;
+          const userName = user?.name?.split(' ')[0] ?? 'there';
+          notif = notificationEngine.buildComebackNotification(
+            userId,
+            userName,
+            Math.floor((urgency.streakStatus.hoursSinceLast ?? 0) / 24),
+          );
+        }
+
+        if (notif) {
+          const delivery = await notificationEngine.sendPersonalizedRetentionNotification(
+            userId,
+            notif.type,
+            notif,
+          );
+          notificationSent = delivery.success;
+          if (notificationSent) actionsTriggered.push('notification_sent');
+        }
       }
 
-      if (notif) {
-        const delivery = await notificationEngine.sendPersonalizedRetentionNotification(
-          userId,
-          notif.type,
-          notif,
-        );
-        notificationSent = delivery.success;
-        if (notificationSent) actionsTriggered.push('notification_sent');
+      if (emotionalResult.mentorFired) {
+        actionsTriggered.push('emotional_ai_fired');
       }
     }
 
@@ -171,11 +182,11 @@ export async function runRetentionEngine(
  * getRetentionDashboard — Full status snapshot for frontend dashboard widget
  */
 export async function getRetentionDashboard(userId: string): Promise<{
-  streakStatus:    Awaited<ReturnType<typeof streakManager.getStreakStatus>>;
-  urgency:         UrgencyReport;
-  recovery:        RecoveryStatus;
-  comeback:        ComebackPlan | null;
-  notifications:   Awaited<ReturnType<typeof notificationEngine.getUnreadNotifications>>;
+  streakStatus:  Awaited<ReturnType<typeof streakManager.getStreakStatus>>;
+  urgency:       UrgencyReport;
+  recovery:      RecoveryStatus;
+  comeback:      ComebackPlan | null;
+  notifications: Awaited<ReturnType<typeof notificationEngine.getUnreadNotifications>>;
 }> {
   const [streakStatus, urgency, recovery, notifications] = await Promise.all([
     streakManager.getStreakStatus(userId),
@@ -206,15 +217,12 @@ export async function handleActivityCompleted(
   rewardResult:    Awaited<ReturnType<typeof rewardTriggerSystem.triggerReward>> | null;
 }> {
   try {
-    // 1. Update streak
     const streakResult = await streakManager.updateStreak(userId);
 
-    // 2. Check if this completes a recovery task
     const recovery = await streakRecoverySystem.getRecoveryStatus(userId);
     let recoveryChecked = false;
 
     if (recovery.state === 'available' || recovery.state === 'pending') {
-      // Map activity to recovery method
       const methodMap: Record<string, 'task' | 'quiz' | 'lesson'> = {
         lesson:    'lesson',
         quiz:      'quiz',
@@ -227,7 +235,6 @@ export async function handleActivityCompleted(
       recoveryChecked = true;
     }
 
-    // 3. Trigger activity reward
     const rewardMap: Record<string, Parameters<typeof rewardTriggerSystem.triggerReward>[1]> = {
       lesson:    'lesson_completed',
       quiz:      'task_completed',
@@ -236,15 +243,13 @@ export async function handleActivityCompleted(
       ask_ai:    'task_completed',
     };
 
-    const rewardResult = await rewardTriggerSystem.triggerReward(userId, rewardMap[activityType] ?? 'task_completed', {
-      streakValue: streakResult.newStreak,
-    });
+    const rewardResult = await rewardTriggerSystem.triggerReward(
+      userId,
+      rewardMap[activityType] ?? 'task_completed',
+      { streakValue: streakResult.newStreak },
+    );
 
-    return {
-      streakUpdated:   streakResult.success,
-      recoveryChecked,
-      rewardResult,
-    };
+    return { streakUpdated: streakResult.success, recoveryChecked, rewardResult };
 
   } catch (err) {
     logger.error({ userId, activityType, err }, '[RetentionEngine] handleActivityCompleted failed');

@@ -19,7 +19,7 @@
  *   POST /api/retention/reward           → trigger reward for event
  */
 
-import { Request, Response, NextFunction } from 'express';
+import { Request, Response, NextFunction }  from 'express';
 import { retentionEngine }                  from '../services/retentionEngine/retentionEngine.js';
 import { streakManager }                    from '../services/retentionEngine/streakManager.js';
 import { urgencyEngine }                    from '../services/retentionEngine/urgencyEngine.js';
@@ -27,11 +27,12 @@ import { streakRecoverySystem }             from '../services/retentionEngine/st
 import { comebackEngine }                   from '../services/retentionEngine/comebackEngine.js';
 import { notificationEngine }               from '../services/retentionEngine/notificationEngine.js';
 import { rewardTriggerSystem }              from '../services/retentionEngine/rewardTriggerSystem.js';
+// ── Stage 7 Advanced: Emotional AI on recovery success ────────
+import { mergeEmotionalAIOnRecovery }       from '../services/retentionEngine/emotionalAIMerge.js';
 import { logger }                           from '../utils/logger.js';
 
 // ─────────────────────────────────────────────────────────────
 // GET /api/retention/status
-// Full retention dashboard — streak + urgency + recovery + comeback + notifications
 // ─────────────────────────────────────────────────────────────
 export async function getRetentionStatus(req: Request, res: Response, next: NextFunction) {
   try {
@@ -45,7 +46,6 @@ export async function getRetentionStatus(req: Request, res: Response, next: Next
 
 // ─────────────────────────────────────────────────────────────
 // GET /api/retention/streak
-// Streak status only (lighter endpoint for header/navbar)
 // ─────────────────────────────────────────────────────────────
 export async function getStreakStatus(req: Request, res: Response, next: NextFunction) {
   try {
@@ -59,13 +59,11 @@ export async function getStreakStatus(req: Request, res: Response, next: NextFun
 
 // ─────────────────────────────────────────────────────────────
 // POST /api/retention/streak/update
-// Called when user does any study activity — updates streak
 // ─────────────────────────────────────────────────────────────
 export async function updateStreak(req: Request, res: Response, next: NextFunction) {
   try {
     const userId = req.userId as string;
     const result = await streakManager.updateStreak(userId);
-    // ✅ FIX: Explicit fields — no spread, no duplicate 'success' key (TS2783)
     return res.json({
       success:     result.success,
       newStreak:   result.newStreak,
@@ -80,7 +78,6 @@ export async function updateStreak(req: Request, res: Response, next: NextFuncti
 
 // ─────────────────────────────────────────────────────────────
 // GET /api/retention/urgency
-// Urgency report with countdown timer data
 // ─────────────────────────────────────────────────────────────
 export async function getUrgencyReport(req: Request, res: Response, next: NextFunction) {
   try {
@@ -94,7 +91,6 @@ export async function getUrgencyReport(req: Request, res: Response, next: NextFu
 
 // ─────────────────────────────────────────────────────────────
 // GET /api/retention/recovery
-// Check recovery status — is recovery available? pending? expired?
 // ─────────────────────────────────────────────────────────────
 export async function getRecoveryStatus(req: Request, res: Response, next: NextFunction) {
   try {
@@ -108,7 +104,6 @@ export async function getRecoveryStatus(req: Request, res: Response, next: NextF
 
 // ─────────────────────────────────────────────────────────────
 // POST /api/retention/recovery/start
-// Initiate recovery session (opens 24h window)
 // ─────────────────────────────────────────────────────────────
 export async function startRecovery(req: Request, res: Response, next: NextFunction) {
   try {
@@ -122,7 +117,6 @@ export async function startRecovery(req: Request, res: Response, next: NextFunct
 
 // ─────────────────────────────────────────────────────────────
 // POST /api/retention/recovery/complete
-// Complete recovery task → restore streak + award XP
 // body: { method: 'task' | 'quiz' | 'lesson' }
 // ─────────────────────────────────────────────────────────────
 export async function completeRecovery(req: Request, res: Response, next: NextFunction) {
@@ -136,7 +130,15 @@ export async function completeRecovery(req: Request, res: Response, next: NextFu
     }
 
     const result = await streakRecoverySystem.completeRecovery(userId, method);
-    // ✅ FIX: Explicit fields — no spread, avoids TS2783 duplicate key error
+
+    // ── ADVANCED LAYER: On success → AI Mentor sends celebration ──
+    // Fire-and-forget — does NOT block the HTTP response
+    if (result.success) {
+      mergeEmotionalAIOnRecovery(userId, result).catch((e: any) => {
+        logger.warn({ userId, err: e?.message }, '[RetentionController] emotionalAI celebration failed');
+      });
+    }
+
     return res.json({
       success:   result.success,
       message:   result.message,
@@ -150,7 +152,6 @@ export async function completeRecovery(req: Request, res: Response, next: NextFu
 
 // ─────────────────────────────────────────────────────────────
 // GET /api/retention/comeback
-// Get personalized comeback plan for inactive user
 // ─────────────────────────────────────────────────────────────
 export async function getComebackPlan(req: Request, res: Response, next: NextFunction) {
   try {
@@ -164,7 +165,6 @@ export async function getComebackPlan(req: Request, res: Response, next: NextFun
 
 // ─────────────────────────────────────────────────────────────
 // GET /api/retention/notifications
-// Get unread in-app notifications for user
 // ─────────────────────────────────────────────────────────────
 export async function getNotifications(req: Request, res: Response, next: NextFunction) {
   try {
@@ -178,8 +178,7 @@ export async function getNotifications(req: Request, res: Response, next: NextFu
 
 // ─────────────────────────────────────────────────────────────
 // POST /api/retention/notifications/read
-// Mark notifications as read
-// body: { ids?: string[] }  — omit ids to mark ALL read
+// body: { ids?: string[] }  — omit to mark ALL read
 // ─────────────────────────────────────────────────────────────
 export async function markNotificationsRead(req: Request, res: Response, next: NextFunction) {
   try {
@@ -194,7 +193,6 @@ export async function markNotificationsRead(req: Request, res: Response, next: N
 
 // ─────────────────────────────────────────────────────────────
 // POST /api/retention/activity
-// Signal that user completed an activity → updates streak + checks recovery
 // body: { type: 'lesson' | 'quiz' | 'task' | 'ask_ai' | 'challenge' }
 // ─────────────────────────────────────────────────────────────
 export async function recordActivity(req: Request, res: Response, next: NextFunction) {
@@ -219,7 +217,6 @@ export async function recordActivity(req: Request, res: Response, next: NextFunc
 
 // ─────────────────────────────────────────────────────────────
 // POST /api/retention/run
-// Manually trigger the full retention engine (login/cron use)
 // body: { trigger?: string, forceRun?: boolean }
 // ─────────────────────────────────────────────────────────────
 export async function runRetention(req: Request, res: Response, next: NextFunction) {
@@ -227,11 +224,7 @@ export async function runRetention(req: Request, res: Response, next: NextFuncti
     const userId = req.userId as string;
     const { trigger = 'manual', forceRun = false, sendEmail = false } = req.body ?? {};
 
-    const result = await retentionEngine.runRetentionEngine(userId, {
-      trigger,
-      forceRun,
-      sendEmail,
-    });
+    const result = await retentionEngine.runRetentionEngine(userId, { trigger, forceRun, sendEmail });
 
     return res.json({
       success:          true,
@@ -250,7 +243,6 @@ export async function runRetention(req: Request, res: Response, next: NextFuncti
 
 // ─────────────────────────────────────────────────────────────
 // POST /api/retention/reward
-// Manually trigger a reward for a specific event (used by other systems)
 // body: { event: string, context?: object }
 // ─────────────────────────────────────────────────────────────
 export async function triggerReward(req: Request, res: Response, next: NextFunction) {

@@ -370,7 +370,7 @@ import { logger }                         from '../utils/logger.js';
 // ── STAGE 5: AI Orchestrator context injection ─────────────────
 import { getFusedContextForAI } from '../services/aiCore/aiOrchestrator.js';
 // ── Stage 6: ChatGPT-level AskAI pipeline ────────────────────
-import { buildMasterPrompt, afterResponse } from '../services/askAI/askAIService.js';
+import { buildMasterPrompt, afterResponse, validateAndLog } from '../services/askAI/askAIService.js';
 // ─────────────────────────────────────────────────────────────
  
 const BASE_AI_POINTS      = 10;
@@ -576,7 +576,7 @@ export async function askAIStream(req: Request, res: Response) {
     });
  
     logger.info(
-      'AskAI stream v6 | intent='  + pkg.plan.intent +
+      'AskAI stream v7 | intent='  + pkg.plan.intent +
       ' strategy=' + pkg.plan.strategy +
       ' skill='    + pkg.context.skillLevel +
       ' model='    + pkg.modelConfig.modelId +
@@ -632,8 +632,11 @@ export async function askAIStream(req: Request, res: Response) {
       proxyRes as any,
     );
  
-    // ── Post-stream: update conversation memory ───────────────
+    // ── Post-stream: validate + update memory + persist to DB ─
     if (fullResponse && userId) {
+      // FIX v7: validate response quality (non-blocking log only)
+      validateAndLog(fullResponse, pkg.plan.intent, prompt, userId);
+      // Update in-session memory + persist topic data to StudentProfile DB
       afterResponse(userId, prompt, fullResponse, pkg.detectedTopic);
     }
  

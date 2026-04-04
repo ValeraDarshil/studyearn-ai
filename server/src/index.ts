@@ -356,6 +356,9 @@ import { mentorScheduler } from './services/aiMentor/mentorScheduler.js';
 // ── Stage 7: Retention Engine ─────────────────────────────────
 import retentionRoutes   from './routes/retentionRoutes.js';
 
+// ── Stage 7 Advanced: Urgency Scheduler (precise 20h detection) ──
+import { UrgencyScheduler } from './services/retentionEngine/urgencyScheduler.js';
+
 import { fixStuckRedemptions, processPendingPremiums } from './controllers/rewardsController.js';
 
 /* ─── 3. PROCESS ERROR HANDLERS ────────────────────────── */
@@ -395,10 +398,12 @@ app.use(helmet({
   contentSecurityPolicy: false,
 }));
 
-// ─── FIX: SSE route pe compression SKIP karo ─────────────────
+// ─── FIX: SSE routes pe compression SKIP karo ────────────────
+// /api/ai/ask-stream aur /api/retention/stream dono SSE hain
 app.use(compression({
   filter: (req: Request, _res: Response) => {
-    if (req.path === '/api/ai/ask-stream') return false;
+    if (req.path === '/api/ai/ask-stream')    return false;
+    if (req.path === '/api/retention/stream') return false;
     return compression.filter(req, _res);
   },
 }));
@@ -440,17 +445,20 @@ app.use(errorHandler);
 connectDB().then(() => {
   app.listen(PORT, () => {
     logger.info(`🚀 Server running on port ${PORT}`);
-    logger.info('✅ AI Ready              (NVIDIA + Groq + OpenRouter)');
-    logger.info('✅ Streaming Ready       (SSE — compression bypassed)');
-    logger.info('✅ PPT Ready             (pptxgenjs)');
-    logger.info('✅ PDF Ready             (pdf-lib + sharp)');
-    logger.info('✅ Auth Ready            (JWT + bcrypt)');
-    logger.info('✅ AI Brain Ready        (Stage 1)');
-    logger.info('✅ AI Tutor Ready        (Stage 2)');
-    logger.info('✅ Learn Engine Ready    (Stage 3)');
-    logger.info('✅ Progress Ready        (Stage 4)');
-    logger.info('✅ AI Mentor Ready       (Stage 6 — Proactive Mentor)');
-    logger.info('✅ Retention Engine Ready (Stage 7 — Streaks + Comeback)');
+    logger.info('✅ AI Ready               (NVIDIA + Groq + OpenRouter)');
+    logger.info('✅ Streaming Ready        (SSE — compression bypassed)');
+    logger.info('✅ PPT Ready              (pptxgenjs)');
+    logger.info('✅ PDF Ready              (pdf-lib + sharp)');
+    logger.info('✅ Auth Ready             (JWT + bcrypt)');
+    logger.info('✅ AI Brain Ready         (Stage 1)');
+    logger.info('✅ AI Tutor Ready         (Stage 2)');
+    logger.info('✅ Learn Engine Ready     (Stage 3)');
+    logger.info('✅ Progress Ready         (Stage 4)');
+    logger.info('✅ AI Mentor Ready        (Stage 6 — Proactive Mentor)');
+    logger.info('✅ Retention Engine Ready  (Stage 7 — Streaks + Comeback)');
+    logger.info('✅ Urgency Scheduler Ready (Stage 7 Advanced — Precise 20h Detection)');
+    logger.info('✅ SSE Push Ready          (Stage 7 Advanced — Real-time Notifications)');
+    logger.info('✅ Emotional AI Ready      (Stage 7 Advanced — Mentor + Retention Merge)');
   });
 
   fixStuckRedemptions()
@@ -461,4 +469,9 @@ connectDB().then(() => {
 
   // ── Stage 6: Start AI Mentor Scheduler ───────────────────
   mentorScheduler.start();
+
+  // ── Stage 7 Advanced: Start Urgency Scheduler ────────────
+  // Precise 20h/36h/48h cron detection — not request-driven
+  const urgencyScheduler = new UrgencyScheduler();
+  urgencyScheduler.start();
 });

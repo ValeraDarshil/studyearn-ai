@@ -16,6 +16,7 @@
  * POST /api/retention/activity            → signal activity completed
  * POST /api/retention/run                 → manually trigger retention engine
  * POST /api/retention/reward              → trigger reward for event
+ * GET  /api/retention/stream              → SSE real-time notification stream (Stage 7 Advanced)
  */
 
 import { Router, Request, Response, NextFunction } from 'express';
@@ -35,6 +36,8 @@ import {
   runRetention,
   triggerReward,
 } from '../controllers/retentionController.js';
+// ── Stage 7 Advanced: SSE real-time push ─────────────────────
+import { registerSSEConnection } from '../services/retentionEngine/notificationSSE.js';
 
 const router = Router();
 
@@ -63,5 +66,11 @@ router.post('/notifications/read', markNotificationsRead);
 router.post('/activity',           recordActivity);
 router.post('/run',                runRetention);
 router.post('/reward',             triggerReward);
+
+// ── Stage 7 Advanced: Real-time SSE stream ────────────────────
+// Frontend connects here ONCE → server pushes notifications instantly
+router.get('/stream', (req: Request, res: Response) => {
+  registerSSEConnection((req as any).userId, res, req);
+});
 
 export default router;
