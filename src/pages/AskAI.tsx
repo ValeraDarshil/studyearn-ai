@@ -867,11 +867,18 @@ import { API_URL }       from "../utils/api";
 import { incrementAction }   from "../utils/user-api";
 import { MarkdownRenderer }  from "../components/MarkdownRenderer";
 import { trackProgressEvent } from "../utils/progress-api";
-
+// Stage 6 — Mentor Intelligence UI
+import {
+  MentorIntelligenceBar,
+  WeakTopicBanner,
+  IntentBadge,
+  type MentorState,
+} from "../components/MentorIntelligenceBar";
+ 
 // ─── Types ────────────────────────────────────────────────────
 type Role        = "user" | "assistant";
 type SubjectMode = "auto" | "math" | "coding" | "science" | "general";
-
+ 
 interface ChatMsg {
   role:          Role;
   content:       string;
@@ -887,7 +894,7 @@ interface ConvoSummary {
   title:         string;
   lastMessageAt: string;
 }
-
+ 
 // ─── Subject Mode Config ──────────────────────────────────────
 const SUBJECT_MODES: {
   id:     SubjectMode;
@@ -904,7 +911,7 @@ const SUBJECT_MODES: {
   { id: "science", label: "Science", icon: FlaskConical,color: "text-cyan-400",   bg: "bg-cyan-500/10",   border: "border-cyan-500/30",   desc: "Formulas + examples"     },
   { id: "general", label: "General", icon: BookOpen,    color: "text-amber-400",  bg: "bg-amber-500/10",  border: "border-amber-500/30",  desc: "Clear explanations"      },
 ];
-
+ 
 // ─── Helpers ──────────────────────────────────────────────────
 async function compressImage(base64: string, maxPx = 1600): Promise<string> {
   return new Promise((resolve) => {
@@ -924,11 +931,11 @@ async function compressImage(base64: string, maxPx = 1600): Promise<string> {
     img.src = base64;
   });
 }
-
+ 
 function authHeaders(): Record<string, string> {
   return { Authorization: `Bearer ${localStorage.getItem("token") || ""}` };
 }
-
+ 
 function groupByDate(convos: ConvoSummary[]) {
   const now   = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -949,7 +956,7 @@ function groupByDate(convos: ConvoSummary[]) {
   }
   return groups.filter(g => g.items.length > 0);
 }
-
+ 
 // ─── Mode badge on AI bubble ──────────────────────────────────
 function ModeBadge({ mode }: { mode?: SubjectMode }) {
   if (!mode || mode === "auto") return null;
@@ -962,7 +969,7 @@ function ModeBadge({ mode }: { mode?: SubjectMode }) {
     </span>
   );
 }
-
+ 
 // ─── Bubbles ──────────────────────────────────────────────────
 function UserBubble({ msg }: { msg: ChatMsg }) {
   return (
@@ -991,7 +998,7 @@ function UserBubble({ msg }: { msg: ChatMsg }) {
     </div>
   );
 }
-
+ 
 function AIBubble({
   msg, isPremium, isStreaming = false,
 }: { msg: ChatMsg; isPremium: boolean; isStreaming?: boolean }) {
@@ -1030,7 +1037,7 @@ function AIBubble({
     </div>
   );
 }
-
+ 
 // ─── Mode Selector Bar ────────────────────────────────────────
 function ModeSelector({ selected, onChange }: { selected: SubjectMode; onChange: (m: SubjectMode) => void }) {
   return (
@@ -1052,7 +1059,7 @@ function ModeSelector({ selected, onChange }: { selected: SubjectMode; onChange:
     </div>
   );
 }
-
+ 
 // ─── Suggestions per mode ─────────────────────────────────────
 const MODE_SUGGESTIONS: Record<SubjectMode, string[]> = {
   auto:    ["Explain photosynthesis with diagram", "Solve: ∫x²dx from 0 to 1", "Write a Python function to reverse a string", "What is Newton's 3rd Law? Give examples"],
@@ -1061,7 +1068,7 @@ const MODE_SUGGESTIONS: Record<SubjectMode, string[]> = {
   science: ["Explain Newton's laws with real examples", "Balance: Fe + O₂ → Fe₂O₃", "What is the photoelectric effect?", "Explain DNA replication step by step"],
   general: ["What is the difference between RAM and ROM?", "Explain the water cycle", "What caused World War II?", "How does inflation work?"],
 };
-
+ 
 // ═══════════════════════════════════════════════════════════════
 // MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════
@@ -1070,12 +1077,12 @@ export function AskAI() {
     questionsLeft, setQuestionsLeft, useQuestion, addPoints, userId,
     logActivity, isPremium, checkAndUnlockAchievements, userStats, setUserStats,
   } = useApp();
-
+ 
   // ── Mode & Step-by-step ──────────────────────────────────
   const [subjectMode, setSubjectMode] = useState<SubjectMode>("auto");
   const [stepByStep,  setStepByStep]  = useState(false);
   const [showModeBar, setShowModeBar] = useState(true);
-
+ 
   // ── Sidebar state ────────────────────────────────────────
   const [convos,        setConvos]        = useState<ConvoSummary[]>([]);
   const [activeId,      setActiveId]      = useState<string | null>(null);
@@ -1084,25 +1091,34 @@ export function AskAI() {
   const [renamingId,    setRenamingId]    = useState<string | null>(null);
   const [renameValue,   setRenameValue]   = useState("");
   const [menuOpenId,    setMenuOpenId]    = useState<string | null>(null);
-
+ 
   // ── Chat state ───────────────────────────────────────────
   const [messages,      setMessages]      = useState<ChatMsg[]>([]);
   const [question,      setQuestion]      = useState("");
   const [loading,       setLoading]       = useState(false);
   const [loadingStep,   setLoadingStep]   = useState("");
-
+ 
   // ── Streaming state (NEW) ────────────────────────────────
   const [isStreaming,      setIsStreaming]      = useState(false);   // true while SSE tokens are arriving
   const [streamingContent, setStreamingContent] = useState("");      // partial text being built
   const abortRef = useRef<AbortController | null>(null);             // to cancel mid-stream
-
+ 
+  // ── Stage 6: Mentor Intelligence state ───────────────────
+  const [mentorState, setMentorState] = useState<MentorState>({
+    intent: null, strategy: null, skillLevel: null, turnCount: 0,
+  });
+  const [sessionTopics,   setSessionTopics]   = useState<string[]>([]);
+  const [mistakeTopics,   setMistakeTopics]   = useState<string[]>([]);
+  const [weakTopicBanner, setWeakTopicBanner] = useState<string | null>(null);
+  const [showMentorBar,   setShowMentorBar]   = useState(true);
+ 
   // ── File state ───────────────────────────────────────────
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [fileType,     setFileType]     = useState<"image" | "pdf" | null>(null);
   const [previewSrc,   setPreviewSrc]   = useState<string | null>(null);
   const [isDragging,   setIsDragging]   = useState(false);
   const [voiceLang,    setVoiceLang]    = useState<"hi-IN" | "en-IN">("en-IN");
-
+ 
   // ── Voice ─────────────────────────────────────────────────
   const { isListening, isUnsupported, interimText, error: voiceError, toggleListening } = useVoiceInput({
     lang: voiceLang,
@@ -1114,20 +1130,20 @@ export function AskAI() {
       }
     },
   });
-
+ 
   // ── Quota ─────────────────────────────────────────────────
   const [nextRefillSecs, setNextRefillSecs] = useState(0);
   const [videoAdsLeft,   setVideoAdsLeft]   = useState(5);
   const [watchingAd,     setWatchingAd]     = useState(false);
   const [adCountdown,    setAdCountdown]    = useState(0);
   const refillTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
+ 
   const fileRef     = useRef<HTMLInputElement>(null);
   const convoIdRef  = useRef<string | null>(null);
   const bottomRef   = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const withUserRef = useRef<ChatMsg[]>([]);  // snapshot for streaming closure
-
+ 
   // ── Fetch conversations ──────────────────────────────────
   const fetchConvos = useCallback(async () => {
     setLoadingConvos(true);
@@ -1138,9 +1154,9 @@ export function AskAI() {
     } catch {}
     finally { setLoadingConvos(false); }
   }, []);
-
+ 
   useEffect(() => { fetchConvos(); }, [fetchConvos]);
-
+ 
   // ── Fetch quota ──────────────────────────────────────────
   useEffect(() => {
     fetch(`${API_URL}/api/ai/quota`, { headers: authHeaders() })
@@ -1154,7 +1170,7 @@ export function AskAI() {
       })
       .catch(() => {});
   }, []);
-
+ 
   // ── Refill countdown ────────────────────────────────────
   useEffect(() => {
     if (refillTimerRef.current) clearInterval(refillTimerRef.current);
@@ -1174,10 +1190,10 @@ export function AskAI() {
     }, 1000);
     return () => { if (refillTimerRef.current) clearInterval(refillTimerRef.current); };
   }, [nextRefillSecs]);
-
+ 
   // ── Auto scroll ──────────────────────────────────────────
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, loading, streamingContent]);
-
+ 
   // ── Auto resize textarea ─────────────────────────────────
   useEffect(() => {
     const ta = textareaRef.current;
@@ -1189,7 +1205,7 @@ export function AskAI() {
       ta.style.height = Math.min(ta.scrollHeight, 160) + "px";
     });
   }, [question]);
-
+ 
   // ── Close menu on outside click ──────────────────────────
   useEffect(() => {
     if (!menuOpenId) return;
@@ -1197,12 +1213,12 @@ export function AskAI() {
     document.addEventListener("click", close);
     return () => document.removeEventListener("click", close);
   }, [menuOpenId]);
-
+ 
   // ── Cleanup abort on unmount ──────────────────────────────
   useEffect(() => {
     return () => { abortRef.current?.abort(); };
   }, []);
-
+ 
   // ─────────────────────────────────────────────────────────
   // API helpers
   // ─────────────────────────────────────────────────────────
@@ -1221,7 +1237,7 @@ export function AskAI() {
       }
     } catch {}
   }
-
+ 
   async function createNewConvo(firstMessage?: string): Promise<string | null> {
     try {
       const res  = await fetch(`${API_URL}/api/chat`, {
@@ -1238,7 +1254,7 @@ export function AskAI() {
     } catch {}
     return null;
   }
-
+ 
   async function saveMessages(convoId: string, msgs: ChatMsg[]) {
     try {
       const res = await fetch(`${API_URL}/api/chat/${convoId}/messages`, {
@@ -1256,14 +1272,14 @@ export function AskAI() {
       }
     } catch {}
   }
-
+ 
   async function handleDeleteConvo(id: string) {
     setMenuOpenId(null);
     try { await fetch(`${API_URL}/api/chat/${id}`, { method: "DELETE", headers: authHeaders() }); } catch {}
     setConvos(prev => prev.filter(c => c._id !== id));
     if (activeId === id) { setActiveId(null); convoIdRef.current = null; setMessages([]); }
   }
-
+ 
   async function handleRename(id: string) {
     const title = renameValue.trim();
     if (!title) { setRenamingId(null); return; }
@@ -1276,7 +1292,7 @@ export function AskAI() {
     } catch {}
     setRenamingId(null);
   }
-
+ 
   // ─────────────────────────────────────────────────────────
   // File handlers
   // ─────────────────────────────────────────────────────────
@@ -1289,17 +1305,20 @@ export function AskAI() {
     else setPreviewSrc(null);
     textareaRef.current?.focus();
   }, []);
-
+ 
   const removeFile = () => { setUploadedFile(null); setFileType(null); setPreviewSrc(null); if (fileRef.current) fileRef.current.value = ""; };
-
+ 
   function startNewChat() {
     abortRef.current?.abort();
     setActiveId(null); convoIdRef.current = null; setMessages([]);
     setQuestion(""); removeFile(); setSidebarOpen(false);
     setIsStreaming(false); setStreamingContent("");
+    // Stage 6: reset mentor intelligence for new session
+    setMentorState({ intent: null, strategy: null, skillLevel: null, turnCount: 0 });
+    setSessionTopics([]); setMistakeTopics([]); setWeakTopicBanner(null);
     textareaRef.current?.focus();
   }
-
+ 
   // ─────────────────────────────────────────────────────────
   // STOP GENERATION
   // ─────────────────────────────────────────────────────────
@@ -1324,7 +1343,7 @@ export function AskAI() {
     setLoading(false);
     setLoadingStep("");
   }
-
+ 
   // ─────────────────────────────────────────────────────────
   // WATCH AD
   // ─────────────────────────────────────────────────────────
@@ -1340,20 +1359,20 @@ export function AskAI() {
     } catch {}
     setWatchingAd(false); setAdCountdown(0);
   };
-
+ 
   const buildHistory = () =>
     messages
       .filter(m => !m.isError && !m.imagePreview && !m.fileName)
       .slice(-10)
       .map(m => ({ role: m.role as "user" | "assistant", content: m.content }));
-
+ 
   // ─────────────────────────────────────────────────────────
   // SEND — Streaming path for text, non-streaming for image/PDF
   // ─────────────────────────────────────────────────────────
   const handleSend = async () => {
     const text = question.trim();
     if ((!text && !uploadedFile) || loading || isStreaming || questionsLeft <= 0) return;
-
+ 
     // ── Optimistic user bubble ──────────────────────────────
     const userMsg: ChatMsg = {
       role: "user", content: text,
@@ -1369,19 +1388,19 @@ export function AskAI() {
     setQuestion("");
     if (textareaRef.current) textareaRef.current.style.height = "32px";
     setLoading(true);
-
+ 
     const currentFile    = uploadedFile;
     const currentType    = fileType;
     const currentPreview = previewSrc;
     removeFile();
-
+ 
     // ── Ensure a conversation exists ────────────────────────
     let convoId = convoIdRef.current;
     if (!convoId) {
       convoId = await createNewConvo(text || currentFile?.name);
       if (convoId) convoIdRef.current = convoId;
     }
-
+ 
     // ══════════════════════════════════════════════════════
     // PATH A — IMAGE or PDF → non-streaming (vision/PDF API)
     // ══════════════════════════════════════════════════════
@@ -1389,7 +1408,7 @@ export function AskAI() {
       try {
         const headers = authHeaders();
         let result: { success: boolean; answer: string; pointsAwarded?: number; questionsLeft?: number; nextRefillSecs?: number };
-
+ 
         if (currentType === "pdf" && currentFile) {
           setLoadingStep("Extracting PDF text…");
           const form = new FormData(); form.append("file", currentFile); if (text) form.append("prompt", text);
@@ -1406,7 +1425,7 @@ export function AskAI() {
           });
           result = await res.json();
         }
-
+ 
         const aiMsg: ChatMsg = {
           role: "assistant",
           content: result.answer || "No answer received. Please try again.",
@@ -1435,11 +1454,11 @@ export function AskAI() {
       }
       return;
     }
-
+ 
     // ══════════════════════════════════════════════════════
     // PATH B — TEXT ONLY → SSE Streaming (/api/ai/ask-stream)
     // ══════════════════════════════════════════════════════
-
+ 
     // Step 1 — Show "AI is thinking…" dots (loading=true, isStreaming=false)
     // These stay visible until the FIRST token arrives from the server.
     const modeLabels: Record<SubjectMode, string> = {
@@ -1456,14 +1475,14 @@ export function AskAI() {
     // loading=true already set above — dots will show now
     setIsStreaming(false);    // NOT streaming yet — no bubble, just dots
     setStreamingContent("");
-
+ 
     const ctrl = new AbortController();
     abortRef.current = ctrl;
-
+ 
     let accumulated  = "";
     let finalPoints  = isPremium ? 20 : 10;
     let firstToken   = true;   // track first token so we can flip from dots → bubble
-
+ 
     try {
       const res = await fetch(`${API_URL}/api/ai/ask-stream`, {
         method: "POST",
@@ -1479,36 +1498,36 @@ export function AskAI() {
           recentActivity: subjectMode === "coding" ? "coding" : "ask",
         }),
       });
-
+ 
       if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
-
+ 
       // ── Read SSE stream token-by-token ──────────────────
       const reader  = res.body.getReader();
       const decoder = new TextDecoder();
       let   buffer  = "";
-
+ 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-
+ 
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split("\n");
         buffer = lines.pop() ?? "";   // keep incomplete line for next chunk
-
+ 
         for (const line of lines) {
           const trimmed = line.trim();
           if (!trimmed.startsWith("data:")) continue;
-
+ 
           const raw = trimmed.slice(5).trim();
           if (raw === "[DONE]") { reader.cancel(); break; }
-
+ 
           try {
             const parsed = JSON.parse(raw);
-
+ 
             // ── Token chunk ──────────────────────────────
             if (parsed.token) {
               accumulated += parsed.token;
-
+ 
               // First token → kill the dots, show streaming bubble
               if (firstToken) {
                 firstToken = false;
@@ -1518,7 +1537,7 @@ export function AskAI() {
                 setMessages([...withUserRef.current, { role: "assistant", content: "", subjectMode }]);
                 setIsStreaming(true);
               }
-
+ 
               setStreamingContent(accumulated);
               setMessages(prev => {
                 const updated = [...prev];
@@ -1529,12 +1548,35 @@ export function AskAI() {
                 return updated;
               });
             }
-
+ 
             // Points / quota piggy-backed at end of stream
             if (parsed.pointsAwarded)              finalPoints = parsed.pointsAwarded;
             if (parsed.questionsLeft !== undefined) setQuestionsLeft(parsed.questionsLeft);
             if (parsed.nextRefillSecs !== undefined) setNextRefillSecs(parsed.nextRefillSecs);
-
+ 
+            // ── Stage 6: Mentor intelligence metadata ────────
+            if (parsed.intent || parsed.strategy || parsed.skillLevel) {
+              setMentorState(prev => ({
+                intent:     parsed.intent    ?? prev.intent,
+                strategy:   parsed.strategy  ?? prev.strategy,
+                skillLevel: parsed.skillLevel ?? prev.skillLevel,
+                turnCount:  prev.turnCount,   // incremented after full response
+              }));
+            }
+            if (parsed.detectedTopic) {
+              setSessionTopics(prev =>
+                prev.includes(parsed.detectedTopic) ? prev : [...prev, parsed.detectedTopic]
+              );
+              // Show weak topic banner if this topic is known struggle area
+              setMistakeTopics(prev => {
+                if (parsed.isWeakTopic && !prev.includes(parsed.detectedTopic)) {
+                  setWeakTopicBanner(parsed.detectedTopic);
+                  return [...prev, parsed.detectedTopic];
+                }
+                return prev;
+              });
+            }
+ 
             // Server-side error
             if (parsed.error) throw new Error(parsed.error);
           } catch {
@@ -1542,7 +1584,7 @@ export function AskAI() {
           }
         }
       }
-
+ 
       // ── Stream finished — finalize message ──────────────
       const finalContent = accumulated || "No answer received. Please try again.";
       const aiMsg: ChatMsg = {
@@ -1551,14 +1593,14 @@ export function AskAI() {
         subjectMode,
         pointsAwarded: finalPoints,
       };
-
+ 
       setMessages(prev => {
         const updated = [...prev];
         const lastIdx = updated.length - 1;
         if (updated[lastIdx]?.role === "assistant") updated[lastIdx] = aiMsg;
         return updated;
       });
-
+ 
       // ── Award points & update quota ─────────────────────
       if (accumulated) {
         addPoints(finalPoints);
@@ -1568,13 +1610,15 @@ export function AskAI() {
         incrementAction("question");
         checkAndUnlockAchievements({ totalQuestionsAsked: newTotal });
         trackProgressEvent("ai_tutor_used", { mode: subjectMode }).catch(() => {});
+        // Stage 6: increment mentor turn count
+        setMentorState(prev => ({ ...prev, turnCount: prev.turnCount + 1 }));
       }
-
+ 
       // ── Save to DB (non-blocking) ───────────────────────
       if (convoId) {
         saveMessages(convoId, [userMsg, aiMsg]).then(() => fetchConvos()).catch(() => {});
       }
-
+ 
     } catch (err: any) {
       if (err?.name === "AbortError") return; // User stopped — already handled in handleStop()
       // Network or server error
@@ -1596,12 +1640,12 @@ export function AskAI() {
       textareaRef.current?.focus();
     }
   };
-
+ 
   const canSend = (!!question.trim() || !!uploadedFile) && questionsLeft > 0 && !loading && !isStreaming;
   const hasChat = messages.length > 0;
   const grouped = groupByDate(convos);
   const currentMode = SUBJECT_MODES.find(m => m.id === subjectMode)!;
-
+ 
   // ─────────────────────────────────────────────────────────
   // SIDEBAR
   // ─────────────────────────────────────────────────────────
@@ -1664,16 +1708,16 @@ export function AskAI() {
       </div>
     </div>
   );
-
+ 
   // ─────────────────────────────────────────────────────────
   // RENDER
   // ─────────────────────────────────────────────────────────
   return (
     <div className="flex absolute inset-0">
-
+ 
       {/* Sidebar overlay */}
       {sidebarOpen && <div className="fixed inset-0 z-40 bg-black/60 md:hidden" onClick={() => setSidebarOpen(false)} />}
-
+ 
       {/* Sidebar */}
       <aside
         className={`flex-shrink-0 w-64 border-r border-white/8 flex flex-col overflow-hidden transition-all duration-300 fixed md:static top-0 left-0 h-full z-50 md:z-auto ${sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}
@@ -1684,10 +1728,10 @@ export function AskAI() {
         </div>
         {sidebar}
       </aside>
-
+ 
       {/* Chat area */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden" style={{ background: "#060914" }}>
-
+ 
         {/* Top bar */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-white/8 flex-shrink-0">
           <div className="flex items-center gap-3">
@@ -1701,7 +1745,7 @@ export function AskAI() {
               </h1>
             </div>
           </div>
-
+ 
           <div className="flex items-center gap-2">
             {/* Step-by-step toggle */}
             <button onClick={() => setStepByStep(p => !p)} title="Step-by-step mode"
@@ -1713,7 +1757,7 @@ export function AskAI() {
               <ListOrdered className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Steps</span>
             </button>
-
+ 
             {/* Questions left */}
             <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-medium ${questionsLeft > 0 ? "border-blue-500/20 bg-blue-500/5 text-blue-300" : "border-red-500/20 bg-red-500/5 text-red-300"}`}>
               <Zap className="w-3 h-3" />
@@ -1721,7 +1765,7 @@ export function AskAI() {
               {isPremium && <span className="text-yellow-300 ml-0.5">⚡</span>}
               {questionsLeft <= 0 && nextRefillSecs > 0 && <span className="text-[10px] text-slate-500 ml-1">{Math.floor(nextRefillSecs/60)}m</span>}
             </div>
-
+ 
             {/* New chat */}
             <button onClick={startNewChat} title="New chat"
               className="hidden md:flex p-1.5 rounded-lg border border-white/10 text-slate-400 hover:text-white hover:border-white/20 transition-all items-center gap-1.5 text-xs">
@@ -1729,14 +1773,32 @@ export function AskAI() {
             </button>
           </div>
         </div>
-
+ 
         {/* Mode bar */}
         <div className={`flex-shrink-0 border-b border-white/5 transition-all overflow-hidden ${showModeBar ? "max-h-16" : "max-h-0"}`}>
           <div className="px-4 py-2">
             <ModeSelector selected={subjectMode} onChange={setSubjectMode} />
           </div>
         </div>
-
+ 
+        {/* Stage 6: Mentor Intelligence Bar */}
+        <MentorIntelligenceBar
+          mentorState={mentorState}
+          sessionTopics={sessionTopics}
+          mistakeTopics={mistakeTopics}
+          isVisible={showMentorBar}
+          onToggle={() => setShowMentorBar(p => !p)}
+          turnCount={mentorState.turnCount}
+        />
+ 
+        {/* Weak Topic Banner */}
+        {weakTopicBanner && (
+          <WeakTopicBanner
+            topic={weakTopicBanner}
+            onDismiss={() => setWeakTopicBanner(null)}
+          />
+        )}
+ 
         {/* Messages */}
         <div className="flex-1 overflow-y-auto space-y-6 px-4 py-5" style={{ minHeight: 0 }}>
           {!hasChat && (
@@ -1763,14 +1825,14 @@ export function AskAI() {
               </div>
             </div>
           )}
-
+ 
           {messages.map((msg, i) => {
             const isLastAssistant = msg.role === "assistant" && i === messages.length - 1;
             return msg.role === "user"
               ? <UserBubble key={i} msg={msg} />
               : <AIBubble   key={i} msg={msg} isPremium={isPremium} isStreaming={isStreaming && isLastAssistant} />;
           })}
-
+ 
           {/* Loading dots — shown for:
                1. Image/PDF processing (loading=true, no stream)
                2. Waiting for first streaming token (loading=true, isStreaming=false)
@@ -1797,16 +1859,19 @@ export function AskAI() {
                       style={{ animationDelay: `${d}ms` }} />
                   ))}
                 </div>
-                <span className="text-xs text-slate-500">{loadingStep || "AI is thinking…"}</span>
+                {mentorState.intent
+                  ? <IntentBadge intent={mentorState.intent} />
+                  : <span className="text-xs text-slate-500">{loadingStep || "AI is thinking…"}</span>
+                }
               </div>
             </div>
           )}
           <div ref={bottomRef} />
         </div>
-
+ 
         {/* Input box */}
         <div className="flex-shrink-0 p-3 border-t border-white/8">
-
+ 
           {/* Mode/step indicator strip */}
           {(stepByStep || subjectMode !== "auto") && (
             <div className="flex items-center gap-2 mb-2 px-1">
@@ -1825,7 +1890,7 @@ export function AskAI() {
               <button onClick={() => { setSubjectMode("auto"); setStepByStep(false); }} className="text-[10px] text-slate-600 hover:text-slate-400 ml-auto">reset</button>
             </div>
           )}
-
+ 
           <div className="rounded-2xl border border-white/10 bg-white/[0.02] px-3 py-2">
             {/* File preview */}
             {uploadedFile && (
@@ -1838,17 +1903,17 @@ export function AskAI() {
                 <button onClick={removeFile} className="text-slate-500 hover:text-red-400 transition-colors"><X className="w-3 h-3" /></button>
               </div>
             )}
-
+ 
             <div className="flex items-end gap-2"
               onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
               onDragLeave={() => setIsDragging(false)}
               onDrop={e => { e.preventDefault(); setIsDragging(false); const f = e.dataTransfer.files[0]; if (f) handleFile(f); }}>
-
+ 
               <button onClick={() => fileRef.current?.click()} title="Upload image or PDF"
                 className={`p-1.5 rounded-lg border transition-all flex-shrink-0 mb-0.5 ${isDragging ? "border-blue-500/50 text-blue-400" : "border-white/10 text-slate-500 hover:text-blue-400 hover:border-blue-500/20"}`}>
                 <ImagePlus className="w-4 h-4" />
               </button>
-
+ 
               {!isUnsupported && (
                 <div className="relative flex-shrink-0 mb-0.5">
                   <button onClick={() => toggleListening(question)} title={isListening ? "Stop recording" : "Voice input"}
@@ -1858,7 +1923,7 @@ export function AskAI() {
                   </button>
                 </div>
               )}
-
+ 
               <textarea
                 ref={textareaRef}
                 value={question}
@@ -1881,7 +1946,7 @@ export function AskAI() {
                 className="flex-1 bg-transparent text-white placeholder-slate-600 resize-none focus:outline-none text-sm leading-relaxed py-1.5 disabled:opacity-40"
                 style={{ minHeight: "32px", maxHeight: "160px" }}
               />
-
+ 
               {/* ── Stop button (shown while streaming) ─── */}
               {isStreaming ? (
                 <button onClick={handleStop}
@@ -1903,7 +1968,7 @@ export function AskAI() {
               )}
             </div>
           </div>
-
+ 
           <div className="flex items-center justify-between mt-1.5 px-1">
             <p className="text-[10px] text-slate-700">
               Earn {isPremium ? "20" : "10"} pts per question • History saved 30 days
@@ -1935,7 +2000,7 @@ export function AskAI() {
           </div>
         </div>
       </div>
-
+ 
       <input ref={fileRef} type="file" accept="image/*,.webp,application/pdf" className="hidden"
         onChange={e => { if (e.target.files?.[0]) handleFile(e.target.files[0]); }} />
     </div>

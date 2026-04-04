@@ -348,16 +348,6 @@
 
 
 // latest version 
-// ─────────────────────────────────────────────────────────────
-// AI Study OS — AI Controller (v5 — AI Mentor + Stage 5)
-// Routes:
-//  POST /api/ai/ask        -> text or image questions
-//  POST /api/ai/ask-stream -> SSE streaming with mentor + Stage 5 context
-//  POST /api/ai/solve-pdf  -> PDF analysis (digital + scanned)
-//  POST /api/ai/watch-ad   -> +1 question bonus
-//  GET  /api/ai/quota      -> quota info
-// ─────────────────────────────────────────────────────────────
-
 import { Request, Response } from 'express';
 import {
   solveText,
@@ -376,30 +366,32 @@ import { Activity }                       from '../models/Activity.model.js';
 import { syncActivityToProfile }          from '../services/studentProfileService.js';
 import { onActivityEvent }                from '../services/progressSystem/progressAnalyzer.js';
 import { logger }                         from '../utils/logger.js';
-
+ 
 // ── STAGE 5: AI Orchestrator context injection ─────────────────
 import { getFusedContextForAI } from '../services/aiCore/aiOrchestrator.js';
+// ── Stage 6: ChatGPT-level AskAI pipeline ────────────────────
+import { buildMasterPrompt, afterResponse } from '../services/askAI/askAIService.js';
 // ─────────────────────────────────────────────────────────────
-
+ 
 const BASE_AI_POINTS      = 10;
 const PREMIUM_MULTIPLIER  = 2;
 const FREE_DAILY_LIMIT    = 15;
 const PREMIUM_DAILY_LIMIT = 30;
 const REFILL_INTERVAL_MS  = 60 * 60 * 1000;
 const MAX_VIDEO_ADS_DAY   = 5;
-
+ 
 function getTodayIST(): string {
   const now = new Date();
   return new Date(now.getTime() + 5.5 * 60 * 60 * 1000).toISOString().split('T')[0];
 }
-
+ 
 function applyHourlyRefill(user: any, dailyLimit: number): void {
   const cutoff = Date.now() - REFILL_INTERVAL_MS;
   const recent = (user.questionUsedAt || []).filter((t: Date) => new Date(t).getTime() > cutoff);
   user.questionUsedAt = recent;
   user.questionsLeft  = Math.max(0, Math.min(dailyLimit, dailyLimit - recent.length));
 }
-
+ 
 function isPremiumValid(user: any): boolean {
   if (!user.isPremium || !user.premiumExpiresAt) return false;
   if (new Date(user.premiumExpiresAt) < new Date()) {
@@ -407,14 +399,14 @@ function isPremiumValid(user: any): boolean {
   }
   return true;
 }
-
+ 
 function getNextRefillSecs(user: any): number {
   const used: Date[] = user.questionUsedAt || [];
   if (used.length === 0) return 0;
   const oldest = Math.min(...used.map((t: Date) => new Date(t).getTime()));
   return Math.max(0, Math.ceil((oldest + REFILL_INTERVAL_MS - Date.now()) / 1000));
 }
-
+ 
 async function handleQuestionUsed(
   req: Request,
   promptText = '',
@@ -460,30 +452,30 @@ async function handleQuestionUsed(
     return null;
   }
 }
-
+ 
 // ─────────────────────────────────────────────────────────────
 // POST /api/ai/ask
 // ─────────────────────────────────────────────────────────────
 export async function askAI(req: Request, res: Response) {
   try {
     const { prompt, image, history = [], subjectMode, stepByStep, personality, hintMode, recentActivity } = req.body;
-
+ 
     const safeHistory: ChatMessage[] = (Array.isArray(history) ? history : [])
       .slice(-10)
       .filter((m: any) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
       .map((m: any) => ({ role: m.role as 'user' | 'assistant', content: m.content.slice(0, 2000) }));
-
+ 
     if (!prompt && !image) {
       return res.status(400).json({ success: false, answer: 'Please enter a question or upload an image.' });
     }
-
+ 
     const imgSizeKB = image ? Math.round(image.length * 0.75 / 1024) : 0;
     logger.info('/api/ai/ask  image=' + (!!image) + '(' + imgSizeKB + 'KB)  mode=' + (subjectMode || 'auto') + '  prompt="' + (prompt || '').substring(0, 60) + '"');
-
+ 
     const userId = getUserIdFromToken(req) ?? '';
     let answer: string;
     let tutorMeta: { followUpQ?: string | null; learningMode?: string; hintMode?: boolean; detectedTopic?: string | null } = {};
-
+ 
     if (image) {
       let imageUrl = image;
       if (!image.startsWith('data:')) {
@@ -522,7 +514,7 @@ export async function askAI(req: Request, res: Response) {
         answer = await solveText(prompt, safeHistory, subjectMode);
       }
     }
-
+ 
     const userAction = await handleQuestionUsed(req, String(prompt || '').substring(0, 100));
     res.json({
       success: true,
@@ -542,102 +534,134 @@ export async function askAI(req: Request, res: Response) {
     res.status(500).json({ success: false, answer: 'AI is temporarily unavailable. Please try again.' });
   }
 }
-
+ 
 // ─────────────────────────────────────────────────────────────
-// POST /api/ai/ask-stream — SSE streaming with Stage 5 context
 // ─────────────────────────────────────────────────────────────
+// POST /api/ai/ask-stream — STAGE 6: ChatGPT-level pipeline
+// ─────────────────────────────────────────────────────────────
+// New pipeline (server/src/services/askAI/):
+//   conversationMemoryEngine → contextEnhancer →
+//   aiResponsePlanner → difficultyAdapter →
+//   mentorTeachingMode → aiPersonalityEngine →
+//   aiModelRouter → responseValidator
+// ─────────────────────────────────────────────────────────────
+ 
 export async function askAIStream(req: Request, res: Response) {
-  const { prompt, history = [], subjectMode, stepByStep } = req.body;
+  const {
+    prompt,
+    history     = [],
+    subjectMode = 'auto',
+    stepByStep  = false,
+  } = req.body;
   const userId = getUserIdFromToken(req) ?? '';
-
+ 
   if (!prompt) { res.status(400).json({ error: 'prompt required' }); return; }
-
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Connection', 'keep-alive');
+ 
+  res.setHeader('Content-Type',      'text/event-stream');
+  res.setHeader('Cache-Control',     'no-cache');
+  res.setHeader('Connection',        'keep-alive');
   res.setHeader('X-Accel-Buffering', 'no');
   res.flushHeaders();
-
-  const safeHistory: ChatMessage[] = (Array.isArray(history) ? history : [])
-    .slice(-10)
-    .filter((m: any) => m?.role && m?.content)
-    .map((m: any) => ({ role: m.role as 'user' | 'assistant', content: String(m.content).slice(0, 2000) }));
-
+ 
+  let fullResponse = '';
+ 
   try {
-    let systemPrompt: string | undefined;
-
-    if (userId) {
+    // ── Stage 6 Pipeline: Build ChatGPT-level master prompt ──
+    const pkg = await buildMasterPrompt({
+      userId,
+      message:    prompt,
+      subjectMode,
+      stepByStep: !!stepByStep,
+      history:    Array.isArray(history) ? history : [],
+    });
+ 
+    logger.info(
+      'AskAI stream v6 | intent='  + pkg.plan.intent +
+      ' strategy=' + pkg.plan.strategy +
+      ' skill='    + pkg.context.skillLevel +
+      ' model='    + pkg.modelConfig.modelId +
+      ' userId='   + (userId ? userId.slice(-6) : 'anon')
+    );
+ 
+    // ── Emit mentor metadata as first SSE event ───────────────
+    // Frontend reads this to update MentorIntelligenceBar before
+    // the first token arrives — zero latency cost.
+    const isWeakTopic = pkg.detectedTopic
+      ? pkg.context.weakTopics.includes(pkg.detectedTopic)
+      : false;
+ 
+    res.write('data: ' + JSON.stringify({
+      intent:        pkg.plan.intent,
+      strategy:      pkg.plan.strategy,
+      skillLevel:    pkg.context.skillLevel,
+      detectedTopic: pkg.detectedTopic,
+      isWeakTopic,
+    }) + '\n\n');
+ 
+    // ── Capture tokens for memory update ─────────────────────
+    const captureWrite = (chunk: any): boolean => {
       try {
-        const tutorCtx = await buildTutorContext(userId, prompt, 'ask', undefined).catch(() => null);
-
-        if (tutorCtx?.systemPromptBlock) {
-          const skillNote = tutorCtx.skillLevel === 'beginner'
-            ? '\n\nEXPLANATION LEVEL: BEGINNER. Use simple language, real-world analogies, build from basics. Avoid jargon.'
-            : tutorCtx.skillLevel === 'advanced'
-            ? '\n\nEXPLANATION LEVEL: ADVANCED. Skip basics, go deep, include edge cases and best practices.'
-            : '\n\nEXPLANATION LEVEL: INTERMEDIATE. Balance theory with practical examples.';
-
-          const modeNote = subjectMode === 'math'
-            ? '\n\nMATH MODE: Show formula, substitution, every step, boxed final answer.'
-            : subjectMode === 'coding'
-            ? '\n\nCODING MODE: Complete runnable code, comment every line, show expected output.'
-            : subjectMode === 'science'
-            ? '\n\nSCIENCE MODE: State law/formula, substitute with units, give real example.'
-            : '';
-
-          const stepNote = stepByStep
-            ? '\n\nSTEP MODE: Break solution into numbered steps, show each calculation explicitly.'
-            : '';
-
-          // ── STAGE 5: Get fused AI context from Orchestrator ────
-          // Uses 5-min cache — near-zero latency overhead
-          // Fails silently — never breaks existing functionality
-          const fusedCtx    = await getFusedContextForAI(userId).catch(() => null);
-          const stage5Prefix = fusedCtx?.systemPromptPrefix ?? '';
-          // ───────────────────────────────────────────────────────
-
-          // Stage 5 context prepended before existing tutor context
-          systemPrompt = stage5Prefix + tutorCtx.systemPromptBlock + skillNote + modeNote + stepNote;
-
-          logger.info(
-            'Stream ctx: skill=' + tutorCtx.skillLevel +
-            ' mode=' + tutorCtx.learningMode +
-            ' stage5=' + (!!stage5Prefix) +
-            ' state=' + (fusedCtx?.currentState ?? 'none')
-          );
+        const str = typeof chunk === 'string' ? chunk : chunk.toString('utf8');
+        for (const line of str.split('\n')) {
+          if (line.startsWith('data: ')) {
+            const raw = line.slice(6).trim();
+            if (raw && raw !== '[DONE]') {
+              const parsed = JSON.parse(raw);
+              if (parsed.token) fullResponse += parsed.token;
+            }
+          }
         }
-      } catch (ctxErr: any) {
-        logger.warn('Stream context build failed, using default: ' + ctxErr.message);
-      }
+      } catch { /* ignore */ }
+      return res.write(chunk);
+    };
+ 
+    // Proxy the response to capture tokens while streaming
+    const proxyRes = new Proxy(res, {
+      get(target, prop) {
+        if (prop === 'write') return captureWrite;
+        const val = (target as any)[prop];
+        return typeof val === 'function' ? val.bind(target) : val;
+      },
+    });
+ 
+    // ── Stream with master system prompt ─────────────────────
+    await solveTextStreamWithContext(
+      pkg.userMessage,
+      pkg.history as ChatMessage[],
+      pkg.systemPrompt,
+      proxyRes as any,
+    );
+ 
+    // ── Post-stream: update conversation memory ───────────────
+    if (fullResponse && userId) {
+      afterResponse(userId, prompt, fullResponse, pkg.detectedTopic);
     }
-
-    if (systemPrompt) {
-      await solveTextStreamWithContext(prompt, safeHistory, systemPrompt, res);
-    } else {
-      await solveTextStream(prompt, safeHistory, subjectMode, res);
-    }
-
+ 
+    // ── Award points (non-blocking) ───────────────────────────
     if (userId) {
       handleQuestionUsed(req, String(prompt).substring(0, 100)).catch(() => {});
     }
+ 
   } catch (err: any) {
-    logger.error('Stream error: ' + err.message);
-    res.write('data: ' + JSON.stringify({ error: 'Stream failed. Please try again.' }) + '\n\n');
+    if (!res.writableEnded) {
+      logger.error('AskAI stream v6 error: ' + err.message);
+      res.write('data: ' + JSON.stringify({ error: 'Stream failed. Please try again.' }) + '\n\n');
+    }
   } finally {
-    res.end();
+    if (!res.writableEnded) res.end();
   }
 }
-
+ 
 // ─────────────────────────────────────────────────────────────
 // POST /api/ai/solve-pdf
 // ─────────────────────────────────────────────────────────────
 export async function solvePDF(req: Request, res: Response) {
   try {
     if (!req.file) return res.status(400).json({ success: false, answer: 'No file uploaded.' });
-
+ 
     const userPrompt = (req.body.prompt || '').trim();
     logger.info('/api/ai/solve-pdf  size=' + req.file.size + 'bytes');
-
+ 
     let extracted = '';
     try {
       extracted = await parsePDFText(req.file.buffer);
@@ -645,7 +669,7 @@ export async function solvePDF(req: Request, res: Response) {
     } catch (e: any) {
       logger.warn('PDF text extraction failed: ' + e.message);
     }
-
+ 
     if (extracted && extracted.trim().length >= 80) {
       logger.info('PDF: digital -> GROQ/OR');
       const MAX_CHARS = 12000;
@@ -656,11 +680,11 @@ export async function solvePDF(req: Request, res: Response) {
       } else {
         text = extracted;
       }
-
+ 
       const solvePrompt = userPrompt
         ? 'You are analyzing a PDF for a student.\n\n## PDF Content:\n' + text + '\n\n---\nStudent\'s request: "' + userPrompt + '"\n\nAnswer COMPLETELY. Be thorough with headings and step-by-step solutions. Indian exam style.'
         : 'Analyze this PDF completely for a student:\n\n## PDF Content:\n' + text + '\n\n---\n\n## 1. Summary\nClear summary of what this document covers.\n\n## 2. Questions and Solutions\nFind EVERY question or exercise. Solve each completely, step-by-step, numbered.\n\n## 3. Key Concepts\nList important concepts and formulas.\n\n## 4. Study Tips\nGive 3-4 specific study tips for this topic.';
-
+ 
       const answer     = await solveText(solvePrompt);
       const userAction = await handleQuestionUsed(req, userPrompt || 'PDF analysis');
       return res.json({
@@ -668,13 +692,13 @@ export async function solvePDF(req: Request, res: Response) {
         ...(userAction ? { questionsLeft: userAction.questionsLeft, pointsAwarded: userAction.pointsAwarded, nextRefillSecs: userAction.nextRefillSecs } : {}),
       });
     }
-
+ 
     logger.info('PDF: scanned -> Vision');
     const pdfDataUrl    = 'data:application/pdf;base64,' + req.file.buffer.toString('base64');
     const visionPrompt  = userPrompt
       ? 'Scanned PDF. Student asks: "' + userPrompt + '". Read every page, extract all text/equations/diagrams. Answer completely step-by-step. Indian exam style.'
       : 'Scanned PDF. Read and extract ALL visible text from every page. Identify EVERY question or problem. Solve each completely, step-by-step, numbered. Explain key concepts clearly.';
-
+ 
     const answer     = await solveWithVision(pdfDataUrl, visionPrompt);
     const userAction = await handleQuestionUsed(req, userPrompt || 'Scanned PDF analysis');
     return res.json({
@@ -686,7 +710,7 @@ export async function solvePDF(req: Request, res: Response) {
     res.status(500).json({ success: false, answer: 'Failed to process PDF. Please try again.' });
   }
 }
-
+ 
 // ─────────────────────────────────────────────────────────────
 // POST /api/ai/watch-ad
 // ─────────────────────────────────────────────────────────────
@@ -728,7 +752,7 @@ export async function watchAd(req: Request, res: Response) {
     return res.status(500).json({ success: false, message: 'Server error' });
   }
 }
-
+ 
 // ─────────────────────────────────────────────────────────────
 // GET /api/ai/quota
 // ─────────────────────────────────────────────────────────────
