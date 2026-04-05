@@ -1,15 +1,16 @@
 // ─────────────────────────────────────────────────────────────
-// AskAI — askAIService.ts  (v8 — Ultra-Powerful Teaching Partner)
+// AskAI — askAIService.ts  (v9 — DB-Aware Master Prompt Builder)
 //
-// ROUTE: server/src/services/askAI/askAIService.ts
+// What changed in v9:
+//   1. AskAIServiceInput now accepts:
+//        persistentWeakTopics?: string[]  ← from MongoDB (30-day)
+//        dbSessionSummary?:     string    ← from MongoDB sessions
+//   2. buildMasterPrompt merges RAM weak topics WITH DB weak topics
+//      → AI now knows LONG-TERM struggles, not just current session
+//   3. dbSessionSummary injected into context block
+//      → AI knows "you studied 3 sessions ago and struggled with X"
 //
-// What changed in v8:
-//   1. Section J: MANDATORY RESPONSE STRUCTURE added to system prompt
-//      → Forces AI to always return: Explanation → Example → Summary → "Quick check:"
-//   2. detectEmotionalState() — new export function
-//      → Detects correct / confused / frustrated / motivated from user message
-//      → Used by aiController to emit emotionalState via SSE
-//   3. turnCount added to ResponsePlan return (for emotional state detection)
+// Everything else unchanged from v8.
 // ─────────────────────────────────────────────────────────────
 
 import {
@@ -70,6 +71,9 @@ export interface AskAIServiceInput {
   subjectMode: string;
   stepByStep:  boolean;
   history?:    { role: 'user' | 'assistant'; content: string }[];
+  // ← v9: persistent data from MongoDB
+  persistentWeakTopics?: string[];
+  dbSessionSummary?:     string;
 }
 
 export interface AskAIPromptPackage {
@@ -89,14 +93,21 @@ export async function buildMasterPrompt(
   input: AskAIServiceInput,
 ): Promise<AskAIPromptPackage> {
 
-  const { userId, message, subjectMode, stepByStep } = input;
+  const {
+    userId,
+    message,
+    subjectMode,
+    stepByStep,
+    persistentWeakTopics = [],
+    dbSessionSummary     = '',
+  } = input;
 
-  // ── Step 1: Memory ──────────────────────────────────────
+  // ── Step 1: RAM Memory ──────────────────────────────────────
   const memory        = getOrCreateMemory(userId);
-  const mistakeTopics = getMistakeTopics(userId);
+  const ramMistakes   = getMistakeTopics(userId);
   const memHistory    = getRecentHistory(userId, 10);
 
-  // ── Step 2: Rich context from all systems ──────────────
+  // ── Step 2: Rich context from AI Brain ─────────────────────
   let context: EnhancedContext;
   try {
     context = await buildEnhancedContext(userId, message);
@@ -104,7 +115,7 @@ export async function buildMasterPrompt(
     const fallbackLevel = detectSkillLevelFromMessage(message);
     context = {
       skillLevel:     fallbackLevel,
-      weakTopics:     mistakeTopics,
+      weakTopics:     ramMistakes,
       strongTopics:   [],
       currentGoal:    '',
       learningState:  'unknown',
@@ -115,47 +126,60 @@ export async function buildMasterPrompt(
   }
 
   const skillLevel: SkillLevel = context.skillLevel ?? detectSkillLevelFromMessage(message);
-  const allWeakTopics = [...new Set([...context.weakTopics, ...mistakeTopics])];
 
-  // ── Step 3: Response Planning ───────────────────────────
+  // ── v9: Merge ALL weak topic sources ──────────────────────
+  // Priority: DB persistent > AI Brain > RAM session
+  const allWeakTopics = [
+    ...new Set([
+      ...persistentWeakTopics,     // ← from MongoDB (30-day history)
+      ...context.weakTopics,        // ← from AI Brain orchestrator
+      ...ramMistakes,               // ← from current RAM session
+    ])
+  ].slice(0, 10);  // cap at 10 to keep prompt clean
+
+  // ── Step 3: Response Planning ───────────────────────────────
   const plan = buildResponsePlan(
     message,
     skillLevel,
     allWeakTopics,
     memory.turnCount,
   );
-  // Attach turnCount to plan so controller can use it
   plan.turnCount = memory.turnCount;
 
   if (stepByStep && plan.strategy !== 'QUIZ') {
     plan.strategy = 'STEP_BY_STEP';
   }
 
-  // ── Step 4: Model Routing ───────────────────────────────
+  // ── Step 4: Model Routing ───────────────────────────────────
   const modelConfig = routeToModel(
     plan.intent,
     subjectMode,
     skillLevel,
     message.length,
+    'text',  // ← stream endpoint is always text
   );
 
-  // ── Step 5: Topic Detection ─────────────────────────────
+  // ── Step 5: Topic Detection ─────────────────────────────────
   const detectedTopic = detectTopic(message, subjectMode);
 
-  // ── Step 6: Personality ─────────────────────────────────
-  const personality = inferPersonality(message);
-  const isFirstTurn = memory.turnCount === 0;
+  // ── Step 6: Personality ─────────────────────────────────────
+  const personality  = inferPersonality(message);
+  const isFirstTurn  = memory.turnCount === 0;
 
-  // ── Step 7: Build Master System Prompt ─────────────────
+  // ── Step 7: Build Master System Prompt ─────────────────────
   const sections: string[] = [
 
-    // A) PERSONALITY BLOCK (who the AI is)
+    // A) PERSONALITY BLOCK
     buildPersonalityBlock(personality),
 
-    // B) CONTEXT BLOCK (who the student is)
+    // B) CONTEXT BLOCK (AI Brain data)
     context.contextBlock,
 
-    // C) INSTRUCTION LAYER
+    // C) v9: DB SESSION HISTORY BLOCK ← NEW
+    // Only injected if we have real cross-session data from DB
+    dbSessionSummary ? `\n=== STUDENT'S LEARNING HISTORY (from past sessions) ===\n${dbSessionSummary}\nUSE THIS: Reference past struggles naturally. E.g., "Since you've been working on recursion, let's connect this concept..."` : '',
+
+    // D) INSTRUCTION LAYER
     '\n=== HOW TO RESPOND ===',
     'Before answering, internally:',
     '1. Check the student\'s level and learning state',
@@ -163,22 +187,22 @@ export async function buildMasterPrompt(
     '3. Decide explanation depth based on skill level',
     '4. Think step by step before giving the final answer',
 
-    // D) DIFFICULTY ADAPTER
+    // E) DIFFICULTY ADAPTER
     '\n' + buildDifficultyInstruction(skillLevel),
     getResponseStyleNote(skillLevel, allWeakTopics.length > 0),
 
-    // E) TEACHING MODE
+    // F) TEACHING MODE
     buildTeachingInstruction(plan.strategy),
 
-    // F) FOLLOW-UP + CONFIDENCE + CORRECTION
+    // G) FOLLOW-UP + CONFIDENCE + CORRECTION
     buildFollowUpInstruction(plan.followUpQuestion, detectedTopic ?? undefined),
     buildConfidenceBoost(plan.boostConfidence, isFirstTurn),
     buildCorrectionInstruction(plan.correctGently),
 
-    // G) PERSONALITY POST-PROCESS
+    // H) PERSONALITY POST-PROCESS
     getPersonalityPostProcessNote(personality, isFirstTurn, plan.correctGently),
 
-    // H) SUBJECT MODE
+    // I) SUBJECT MODE
     subjectMode === 'math'
       ? '\nMATH: Show formula → substitution → every step → boxed final answer.'
       : subjectMode === 'coding'
@@ -187,12 +211,10 @@ export async function buildMasterPrompt(
       ? '\nSCIENCE: State law/principle → formula with units → worked example.'
       : '',
 
-    // I) MODEL note
+    // J) MODEL NOTE
     '\n' + getModelNote(modelConfig),
 
-    // J) MANDATORY RESPONSE STRUCTURE ← THE KILLER FEATURE
-    // This is what transforms AskAI from "answer machine" → "teaching partner"
-    // Skipped only for QUIZ and SHORT strategies (they have their own format)
+    // K) MANDATORY RESPONSE STRUCTURE ← THE KILLER FEATURE
     plan.strategy !== 'QUIZ' && plan.strategy !== 'SHORT' ? `
 
 === MANDATORY RESPONSE STRUCTURE (follow this EVERY single time) ===
@@ -233,17 +255,21 @@ ABSOLUTE RULES:
 
   const systemPrompt = sections.filter(Boolean).join('\n');
 
-  const history = memHistory.length > 0
+  // Use DB history if provided (longer context), else RAM history
+  const history = input.history && input.history.length > 0
+    ? input.history.slice(-20)   // DB history can be 20 messages
+    : memHistory.length > 0
     ? memHistory
-    : (input.history || []).slice(-10);
+    : [];
 
   logger.info(
-    'AskAI v8 prompt | intent=' + plan.intent +
-    ' strategy=' + plan.strategy +
-    ' skill=' + skillLevel +
-    ' model=' + modelConfig.modelId +
-    ' weakTopics=' + allWeakTopics.length +
-    ' turn=' + memory.turnCount
+    'AskAI v9 prompt | intent='    + plan.intent +
+    ' strategy='  + plan.strategy +
+    ' skill='     + skillLevel +
+    ' model='     + modelConfig.modelId +
+    ' weakTopics(db)='  + persistentWeakTopics.length +
+    ' weakTopics(ram)=' + ramMistakes.length +
+    ' turn='      + memory.turnCount
   );
 
   return { systemPrompt, history, userMessage: message, modelConfig, plan, context, detectedTopic };
@@ -253,10 +279,10 @@ ABSOLUTE RULES:
 // validateAndLog
 // ─────────────────────────────────────────────────────────────
 export function validateAndLog(
-  aiResponse:  string,
-  intent:      string,
-  userPrompt:  string,
-  userId:      string,
+  aiResponse: string,
+  intent:     string,
+  userPrompt: string,
+  userId:     string,
 ): ValidationResult {
   const result = validateResponse(aiResponse, intent, userPrompt);
 
@@ -276,10 +302,7 @@ export function validateAndLog(
 }
 
 // ─────────────────────────────────────────────────────────────
-// detectEmotionalState  ← NEW in v8
-// Detects the student's emotional state from their message.
-// The aiController emits this via SSE → frontend shows toast.
-// Covers English + Hindi + Hinglish patterns.
+// detectEmotionalState  (unchanged from v8)
 // ─────────────────────────────────────────────────────────────
 export function detectEmotionalState(
   userMessage: string,
@@ -287,165 +310,50 @@ export function detectEmotionalState(
 ): 'correct' | 'confused' | 'frustrated' | 'motivated' | 'neutral' {
   const msg = userMessage.toLowerCase().trim();
 
-  // ── Correct / mastery signals ──────────────────────────
   if (/\b(got it|makes sense|i understand|clear hai|samajh gaya|samajh gayi|oh i see|that makes sense|i get it|achha|accha|ohh|ahhh|right right|yes exactly|bilkul|haan samajh|ab samajh|got this)\b/.test(msg)) {
     return 'correct';
   }
 
-  // ── Confusion signals ──────────────────────────────────
   if (/\b(don'?t understand|confused|not clear|samajh nahi|kya matlab|phir se|not getting|what do you mean|explain again|dubara|didn'?t get|unclear|ye kya hai|yeh kya|pata nahi|nahi pata|kuch nahi samajha)\b/.test(msg)) {
     return 'confused';
   }
 
-  // ── Frustration signals ────────────────────────────────
   if (/\b(why is this so|this is hard|too difficult|giving up|i can'?t|can'?t do this|impossible|ugh|argh|frustrat|bahut mushkil|nahi ho raha|nahi samajh|ye toh bahut|yaar kuch nahi|pakka nahi hoga)\b/.test(msg)) {
     return 'frustrated';
   }
 
-  // ── Motivated / excited signals ────────────────────────
   if (/\b(amazing|awesome|great|love this|this is cool|interesting|wow|wah|mast|bahut accha|nice|let'?s go|let me try|i want to|and then|what about|tell me more|aur batao|aage batao|next)\b/.test(msg)) {
     return 'motivated';
   }
 
-  // First turn — no feedback needed yet
   if (turnCount === 0) return 'neutral';
 
   return 'neutral';
 }
 
 // ─────────────────────────────────────────────────────────────
-// afterResponse
+// afterResponse  (unchanged — still updates RAM memory)
+// DB persistence is handled separately in aiController.ts
 // ─────────────────────────────────────────────────────────────
 export function afterResponse(
-  userId:       string,
-  userMessage:  string,
-  aiResponse:   string,
-  topic?:       string | null,
+  userId:      string,
+  userMessage: string,
+  aiResponse:  string,
+  topic?:      string | null,
 ): void {
   try {
     addMessage(userId, 'user',      userMessage, topic ?? undefined);
     addMessage(userId, 'assistant', aiResponse,  topic ?? undefined);
   } catch (e: any) {
-    logger.warn('afterResponse memory update failed: ' + e.message);
+    logger.warn('afterResponse RAM update failed: ' + e.message);
   }
 
-  if (userId && topic) {
-    persistLearningData(userId, userMessage, topic).catch((e: any) => {
-      logger.warn('afterResponse DB persist failed (non-blocking): ' + e.message);
-    });
-  }
+  // DB persistence is now in aiController.ts (persistAIMessage)
+  // No DB call here — separation of concerns
 }
 
 // ─────────────────────────────────────────────────────────────
-// persistLearningData  (PRIVATE)
-// ─────────────────────────────────────────────────────────────
-async function persistLearningData(
-  userId:       string,
-  userMessage:  string,
-  topic:        string,
-): Promise<void> {
-  try {
-    const { StudentProfile } = await import('../../models/StudentProfile.model.js');
-
-    const now         = new Date();
-    const todayStr    = now.toISOString().split('T')[0];
-    const isConfusion = /don'?t understand|confused|not clear|samajh nahi|kya matlab|phir se|not getting/i.test(userMessage);
-    const isMastery   = /got it|makes sense|understand now|clear hai|samajh gaya|samajh gayi/i.test(userMessage);
-
-    const profile = await StudentProfile.findOne({ userId }).select('topicMastery dailyLogs recentMistakes').lean() as any;
-    if (!profile) return;
-
-    const existingIdx = (profile.topicMastery || []).findIndex(
-      (t: any) => t.topic?.toLowerCase() === topic.toLowerCase()
-    );
-
-    if (existingIdx >= 0) {
-      const updateKey = `topicMastery.${existingIdx}`;
-      await StudentProfile.updateOne(
-        { userId },
-        {
-          $inc: {
-            [`${updateKey}.totalAttempts`]:   1,
-            [`${updateKey}.correctAttempts`]: isMastery ? 1 : 0,
-          },
-          $set: {
-            [`${updateKey}.lastAttemptedAt`]: now,
-            [`${updateKey}.trend`]: isConfusion ? 'declining' : isMastery ? 'improving' : 'stable',
-          },
-        }
-      );
-    } else {
-      await StudentProfile.updateOne(
-        { userId },
-        {
-          $push: {
-            topicMastery: {
-              topic,
-              subject:         detectSubject(topic),
-              category:        'self',
-              masteryLevel:    isMastery ? 30 : 10,
-              correctAttempts: isMastery ? 1 : 0,
-              totalAttempts:   1,
-              lastAttemptedAt: now,
-              isWeak:          true,
-              isStrong:        false,
-              trend:           isConfusion ? 'declining' : isMastery ? 'improving' : 'stable',
-            },
-          },
-        }
-      );
-    }
-
-    if (isConfusion) {
-      await StudentProfile.updateOne(
-        { userId },
-        {
-          $push: {
-            recentMistakes: {
-              $each:  [topic],
-              $slice: -10,
-            },
-          },
-        }
-      );
-    }
-
-    const todayLogIdx = (profile.dailyLogs || []).findIndex((d: any) => d.date === todayStr);
-    if (todayLogIdx >= 0) {
-      await StudentProfile.updateOne(
-        { userId },
-        { $inc: { [`dailyLogs.${todayLogIdx}.questionsAsked`]: 1 } }
-      );
-    } else {
-      await StudentProfile.updateOne(
-        { userId },
-        {
-          $push: {
-            dailyLogs: {
-              $each: [{
-                date:                    todayStr,
-                minutesStudied:          0,
-                questionsAsked:          1,
-                quizzesCompleted:        0,
-                codingSectionsCompleted: 0,
-                xpEarned:                0,
-                topicsCovered:           [topic],
-              }],
-              $slice: -90,
-            },
-          },
-        }
-      );
-    }
-
-    logger.info(`[AskAI] Persisted learning | ${userId.slice(-6)} | topic: ${topic} | confusion: ${isConfusion}`);
-  } catch (err: any) {
-    throw new Error(`persistLearningData: ${err.message}`);
-  }
-}
-
-// ─────────────────────────────────────────────────────────────
-// detectTopic
+// detectTopic  (unchanged)
 // ─────────────────────────────────────────────────────────────
 export function detectTopic(message: string, subjectMode: string): string | null {
   const lower = message.toLowerCase();
@@ -479,9 +387,6 @@ export function detectTopic(message: string, subjectMode: string): string | null
   return null;
 }
 
-// ─────────────────────────────────────────────────────────────
-// detectSubject
-// ─────────────────────────────────────────────────────────────
 function detectSubject(topic: string): string {
   const t = topic.toLowerCase();
   if (['loops', 'arrays', 'functions', 'recursion', 'oop', 'sorting', 'pointers'].includes(t)) return 'Programming';
