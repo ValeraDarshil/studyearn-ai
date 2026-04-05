@@ -496,6 +496,14 @@ export function AskAI() {
   // ─────────────────────────────────────────────────────────
   async function loadConversation(id: string) {
     setActiveId(id); convoIdRef.current = id; setSidebarOpen(false);
+    // ── v9 FIX: Server-side RAM memory reset karo ──────────────
+    // Jab user kisi purani chat pe click karta hai, server ke RAM mein
+    // galat session hota hai. Yeh call us session ko clear karta hai.
+    fetch(`${API_URL}/api/ai/reset-session`, {
+      method:  "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body:    JSON.stringify({ convoId: id }),
+    }).catch(() => {});
     try {
       const res  = await fetch(`${API_URL}/api/chat/${id}`, { headers: authHeaders() });
       const data = await res.json();
@@ -627,10 +635,14 @@ export function AskAI() {
     setWatchingAd(false); setAdCountdown(0);
   };
 
+  // ── v9 FIX: Full history bhejo — last 20 messages ──────────
+  // Pehle sirf 10 messages aur images/files filter hoti thi.
+  // Ab poori chat history (last 20) bhejte hain taaki AI ko
+  // purani chat ka pura context mile jab user continue kare.
   const buildHistory = () =>
     messages
       .filter(m => !m.isError && !m.imagePreview && !m.fileName)
-      .slice(-10)
+      .slice(-20)
       .map(m => ({ role: m.role as "user" | "assistant", content: m.content }));
 
   // ─────────────────────────────────────────────────────────

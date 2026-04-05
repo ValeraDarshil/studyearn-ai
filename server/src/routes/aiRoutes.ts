@@ -58,16 +58,17 @@
 
 
 // ─────────────────────────────────────────────────────────────
-// StudyEarn AI — AI Routes  (Fix #1: streaming route added)
+// StudyEarn AI — AI Routes  (v9 — reset-session added)
 // ─────────────────────────────────────────────────────────────
 import { Router } from 'express';
 import multer    from 'multer';
 import {
   askAI,
-  askAIStream,          // ← NEW: SSE streaming controller
+  askAIStream,
   solvePDF,
   watchAd,
   getQuota,
+  resetSession,          // ← v9 NEW: chat switch memory fix
 } from '../controllers/aiController.js';
 import { aiAskLimiter, pdfSolveLimiter } from '../middleware/rateLimiter.js';
 import { validateAskAI }                  from '../middleware/validate.js';
@@ -79,19 +80,21 @@ const upload = multer({
   limits: { fileSize: 25 * 1024 * 1024 },
 });
 
-// ── Text / image question (non-streaming — still used for image+PDF) ──
-router.post('/ask',        authenticate, aiAskLimiter, validateAskAI, askAI);
+// ── Text / image question (non-streaming — image+PDF use this) ─
+router.post('/ask',           authenticate, aiAskLimiter, validateAskAI, askAI);
 
-// ── SSE Streaming endpoint ─────────────────────────────────────────────
-// Frontend connects here for text-only questions → tokens arrive word-by-word
-// Image / PDF questions still go to /ask (vision doesn't support streaming yet)
-router.post('/ask-stream', authenticate, aiAskLimiter, askAIStream);   // ← NEW
+// ── SSE Streaming (text questions) ────────────────────────────
+router.post('/ask-stream',    authenticate, aiAskLimiter, askAIStream);
 
-// ── PDF solve ─────────────────────────────────────────────────────────
-router.post('/solve-pdf',  authenticate, pdfSolveLimiter, upload.single('file'), solvePDF);
+// ── PDF solve ─────────────────────────────────────────────────
+router.post('/solve-pdf',     authenticate, pdfSolveLimiter, upload.single('file'), solvePDF);
 
-// ── Quota & ads ───────────────────────────────────────────────────────
-router.post('/watch-ad',   authenticate, watchAd);
-router.get('/quota',       authenticate, getQuota);
+// ── Quota & ads ───────────────────────────────────────────────
+router.post('/watch-ad',      authenticate, watchAd);
+router.get('/quota',          authenticate, getQuota);
+
+// ── v9: Chat switch — RAM memory reset ────────────────────────
+// Called by frontend when user clicks a different chat in sidebar
+router.post('/reset-session', authenticate, resetSession);
 
 export default router;

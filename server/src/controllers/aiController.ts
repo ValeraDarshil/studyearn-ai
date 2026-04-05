@@ -641,3 +641,33 @@ export async function getQuota(req: Request, res: Response) {
     return res.status(500).json({ success: false });
   }
 }
+
+// ─────────────────────────────────────────────────────────────
+// POST /api/ai/reset-session
+// ── v9 FIX: Chat Switch Memory Reset ─────────────────────────
+//
+// Problem: Jab user purani chat open karta hai aur question
+// puchta hai, server RAM mein ek alag (wrong) session hota hai.
+// Uska context current chat se match nahi karta.
+// Yeh endpoint us RAM session ko clear karta hai.
+//
+// Frontend is endpoint ko tab call karta hai jab user
+// sidebar se kisi aur chat pe click karta hai.
+// ─────────────────────────────────────────────────────────────
+export async function resetSession(req: Request, res: Response) {
+  const userId = getUserIdFromToken(req);
+  if (!userId) return res.status(401).json({ success: false });
+
+  try {
+    // RAM memory clear karo is user ke liye
+    const { clearSession } = await import('../services/askAI/conversationMemoryEngine.js');
+    clearSession(userId);
+
+    logger.info(`[AskAI] Session RAM cleared | userId=${userId.slice(-6)} | convoId=${req.body.convoId || 'none'}`);
+
+    return res.json({ success: true });
+  } catch (err: any) {
+    logger.error('resetSession error: ' + err.message);
+    return res.status(500).json({ success: false });
+  }
+}
