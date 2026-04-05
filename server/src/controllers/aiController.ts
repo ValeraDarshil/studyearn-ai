@@ -48,17 +48,15 @@ import { logger }              from '../utils/logger.js';
 
 import {
   buildMasterPrompt,
-  afterResponse,
   validateAndLog,
   detectEmotionalState,
 }                              from '../services/askAI/askAIService.js';
 
 // ── v9: DB persistence layer ──────────────────────────────────
 import {
-  createOrGetSession,
+  getOrCreateAskAISession,
   persistUserMessage,
   persistAIMessage,
-  loadSessionHistory,
   getWeakTopicsFromDB,
   getSessionSummaryForPrompt,
 }                              from '../services/askAI/askAIDbService.js';
@@ -255,7 +253,7 @@ export async function askAI(req: Request, res: Response) {
     if (userId) {
       (async () => {
         try {
-          const sessionId = await createOrGetSession(userId, convoId || null);
+          const sessionId = await getOrCreateAskAISession(userId, convoId || null);
           await persistUserMessage(
             sessionId, userId,
             String(prompt || '').slice(0, 2000),
@@ -308,10 +306,10 @@ export async function askAI(req: Request, res: Response) {
 export async function askAIStream(req: Request, res: Response): Promise<void> {
   const {
     prompt,
-    history      = [],
+    history      = [],   // ← Frontend se aata hai — CORRECT chat ki history
     subjectMode  = 'auto',
     stepByStep   = false,
-    convoId      = null,   // ← v9: frontend sends this
+    convoId      = null,
   } = req.body;
 
   const userId  = getUserIdFromToken(req) ?? '';
@@ -322,7 +320,6 @@ export async function askAIStream(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  // ── SSE headers ─────────────────────────────────────────────
   res.setHeader('Content-Type',      'text/event-stream');
   res.setHeader('Cache-Control',     'no-cache');
   res.setHeader('Connection',        'keep-alive');
@@ -333,81 +330,73 @@ export async function askAIStream(req: Request, res: Response): Promise<void> {
   let sessionId    = '';
 
   try {
-
-    // ── v9 Step 0: Get/create DB session + load cross-session history ──
-    let dbHistory: { role: 'user' | 'assistant'; content: string }[] = [];
-    let dbWeakTopics: string[] = [];
+    // ── v10 CRITICAL FIX: DB se history LOAD NAHI karte ────────
+    // Pehle loadSessionHistory(userId) se saari chats ki history
+    // merge hoti thi — Newton chat mein Photosynthesis context
+    // inject ho jaata tha. Ab sirf frontend ki history use karo.
+    //
+    // Frontend ka `history` array = screen pe jo messages dikh
+    // rahe hain = current chat ke messages = ALWAYS CORRECT.
+    let dbWeakTopics:    string[] = [];
     let dbSessionSummary = '';
 
     if (userId) {
       try {
-        sessionId        = await createOrGetSession(userId, convoId);
-        dbHistory        = await loadSessionHistory(userId, 20);
+        sessionId        = await getOrCreateAskAISession(userId, convoId);
         dbWeakTopics     = await getWeakTopicsFromDB(userId);
         dbSessionSummary = await getSessionSummaryForPrompt(userId);
       } catch (e: any) {
-        logger.warn('[AskAI DB] Pre-stream DB ops failed (continuing): ' + e.message);
+        logger.warn('[AskAI DB] Pre-stream setup failed (continuing): ' + e.message);
       }
     }
 
-    // ── Step 1–7: Build master prompt ───────────────────────────
-    // Use DB history if available, else fall back to req.body history
-    const contextHistory = dbHistory.length > 0
-      ? dbHistory
-      : (Array.isArray(history) ? history : []);
+    // ── Frontend history = current chat ka context ──────────────
+    const contextHistory = (Array.isArray(history) ? history : [])
+      .filter((m: any) => m.role && m.content && typeof m.content === 'string')
+      .slice(-20);
 
+    // ── Build master prompt ─────────────────────────────────────
     const pkg = await buildMasterPrompt({
       userId,
-      message:    prompt,
+      message:              prompt,
       subjectMode,
-      stepByStep: !!stepByStep,
-      history:    contextHistory,
-      // ← v9: inject persistent weak topics into context
+      stepByStep:           !!stepByStep,
+      history:              contextHistory,
       persistentWeakTopics: dbWeakTopics,
       dbSessionSummary,
     });
 
-    // Detect emotional state
     const emotionalState = detectEmotionalState(prompt, pkg.plan.turnCount ?? 0);
 
     logger.info(
-      'AskAI stream v9 | intent='   + pkg.plan.intent   +
-      ' strategy='  + pkg.plan.strategy +
-      ' skill='     + pkg.context.skillLevel +
-      ' model='     + pkg.modelConfig.modelId +
-      ' sessionId=' + (sessionId ? sessionId.slice(-6) : 'none') +
-      ' userId='    + (userId    ? userId.slice(-6)    : 'anon')
+      'AskAI v10 | intent='  + pkg.plan.intent +
+      ' skill='   + pkg.context.skillLevel +
+      ' model='   + pkg.modelConfig.modelId +
+      ' convoId=' + (convoId ? convoId.slice(-6) : 'new') +
+      ' history=' + contextHistory.length + 'msgs'
     );
 
-    // ── v9: Persist user message to DB before streaming ────────
+    // ── Persist user message (background) ──────────────────────
     if (userId && sessionId) {
       persistUserMessage(
-        sessionId, userId,
-        prompt,
-        pkg.detectedTopic,
-        emotionalState,
-        'text',
-      ).catch(e => logger.warn('[AskAI DB] user msg persist failed: ' + e.message));
+        sessionId, userId, prompt,
+        pkg.detectedTopic, emotionalState, 'text',
+      ).catch(() => {});
     }
 
-    // ── Emit metadata SSE event (intent + emotional state) ─────
+    // ── Emit metadata SSE ───────────────────────────────────────
     const isWeakTopic = pkg.detectedTopic
       ? pkg.context.weakTopics.includes(pkg.detectedTopic) ||
-        dbWeakTopics.includes(pkg.detectedTopic)           // ← check DB weak topics too
+        dbWeakTopics.includes(pkg.detectedTopic)
       : false;
 
     res.write('data: ' + JSON.stringify({
-      intent:        pkg.plan.intent,
-      strategy:      pkg.plan.strategy,
-      skillLevel:    pkg.context.skillLevel,
-      detectedTopic: pkg.detectedTopic,
-      isWeakTopic,
-      emotionalState,
-      // ← v9: let frontend know which provider is being used
-      provider: 'groq',  // always starts with groq
+      intent: pkg.plan.intent, strategy: pkg.plan.strategy,
+      skillLevel: pkg.context.skillLevel, detectedTopic: pkg.detectedTopic,
+      isWeakTopic, emotionalState, provider: 'groq',
     }) + '\n\n');
 
-    // ── Capture tokens while streaming ─────────────────────────
+    // ── Capture tokens ──────────────────────────────────────────
     const captureWrite = (chunk: any) => {
       try {
         const str = typeof chunk === 'string' ? chunk : chunk.toString('utf8');
@@ -417,7 +406,6 @@ export async function askAIStream(req: Request, res: Response): Promise<void> {
             if (raw && raw !== '[DONE]') {
               const parsed = JSON.parse(raw);
               if (parsed.token) fullResponse += parsed.token;
-              // ← v9: capture which provider actually responded
             }
           }
         }
@@ -433,60 +421,34 @@ export async function askAIStream(req: Request, res: Response): Promise<void> {
       },
     });
 
-    // ── Stream: GROQ first, OpenRouter fallback ─────────────────
-    // solveTextStreamWithContext() in aiService.ts handles this:
-    //   1. groqStream()       ← primary (GROQ)
-    //   2. openRouterStream() ← fallback (if GROQ fails)
-    // No changes needed here — the priority is already correct.
+    // ── Stream: GROQ → OpenRouter fallback ─────────────────────
     await solveTextStreamWithContext(
-      pkg.userMessage,
-      pkg.history,
-      pkg.systemPrompt,
-      proxyRes as any,
+      pkg.userMessage, pkg.history, pkg.systemPrompt, proxyRes as any,
     );
 
     const responseMs = Date.now() - startMs;
 
-    // ── Post-stream: validate + RAM memory update ───────────────
+    // ── Post-stream: validate + DB persist ──────────────────────
     if (fullResponse && userId) {
       validateAndLog(fullResponse, pkg.plan.intent, prompt, userId);
-      afterResponse(userId, prompt, fullResponse, pkg.detectedTopic);
     }
 
-    // ── v9: Persist AI response to DB ──────────────────────────
     if (fullResponse && userId && sessionId) {
       persistAIMessage(
-        sessionId, userId,
-        fullResponse,
-        pkg.plan.intent,
-        pkg.plan.strategy,
-        pkg.context.skillLevel,
-        pkg.modelConfig.modelId,
-        pkg.modelConfig.provider,
-        'text',
-        0,           // points calculated separately below
-        responseMs,
-      ).catch(e => logger.warn('[AskAI DB] AI msg persist failed: ' + e.message));
+        sessionId, userId, fullResponse,
+        pkg.plan.intent, pkg.plan.strategy, pkg.context.skillLevel,
+        pkg.modelConfig.modelId, pkg.modelConfig.provider,
+        'text', 0, responseMs,
+      ).catch(() => {});
     }
 
-    // ── Award points ────────────────────────────────────────────
     if (userId) {
-      handleQuestionUsed(req, String(prompt).substring(0, 100))
-        .then(result => {
-          if (result && sessionId) {
-            // Update points on the last assistant message in DB
-            persistAIMessage(
-              sessionId, userId, '', null, null, null, null, null,
-              'text', result.pointsAwarded, null,
-            ).catch(() => {});
-          }
-        })
-        .catch(() => {});
+      handleQuestionUsed(req, String(prompt).substring(0, 100)).catch(() => {});
     }
 
   } catch (err: any) {
     if (!res.writableEnded) {
-      logger.error('AskAI stream v9 error: ' + err.message);
+      logger.error('AskAI v10 error: ' + err.message);
       res.write('data: ' + JSON.stringify({ error: 'Stream failed. Please try again.' }) + '\n\n');
     }
   } finally {
@@ -494,12 +456,6 @@ export async function askAIStream(req: Request, res: Response): Promise<void> {
   }
 }
 
-// ─────────────────────────────────────────────────────────────
-// POST /api/ai/solve-pdf
-// PDF Path: extract text → solve (or vision if scanned)
-// ROUTING: Already uses solveWithVision → NVIDIA first (correct)
-// v9: DB persist added
-// ─────────────────────────────────────────────────────────────
 export async function solvePDF(req: Request, res: Response) {
   try {
     if (!req.file)
@@ -534,7 +490,7 @@ export async function solvePDF(req: Request, res: Response) {
     if (userId) {
       (async () => {
         try {
-          const sessionId = await createOrGetSession(userId, null);
+          const sessionId = await getOrCreateAskAISession(userId, null);
           await persistUserMessage(
             sessionId, userId,
             prompt || `[PDF: ${req.file!.originalname}]`,

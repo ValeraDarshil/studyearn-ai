@@ -65,20 +65,7 @@ export function getOrCreateMemory(userId: string): ConversationMemory {
       turnCount:       0,
     };
     memoryStore.set(userId, fresh);
-    // DB se history load karo (background mein — non-blocking)
-import('../../services/askAI/askAIDbService.js')
-  .then(({ loadSessionHistory }) => loadSessionHistory(userId, 10))
-  .then(dbMsgs => {
-    const mem = memoryStore.get(userId);
-    if (mem && dbMsgs.length > 0 && mem.sessionMessages.length === 0) {
-      mem.sessionMessages = dbMsgs.map(m => ({
-        role:      m.role,
-        content:   m.content,
-        timestamp: Date.now(),
-      }));
-    }
-  })
-  .catch(() => {}); // silent fail — RAM fallback already works
+    // v10: DB history load removed — frontend sends correct chat history
     return fresh;
   }
 

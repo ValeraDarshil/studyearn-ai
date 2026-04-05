@@ -13,12 +13,9 @@
 // Everything else unchanged from v8.
 // ─────────────────────────────────────────────────────────────
 
-import {
-  getOrCreateMemory,
-  addMessage,
-  getRecentHistory,
-  getMistakeTopics,
-} from './conversationMemoryEngine.js';
+// v10: RAM memory engine removed — sirf DB use hota hai
+// conversationMemoryEngine ab sirf afterResponse ke liye hai (addMessage)
+import { addMessage } from './conversationMemoryEngine.js';
 
 import {
   buildResponsePlan,
@@ -102,10 +99,9 @@ export async function buildMasterPrompt(
     dbSessionSummary     = '',
   } = input;
 
-  // ── Step 1: RAM Memory ──────────────────────────────────────
-  const memory        = getOrCreateMemory(userId);
-  const ramMistakes   = getMistakeTopics(userId);
-  const memHistory    = getRecentHistory(userId, 10);
+  // ── v10: RAM Memory REMOVED ─────────────────────────────────
+  // Frontend history = correct chat. DB weak topics = persistent data.
+  const ramMistakes: string[] = [];
 
   // ── Step 2: Rich context from AI Brain ─────────────────────
   let context: EnhancedContext;
@@ -129,22 +125,22 @@ export async function buildMasterPrompt(
 
   // ── v9: Merge ALL weak topic sources ──────────────────────
   // Priority: DB persistent > AI Brain > RAM session
+  // v10: RAM topics removed — only DB + AI Brain
   const allWeakTopics = [
     ...new Set([
-      ...persistentWeakTopics,     // ← from MongoDB (30-day history)
-      ...context.weakTopics,        // ← from AI Brain orchestrator
-      ...ramMistakes,               // ← from current RAM session
+      ...persistentWeakTopics,   // from MongoDB (30-day)
+      ...context.weakTopics,     // from AI Brain orchestrator
     ])
-  ].slice(0, 10);  // cap at 10 to keep prompt clean
+  ].slice(0, 10);
 
   // ── Step 3: Response Planning ───────────────────────────────
   const plan = buildResponsePlan(
     message,
     skillLevel,
     allWeakTopics,
-    memory.turnCount,
+    0,  // v10: turnCount from frontend history length
   );
-  plan.turnCount = memory.turnCount;
+  plan.turnCount = input.history?.length ?? 0;
 
   if (stepByStep && plan.strategy !== 'QUIZ') {
     plan.strategy = 'STEP_BY_STEP';
@@ -164,7 +160,7 @@ export async function buildMasterPrompt(
 
   // ── Step 6: Personality ─────────────────────────────────────
   const personality  = inferPersonality(message);
-  const isFirstTurn  = memory.turnCount === 0;
+  const isFirstTurn  = (input.history?.length ?? 0) === 0;
 
   // ── Step 7: Build Master System Prompt ─────────────────────
   const sections: string[] = [
@@ -255,21 +251,16 @@ ABSOLUTE RULES:
 
   const systemPrompt = sections.filter(Boolean).join('\n');
 
-  // Use DB history if provided (longer context), else RAM history
-  const history = input.history && input.history.length > 0
-    ? input.history.slice(-20)   // DB history can be 20 messages
-    : memHistory.length > 0
-    ? memHistory
-    : [];
+  // v10: Frontend history ONLY — already filtered & correct chat
+  const history = (input.history ?? []).slice(-20);
 
   logger.info(
-    'AskAI v9 prompt | intent='    + plan.intent +
-    ' strategy='  + plan.strategy +
-    ' skill='     + skillLevel +
-    ' model='     + modelConfig.modelId +
-    ' weakTopics(db)='  + persistentWeakTopics.length +
-    ' weakTopics(ram)=' + ramMistakes.length +
-    ' turn='      + memory.turnCount
+    'AskAI v10 prompt | intent=' + plan.intent +
+    ' strategy=' + plan.strategy +
+    ' skill='    + skillLevel +
+    ' model='    + modelConfig.modelId +
+    ' history='  + history.length + 'msgs' +
+    ' weakDB='   + persistentWeakTopics.length
   );
 
   return { systemPrompt, history, userMessage: message, modelConfig, plan, context, detectedTopic };
