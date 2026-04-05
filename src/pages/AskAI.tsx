@@ -774,6 +774,7 @@ export function AskAI() {
           stepByStep,
           personality:    "friendly",
           recentActivity: subjectMode === "coding" ? "coding" : "ask",
+          convoId: convoIdRef.current,
         }),
       });
 

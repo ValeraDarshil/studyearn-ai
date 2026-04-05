@@ -348,6 +348,7 @@ import notesRoutes       from './routes/notesRoutes.js';
 import brainRoutes       from './routes/brainRoutes.js';
 import learningRoutes    from './routes/learningEngineRoutes.js';
 import progressRoutes    from './routes/progressRoutes.js';
+import './models/AskAISession.model.js';
 
 // ── Stage 6: AI Mentor ────────────────────────────────────────
 import mentorRoutes      from './routes/mentorRoutes.js';
