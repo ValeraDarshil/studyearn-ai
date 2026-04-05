@@ -413,6 +413,9 @@ export function AskAI() {
   const [question,    setQuestion]    = useState("");
   const [loading,     setLoading]     = useState(false);
   const [loadingStep, setLoadingStep] = useState("");
+  // ── v10: Edit mode state ──────────────────────────────────
+  const [isEditing,         setIsEditing]         = useState(false);
+  const [editOriginalMsgs,  setEditOriginalMsgs]  = useState<ChatMsg[]>([]);
 
   // ── Streaming ────────────────────────────────────────────
   const [isStreaming,      setIsStreaming]      = useState(false);
@@ -661,7 +664,7 @@ export function AskAI() {
   function startNewChat() {
     abortRef.current?.abort();
     setActiveId(null); convoIdRef.current = null; setMessages([]);
-    setQuestion(""); removeFile(); setSidebarOpen(false);
+    setQuestion(""); removeFile(); setSidebarOpen(false); setIsEditing(false); setEditOriginalMsgs([]);
     setIsStreaming(false); setStreamingContent("");
     setMentorState({ intent: null, strategy: null, skillLevel: null, turnCount: 0 });
     setSessionTopics([]); setMistakeTopics([]); setWeakTopicBanner(null);
@@ -721,13 +724,14 @@ export function AskAI() {
   // aur messages truncate ho jaaye us message tak
   // ─────────────────────────────────────────────────────────
   const handleEditMessage = useCallback((content: string) => {
-    // Find the message index
+    // Save original messages so cancel can restore them
+    setEditOriginalMsgs(messages);
+
     const idx = messages.findLastIndex(m => m.role === "user" && m.content === content);
     if (idx !== -1) {
-      // Remove that message and everything after it
       setMessages(prev => prev.slice(0, idx));
     }
-    // Load content into textarea
+    setIsEditing(true);
     setQuestion(content);
     setTimeout(() => {
       textareaRef.current?.focus();
@@ -737,6 +741,15 @@ export function AskAI() {
       }
     }, 50);
   }, [messages]);
+
+  // Cancel edit — restore original messages + clear textarea
+  const handleCancelEdit = useCallback(() => {
+    setMessages(editOriginalMsgs);
+    setQuestion("");
+    setIsEditing(false);
+    setEditOriginalMsgs([]);
+    if (textareaRef.current) textareaRef.current.style.height = "32px";
+  }, [editOriginalMsgs]);
 
   // ─────────────────────────────────────────────────────────
   // Quick Action Handler (v8 NEW)
@@ -778,6 +791,8 @@ export function AskAI() {
     setMessages(withUser);
     withUserRef.current = withUser;
     setQuestion("");
+    setIsEditing(false);
+    setEditOriginalMsgs([]);
     if (textareaRef.current) textareaRef.current.style.height = "32px";
     setLoading(true);
 
@@ -1320,6 +1335,22 @@ export function AskAI() {
           )}
 
           <div className="rounded-2xl border border-white/10 bg-white/[0.02] px-3 py-2">
+            {/* ── Edit mode cancel banner ── */}
+            {isEditing && (
+              <div className="flex items-center justify-between px-1 py-1.5 mb-2 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                <div className="flex items-center gap-1.5">
+                  <Pencil className="w-3 h-3 text-amber-400 flex-shrink-0" />
+                  <span className="text-[11px] text-amber-300 font-medium">Editing message</span>
+                  <span className="text-[10px] text-amber-500 hidden sm:inline">· Press Esc or click Cancel</span>
+                </div>
+                <button
+                  onClick={handleCancelEdit}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/[0.06] border border-white/10 text-[11px] text-slate-300 hover:text-white hover:bg-white/[0.10] transition-all"
+                >
+                  <X className="w-3 h-3" /> Cancel
+                </button>
+              </div>
+            )}
             {/* File preview */}
             {uploadedFile && (
               <div className="flex items-center gap-2 px-1 py-1 mb-2 rounded-xl bg-white/[0.03] border border-white/10">
@@ -1356,7 +1387,10 @@ export function AskAI() {
                 ref={textareaRef}
                 value={question}
                 onChange={e => setQuestion(e.target.value)}
-                onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+                onKeyDown={e => {
+                  if (e.key === "Escape" && isEditing) { handleCancelEdit(); return; }
+                  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
+                }}
                 placeholder={
                   isListening            ? (interimText || "🎤 Listening… speak now")
                   : questionsLeft <= 0   ? "Daily limit reached…"
