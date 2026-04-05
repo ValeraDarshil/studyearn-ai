@@ -31,6 +31,7 @@ import {
   BookOpen, ListOrdered, ChevronDown, Plus, Sparkles,
   Square,
   ThumbsUp, RotateCcw, Dumbbell,
+  Copy, Pin,
 } from "lucide-react";
 import { useVoiceInput }      from "../hooks/useVoiceInput";
 import { useApp }             from "../context/AppContext";
@@ -204,9 +205,25 @@ function ActionButtons({
 }
 
 // ─── User Bubble ──────────────────────────────────────────────
-function UserBubble({ msg }: { msg: ChatMsg }) {
+function UserBubble({
+  msg,
+  onEdit,
+}: {
+  msg:    ChatMsg;
+  onEdit: (content: string) => void;
+}) {
+  const [showActions, setShowActions] = useState(false);
+  const [copied,      setCopied]      = useState(false);
+
+  function handleCopy() {
+    navigator.clipboard.writeText(msg.content).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  }
+
   return (
-    <div className="flex justify-end">
+    <div className="flex justify-end group/user">
       <div className="max-w-[75%] space-y-2">
         {msg.imagePreview && (
           <div className="flex justify-end">
@@ -223,8 +240,28 @@ function UserBubble({ msg }: { msg: ChatMsg }) {
           </div>
         )}
         {msg.content && (
-          <div className="bg-gradient-to-br from-violet-600/30 to-blue-600/20 border border-violet-500/25 rounded-2xl rounded-tr-sm px-4 py-3">
-            <p className="text-sm text-white leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+          <div className="relative">
+            {/* Action buttons — appear on hover above the bubble */}
+            <div className="flex justify-end gap-1 mb-1 opacity-0 group-hover/user:opacity-100 transition-opacity">
+              <button
+                onClick={handleCopy}
+                className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/[0.06] border border-white/10 text-[10px] text-slate-400 hover:text-white hover:bg-white/[0.10] transition-all"
+              >
+                {copied
+                  ? <><Check className="w-3 h-3 text-green-400" /> Copied</>
+                  : <><Copy className="w-3 h-3" /> Copy</>
+                }
+              </button>
+              <button
+                onClick={() => onEdit(msg.content)}
+                className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/[0.06] border border-white/10 text-[10px] text-slate-400 hover:text-white hover:bg-white/[0.10] transition-all"
+              >
+                <Pencil className="w-3 h-3" /> Edit
+              </button>
+            </div>
+            <div className="bg-gradient-to-br from-violet-600/30 to-blue-600/20 border border-violet-500/25 rounded-2xl rounded-tr-sm px-4 py-3">
+              <p className="text-sm text-white leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+            </div>
           </div>
         )}
       </div>
@@ -246,9 +283,18 @@ function AIBubble({
   isLast?:       boolean;
   onQuickAction: (type: "understood" | "reexplain" | "testme") => void;
 }) {
+  const [copied, setCopied] = useState(false);
   const modeConfig = SUBJECT_MODES.find(s => s.id === (msg.subjectMode || "auto"));
+
+  function handleCopy() {
+    navigator.clipboard.writeText(msg.content).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  }
+
   return (
-    <div className="flex gap-3 items-start w-full">
+    <div className="flex gap-3 items-start w-full group/ai">
       <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 bg-gradient-to-br ${
         modeConfig?.id === "math"    ? "from-blue-500 to-blue-600"    :
         modeConfig?.id === "coding"  ? "from-green-500 to-emerald-600" :
@@ -267,7 +313,6 @@ function AIBubble({
           {msg.isError
             ? <p className="text-sm leading-relaxed">{msg.content}</p>
             : <MarkdownRenderer content={msg.content} />}
-          {/* Blinking cursor while streaming */}
           {isStreaming && (
             <span className="inline-block w-0.5 h-4 bg-blue-400 ml-0.5 animate-pulse align-middle" />
           )}
@@ -278,6 +323,21 @@ function AIBubble({
             <span className="text-xs font-medium text-green-400">
               +{msg.pointsAwarded} pts ✓{isPremium && msg.pointsAwarded > 10 ? " ⚡" : ""}
             </span>
+          </div>
+        )}
+
+        {/* Copy button — visible on hover, only on completed messages */}
+        {!isStreaming && !msg.isError && msg.content && (
+          <div className="opacity-0 group-hover/ai:opacity-100 transition-opacity pt-1">
+            <button
+              onClick={handleCopy}
+              className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/[0.04] border border-white/8 text-[10px] text-slate-500 hover:text-slate-300 hover:bg-white/[0.08] transition-all"
+            >
+              {copied
+                ? <><Check className="w-3 h-3 text-green-400" /> Copied!</>
+                : <><Copy className="w-3 h-3" /> Copy</>
+              }
+            </button>
           </div>
         )}
 
@@ -345,6 +405,8 @@ export function AskAI() {
   const [renamingId,    setRenamingId]    = useState<string | null>(null);
   const [renameValue,   setRenameValue]   = useState("");
   const [menuOpenId,    setMenuOpenId]    = useState<string | null>(null);
+  // ── v10: Long-press for sidebar context menu ─────────────
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── Chat ─────────────────────────────────────────────────
   const [messages,    setMessages]    = useState<ChatMsg[]>([]);
@@ -418,6 +480,14 @@ export function AskAI() {
   }, []);
 
   useEffect(() => { fetchConvos(); }, [fetchConvos]);
+
+  // ── v10: Close sidebar context menu on outside click ────
+  useEffect(() => {
+    if (!menuOpenId) return;
+    const handler = () => setMenuOpenId(null);
+    document.addEventListener("click", handler);
+    return () => document.removeEventListener("click", handler);
+  }, [menuOpenId]);
 
   // ── Fetch quota ──────────────────────────────────────────
   useEffect(() => {
@@ -644,6 +714,29 @@ export function AskAI() {
       .filter(m => !m.isError && !m.imagePreview && !m.fileName)
       .slice(-20)
       .map(m => ({ role: m.role as "user" | "assistant", content: m.content }));
+
+  // ─────────────────────────────────────────────────────────
+  // Edit Message Handler (v10 NEW)
+  // User message pe Edit click karo → textarea mein load ho
+  // aur messages truncate ho jaaye us message tak
+  // ─────────────────────────────────────────────────────────
+  const handleEditMessage = useCallback((content: string) => {
+    // Find the message index
+    const idx = messages.findLastIndex(m => m.role === "user" && m.content === content);
+    if (idx !== -1) {
+      // Remove that message and everything after it
+      setMessages(prev => prev.slice(0, idx));
+    }
+    // Load content into textarea
+    setQuestion(content);
+    setTimeout(() => {
+      textareaRef.current?.focus();
+      if (textareaRef.current) {
+        textareaRef.current.style.height = "auto";
+        textareaRef.current.style.height = textareaRef.current.scrollHeight + "px";
+      }
+    }, 50);
+  }, [messages]);
 
   // ─────────────────────────────────────────────────────────
   // Quick Action Handler (v8 NEW)
@@ -967,24 +1060,47 @@ export function AskAI() {
                     <button onClick={() => setRenamingId(null)} className="text-slate-500 hover:text-slate-300 p-1"><X className="w-3.5 h-3.5" /></button>
                   </div>
                 ) : (
-                  <button onClick={() => loadConversation(c._id)}
+                  <button
+                    onClick={() => { setMenuOpenId(null); loadConversation(c._id); }}
+                    onMouseDown={() => {
+                      // Long press — 600ms hold → open menu (mobile friendly)
+                      longPressTimer.current = setTimeout(() => {
+                        setMenuOpenId(c._id);
+                      }, 600);
+                    }}
+                    onMouseUp={() => { if (longPressTimer.current) clearTimeout(longPressTimer.current); }}
+                    onMouseLeave={() => { if (longPressTimer.current) clearTimeout(longPressTimer.current); }}
+                    onTouchStart={() => {
+                      longPressTimer.current = setTimeout(() => setMenuOpenId(c._id), 600);
+                    }}
+                    onTouchEnd={() => { if (longPressTimer.current) clearTimeout(longPressTimer.current); }}
                     className={`w-full text-left flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs transition-all group/btn ${activeId === c._id ? "bg-white/[0.07] text-white border border-white/10" : "text-slate-400 hover:text-white hover:bg-white/[0.04]"}`}>
                     <MessageSquare className="w-3.5 h-3.5 flex-shrink-0 text-slate-600 group-hover/btn:text-slate-400" />
                     <span className="flex-1 truncate">{c.title}</span>
+                    {/* Three-dot menu — desktop hover */}
                     <span onClick={e => { e.stopPropagation(); setMenuOpenId(prev => prev === c._id ? null : c._id); }}
                       className={`p-0.5 rounded transition-opacity flex-shrink-0 ${menuOpenId === c._id ? "opacity-100" : "opacity-0 group-hover/item:opacity-100"}`}>
                       <MoreHorizontal className="w-3.5 h-3.5 text-slate-500 hover:text-white" />
                     </span>
                   </button>
                 )}
+                {/* Context Menu — ChatGPT style */}
                 {menuOpenId === c._id && renamingId !== c._id && (
-                  <div className="absolute right-2 top-8 z-50 bg-[#0f1120] border border-white/10 rounded-xl shadow-xl overflow-hidden w-36" onClick={e => e.stopPropagation()}>
-                    <button onClick={() => { setMenuOpenId(null); setRenamingId(c._id); setRenameValue(c.title); }}
-                      className="w-full flex items-center gap-2 px-3 py-2.5 text-xs text-slate-300 hover:text-white hover:bg-white/[0.06] transition-colors">
+                  <div
+                    className="absolute right-2 top-9 z-50 bg-[#0f1120] border border-white/10 rounded-xl shadow-2xl overflow-hidden w-40 py-1"
+                    onClick={e => e.stopPropagation()}
+                  >
+                    <button
+                      onClick={() => { setMenuOpenId(null); setRenamingId(c._id); setRenameValue(c.title); }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs text-slate-300 hover:text-white hover:bg-white/[0.06] transition-colors"
+                    >
                       <Pencil className="w-3.5 h-3.5" /> Rename
                     </button>
-                    <button onClick={() => handleDeleteConvo(c._id)}
-                      className="w-full flex items-center gap-2 px-3 py-2.5 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors">
+                    <div className="h-px bg-white/[0.06] mx-3" />
+                    <button
+                      onClick={() => handleDeleteConvo(c._id)}
+                      className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/[0.08] transition-colors"
+                    >
                       <Trash2 className="w-3.5 h-3.5" /> Delete
                     </button>
                   </div>
@@ -1137,7 +1253,7 @@ export function AskAI() {
             const isLastMsg       = i === messages.length - 1;
             const isLastAssistant = msg.role === "assistant" && isLastMsg;
             return msg.role === "user"
-              ? <UserBubble key={i} msg={msg} />
+              ? <UserBubble key={i} msg={msg} onEdit={handleEditMessage} />
               : <AIBubble
                   key={i}
                   msg={msg}
