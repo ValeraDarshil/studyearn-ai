@@ -214,6 +214,7 @@ function UserBubble({
 }) {
   const [showActions, setShowActions] = useState(false);
   const [copied,      setCopied]      = useState(false);
+  const tapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function handleCopy() {
     navigator.clipboard.writeText(msg.content).then(() => {
@@ -221,6 +222,32 @@ function UserBubble({
       setTimeout(() => setCopied(false), 1500);
     });
   }
+
+  // Mobile: single tap on bubble toggles action buttons
+  // Desktop: hover handles it via CSS (showActions also works as fallback)
+  function handleTap() {
+    setShowActions(prev => !prev);
+  }
+
+  // Click outside → hide actions
+  useEffect(() => {
+    if (!showActions) return;
+    const handler = (e: MouseEvent | TouchEvent) => {
+      setShowActions(false);
+    };
+    // Small delay so the tap that opened it doesn't immediately close it
+    const t = setTimeout(() => {
+      document.addEventListener("click", handler);
+      document.addEventListener("touchend", handler);
+    }, 100);
+    return () => {
+      clearTimeout(t);
+      document.removeEventListener("click", handler);
+      document.removeEventListener("touchend", handler);
+    };
+  }, [showActions]);
+
+  const actionsVisible = showActions; // controlled by tap/click
 
   return (
     <div className="flex justify-end group/user">
@@ -241,11 +268,13 @@ function UserBubble({
         )}
         {msg.content && (
           <div className="relative">
-            {/* Action buttons — appear on hover above the bubble */}
-            <div className="flex justify-end gap-1 mb-1 opacity-0 group-hover/user:opacity-100 transition-opacity">
+            {/* Action buttons — hover (desktop) OR tap (mobile) */}
+            <div className={`flex justify-end gap-1 mb-1.5 transition-all duration-150 ${
+              actionsVisible ? "opacity-100 translate-y-0" : "opacity-0 group-hover/user:opacity-100 pointer-events-none group-hover/user:pointer-events-auto"
+            }`}>
               <button
-                onClick={handleCopy}
-                className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/[0.06] border border-white/10 text-[10px] text-slate-400 hover:text-white hover:bg-white/[0.10] transition-all"
+                onClick={e => { e.stopPropagation(); handleCopy(); }}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#0f1120] border border-white/10 text-[10px] font-medium text-slate-300 hover:text-white hover:border-white/20 active:scale-95 transition-all shadow-lg"
               >
                 {copied
                   ? <><Check className="w-3 h-3 text-green-400" /> Copied</>
@@ -253,13 +282,17 @@ function UserBubble({
                 }
               </button>
               <button
-                onClick={() => onEdit(msg.content)}
-                className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/[0.06] border border-white/10 text-[10px] text-slate-400 hover:text-white hover:bg-white/[0.10] transition-all"
+                onClick={e => { e.stopPropagation(); setShowActions(false); onEdit(msg.content); }}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#0f1120] border border-white/10 text-[10px] font-medium text-slate-300 hover:text-white hover:border-white/20 active:scale-95 transition-all shadow-lg"
               >
                 <Pencil className="w-3 h-3" /> Edit
               </button>
             </div>
-            <div className="bg-gradient-to-br from-violet-600/30 to-blue-600/20 border border-violet-500/25 rounded-2xl rounded-tr-sm px-4 py-3">
+            {/* Bubble — tap toggles actions on mobile */}
+            <div
+              onClick={e => { e.stopPropagation(); handleTap(); }}
+              className="bg-gradient-to-br from-violet-600/30 to-blue-600/20 border border-violet-500/25 rounded-2xl rounded-tr-sm px-4 py-3 cursor-pointer select-none active:opacity-80 transition-opacity"
+            >
               <p className="text-sm text-white leading-relaxed whitespace-pre-wrap">{msg.content}</p>
             </div>
           </div>
@@ -283,7 +316,8 @@ function AIBubble({
   isLast?:       boolean;
   onQuickAction: (type: "understood" | "reexplain" | "testme") => void;
 }) {
-  const [copied, setCopied] = useState(false);
+  const [copied,      setCopied]      = useState(false);
+  const [showCopy,    setShowCopy]    = useState(false);
   const modeConfig = SUBJECT_MODES.find(s => s.id === (msg.subjectMode || "auto"));
 
   function handleCopy() {
@@ -292,6 +326,14 @@ function AIBubble({
       setTimeout(() => setCopied(false), 1500);
     });
   }
+
+  // Click outside → hide copy button
+  useEffect(() => {
+    if (!showCopy) return;
+    const handler = () => setShowCopy(false);
+    const t = setTimeout(() => document.addEventListener("click", handler), 100);
+    return () => { clearTimeout(t); document.removeEventListener("click", handler); };
+  }, [showCopy]);
 
   return (
     <div className="flex gap-3 items-start w-full group/ai">
@@ -309,7 +351,11 @@ function AIBubble({
       <div className="flex-1 min-w-0 space-y-1">
         {msg.subjectMode && msg.subjectMode !== "auto" && <ModeBadge mode={msg.subjectMode} />}
 
-        <div className={`w-full ${msg.isError ? "text-red-300" : "text-white"}`}>
+        {/* Tap on AI response to reveal copy button on mobile */}
+        <div
+          className={`w-full ${msg.isError ? "text-red-300" : "text-white"}`}
+          onClick={() => { if (!isStreaming && !msg.isError && msg.content) setShowCopy(p => !p); }}
+        >
           {msg.isError
             ? <p className="text-sm leading-relaxed">{msg.content}</p>
             : <MarkdownRenderer content={msg.content} />}
@@ -326,12 +372,14 @@ function AIBubble({
           </div>
         )}
 
-        {/* Copy button — visible on hover, only on completed messages */}
+        {/* Copy button — hover (desktop) OR tap (mobile) */}
         {!isStreaming && !msg.isError && msg.content && (
-          <div className="opacity-0 group-hover/ai:opacity-100 transition-opacity pt-1">
+          <div className={`transition-all duration-150 pt-0.5 ${
+            showCopy ? "opacity-100" : "opacity-0 group-hover/ai:opacity-100"
+          }`}>
             <button
-              onClick={handleCopy}
-              className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/[0.04] border border-white/8 text-[10px] text-slate-500 hover:text-slate-300 hover:bg-white/[0.08] transition-all"
+              onClick={e => { e.stopPropagation(); handleCopy(); }}
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white/[0.04] border border-white/8 text-[10px] font-medium text-slate-500 hover:text-slate-200 hover:bg-white/[0.08] hover:border-white/15 active:scale-95 transition-all"
             >
               {copied
                 ? <><Check className="w-3 h-3 text-green-400" /> Copied!</>
@@ -341,7 +389,7 @@ function AIBubble({
           </div>
         )}
 
-        {/* Action Buttons — show on last completed AI message only */}
+        {/* Action Buttons — last completed AI message only */}
         {isLast && !isStreaming && !msg.isError && msg.content && (
           <ActionButtons onAction={onQuickAction} />
         )}
