@@ -214,7 +214,8 @@ function UserBubble({
 }) {
   const [showActions, setShowActions] = useState(false);
   const [copied,      setCopied]      = useState(false);
-  const tapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const actionsRef = useRef<HTMLDivElement>(null);
+  const bubbleRef  = useRef<HTMLDivElement>(null);
 
   function handleCopy() {
     navigator.clipboard.writeText(msg.content).then(() => {
@@ -223,31 +224,27 @@ function UserBubble({
     });
   }
 
-  // Mobile: single tap on bubble toggles action buttons
-  // Desktop: hover handles it via CSS (showActions also works as fallback)
-  function handleTap() {
-    setShowActions(prev => !prev);
-  }
-
-  // Click outside → hide actions
+  // Click/tap outside the entire bubble+actions area → hide actions
   useEffect(() => {
     if (!showActions) return;
-    const handler = (e: MouseEvent | TouchEvent) => {
+    function handler(e: MouseEvent | TouchEvent) {
+      const target = e.target as Node;
+      // Agar click bubble ya actions ke andar hua → ignore
+      if (bubbleRef.current?.contains(target)) return;
+      if (actionsRef.current?.contains(target)) return;
       setShowActions(false);
-    };
-    // Small delay so the tap that opened it doesn't immediately close it
+    }
+    // Delay taaki current tap/click already process ho jaye
     const t = setTimeout(() => {
-      document.addEventListener("click", handler);
-      document.addEventListener("touchend", handler);
-    }, 100);
+      document.addEventListener("click",     handler);
+      document.addEventListener("touchstart", handler, { passive: true });
+    }, 150);
     return () => {
       clearTimeout(t);
-      document.removeEventListener("click", handler);
-      document.removeEventListener("touchend", handler);
+      document.removeEventListener("click",      handler);
+      document.removeEventListener("touchstart",  handler);
     };
   }, [showActions]);
-
-  const actionsVisible = showActions; // controlled by tap/click
 
   return (
     <div className="flex justify-end group/user">
@@ -268,12 +265,19 @@ function UserBubble({
         )}
         {msg.content && (
           <div className="relative">
-            {/* Action buttons — hover (desktop) OR tap (mobile) */}
-            <div className={`flex justify-end gap-1 mb-1.5 transition-all duration-150 ${
-              actionsVisible ? "opacity-100 translate-y-0" : "opacity-0 group-hover/user:opacity-100 pointer-events-none group-hover/user:pointer-events-auto"
-            }`}>
+
+            {/* Action buttons — always rendered, shown via state OR hover */}
+            <div
+              ref={actionsRef}
+              className={`flex justify-end gap-1.5 mb-1.5 transition-opacity duration-150 ${
+                showActions
+                  ? "opacity-100"
+                  : "opacity-0 group-hover/user:opacity-100 pointer-events-none group-hover/user:pointer-events-auto"
+              }`}
+            >
               <button
-                onClick={e => { e.stopPropagation(); handleCopy(); }}
+                onPointerDown={e => e.stopPropagation()}
+                onClick={() => { handleCopy(); }}
                 className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#0f1120] border border-white/10 text-[10px] font-medium text-slate-300 hover:text-white hover:border-white/20 active:scale-95 transition-all shadow-lg"
               >
                 {copied
@@ -282,19 +286,23 @@ function UserBubble({
                 }
               </button>
               <button
-                onClick={e => { e.stopPropagation(); setShowActions(false); onEdit(msg.content); }}
+                onPointerDown={e => e.stopPropagation()}
+                onClick={() => { setShowActions(false); onEdit(msg.content); }}
                 className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#0f1120] border border-white/10 text-[10px] font-medium text-slate-300 hover:text-white hover:border-white/20 active:scale-95 transition-all shadow-lg"
               >
                 <Pencil className="w-3 h-3" /> Edit
               </button>
             </div>
-            {/* Bubble — tap toggles actions on mobile */}
+
+            {/* Bubble — tap toggles actions */}
             <div
-              onClick={e => { e.stopPropagation(); handleTap(); }}
+              ref={bubbleRef}
+              onClick={() => setShowActions(prev => !prev)}
               className="bg-gradient-to-br from-violet-600/30 to-blue-600/20 border border-violet-500/25 rounded-2xl rounded-tr-sm px-4 py-3 cursor-pointer select-none active:opacity-80 transition-opacity"
             >
               <p className="text-sm text-white leading-relaxed whitespace-pre-wrap">{msg.content}</p>
             </div>
+
           </div>
         )}
       </div>
