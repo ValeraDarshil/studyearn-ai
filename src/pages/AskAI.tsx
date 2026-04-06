@@ -31,7 +31,7 @@ import {
   BookOpen, ListOrdered, ChevronDown, Plus, Sparkles,
   Square,
   ThumbsUp, RotateCcw, Dumbbell,
-  Copy, Pin,
+  Copy, Pin, Search,
 } from "lucide-react";
 import { useVoiceInput }      from "../hooks/useVoiceInput";
 import { useApp }             from "../context/AppContext";
@@ -350,6 +350,97 @@ function AIBubble({
   );
 }
 
+// ─── ConvoItem ────────────────────────────────────────────────
+// Reusable sidebar conversation item — used in both grouped
+// view and search results view. Supports highlight of matched text.
+function ConvoItem({
+  c, activeId, menuOpenId, renamingId, renameValue, searchQuery,
+  longPressTimer, onLoad, onMenuToggle, onMenuOpen,
+  onRenameStart, onRenameChange, onRenameConfirm, onRenameCancel, onDelete,
+}: {
+  c:               ConvoSummary;
+  activeId:        string | null;
+  menuOpenId:      string | null;
+  renamingId:      string | null;
+  renameValue:     string;
+  searchQuery:     string;
+  longPressTimer:  React.MutableRefObject<ReturnType<typeof setTimeout> | null>;
+  onLoad:          () => void;
+  onMenuToggle:    () => void;
+  onMenuOpen:      () => void;
+  onRenameStart:   () => void;
+  onRenameChange:  (v: string) => void;
+  onRenameConfirm: () => void;
+  onRenameCancel:  () => void;
+  onDelete:        () => void;
+}) {
+  // Highlight matched text in title
+  function HighlightTitle() {
+    if (!searchQuery) return <span className="flex-1 truncate">{c.title}</span>;
+    const idx = c.title.toLowerCase().indexOf(searchQuery);
+    if (idx === -1) return <span className="flex-1 truncate">{c.title}</span>;
+    return (
+      <span className="flex-1 truncate">
+        {c.title.slice(0, idx)}
+        <mark className="bg-blue-500/30 text-blue-200 rounded px-0.5 not-italic">
+          {c.title.slice(idx, idx + searchQuery.length)}
+        </mark>
+        {c.title.slice(idx + searchQuery.length)}
+      </span>
+    );
+  }
+
+  return (
+    <div className="relative group/item">
+      {renamingId === c._id ? (
+        <div className="flex items-center gap-1 px-2 py-1">
+          <input value={renameValue} onChange={e => onRenameChange(e.target.value)}
+            onKeyDown={e => { if (e.key === "Enter") onRenameConfirm(); if (e.key === "Escape") onRenameCancel(); }}
+            autoFocus className="flex-1 bg-white/[0.06] border border-blue-500/30 rounded-lg px-2 py-1.5 text-xs text-white outline-none" />
+          <button onClick={onRenameConfirm} className="text-green-400 hover:text-green-300 p-1"><Check className="w-3.5 h-3.5" /></button>
+          <button onClick={onRenameCancel} className="text-slate-500 hover:text-slate-300 p-1"><X className="w-3.5 h-3.5" /></button>
+        </div>
+      ) : (
+        <button
+          onClick={onLoad}
+          onMouseDown={() => { longPressTimer.current = setTimeout(onMenuOpen, 600); }}
+          onMouseUp={() => { if (longPressTimer.current) clearTimeout(longPressTimer.current); }}
+          onMouseLeave={() => { if (longPressTimer.current) clearTimeout(longPressTimer.current); }}
+          onTouchStart={() => { longPressTimer.current = setTimeout(onMenuOpen, 600); }}
+          onTouchEnd={() => { if (longPressTimer.current) clearTimeout(longPressTimer.current); }}
+          className={`w-full text-left flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs transition-all group/btn ${
+            activeId === c._id
+              ? "bg-white/[0.07] text-white border border-white/10"
+              : "text-slate-400 hover:text-white hover:bg-white/[0.04]"
+          }`}>
+          <MessageSquare className="w-3.5 h-3.5 flex-shrink-0 text-slate-600 group-hover/btn:text-slate-400" />
+          <HighlightTitle />
+          <span onClick={e => { e.stopPropagation(); onMenuToggle(); }}
+            className={`p-0.5 rounded transition-opacity flex-shrink-0 ${menuOpenId === c._id ? "opacity-100" : "opacity-0 group-hover/item:opacity-100"}`}>
+            <MoreHorizontal className="w-3.5 h-3.5 text-slate-500 hover:text-white" />
+          </span>
+        </button>
+      )}
+
+      {/* Context menu */}
+      {menuOpenId === c._id && renamingId !== c._id && (
+        <div className="absolute right-2 top-9 z-50 bg-[#0f1120] border border-white/10 rounded-xl shadow-2xl overflow-hidden w-40 py-1"
+          onClick={e => e.stopPropagation()}>
+          <button onClick={onRenameStart}
+            className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs text-slate-300 hover:text-white hover:bg-white/[0.06] transition-colors">
+            <Pencil className="w-3.5 h-3.5" /> Rename
+          </button>
+          <div className="h-px bg-white/[0.06] mx-3" />
+          <button onClick={onDelete}
+            className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/[0.08] transition-colors">
+            <Trash2 className="w-3.5 h-3.5" /> Delete
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Mode Selector Bar ────────────────────────────────────────
 function ModeSelector({
   selected, onChange,
@@ -405,6 +496,9 @@ export function AskAI() {
   const [renamingId,    setRenamingId]    = useState<string | null>(null);
   const [renameValue,   setRenameValue]   = useState("");
   const [menuOpenId,    setMenuOpenId]    = useState<string | null>(null);
+  const [searchQuery,   setSearchQuery]   = useState("");
+  const [searchFocused, setSearchFocused] = useState(false);
+  const searchRef = useRef<HTMLInputElement>(null);
   // ── v10: Long-press for sidebar context menu ─────────────
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -1040,6 +1134,12 @@ export function AskAI() {
   const canSend = (!!question.trim() || !!uploadedFile) && questionsLeft > 0 && !loading && !isStreaming;
   const hasChat = messages.length > 0;
   const grouped = groupByDate(convos);
+
+  // ── Search filter — case-insensitive title match ──────────
+  const searchTrimmed   = searchQuery.trim().toLowerCase();
+  const filteredConvos  = searchTrimmed
+    ? convos.filter(c => c.title.toLowerCase().includes(searchTrimmed))
+    : null; // null = not searching, show grouped view
   const currentMode = SUBJECT_MODES.find(m => m.id === subjectMode)!;
 
   // ─────────────────────────────────────────────────────────
@@ -1047,83 +1147,118 @@ export function AskAI() {
   // ─────────────────────────────────────────────────────────
   const sidebar = (
     <div className="flex flex-col h-full">
-      <div className="p-3 flex-shrink-0">
+
+      {/* Top: New Chat + Search */}
+      <div className="p-3 flex-shrink-0 space-y-2">
         <button onClick={startNewChat}
           className="w-full flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-500/15 to-purple-500/15 border border-blue-500/20 text-sm font-semibold text-white hover:from-blue-500/25 hover:to-purple-500/25 transition-all">
           <Plus className="w-4 h-4 text-blue-400" /> New Chat
         </button>
+
+        {/* Search box */}
+        <div className={`flex items-center gap-2 px-3 py-2 rounded-xl border transition-all ${
+          searchFocused
+            ? "border-blue-500/40 bg-blue-500/5"
+            : "border-white/8 bg-white/[0.02] hover:border-white/12"
+        }`}>
+          <Search className={`w-3.5 h-3.5 flex-shrink-0 transition-colors ${searchFocused ? "text-blue-400" : "text-slate-600"}`} />
+          <input
+            ref={searchRef}
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            onFocus={() => setSearchFocused(true)}
+            onBlur={() => setSearchFocused(false)}
+            onKeyDown={e => { if (e.key === "Escape") { setSearchQuery(""); searchRef.current?.blur(); } }}
+            placeholder="Search chats…"
+            className="flex-1 bg-transparent text-xs text-white placeholder-slate-600 outline-none"
+          />
+          {searchQuery && (
+            <button onClick={() => { setSearchQuery(""); searchRef.current?.focus(); }}
+              className="text-slate-600 hover:text-slate-300 transition-colors flex-shrink-0">
+              <X className="w-3 h-3" />
+            </button>
+          )}
+        </div>
       </div>
-      <div className="flex-1 overflow-y-auto px-2 space-y-4 pb-4">
+
+      {/* Conversation list */}
+      <div className="flex-1 overflow-y-auto px-2 pb-4">
         {loadingConvos ? (
           <div className="space-y-2 px-1 pt-2">{[1,2,3].map(i => <div key={i} className="h-9 rounded-lg bg-white/[0.03] animate-pulse" />)}</div>
+
+        ) : filteredConvos !== null ? (
+          /* ── SEARCH RESULTS VIEW ── */
+          filteredConvos.length === 0 ? (
+            <div className="text-center py-10 px-4">
+              <Search className="w-7 h-7 text-slate-700 mx-auto mb-2" />
+              <p className="text-xs text-slate-600">No chats found for<br />
+                <span className="text-slate-500 font-medium">"{searchQuery}"</span>
+              </p>
+            </div>
+          ) : (
+            <div className="pt-1">
+              <p className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider px-3 mb-1">
+                {filteredConvos.length} result{filteredConvos.length !== 1 ? "s" : ""}
+              </p>
+              {filteredConvos.map(c => (
+                <ConvoItem
+                  key={c._id}
+                  c={c}
+                  activeId={activeId}
+                  menuOpenId={menuOpenId}
+                  renamingId={renamingId}
+                  renameValue={renameValue}
+                  searchQuery={searchTrimmed}
+                  longPressTimer={longPressTimer}
+                  onLoad={() => { setSearchQuery(""); loadConversation(c._id); }}
+                  onMenuToggle={() => setMenuOpenId(prev => prev === c._id ? null : c._id)}
+                  onMenuOpen={() => setMenuOpenId(c._id)}
+                  onRenameStart={() => { setMenuOpenId(null); setRenamingId(c._id); setRenameValue(c.title); }}
+                  onRenameChange={setRenameValue}
+                  onRenameConfirm={() => handleRename(c._id)}
+                  onRenameCancel={() => setRenamingId(null)}
+                  onDelete={() => handleDeleteConvo(c._id)}
+                />
+              ))}
+            </div>
+          )
+
         ) : convos.length === 0 ? (
           <div className="text-center py-8 px-4">
             <MessageSquare className="w-8 h-8 text-slate-700 mx-auto mb-2" />
             <p className="text-xs text-slate-600">No conversations yet.<br />Start chatting!</p>
           </div>
-        ) : grouped.map(group => (
-          <div key={group.label}>
-            <p className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider px-3 mb-1">{group.label}</p>
-            {group.items.map(c => (
-              <div key={c._id} className="relative group/item">
-                {renamingId === c._id ? (
-                  <div className="flex items-center gap-1 px-2 py-1">
-                    <input value={renameValue} onChange={e => setRenameValue(e.target.value)}
-                      onKeyDown={e => { if (e.key === "Enter") handleRename(c._id); if (e.key === "Escape") setRenamingId(null); }}
-                      autoFocus className="flex-1 bg-white/[0.06] border border-blue-500/30 rounded-lg px-2 py-1.5 text-xs text-white outline-none" />
-                    <button onClick={() => handleRename(c._id)} className="text-green-400 hover:text-green-300 p-1"><Check className="w-3.5 h-3.5" /></button>
-                    <button onClick={() => setRenamingId(null)} className="text-slate-500 hover:text-slate-300 p-1"><X className="w-3.5 h-3.5" /></button>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => { setMenuOpenId(null); loadConversation(c._id); }}
-                    onMouseDown={() => {
-                      // Long press — 600ms hold → open menu (mobile friendly)
-                      longPressTimer.current = setTimeout(() => {
-                        setMenuOpenId(c._id);
-                      }, 600);
-                    }}
-                    onMouseUp={() => { if (longPressTimer.current) clearTimeout(longPressTimer.current); }}
-                    onMouseLeave={() => { if (longPressTimer.current) clearTimeout(longPressTimer.current); }}
-                    onTouchStart={() => {
-                      longPressTimer.current = setTimeout(() => setMenuOpenId(c._id), 600);
-                    }}
-                    onTouchEnd={() => { if (longPressTimer.current) clearTimeout(longPressTimer.current); }}
-                    className={`w-full text-left flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs transition-all group/btn ${activeId === c._id ? "bg-white/[0.07] text-white border border-white/10" : "text-slate-400 hover:text-white hover:bg-white/[0.04]"}`}>
-                    <MessageSquare className="w-3.5 h-3.5 flex-shrink-0 text-slate-600 group-hover/btn:text-slate-400" />
-                    <span className="flex-1 truncate">{c.title}</span>
-                    {/* Three-dot menu — desktop hover */}
-                    <span onClick={e => { e.stopPropagation(); setMenuOpenId(prev => prev === c._id ? null : c._id); }}
-                      className={`p-0.5 rounded transition-opacity flex-shrink-0 ${menuOpenId === c._id ? "opacity-100" : "opacity-0 group-hover/item:opacity-100"}`}>
-                      <MoreHorizontal className="w-3.5 h-3.5 text-slate-500 hover:text-white" />
-                    </span>
-                  </button>
-                )}
-                {/* Context Menu — ChatGPT style */}
-                {menuOpenId === c._id && renamingId !== c._id && (
-                  <div
-                    className="absolute right-2 top-9 z-50 bg-[#0f1120] border border-white/10 rounded-xl shadow-2xl overflow-hidden w-40 py-1"
-                    onClick={e => e.stopPropagation()}
-                  >
-                    <button
-                      onClick={() => { setMenuOpenId(null); setRenamingId(c._id); setRenameValue(c.title); }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs text-slate-300 hover:text-white hover:bg-white/[0.06] transition-colors"
-                    >
-                      <Pencil className="w-3.5 h-3.5" /> Rename
-                    </button>
-                    <div className="h-px bg-white/[0.06] mx-3" />
-                    <button
-                      onClick={() => handleDeleteConvo(c._id)}
-                      className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/[0.08] transition-colors"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" /> Delete
-                    </button>
-                  </div>
-                )}
+
+        ) : (
+          /* ── NORMAL GROUPED VIEW ── */
+          <div className="space-y-4 pt-1">
+            {grouped.map(group => (
+              <div key={group.label}>
+                <p className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider px-3 mb-1">{group.label}</p>
+                {group.items.map(c => (
+                  <ConvoItem
+                    key={c._id}
+                    c={c}
+                    activeId={activeId}
+                    menuOpenId={menuOpenId}
+                    renamingId={renamingId}
+                    renameValue={renameValue}
+                    searchQuery=""
+                    longPressTimer={longPressTimer}
+                    onLoad={() => loadConversation(c._id)}
+                    onMenuToggle={() => setMenuOpenId(prev => prev === c._id ? null : c._id)}
+                    onMenuOpen={() => setMenuOpenId(c._id)}
+                    onRenameStart={() => { setMenuOpenId(null); setRenamingId(c._id); setRenameValue(c.title); }}
+                    onRenameChange={setRenameValue}
+                    onRenameConfirm={() => handleRename(c._id)}
+                    onRenameCancel={() => setRenamingId(null)}
+                    onDelete={() => handleDeleteConvo(c._id)}
+                  />
+                ))}
               </div>
             ))}
           </div>
-        ))}
+        )}
       </div>
     </div>
   );
