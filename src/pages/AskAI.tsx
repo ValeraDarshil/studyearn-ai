@@ -51,6 +51,21 @@ type Role        = "user" | "assistant";
 type SubjectMode = "auto" | "math" | "coding" | "science" | "general";
 type EmotionalState = "correct" | "confused" | "frustrated" | "motivated" | "neutral";
 
+// v11: AI-OS enrichment from backend orchestrator
+interface AskAIEnrichment {
+  recommendation?: {
+    title:   string;
+    message: string;
+    action:  string;
+    icon:    string;
+    xp:      number;
+  } | null;
+  progressInsight?: string | null;
+  hintMode?:        boolean;
+  hintText?:        string | null;
+  emotionalNudge?:  string | null;
+}
+
 interface ChatMsg {
   role:           Role;
   content:        string;
@@ -167,6 +182,73 @@ function EmotionalToast({
   return (
     <div className={`fixed bottom-24 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl border text-xs font-semibold shadow-lg animate-fade-in-up ${classes}`}>
       {msg}
+    </div>
+  );
+}
+
+// ─── v11: Enrichment Card ─────────────────────────────────────
+// Shows after stream ends: next-topic recommendation, progress
+// insight, or hint nudge — from the AI-OS orchestrator pipeline.
+function EnrichmentCard({
+  enrichment,
+  onDismiss,
+}: {
+  enrichment: AskAIEnrichment;
+  onDismiss: () => void;
+}) {
+  if (!enrichment.recommendation && !enrichment.progressInsight && !enrichment.emotionalNudge) return null;
+
+  return (
+    <div className="mt-3 space-y-2">
+      {/* Emotional nudge for frustrated/confused students */}
+      {enrichment.emotionalNudge && (
+        <div className="flex items-start gap-2.5 px-3.5 py-2.5 rounded-xl border border-blue-500/20 bg-blue-500/8 text-blue-300 text-xs leading-relaxed">
+          <span className="mt-0.5 flex-shrink-0">💙</span>
+          <span>{enrichment.emotionalNudge}</span>
+          <button onClick={onDismiss} className="ml-auto flex-shrink-0 text-blue-400/60 hover:text-blue-300 transition-colors">
+            <X className="w-3 h-3" />
+          </button>
+        </div>
+      )}
+
+      {/* Progress insight */}
+      {enrichment.progressInsight && (
+        <div className="flex items-start gap-2.5 px-3.5 py-2.5 rounded-xl border border-violet-500/20 bg-violet-500/8 text-violet-300 text-xs leading-relaxed">
+          <span className="mt-0.5 flex-shrink-0">📊</span>
+          <span>{enrichment.progressInsight}</span>
+        </div>
+      )}
+
+      {/* Next-topic recommendation */}
+      {enrichment.recommendation && (
+        <div className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl border border-amber-500/20 bg-amber-500/8">
+          <span className="text-base flex-shrink-0">{enrichment.recommendation.icon}</span>
+          <div className="flex-1 min-w-0">
+            <p className="text-amber-300 text-xs font-semibold truncate">{enrichment.recommendation.title}</p>
+            <p className="text-amber-300/70 text-[11px] truncate">{enrichment.recommendation.message}</p>
+          </div>
+          <span className="flex-shrink-0 text-[10px] font-semibold text-amber-400 bg-amber-500/15 border border-amber-500/25 px-2 py-0.5 rounded-full">
+            +{enrichment.recommendation.xp} XP
+          </span>
+          <button onClick={onDismiss} className="flex-shrink-0 text-amber-400/60 hover:text-amber-300 transition-colors">
+            <X className="w-3 h-3" />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── v11: Hint Banner ─────────────────────────────────────────
+// Shows when AI chose HINT/GUIDE strategy — socratic nudge
+function HintBanner({ text, onDismiss }: { text: string; onDismiss: () => void }) {
+  return (
+    <div className="flex items-start gap-2.5 px-3.5 py-2.5 rounded-xl border border-cyan-500/25 bg-cyan-500/8 text-cyan-300 text-xs leading-relaxed mt-2">
+      <Zap className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-cyan-400" />
+      <span>{text}</span>
+      <button onClick={onDismiss} className="ml-auto flex-shrink-0 text-cyan-400/60 hover:text-cyan-300 transition-colors">
+        <X className="w-3 h-3" />
+      </button>
     </div>
   );
 }
@@ -585,6 +667,11 @@ export function AskAI() {
   const [emotionalState,    setEmotionalState]    = useState<EmotionalState>("neutral");
   const [showEmotionalToast, setShowEmotionalToast] = useState(false);
 
+  // ── v11: AI-OS Enrichment state ──────────────────────────
+  const [enrichment,     setEnrichment]     = useState<AskAIEnrichment | null>(null);
+  const [showHintBanner, setShowHintBanner] = useState(false);
+  const [hintText,       setHintText]       = useState<string | null>(null);
+
   // ── Comeback Nudge (v8 NEW) ──────────────────────────────
   const [showComebackNudge, setShowComebackNudge] = useState(false);
   const comebackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -820,6 +907,7 @@ export function AskAI() {
     setSessionTopics([]); setMistakeTopics([]); setWeakTopicBanner(null);
     setEmotionalState("neutral"); setShowEmotionalToast(false);
     setShowComebackNudge(false);
+    setEnrichment(null); setShowHintBanner(false); setHintText(null);
     textareaRef.current?.focus();
   }
 
@@ -930,6 +1018,10 @@ export function AskAI() {
 
     // Dismiss comeback nudge
     setShowComebackNudge(false);
+    // v11: Clear previous enrichment cards on new message
+    setEnrichment(null);
+    setShowHintBanner(false);
+    setHintText(null);
 
     const userMsg: ChatMsg = {
       role: "user", content: text,
@@ -1126,6 +1218,18 @@ export function AskAI() {
             if (parsed.emotionalState && parsed.emotionalState !== "neutral") {
               setEmotionalState(parsed.emotionalState);
               setShowEmotionalToast(true);
+            }
+
+            // ── v11: AI-OS Enrichment chunk ───────────────
+            // Arrives AFTER stream ends — shows recommendations,
+            // progress insights, hint nudges, emotional nudges
+            if (parsed.enrichment) {
+              const e: AskAIEnrichment = parsed.enrichment;
+              setEnrichment(e);
+              if (e.hintMode && e.hintText) {
+                setHintText(e.hintText);
+                setShowHintBanner(true);
+              }
             }
 
             if (parsed.error) throw new Error(parsed.error);
@@ -1469,6 +1573,26 @@ export function AskAI() {
                   onQuickAction={handleQuickAction}
                 />;
           })}
+
+          {/* v11: Hint Banner — shows when AI chose HINT/GUIDE strategy */}
+          {showHintBanner && hintText && !isStreaming && (
+            <div className="px-1">
+              <HintBanner
+                text={hintText}
+                onDismiss={() => { setShowHintBanner(false); setHintText(null); }}
+              />
+            </div>
+          )}
+
+          {/* v11: Enrichment Card — recommendation / insight / nudge */}
+          {enrichment && !isStreaming && (
+            <div className="px-1">
+              <EnrichmentCard
+                enrichment={enrichment}
+                onDismiss={() => setEnrichment(null)}
+              />
+            </div>
+          )}
 
           {/* Loading dots */}
           {loading && (

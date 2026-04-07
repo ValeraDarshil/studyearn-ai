@@ -1,100 +1,58 @@
-// // ─────────────────────────────────────────────────────────────
-// // StudyEarn AI — AI Routes
-// // ─────────────────────────────────────────────────────────────
-// // URL → Controller ka mapping sirf yahan hota hai
-// // Logic controllers mein hai, yahan sirf wiring hai
-
-// import { Router } from 'express';
-// import multer from 'multer';
-// import { askAI, solvePDF, watchAd, getQuota } from '../controllers/aiController.js';
-// import { aiAskLimiter, pdfSolveLimiter } from '../middleware/rateLimiter.js';
-// import { validateAskAI } from '../middleware/validate.js';
-
-// const router = Router();
-// const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
-
-// // POST /api/ai/ask — text ya image question bhejo
-// router.post('/ask', aiAskLimiter, validateAskAI, askAI);
-
-// // POST /api/ai/solve-pdf — PDF upload karke AI se solve karao
-// router.post('/solve-pdf', pdfSolveLimiter, upload.single('file'), solvePDF);
-
-// router.post('/watch-ad', watchAd);   // POST /api/ai/watch-ad
-// router.get('/quota',     getQuota);   // GET  /api/ai/quota
-
-// export default router;
-
-
-
-
-// // ─────────────────────────────────────────────────────────────
-// // StudyEarn AI — AI Routes
-// // ─────────────────────────────────────────────────────────────
-// // URL → Controller ka mapping sirf yahan hota hai
-// // Logic controllers mein hai, yahan sirf wiring hai
-
-// import { Router } from 'express';
-// import multer from 'multer';
-// import { askAI, solvePDF, watchAd, getQuota } from '../controllers/aiController.js';
-// import { aiAskLimiter, pdfSolveLimiter } from '../middleware/rateLimiter.js';
-// import { validateAskAI } from '../middleware/validate.js';
-// import { authenticate } from '../middleware/authMiddleware.js';
-
-// const router = Router();
-// const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
-
-// // POST /api/ai/ask — text ya image question bhejo
-// // authenticate: bina login ke koi bhi free AI calls nahi maar sakta
-// router.post('/ask',       authenticate, aiAskLimiter, validateAskAI, askAI);
-
-// // POST /api/ai/solve-pdf — PDF upload karke AI se solve karao
-// router.post('/solve-pdf', authenticate, pdfSolveLimiter, upload.single('file'), solvePDF);
-
-// // Watch ad + quota — bhi login required hona chahiye
-// router.post('/watch-ad',  authenticate, watchAd);
-// router.get('/quota',      authenticate, getQuota);
-
-// export default router;
-
-
 // ─────────────────────────────────────────────────────────────
-// StudyEarn AI — AI Routes  (v9 — reset-session added)
+// AskAI — aiRoutes.ts  (v11 — clean, Bug #6 fixed)
+//
+// ALL ROUTES:
+//   POST /api/ai/ask           — text / image question (non-streaming)
+//   POST /api/ai/ask-stream    — SSE streaming (main chat)
+//   POST /api/ai/solve-pdf     — PDF upload → AI solve
+//   POST /api/ai/watch-ad      — watch ad → +3 quota
+//   GET  /api/ai/quota         — get remaining questions
+//   POST /api/ai/reset-session — chat switch → RAM clear
+//
+// Bug #6 FIXED: validateAskAI middleware added to /ask-stream
+//   (was missing — streaming endpoint had no input validation)
 // ─────────────────────────────────────────────────────────────
+
 import { Router } from 'express';
-import multer    from 'multer';
+import multer     from 'multer';
+
 import {
   askAI,
   askAIStream,
   solvePDF,
   watchAd,
   getQuota,
-  resetSession,          // ← v9 NEW: chat switch memory fix
+  resetSession,
 } from '../controllers/aiController.js';
+
 import { aiAskLimiter, pdfSolveLimiter } from '../middleware/rateLimiter.js';
 import { validateAskAI }                  from '../middleware/validate.js';
 import { authenticate }                   from '../middleware/authMiddleware.js';
 
 const router = Router();
+
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 25 * 1024 * 1024 },
+  limits:  { fileSize: 25 * 1024 * 1024 },   // 25 MB
 });
 
-// ── Text / image question (non-streaming — image+PDF use this) ─
+// Text / image question (non-streaming — images + PDFs use this)
 router.post('/ask',           authenticate, aiAskLimiter, validateAskAI, askAI);
 
-// ── SSE Streaming (text questions) ────────────────────────────
-router.post('/ask-stream',    authenticate, aiAskLimiter, askAIStream);
+// SSE Streaming for text questions — main chat endpoint
+// Bug #6 fix: validateAskAI added (was missing before v11)
+router.post('/ask-stream',    authenticate, aiAskLimiter, validateAskAI, askAIStream);
 
-// ── PDF solve ─────────────────────────────────────────────────
+// PDF file upload → AI solve
 router.post('/solve-pdf',     authenticate, pdfSolveLimiter, upload.single('file'), solvePDF);
 
-// ── Quota & ads ───────────────────────────────────────────────
+// Watch a video ad → refill +3 questions
 router.post('/watch-ad',      authenticate, watchAd);
+
+// Get remaining question quota
 router.get('/quota',          authenticate, getQuota);
 
-// ── v9: Chat switch — RAM memory reset ────────────────────────
-// Called by frontend when user clicks a different chat in sidebar
+// Chat switch → clear RAM memory for this user
 router.post('/reset-session', authenticate, resetSession);
 
 export default router;

@@ -1,20 +1,20 @@
 // ─────────────────────────────────────────────────────────────
-// AskAI — askAIService.ts  (v9 — DB-Aware Master Prompt Builder)
+// AskAI — askAIService.ts  (v11 — Bug fixes applied)
 //
-// What changed in v9:
-//   1. AskAIServiceInput now accepts:
-//        persistentWeakTopics?: string[]  ← from MongoDB (30-day)
-//        dbSessionSummary?:     string    ← from MongoDB sessions
-//   2. buildMasterPrompt merges RAM weak topics WITH DB weak topics
-//      → AI now knows LONG-TERM struggles, not just current session
-//   3. dbSessionSummary injected into context block
-//      → AI knows "you studied 3 sessions ago and struggled with X"
+// Bug #4 FIXED: turnCount passed correctly to buildResponsePlan
+//   Before: buildResponsePlan(..., 0) then plan.turnCount = history.length
+//   After:  currentTurnCount computed once, passed correctly
 //
-// Everything else unchanged from v8.
+// Bug #3 FIXED: afterResponse RAM drift documented
+//   RAM (conversationMemoryEngine) is kept ONLY for getMemorySummary
+//   in contextEnhancer Layer 3. DB is the source of truth.
+//   DB persistence (persistAIMessage) happens in aiController.ts only.
+//
+// Everything else unchanged from v10.
 // ─────────────────────────────────────────────────────────────
 
-// v10: RAM memory engine removed — sirf DB use hota hai
-// conversationMemoryEngine ab sirf afterResponse ke liye hai (addMessage)
+// v10: RAM memory engine kept only for in-session getMemorySummary
+// conversationMemoryEngine.addMessage used by afterResponse (Layer 3 context)
 import { addMessage } from './conversationMemoryEngine.js';
 
 import {
@@ -68,7 +68,7 @@ export interface AskAIServiceInput {
   subjectMode: string;
   stepByStep:  boolean;
   history?:    { role: 'user' | 'assistant'; content: string }[];
-  // ← v9: persistent data from MongoDB
+  // v9: persistent data from MongoDB
   persistentWeakTopics?: string[];
   dbSessionSummary?:     string;
 }
@@ -84,7 +84,8 @@ export interface AskAIPromptPackage {
 }
 
 // ─────────────────────────────────────────────────────────────
-// buildMasterPrompt
+// buildMasterPrompt — Main export
+// Builds the complete system prompt + all AI pipeline decisions
 // ─────────────────────────────────────────────────────────────
 export async function buildMasterPrompt(
   input: AskAIServiceInput,
@@ -99,11 +100,7 @@ export async function buildMasterPrompt(
     dbSessionSummary     = '',
   } = input;
 
-  // ── v10: RAM Memory REMOVED ─────────────────────────────────
-  // Frontend history = correct chat. DB weak topics = persistent data.
-  const ramMistakes: string[] = [];
-
-  // ── Step 2: Rich context from AI Brain ─────────────────────
+  // Step 1: Rich context from AI Brain (orchestrator + tutor)
   let context: EnhancedContext;
   try {
     context = await buildEnhancedContext(userId, message);
@@ -111,7 +108,7 @@ export async function buildMasterPrompt(
     const fallbackLevel = detectSkillLevelFromMessage(message);
     context = {
       skillLevel:     fallbackLevel,
-      weakTopics:     ramMistakes,
+      weakTopics:     [],
       strongTopics:   [],
       currentGoal:    '',
       learningState:  'unknown',
@@ -123,57 +120,59 @@ export async function buildMasterPrompt(
 
   const skillLevel: SkillLevel = context.skillLevel ?? detectSkillLevelFromMessage(message);
 
-  // ── v9: Merge ALL weak topic sources ──────────────────────
-  // Priority: DB persistent > AI Brain > RAM session
-  // v10: RAM topics removed — only DB + AI Brain
+  // Step 2: Merge ALL weak topic sources
+  // Priority: DB persistent (30-day) > AI Brain orchestrator
   const allWeakTopics = [
     ...new Set([
-      ...persistentWeakTopics,   // from MongoDB (30-day)
-      ...context.weakTopics,     // from AI Brain orchestrator
-    ])
+      ...persistentWeakTopics,
+      ...context.weakTopics,
+    ]),
   ].slice(0, 10);
 
-  // ── Step 3: Response Planning ───────────────────────────────
+  // Step 3: Response Planning
+  // Bug #4 FIX: pass correct turnCount directly — was passing 0 then overriding
+  const currentTurnCount = input.history?.length ?? 0;
   const plan = buildResponsePlan(
     message,
     skillLevel,
     allWeakTopics,
-    0,  // v10: turnCount from frontend history length
+    currentTurnCount,
   );
-  plan.turnCount = input.history?.length ?? 0;
+  plan.turnCount = currentTurnCount;
 
   if (stepByStep && plan.strategy !== 'QUIZ') {
     plan.strategy = 'STEP_BY_STEP';
   }
 
-  // ── Step 4: Model Routing ───────────────────────────────────
+  // Step 4: Model Routing
   const modelConfig = routeToModel(
     plan.intent,
     subjectMode,
     skillLevel,
     message.length,
-    'text',  // ← stream endpoint is always text
+    'text',
   );
 
-  // ── Step 5: Topic Detection ─────────────────────────────────
+  // Step 5: Topic Detection (base — aiController uses detectTopicExpanded on top)
   const detectedTopic = detectTopic(message, subjectMode);
 
-  // ── Step 6: Personality ─────────────────────────────────────
-  const personality  = inferPersonality(message);
-  const isFirstTurn  = (input.history?.length ?? 0) === 0;
+  // Step 6: Personality
+  const personality = inferPersonality(message);
+  const isFirstTurn = currentTurnCount === 0;
 
-  // ── Step 7: Build Master System Prompt ─────────────────────
+  // Step 7: Build Master System Prompt
   const sections: string[] = [
 
     // A) PERSONALITY BLOCK
     buildPersonalityBlock(personality),
 
-    // B) CONTEXT BLOCK (AI Brain data)
+    // B) CONTEXT BLOCK (AI Brain + Tutor data)
     context.contextBlock,
 
-    // C) v9: DB SESSION HISTORY BLOCK ← NEW
-    // Only injected if we have real cross-session data from DB
-    dbSessionSummary ? `\n=== STUDENT'S LEARNING HISTORY (from past sessions) ===\n${dbSessionSummary}\nUSE THIS: Reference past struggles naturally. E.g., "Since you've been working on recursion, let's connect this concept..."` : '',
+    // C) DB SESSION HISTORY — cross-session learning memory
+    dbSessionSummary
+      ? `\n=== STUDENT'S LEARNING HISTORY (from past sessions) ===\n${dbSessionSummary}\nUSE THIS: Reference past struggles naturally. E.g., "Since you've been working on recursion, let's connect this concept..."`
+      : '',
 
     // D) INSTRUCTION LAYER
     '\n=== HOW TO RESPOND ===',
@@ -210,7 +209,7 @@ export async function buildMasterPrompt(
     // J) MODEL NOTE
     '\n' + getModelNote(modelConfig),
 
-    // K) MANDATORY RESPONSE STRUCTURE ← THE KILLER FEATURE
+    // K) MANDATORY RESPONSE STRUCTURE
     plan.strategy !== 'QUIZ' && plan.strategy !== 'SHORT' ? `
 
 === MANDATORY RESPONSE STRUCTURE (follow this EVERY single time) ===
@@ -251,16 +250,17 @@ ABSOLUTE RULES:
 
   const systemPrompt = sections.filter(Boolean).join('\n');
 
-  // v10: Frontend history ONLY — already filtered & correct chat
+  // Frontend history ONLY — already filtered for correct chat (v10 fix)
   const history = (input.history ?? []).slice(-20);
 
   logger.info(
-    'AskAI v10 prompt | intent=' + plan.intent +
+    'AskAI v11 prompt | intent=' + plan.intent +
     ' strategy=' + plan.strategy +
     ' skill='    + skillLevel +
     ' model='    + modelConfig.modelId +
     ' history='  + history.length + 'msgs' +
-    ' weakDB='   + persistentWeakTopics.length
+    ' weakDB='   + persistentWeakTopics.length +
+    ' turns='    + currentTurnCount,
   );
 
   return { systemPrompt, history, userMessage: message, modelConfig, plan, context, detectedTopic };
@@ -280,12 +280,12 @@ export function validateAndLog(
   if (!result.isValid) {
     logger.warn(
       `[AskAI] Response validation failed | userId=${userId.slice(-6)} ` +
-      `intent=${intent} score=${result.score} issues=${result.issues.join(', ')}`
+      `intent=${intent} score=${result.score} issues=${result.issues.join(', ')}`,
     );
   } else if (result.issues.length > 0) {
     logger.info(
       `[AskAI] Response validation passed with warnings | userId=${userId.slice(-6)} ` +
-      `score=${result.score} warnings=${result.issues.join(', ')}`
+      `score=${result.score} warnings=${result.issues.join(', ')}`,
     );
   }
 
@@ -293,7 +293,9 @@ export function validateAndLog(
 }
 
 // ─────────────────────────────────────────────────────────────
-// detectEmotionalState  (unchanged from v8)
+// detectEmotionalState
+// Detects user's current emotional state from their message.
+// Supports English + Hinglish.
 // ─────────────────────────────────────────────────────────────
 export function detectEmotionalState(
   userMessage: string,
@@ -318,13 +320,15 @@ export function detectEmotionalState(
   }
 
   if (turnCount === 0) return 'neutral';
-
   return 'neutral';
 }
 
 // ─────────────────────────────────────────────────────────────
-// afterResponse  (unchanged — still updates RAM memory)
-// DB persistence is handled separately in aiController.ts
+// afterResponse
+// Bug #3 FIXED: RAM memory clarified.
+// RAM (conversationMemoryEngine) is kept ONLY for in-session
+// getMemorySummary used by contextEnhancer Layer 3.
+// DB persistence (persistAIMessage) is in aiController.ts ONLY.
 // ─────────────────────────────────────────────────────────────
 export function afterResponse(
   userId:      string,
@@ -332,19 +336,21 @@ export function afterResponse(
   aiResponse:  string,
   topic?:      string | null,
 ): void {
+  // RAM write: only for contextEnhancer.getMemorySummary (in-session context)
+  // DB is the source of truth — this is supplementary, in-process only
   try {
     addMessage(userId, 'user',      userMessage, topic ?? undefined);
     addMessage(userId, 'assistant', aiResponse,  topic ?? undefined);
   } catch (e: any) {
     logger.warn('afterResponse RAM update failed: ' + e.message);
   }
-
-  // DB persistence is now in aiController.ts (persistAIMessage)
-  // No DB call here — separation of concerns
+  // NOTE: persistAIMessage() is called in aiController.ts — NOT here
 }
 
 // ─────────────────────────────────────────────────────────────
-// detectTopic  (unchanged)
+// detectTopic — base topic detection (18 topics)
+// NOTE: aiController.ts uses detectTopicExpanded() (80+ topics)
+// from askAIOrchestrator.ts on top of this. Keep both.
 // ─────────────────────────────────────────────────────────────
 export function detectTopic(message: string, subjectMode: string): string | null {
   const lower = message.toLowerCase();
@@ -376,14 +382,4 @@ export function detectTopic(message: string, subjectMode: string): string | null
 
   if (subjectMode && subjectMode !== 'auto') return subjectMode;
   return null;
-}
-
-function detectSubject(topic: string): string {
-  const t = topic.toLowerCase();
-  if (['loops', 'arrays', 'functions', 'recursion', 'oop', 'sorting', 'pointers'].includes(t)) return 'Programming';
-  if (['python', 'javascript', 'react', 'databases'].includes(t)) return t.charAt(0).toUpperCase() + t.slice(1);
-  if (['algebra', 'calculus', 'trigonometry', 'probability'].includes(t)) return 'Mathematics';
-  if (['newtonian mechanics', 'electricity'].includes(t)) return 'Physics';
-  if (['chemistry', 'photosynthesis'].includes(t)) return 'Chemistry';
-  return 'General';
 }

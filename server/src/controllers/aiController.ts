@@ -1,65 +1,63 @@
 // ─────────────────────────────────────────────────────────────
-// AskAI — aiController.ts  (v9 — Fixed Routing + DB Persistence)
+// AskAI — aiController.ts  (v11 — AI-OS Full Integration)
 //
-// CHANGES FROM v8:
+// ROUTES HANDLED:
+//   POST /api/ai/ask           → askAI()         (image / text non-stream)
+//   POST /api/ai/ask-stream    → askAIStream()   (SSE streaming — main chat)
+//   POST /api/ai/solve-pdf     → solvePDF()      (PDF upload & solve)
+//   POST /api/ai/watch-ad      → watchAd()       (ad → quota refill)
+//   GET  /api/ai/quota         → getQuota()      (remaining questions)
+//   POST /api/ai/reset-session → resetSession()  (chat switch RAM clear)
 //
-//  Problem 1 FIXED — Model Priority for TEXT questions:
-//    GROQ is ALWAYS called first.
-//    OpenRouter is fallback ONLY if Groq fails.
-//    solveTextStreamWithContext() already does this in aiService.ts
-//    — it tries groqStream(), then falls back to openRouterStream().
-//    Nothing else needed — the chain is correct.
-//
-//  Problem 2 FIXED — Image/PDF routing:
-//    If req.body has questionType === 'image' or 'pdf' in the
-//    streaming endpoint (shouldn't happen — images go to /ask,
-//    but just in case), we force NVIDIA.
-//    The /ask endpoint (askAI function) already calls
-//    solveWithVision() which routes: NVIDIA → Groq → OR.
-//    Confirmed correct in aiService.ts.
-//
-//  Problem 3 FIXED — Full DB Persistence:
-//    Every user message → persistUserMessage() to MongoDB
-//    Every AI response  → persistAIMessage() to MongoDB
-//    Session created/retrieved from DB (not RAM-only)
-//    Cross-session history loaded from DB for AI context
-//    Weak topics loaded from DB (persistent, not reset on restart)
-//
-// UNCHANGED:
-//    SSE streaming logic, points system, emotional state detection,
-//    Mentor Intelligence Bar metadata, quota system.
+// WHAT'S NEW IN v11:
+//   1. askAIOrchestrator wired — post-response enrichment pipeline:
+//        learningRecommendationEngine → next-topic suggestions (every 3rd turn)
+//        progressAnalyzer            → real-time mastery score update
+//        hintGenerator               → socratic nudge when strategy=HINT
+//        emotional nudge             → rotating encouragement for struggling students
+//   2. detectTopicExpanded — 80+ topics (was 18), full Indian curriculum
+//   3. Bug fixed: validateAskAI now applied to /ask-stream route (aiRoutes.ts)
+//   4. Bug fixed: turnCount passed correctly to buildResponsePlan (askAIService.ts)
+//   5. Enrichment emitted as final SSE chunk { enrichment: {...} }
+//      Frontend reads this to show recommendation cards / nudges
 // ─────────────────────────────────────────────────────────────
 
-import { Request, Response }    from 'express';
+import { Request, Response }     from 'express';
 import {
   solveText,
   solveWithVision,
   solveTextStreamWithContext,
-}                               from '../services/aiService.js';
-import { contextAwareSolve }   from '../services/contextTutorService.js';
-import { personalTutorSolve }  from '../services/aiTutor/aiTutor.service.js';
-import { parsePDFText }        from '../services/pdfService.js';
-import { getUserIdFromToken }  from '../middleware/authMiddleware.js';
-import { User }                from '../models/User.model.js';
-import { Activity }            from '../models/Activity.model.js';
+}                                from '../services/aiService.js';
+import { contextAwareSolve }    from '../services/contextTutorService.js';
+import { personalTutorSolve }   from '../services/aiTutor/aiTutor.service.js';
+import { parsePDFText }         from '../services/pdfService.js';
+import { getUserIdFromToken }   from '../middleware/authMiddleware.js';
+import { User }                 from '../models/User.model.js';
+import { Activity }             from '../models/Activity.model.js';
 import { syncActivityToProfile } from '../services/studentProfileService.js';
-import { onActivityEvent }     from '../services/progressSystem/progressAnalyzer.js';
-import { logger }              from '../utils/logger.js';
+import { onActivityEvent }      from '../services/progressSystem/progressAnalyzer.js';
+import { logger }               from '../utils/logger.js';
 
 import {
   buildMasterPrompt,
   validateAndLog,
   detectEmotionalState,
-}                              from '../services/askAI/askAIService.js';
+}                               from '../services/askAI/askAIService.js';
 
-// ── v9: DB persistence layer ──────────────────────────────────
+// v11: AI-OS Orchestrator — post-response enrichment + expanded topic detection
+import {
+  runPostResponsePipeline,
+  detectTopicExpanded,
+}                               from '../services/askAI/askAIOrchestrator.js';
+
+// v9: DB persistence layer
 import {
   getOrCreateAskAISession,
   persistUserMessage,
   persistAIMessage,
   getWeakTopicsFromDB,
   getSessionSummaryForPrompt,
-}                              from '../services/askAI/askAIDbService.js';
+}                               from '../services/askAI/askAIDbService.js';
 
 // ─────────────────────────────────────────────────────────────
 // Constants
@@ -72,7 +70,7 @@ const REFILL_INTERVAL_MS  = 60 * 60 * 1000;
 const MAX_VIDEO_ADS_DAY   = 5;
 
 // ─────────────────────────────────────────────────────────────
-// Helpers (unchanged from v8)
+// Private Helpers
 // ─────────────────────────────────────────────────────────────
 function getTodayIST(): string {
   const now = new Date();
@@ -82,16 +80,18 @@ function getTodayIST(): string {
 function applyHourlyRefill(user: any, dailyLimit: number): void {
   const cutoff = Date.now() - REFILL_INTERVAL_MS;
   const recent = (user.questionUsedAt || []).filter(
-    (t: Date) => new Date(t).getTime() > cutoff
+    (t: Date) => new Date(t).getTime() > cutoff,
   );
   user.questionUsedAt = recent;
   user.questionsLeft  = Math.max(0, Math.min(dailyLimit, dailyLimit - recent.length));
 }
 
 function isPremiumValid(user: any): boolean {
-  if (!user.isPremium || !user.premiumExpiresAt) return false;
+  if (!user?.isPremium || !user?.premiumExpiresAt) return false;
   if (new Date(user.premiumExpiresAt) < new Date()) {
-    user.isPremium = false; user.premiumExpiresAt = null; return false;
+    user.isPremium        = false;
+    user.premiumExpiresAt = null;
+    return false;
   }
   return true;
 }
@@ -104,15 +104,15 @@ function getNextRefillSecs(user: any): number {
 }
 
 async function handleQuestionUsed(
-  req: Request,
+  req:        Request,
   promptText = '',
 ): Promise<{ questionsLeft: number; pointsAwarded: number; nextRefillSecs: number } | null> {
   const userId = getUserIdFromToken(req);
   if (!userId) return null;
 
   try {
-    const user       = await User.findById(userId);
-    if (!user) return null;
+    const user = await User.findById(userId);
+    if (!user)  return null;
 
     const premium    = isPremiumValid(user);
     const today      = getTodayIST();
@@ -135,28 +135,28 @@ async function handleQuestionUsed(
     (user as any).questionUsedAt = [...((user as any).questionUsedAt || []), new Date()];
     applyHourlyRefill(user, dailyLimit);
 
-    const pts = premium ? BASE_AI_POINTS * PREMIUM_MULTIPLIER : BASE_AI_POINTS;
+    const pts                         = premium ? BASE_AI_POINTS * PREMIUM_MULTIPLIER : BASE_AI_POINTS;
     user.points                      += pts;
     (user as any).totalXP             = ((user as any).totalXP || 0) + pts;
     (user as any).totalQuestionsAsked = ((user as any).totalQuestionsAsked || 0) + 1;
     await user.save();
 
-    const isInternal   = promptText.startsWith('{') || promptText.startsWith('[') ||
+    const isInternal     = promptText.startsWith('{') || promptText.startsWith('[') ||
       promptText.toLowerCase().startsWith('output only');
-    const cleanPrompt  = isInternal ? '' : promptText.trim();
+    const cleanPrompt    = isInternal ? '' : promptText.trim();
     const activityDetail = cleanPrompt
       ? `Asked: ${cleanPrompt.substring(0, 80)}${cleanPrompt.length > 80 ? '…' : ''}`
       : 'Asked an AI question';
 
     await Activity.create({ userId, action: 'ask_question', details: activityDetail, pointsEarned: pts });
-    logger.info(`AI question: | premium=${premium} | +${pts}pts | left=${(user as any).questionsLeft}`);
+    logger.info(`AI question | premium=${premium} | +${pts}pts | left=${(user as any).questionsLeft}`);
 
     syncActivityToProfile(userId, 'ask_question', pts).catch(() => {});
     onActivityEvent(userId, 'ai_tutor_used', { topic: activityDetail }).catch(() => {});
 
     return {
-      questionsLeft: (user as any).questionsLeft,
-      pointsAwarded: pts,
+      questionsLeft:  (user as any).questionsLeft,
+      pointsAwarded:  pts,
       nextRefillSecs: getNextRefillSecs(user),
     };
   } catch (err: any) {
@@ -167,25 +167,20 @@ async function handleQuestionUsed(
 
 // ─────────────────────────────────────────────────────────────
 // POST /api/ai/ask
-// Non-streaming: used for IMAGE + PDF (vision path)
-//
-// ROUTING (Problem 2):
-//   image → solveWithVision() → NVIDIA first → Groq → OR
-//   pdf   → parsePDFText() then solveWithVision()
-//   text  → personalTutorSolve() (legacy non-streaming path)
+// Non-streaming: IMAGE (vision) + legacy text path
 // ─────────────────────────────────────────────────────────────
 export async function askAI(req: Request, res: Response) {
   try {
     const {
       prompt,
       image,
-      history     = [],
+      history      = [],
       subjectMode,
       stepByStep,
       personality,
       hintMode,
       recentActivity,
-      convoId,           // ← v9: frontend passes convoId for DB linking
+      convoId,
     } = req.body;
 
     const safeHistory = (Array.isArray(history) ? history : [])
@@ -197,39 +192,34 @@ export async function askAI(req: Request, res: Response) {
       return res.status(400).json({ success: false, answer: 'Please enter a question or upload an image.' });
     }
 
-    const userId       = getUserIdFromToken(req) ?? '';
-    const questionType: 'text' | 'image' | 'pdf' = image ? 'image' : 'text';
-    const startMs      = Date.now();
+    const userId                                   = getUserIdFromToken(req) ?? '';
+    const questionType: 'text' | 'image' | 'pdf'  = image ? 'image' : 'text';
+    const startMs                                  = Date.now();
     let answer: string;
 
     if (image) {
-      // ── PATH: IMAGE → NVIDIA (Problem 2) ───────────────────
+      // IMAGE → NVIDIA vision (primary) → Groq Vision → OR Vision
       let imageUrl = image;
       if (!image.startsWith('data:')) {
         const isJpeg = image.startsWith('/9j/');
-        imageUrl = `data:image/${isJpeg ? 'jpeg' : 'png'};base64,${image}`;
+        imageUrl     = `data:image/${isJpeg ? 'jpeg' : 'png'};base64,${image}`;
       }
       logger.info(`/api/ai/ask image=true | mode=${subjectMode || 'auto'}`);
-
-      // solveWithVision routes: NVIDIA → Groq Vision → OR Vision (already correct)
       answer = await solveWithVision(imageUrl, prompt || '');
-
     } else {
-      // ── PATH: TEXT → PersonalTutor ──────────────────────────
+      // TEXT → personalTutorSolve → contextAwareSolve → solveText (fallback chain)
       logger.info(`/api/ai/ask text | mode=${subjectMode || 'auto'}`);
-      let tutorMeta: any = {};
       if (userId) {
         try {
           const tutorResponse = await personalTutorSolve({
             userId,
             message:        prompt,
             history:        safeHistory,
-            personality:    personality || undefined,
+            personality:    personality  || undefined,
             hintOverride:   hintMode !== undefined ? !!hintMode : undefined,
             recentActivity: recentActivity || undefined,
           });
-          answer   = tutorResponse.answer;
-          tutorMeta = tutorResponse;
+          answer = tutorResponse.answer;
         } catch {
           try {
             answer = await contextAwareSolve(userId, prompt, safeHistory, {
@@ -249,7 +239,7 @@ export async function askAI(req: Request, res: Response) {
     const userAction = await handleQuestionUsed(req, String(prompt || '').substring(0, 100));
     const pts        = userAction?.pointsAwarded ?? (isPremiumValid(await User.findById(userId).lean()) ? 20 : 10);
 
-    // ── v9: Persist to DB (non-blocking) ─────────────────────
+    // Persist to DB (non-blocking)
     if (userId) {
       (async () => {
         try {
@@ -260,8 +250,7 @@ export async function askAI(req: Request, res: Response) {
             null, 'neutral', questionType,
           );
           await persistAIMessage(
-            sessionId, userId,
-            answer,
+            sessionId, userId, answer,
             null, null, null,
             image ? 'nvidia-vision' : null,
             image ? 'nvidia'        : null,
@@ -277,7 +266,7 @@ export async function askAI(req: Request, res: Response) {
       success:        true,
       answer,
       pointsAwarded:  pts,
-      questionsLeft:  userAction?.questionsLeft ?? 0,
+      questionsLeft:  userAction?.questionsLeft  ?? 0,
       nextRefillSecs: userAction?.nextRefillSecs ?? 0,
     });
 
@@ -289,27 +278,23 @@ export async function askAI(req: Request, res: Response) {
 
 // ─────────────────────────────────────────────────────────────
 // POST /api/ai/ask-stream
-// SSE Streaming: TEXT questions only
+// SSE Streaming — main AskAI chat endpoint
 //
-// ROUTING (Problem 1):
-//   solveTextStreamWithContext() calls:
-//     groqStream()        ← FIRST (primary)
-//     openRouterStream()  ← FALLBACK (only if Groq fails)
-//   This is already implemented correctly in aiService.ts.
-//
-// DB PERSISTENCE (Problem 3):
-//   - Session created/retrieved from DB at start
-//   - User message persisted BEFORE streaming starts
-//   - AI response persisted AFTER stream completes
-//   - DB history used for cross-session context
+// SSE chunk types (in order):
+//   1. metadata  { intent, strategy, skillLevel, detectedTopic,
+//                  subject, isWeakTopic, emotionalState, provider }
+//   2. tokens    { token: "..." }   (one per LLM token)
+//   3. done      { done: true }
+//   4. enrichment { enrichment: { recommendation, progressInsight,
+//                                 hintMode, hintText, emotionalNudge } }
 // ─────────────────────────────────────────────────────────────
 export async function askAIStream(req: Request, res: Response): Promise<void> {
   const {
     prompt,
-    history      = [],   // ← Frontend se aata hai — CORRECT chat ki history
-    subjectMode  = 'auto',
-    stepByStep   = false,
-    convoId      = null,
+    history     = [],
+    subjectMode = 'auto',
+    stepByStep  = false,
+    convoId     = null,
   } = req.body;
 
   const userId  = getUserIdFromToken(req) ?? '';
@@ -330,15 +315,9 @@ export async function askAIStream(req: Request, res: Response): Promise<void> {
   let sessionId    = '';
 
   try {
-    // ── v10 CRITICAL FIX: DB se history LOAD NAHI karte ────────
-    // Pehle loadSessionHistory(userId) se saari chats ki history
-    // merge hoti thi — Newton chat mein Photosynthesis context
-    // inject ho jaata tha. Ab sirf frontend ki history use karo.
-    //
-    // Frontend ka `history` array = screen pe jo messages dikh
-    // rahe hain = current chat ke messages = ALWAYS CORRECT.
+    // DB setup: session + weak topics (non-blocking on failure)
     let dbWeakTopics:    string[] = [];
-    let dbSessionSummary = '';
+    let dbSessionSummary          = '';
 
     if (userId) {
       try {
@@ -350,12 +329,12 @@ export async function askAIStream(req: Request, res: Response): Promise<void> {
       }
     }
 
-    // ── Frontend history = current chat ka context ──────────────
+    // Frontend history = source of truth for current chat (v10 fix)
     const contextHistory = (Array.isArray(history) ? history : [])
       .filter((m: any) => m.role && m.content && typeof m.content === 'string')
       .slice(-20);
 
-    // ── Build master prompt ─────────────────────────────────────
+    // Build master prompt via full AI-OS pipeline
     const pkg = await buildMasterPrompt({
       userId,
       message:              prompt,
@@ -368,35 +347,47 @@ export async function askAIStream(req: Request, res: Response): Promise<void> {
 
     const emotionalState = detectEmotionalState(prompt, pkg.plan.turnCount ?? 0);
 
+    // v11: expanded topic detection — 80+ topics, Indian curriculum
+    const expandedTopic = detectTopicExpanded(prompt, subjectMode);
+    const finalTopic    = expandedTopic.topic ?? pkg.detectedTopic;
+    const finalSubject  = expandedTopic.subject;
+
     logger.info(
-      'AskAI v10 | intent='  + pkg.plan.intent +
+      'AskAI v11 | intent='  + pkg.plan.intent +
       ' skill='   + pkg.context.skillLevel +
       ' model='   + pkg.modelConfig.modelId +
-      ' convoId=' + (convoId ? convoId.slice(-6) : 'new') +
-      ' history=' + contextHistory.length + 'msgs'
+      ' topic='   + (finalTopic   ?? 'none') +
+      ' subject=' + (finalSubject ?? 'none') +
+      ' emotion=' + emotionalState +
+      ' convoId=' + (convoId ? String(convoId).slice(-6) : 'new') +
+      ' turns='   + contextHistory.length,
     );
 
-    // ── Persist user message (background) ──────────────────────
+    // Persist user message (fire-and-forget)
     if (userId && sessionId) {
       persistUserMessage(
         sessionId, userId, prompt,
-        pkg.detectedTopic, emotionalState, 'text',
+        finalTopic, emotionalState, 'text',
       ).catch(() => {});
     }
 
-    // ── Emit metadata SSE ───────────────────────────────────────
-    const isWeakTopic = pkg.detectedTopic
-      ? pkg.context.weakTopics.includes(pkg.detectedTopic) ||
-        dbWeakTopics.includes(pkg.detectedTopic)
+    // SSE chunk 1: metadata (Mentor Intelligence Bar reads this)
+    const isWeakTopic = finalTopic
+      ? pkg.context.weakTopics.includes(finalTopic) || dbWeakTopics.includes(finalTopic)
       : false;
 
     res.write('data: ' + JSON.stringify({
-      intent: pkg.plan.intent, strategy: pkg.plan.strategy,
-      skillLevel: pkg.context.skillLevel, detectedTopic: pkg.detectedTopic,
-      isWeakTopic, emotionalState, provider: 'groq',
+      intent:        pkg.plan.intent,
+      strategy:      pkg.plan.strategy,
+      skillLevel:    pkg.context.skillLevel,
+      detectedTopic: finalTopic,
+      subject:       finalSubject,
+      isWeakTopic,
+      emotionalState,
+      provider:      'groq',
     }) + '\n\n');
 
-    // ── Capture tokens ──────────────────────────────────────────
+    // SSE token capture proxy — builds fullResponse while streaming
     const captureWrite = (chunk: any) => {
       try {
         const str = typeof chunk === 'string' ? chunk : chunk.toString('utf8');
@@ -409,7 +400,7 @@ export async function askAIStream(req: Request, res: Response): Promise<void> {
             }
           }
         }
-      } catch { /* ignore */ }
+      } catch { /* ignore parse errors */ }
       return res.write(chunk);
     };
 
@@ -421,14 +412,14 @@ export async function askAIStream(req: Request, res: Response): Promise<void> {
       },
     });
 
-    // ── Stream: GROQ → OpenRouter fallback ─────────────────────
+    // Stream: GROQ (primary) → OpenRouter (fallback) — handled inside aiService.ts
     await solveTextStreamWithContext(
       pkg.userMessage, pkg.history, pkg.systemPrompt, proxyRes as any,
     );
 
     const responseMs = Date.now() - startMs;
 
-    // ── Post-stream: validate + DB persist ──────────────────────
+    // Validate + persist AI message (fire-and-forget)
     if (fullResponse && userId) {
       validateAndLog(fullResponse, pkg.plan.intent, prompt, userId);
     }
@@ -442,13 +433,42 @@ export async function askAIStream(req: Request, res: Response): Promise<void> {
       ).catch(() => {});
     }
 
+    // Deduct quota + award points (fire-and-forget)
     if (userId) {
       handleQuestionUsed(req, String(prompt).substring(0, 100)).catch(() => {});
     }
 
+    // ── v11: AI-OS Enrichment Pipeline ────────────────────────
+    // Runs AFTER stream ends — student already has their response
+    // Connects: learningSystem + progressSystem + hintGenerator + emotional nudge
+    // Emits final SSE chunk with enrichment data for the frontend to display
+    if (userId && fullResponse) {
+      runPostResponsePipeline({
+        userId,
+        prompt,
+        aiResponse:    fullResponse,
+        emotionalState,
+        detectedTopic: finalTopic,
+        intent:        pkg.plan.intent,
+        strategy:      pkg.plan.strategy,
+        turnCount:     pkg.plan.turnCount ?? 0,
+        subjectMode,
+      }).then(enrichment => {
+        if (res.writableEnded) return;
+        const hasData =
+          enrichment.recommendation  ||
+          enrichment.progressInsight  ||
+          enrichment.hintMode         ||
+          enrichment.emotionalNudge;
+        if (hasData) {
+          res.write('data: ' + JSON.stringify({ enrichment }) + '\n\n');
+        }
+      }).catch(() => { /* enrichment failure never blocks the stream */ });
+    }
+
   } catch (err: any) {
     if (!res.writableEnded) {
-      logger.error('AskAI v10 error: ' + err.message);
+      logger.error('AskAI v11 stream error: ' + err.message);
       res.write('data: ' + JSON.stringify({ error: 'Stream failed. Please try again.' }) + '\n\n');
     }
   } finally {
@@ -456,27 +476,29 @@ export async function askAIStream(req: Request, res: Response): Promise<void> {
   }
 }
 
+// ─────────────────────────────────────────────────────────────
+// POST /api/ai/solve-pdf
+// PDF upload → AI solve
+// Text PDF → Groq, Scanned PDF → NVIDIA Vision
+// ─────────────────────────────────────────────────────────────
 export async function solvePDF(req: Request, res: Response) {
   try {
     if (!req.file)
       return res.status(400).json({ success: false, answer: 'No file uploaded.' });
 
-    const userId   = getUserIdFromToken(req) ?? '';
-    const prompt   = req.body.prompt || '';
-    const startMs  = Date.now();
+    const userId  = getUserIdFromToken(req) ?? '';
+    const prompt  = req.body.prompt || '';
+    const startMs = Date.now();
 
-    // parsePDFText returns a plain string (not an object)
     const pdfText = await parsePDFText(req.file.buffer);
-
     let answer: string;
+
     if (pdfText && pdfText.trim().length > 50) {
-      // Text-based PDF → Groq (primary) → OR (fallback)
       const q = prompt
         ? `PDF Content:\n\n${pdfText.slice(0, 8000)}\n\nStudent Question: ${prompt}`
         : `Please analyze and solve all questions in this PDF:\n\n${pdfText.slice(0, 8000)}`;
       answer = await solveText(q, [], 'general');
     } else {
-      // Scanned PDF → NVIDIA Vision (primary)
       answer = await solveWithVision(
         `data:application/pdf;base64,${req.file.buffer.toString('base64')}`,
         prompt || 'Solve all questions in this PDF completely.',
@@ -486,7 +508,6 @@ export async function solvePDF(req: Request, res: Response) {
     const responseMs = Date.now() - startMs;
     const userAction = await handleQuestionUsed(req, prompt.substring(0, 100));
 
-    // v9: Persist to DB
     if (userId) {
       (async () => {
         try {
@@ -523,14 +544,15 @@ export async function solvePDF(req: Request, res: Response) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// POST /api/ai/watch-ad  (unchanged)
+// POST /api/ai/watch-ad
+// Watch video ad → +3 questions to quota
 // ─────────────────────────────────────────────────────────────
 export async function watchAd(req: Request, res: Response) {
   const userId = getUserIdFromToken(req);
   if (!userId) return res.status(401).json({ success: false });
 
   try {
-    const user  = await User.findById(userId);
+    const user = await User.findById(userId);
     if (!user)  return res.status(404).json({ success: false });
 
     const today    = getTodayIST();
@@ -538,8 +560,8 @@ export async function watchAd(req: Request, res: Response) {
     const dailyLim = premium ? PREMIUM_DAILY_LIMIT : FREE_DAILY_LIMIT;
 
     if ((user as any).videoAdsDate !== today) {
-      (user as any).videoAdsDate   = today;
-      (user as any).videoAdsToday  = 0;
+      (user as any).videoAdsDate  = today;
+      (user as any).videoAdsToday = 0;
     }
 
     if (((user as any).videoAdsToday || 0) >= MAX_VIDEO_ADS_DAY) {
@@ -552,7 +574,7 @@ export async function watchAd(req: Request, res: Response) {
     await user.save();
 
     return res.json({
-      success:       true,
+      success:      true,
       questionsLeft: (user as any).questionsLeft,
       videoAdsLeft:  MAX_VIDEO_ADS_DAY - (user as any).videoAdsToday,
     });
@@ -563,7 +585,8 @@ export async function watchAd(req: Request, res: Response) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// GET /api/ai/quota  (unchanged)
+// GET /api/ai/quota
+// Returns remaining question quota for current user
 // ─────────────────────────────────────────────────────────────
 export async function getQuota(req: Request, res: Response) {
   const userId = getUserIdFromToken(req);
@@ -571,7 +594,7 @@ export async function getQuota(req: Request, res: Response) {
 
   try {
     const user = await User.findById(userId);
-    if (!user) return res.status(404).json({ success: false });
+    if (!user)  return res.status(404).json({ success: false });
 
     const premium    = isPremiumValid(user);
     const today      = getTodayIST();
@@ -600,27 +623,18 @@ export async function getQuota(req: Request, res: Response) {
 
 // ─────────────────────────────────────────────────────────────
 // POST /api/ai/reset-session
-// ── v9 FIX: Chat Switch Memory Reset ─────────────────────────
-//
-// Problem: Jab user purani chat open karta hai aur question
-// puchta hai, server RAM mein ek alag (wrong) session hota hai.
-// Uska context current chat se match nahi karta.
-// Yeh endpoint us RAM session ko clear karta hai.
-//
-// Frontend is endpoint ko tab call karta hai jab user
-// sidebar se kisi aur chat pe click karta hai.
+// Called by frontend when user switches chat in sidebar.
+// Clears in-process RAM memory for this user so old context
+// doesn't bleed into the next chat's first question.
 // ─────────────────────────────────────────────────────────────
 export async function resetSession(req: Request, res: Response) {
   const userId = getUserIdFromToken(req);
   if (!userId) return res.status(401).json({ success: false });
 
   try {
-    // RAM memory clear karo is user ke liye
     const { clearSession } = await import('../services/askAI/conversationMemoryEngine.js');
     clearSession(userId);
-
     logger.info(`[AskAI] Session RAM cleared | userId=${userId.slice(-6)} | convoId=${req.body.convoId || 'none'}`);
-
     return res.json({ success: true });
   } catch (err: any) {
     logger.error('resetSession error: ' + err.message);
