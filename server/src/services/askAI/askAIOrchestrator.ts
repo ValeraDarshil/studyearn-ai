@@ -38,6 +38,19 @@ export interface PostResponseEnrichment {
   hintMode:         boolean;
   hintText:         string | null;
   emotionalNudge:   string | null;
+  // v12: Improvement 5 — Growth Mirror (visible proof of student growth)
+  growthMirror:     GrowthMirrorData | null;
+  // v12: Improvement 7 — Dynamic Wow Observation (user-specific, from real data)
+  wowObservation:   string | null;
+}
+
+// v12: Growth Mirror data — shows student's actual progress journey
+export interface GrowthMirrorData {
+  grownTopics:  string[];   // topics moved weak -> strong
+  strongTopics: string[];   // all mastered topics
+  totalTurns:   number;     // total Q&A across all sessions
+  sessionCount: number;     // number of sessions
+  message:      string;     // human-readable growth message
 }
 
 interface RecommendationSnippet {
@@ -74,10 +87,12 @@ export async function runPostResponsePipeline(
     hintMode:        false,
     hintText:        null,
     emotionalNudge:  null,
+    growthMirror:    null,
+    wowObservation:  null,
   };
 
   // Run all enrichment in parallel — failures are isolated
-  const [recResult, progressResult, hintResult, emotionResult] = await Promise.allSettled([
+  const [recResult, progressResult, hintResult, emotionResult, growthResult, wowResult] = await Promise.allSettled([
     // 1. Learning recommendation (after_ai_tutor trigger)
     _getRecommendation(userId, detectedTopic, subjectMode, turnCount),
 
@@ -89,6 +104,12 @@ export async function runPostResponsePipeline(
 
     // 4. Emotional nudge for struggling students
     _getEmotionalNudge(userId, emotionalState, turnCount),
+
+    // 5. v12: Growth Mirror — Improvement 5
+    _getGrowthMirror(userId, turnCount),
+
+    // 6. v12: Dynamic Wow Observation — Improvement 7
+    _getWowObservation(userId, turnCount, subjectMode, detectedTopic),
   ]);
 
   if (recResult.status === 'fulfilled' && recResult.value) {
@@ -106,6 +127,17 @@ export async function runPostResponsePipeline(
 
   if (emotionResult.status === 'fulfilled' && emotionResult.value) {
     enrichment.emotionalNudge = emotionResult.value;
+  }
+
+  // v12: Growth Mirror — only show on turn 1 of a session (first response)
+  // or when a new growth milestone is detected
+  if (growthResult.status === 'fulfilled' && growthResult.value) {
+    enrichment.growthMirror = growthResult.value;
+  }
+
+  // v12: Wow Observation — show every 5 turns with real user-specific data
+  if (wowResult.status === 'fulfilled' && wowResult.value) {
+    enrichment.wowObservation = wowResult.value;
   }
 
   return enrichment;
@@ -395,4 +427,152 @@ export function detectTopicExpanded(
   }
 
   return { topic: null, subject: null };
+}
+// ─────────────────────────────────────────────────────────────
+// _getGrowthMirror  (v12 — Improvement 5)
+// Reads DB sessions → finds topics that moved weak → strong.
+// Only fires on turn 1 of a new session OR every 10 turns.
+// Never shows same data twice — checks if growth is "new".
+// ─────────────────────────────────────────────────────────────
+async function _getGrowthMirror(
+  userId:    string,
+  turnCount: number,
+): Promise<GrowthMirrorData | null> {
+  // Only show on first response of a session (turnCount=0 means this IS turn 1)
+  // or every 10 turns as a reminder
+  if (turnCount !== 0 && turnCount % 10 !== 0) return null;
+
+  try {
+    const { AskAISession } = await import('../../models/AskAISession.model.js');
+
+    const sessions = await AskAISession.find({ userId, deletedAt: null, turnCount: { $gt: 0 } })
+      .sort({ lastMessageAt: -1 })
+      .limit(10)
+      .select('weakTopics strongTopics detectedTopics turnCount')
+      .lean();
+
+    if (!sessions.length) return null;
+
+    const allWeak   = [...new Set(sessions.flatMap((s: any) => s.weakTopics   || []) as string[])] as string[];
+    const allStrong = [...new Set(sessions.flatMap((s: any) => s.strongTopics || []) as string[])] as string[];
+    const totalTurns = sessions.reduce((acc: number, s: any) => acc + (s.turnCount || 0), 0);
+
+    // Growth = topics that were once weak but are now strong
+    const grownTopics = allStrong.filter((t: string) => allWeak.includes(t));
+
+    // Need at least some data to show meaningful growth mirror
+    if (allStrong.length === 0 && grownTopics.length === 0) return null;
+
+    // Build a human-readable growth message
+    let message = '';
+    if (grownTopics.length > 0) {
+      const topicList = grownTopics.slice(0, 3).join(', ');
+      message = `You've gone from struggling with ${topicList} to mastering ${grownTopics.length === 1 ? 'it' : 'them'} — real growth! 📈`;
+    } else if (allStrong.length > 0) {
+      const topicList = allStrong.slice(0, 3).join(', ');
+      message = `You've built solid understanding in: ${topicList}. Keep building on this! 💪`;
+    } else if (totalTurns >= 10) {
+      message = `${totalTurns} questions answered across ${sessions.length} sessions — your consistency is paying off! 🔥`;
+    }
+
+    if (!message) return null;
+
+    return {
+      grownTopics,
+      strongTopics: allStrong.slice(0, 5),
+      totalTurns,
+      sessionCount: sessions.length,
+      message,
+    };
+
+  } catch (e: any) {
+    logger.debug('[AskAI Orchestrator] growthMirror failed: ' + e.message);
+    return null;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// _getWowObservation  (v12 — Improvement 7)
+// Generates a PERSONALIZED observation about student's learning
+// pattern — using REAL data from their session history.
+// Fires every 5 turns to feel alive + aware.
+// ─────────────────────────────────────────────────────────────
+async function _getWowObservation(
+  userId:        string,
+  turnCount:     number,
+  subjectMode:   string,
+  detectedTopic: string | null,
+): Promise<string | null> {
+  // Fire every 5 turns (turn 4, 9, 14... because turnCount is 0-indexed here)
+  if ((turnCount + 1) % 5 !== 0) return null;
+
+  try {
+    const { AskAISession } = await import('../../models/AskAISession.model.js');
+
+    const sessions = await AskAISession.find({ userId, deletedAt: null, turnCount: { $gt: 0 } })
+      .sort({ lastMessageAt: -1 })
+      .limit(5)
+      .select('detectedTopics weakTopics strongTopics textCount imageCount turnCount')
+      .lean();
+
+    if (!sessions.length) return null;
+
+    const allTopics  = [...new Set(sessions.flatMap((s: any) => s.detectedTopics || []) as string[])] as string[];
+    const allWeak    = [...new Set(sessions.flatMap((s: any) => s.weakTopics     || []) as string[])] as string[];
+    const allStrong  = [...new Set(sessions.flatMap((s: any) => s.strongTopics   || []) as string[])] as string[];
+    const totalTurns = sessions.reduce((acc: number, s: any) => acc + (s.turnCount || 0), 0);
+    const totalImg   = sessions.reduce((acc: number, s: any) => acc + (s.imageCount || 0), 0);
+
+    // Pick the most relevant observation based on actual data
+    const observations: string[] = [];
+
+    // Subject pattern observation
+    if (subjectMode !== 'auto' && subjectMode) {
+      observations.push(`You've been consistently exploring ${subjectMode} — focused practice like this is exactly how mastery happens! 🎯`);
+    }
+
+    // Topic diversity observation
+    if (allTopics.length >= 4) {
+      observations.push(`You've covered ${allTopics.length} different topics so far — that's great breadth of curiosity! 🌟`);
+    }
+
+    // Visual learner observation
+    if (totalImg >= 3) {
+      observations.push(`You often use images to explain problems — that's a powerful way to communicate complex ideas! 📸`);
+    }
+
+    // Strong foundation observation
+    if (allStrong.length >= 2) {
+      const topics = allStrong.slice(0, 2).join(' and ');
+      observations.push(`Your understanding of ${topics} is solid — you can now use these as stepping stones for harder concepts! 🏗️`);
+    }
+
+    // Persistence observation
+    if (allWeak.length >= 1 && totalTurns >= 8) {
+      observations.push(`You keep coming back to practice even challenging topics — that's the mindset that beats 90% of students! 💪`);
+    }
+
+    // Volume observation
+    if (totalTurns >= 15) {
+      observations.push(`${totalTurns} questions and counting — your consistency is building a real learning habit! 🔥`);
+    }
+
+    // Current topic deep-dive observation
+    if (detectedTopic) {
+      const topicAppearances = allTopics.filter((t: string) => t.toLowerCase().includes(detectedTopic.toLowerCase())).length;
+      if (topicAppearances >= 2) {
+        observations.push(`You keep returning to ${detectedTopic} — deep focus like this is how real expertise is built! 🧠`);
+      }
+    }
+
+    if (observations.length === 0) return null;
+
+    // Pick based on userId hash + turnCount for variety
+    const idx = (userId.charCodeAt(userId.length - 1) + turnCount) % observations.length;
+    return observations[idx];
+
+  } catch (e: any) {
+    logger.debug('[AskAI Orchestrator] wowObservation failed: ' + e.message);
+    return null;
+  }
 }

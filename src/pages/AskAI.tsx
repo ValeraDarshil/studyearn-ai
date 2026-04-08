@@ -49,7 +49,7 @@ type Role        = "user" | "assistant";
 type SubjectMode = "auto" | "math" | "coding" | "science" | "general";
 type EmotionalState = "correct" | "confused" | "frustrated" | "motivated" | "neutral";
 
-// v11: AI-OS enrichment from backend orchestrator
+// v11/v12: AI-OS enrichment from backend orchestrator
 interface AskAIEnrichment {
   recommendation?: {
     title:   string;
@@ -62,6 +62,16 @@ interface AskAIEnrichment {
   hintMode?:        boolean;
   hintText?:        string | null;
   emotionalNudge?:  string | null;
+  // v12: Improvement 5 — Growth Mirror
+  growthMirror?: {
+    grownTopics:  string[];
+    strongTopics: string[];
+    totalTurns:   number;
+    sessionCount: number;
+    message:      string;
+  } | null;
+  // v12: Improvement 7 — Dynamic Wow Observation (replaces hardcoded)
+  wowObservation?: string | null;
 }
 
 interface ChatMsg {
@@ -195,6 +205,7 @@ function EnrichmentCard({
   onDismiss: () => void;
 }) {
   if (!enrichment.recommendation && !enrichment.progressInsight && !enrichment.emotionalNudge) return null;
+  // Note: growthMirror and wowObservation are handled by dedicated components
 
   return (
     <div className="mt-3 space-y-2">
@@ -303,6 +314,47 @@ function WowMomentBadge({ text, onDismiss }: { text: string; onDismiss: () => vo
       <span className="flex-1">{text}</span>
       <button onClick={onDismiss} className="flex-shrink-0 text-yellow-500/60 hover:text-yellow-300 transition-colors">
         <X className="w-3 h-3" />
+      </button>
+    </div>
+  );
+}
+
+// ─── Growth Mirror Card (v12 — Improvement 5) ───────────────
+// Shows at start of first AI response in a session.
+// Visible proof of student's actual progress — NOT generic.
+// Data comes from real DB session history via SSE enrichment.
+function GrowthMirrorCard({
+  data,
+  onDismiss,
+}: {
+  data: NonNullable<AskAIEnrichment["growthMirror"]>;
+  onDismiss: () => void;
+}) {
+  return (
+    <div className="mb-4 flex items-start gap-3 px-4 py-3 rounded-2xl border border-emerald-500/25 bg-emerald-500/8 animate-fade-in-up">
+      <div className="flex-shrink-0 w-8 h-8 rounded-xl bg-emerald-500/15 border border-emerald-500/20 flex items-center justify-center mt-0.5">
+        <span className="text-sm">📈</span>
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-emerald-300 text-xs font-semibold mb-0.5">Your Growth Mirror</p>
+        <p className="text-emerald-200/80 text-xs leading-relaxed">{data.message}</p>
+        {data.grownTopics.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-2">
+            {data.grownTopics.slice(0, 3).map(t => (
+              <span key={t} className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/20">
+                ✓ {t}
+              </span>
+            ))}
+          </div>
+        )}
+        {data.totalTurns > 0 && (
+          <p className="text-emerald-400/50 text-[10px] mt-1.5">
+            {data.totalTurns} questions across {data.sessionCount} session{data.sessionCount !== 1 ? "s" : ""}
+          </p>
+        )}
+      </div>
+      <button onClick={onDismiss} className="flex-shrink-0 text-emerald-500/50 hover:text-emerald-300 transition-colors mt-0.5">
+        <X className="w-3.5 h-3.5" />
       </button>
     </div>
   );
@@ -741,6 +793,10 @@ export function AskAI() {
   const [showHintBanner, setShowHintBanner] = useState(false);
   const [hintText,       setHintText]       = useState<string | null>(null);
 
+  // ── v12: Growth Mirror state (Improvement 5) ─────────────
+  const [growthMirror,     setGrowthMirror]     = useState<AskAIEnrichment["growthMirror"]>(null);
+  const [showGrowthMirror, setShowGrowthMirror] = useState(false);
+
   // ── Comeback Nudge (v8 NEW) ──────────────────────────────
   const [showComebackNudge, setShowComebackNudge] = useState(false);
   const comebackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -976,6 +1032,7 @@ export function AskAI() {
     setSessionTopics([]); setMistakeTopics([]); setWeakTopicBanner(null);
     setEmotionalState("neutral"); setShowEmotionalToast(false);
     setWowMoment(null); setShowWowMoment(false);
+    setGrowthMirror(null); setShowGrowthMirror(false);
     setShowComebackNudge(false);
     setEnrichment(null); setShowHintBanner(false); setHintText(null);
     textareaRef.current?.focus();
@@ -1300,15 +1357,28 @@ export function AskAI() {
               setShowEmotionalToast(true);
             }
 
-            // ── v11: AI-OS Enrichment chunk ───────────────
+            // ── v11/v12: AI-OS Enrichment chunk ──────────
             // Arrives AFTER stream ends — shows recommendations,
-            // progress insights, hint nudges, emotional nudges
+            // progress insights, hint nudges, emotional nudges,
+            // growth mirror (Imp 5), wow observation (Imp 7)
             if (parsed.enrichment) {
               const e: AskAIEnrichment = parsed.enrichment;
               setEnrichment(e);
               if (e.hintMode && e.hintText) {
                 setHintText(e.hintText);
                 setShowHintBanner(true);
+              }
+              // v12: Growth Mirror — show if data exists
+              if (e.growthMirror && e.growthMirror.message) {
+                setGrowthMirror(e.growthMirror);
+                setShowGrowthMirror(true);
+              }
+              // v12: Dynamic Wow Observation — replaces hardcoded messages
+              if (e.wowObservation) {
+                setTimeout(() => {
+                  setWowMoment(e.wowObservation!);
+                  setShowWowMoment(true);
+                }, 1500);
               }
             }
 
@@ -1346,20 +1416,9 @@ export function AskAI() {
         setMentorState(prev => ({ ...prev, turnCount: prev.turnCount + 1 }));
 
         // ── v12: Wow Moment (Improvement 7) ─────────────────
-        // Trigger every 5-6 turns — makes AI feel alive & observant
-        const newTurnCount = mentorState.turnCount + 1;
-        if (newTurnCount > 0 && newTurnCount % 5 === 0) {
-          const wowObservations = [
-            "✨ I've noticed you understand concepts faster when I use examples — I'll keep doing that for you!",
-            "📈 You've asked some really deep questions today — your understanding is clearly growing!",
-            "🎯 You're mixing theory and practical questions really well — that's a great learning pattern!",
-            "🔥 You've covered a lot of ground this session — keep this momentum going!",
-            "💡 The way you're connecting different topics shows your brain is making strong links!",
-          ];
-          const idx = newTurnCount / 5 - 1;
-          const obs = wowObservations[idx % wowObservations.length];
-          setTimeout(() => { setWowMoment(obs); setShowWowMoment(true); }, 1500);
-        }
+        // Now DYNAMIC — driven by SSE enrichment.wowObservation
+        // which contains real user-specific observations from DB.
+        // Hardcoded generic messages removed. SSE block handles it.
       }
 
       if (convoId) {
@@ -1640,6 +1699,15 @@ export function AskAI() {
 
         {/* Messages */}
         <div className="flex-1 overflow-y-auto space-y-6 px-4 py-5" style={{ minHeight: 0 }}>
+
+          {/* v12: Growth Mirror Card (Improvement 5) — shown when enrichment arrives */}
+          {showGrowthMirror && growthMirror && hasChat && (
+            <GrowthMirrorCard
+              data={growthMirror}
+              onDismiss={() => { setShowGrowthMirror(false); setGrowthMirror(null); }}
+            />
+          )}
+
           {!hasChat && (
             <div className="flex flex-col items-center justify-center h-full gap-5 text-center px-4">
               <div className={`w-14 h-14 rounded-2xl flex items-center justify-center border ${currentMode.bg} ${currentMode.border}`}>

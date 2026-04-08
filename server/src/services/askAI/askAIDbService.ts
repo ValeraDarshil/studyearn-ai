@@ -186,8 +186,8 @@ export async function getWeakTopicsFromDB(userId: string): Promise<string[]> {
       .select('weakTopics')
       .lean();
 
-    const allWeak = sessions.flatMap((s: any) => s.weakTopics || []);
-    return [...new Set(allWeak)].slice(0, 10);
+    const allWeak = sessions.flatMap((s: any) => s.weakTopics || []) as string[];
+    return [...new Set(allWeak)].slice(0, 10) as string[];
 
   } catch (err: any) {
     logger.warn(`[AskAI DB] getWeakTopicsFromDB failed: ${err.message}`);
@@ -212,9 +212,9 @@ export async function getSessionSummaryForPrompt(userId: string): Promise<string
 
     if (!sessions.length) return '';
 
-    const allWeak      = [...new Set(sessions.flatMap((s: any) => s.weakTopics      || []))].slice(0, 5);
-    const allStrong    = [...new Set(sessions.flatMap((s: any) => s.strongTopics    || []))].slice(0, 5);
-    const allTopics    = [...new Set(sessions.flatMap((s: any) => s.detectedTopics  || []))].slice(0, 8);
+    const allWeak      = [...new Set(sessions.flatMap((s: any) => s.weakTopics      || []) as string[])].slice(0, 5) as string[];
+    const allStrong    = [...new Set(sessions.flatMap((s: any) => s.strongTopics    || []) as string[])].slice(0, 5) as string[];
+    const allTopics    = [...new Set(sessions.flatMap((s: any) => s.detectedTopics  || []) as string[])].slice(0, 8) as string[];
     const totalTurns   = sessions.reduce((acc: number, s: any) => acc + (s.turnCount || 0), 0);
 
     // Last session's topic for "last time you asked about X" reference
