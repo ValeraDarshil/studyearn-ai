@@ -1,20 +1,20 @@
 /**
- * StudyEarn AI — MarkdownRenderer v10 (VISUAL UPGRADE)
+ * StudyEarn AI — MarkdownRenderer v11 (Premium Notes Style)
  * ─────────────────────────────────────────────────────────────
  * ROUTE: src/components/MarkdownRenderer.tsx
  *
- * v10 — Complete Visual Overhaul:
- *  ✅ Smart paragraph classifier — auto-detects analogies,
- *     formulas, key insights, warnings from plain text
- *  ✅ Animated section label pills (Explanation/Example/Summary)
- *  ✅ Beautiful colored cards: violet/amber/blue/green/teal/red
- *  ✅ Enhanced Quick Check — animated pulsing gradient border
- *  ✅ Inline callouts for key/warning/success/error
- *  ✅ Analogy auto-card (teal) — "Think of it like..."
- *  ✅ Formula auto-card (indigo) — "V = IR" style lines
- *  ✅ Micro-learning hook card (orange) — "Bonus curiosity..."
- *  ✅ Fade-in animations on every card
- *  ✅ MCQ cards, code blocks, KaTeX, tables — all preserved
+ * v11 — Premium Visual Redesign:
+ *  ✅ NO more color background boxes for sections
+ *  ✅ Notes-style: key sentences get a subtle left accent line
+ *  ✅ Bold terms auto-highlighted with soft color underline
+ *  ✅ Section labels = tiny elegant pills (not full-width blocks)
+ *  ✅ Analogy → italic teal text, no background
+ *  ✅ Formula → monospace indigo text, minimal left border only
+ *  ✅ Quick Check → clean green left-border card (no full bg)
+ *  ✅ Key insights → amber left-border accent, no bg box
+ *  ✅ Warnings → red left-border accent, no bg box
+ *  ✅ Smooth fade-in animation on each paragraph
+ *  ✅ MCQ, code blocks, KaTeX, tables — all preserved
  */
 
 import { useEffect, useRef, useCallback } from "react";
@@ -121,34 +121,16 @@ function syntaxHL(esc: string, lang: string): string {
   return esc;
 }
 
-// ─── Section / card type ─────────────────────────────────────
-type CardType = "explanation"|"example"|"summary"|"check"|"warning"|"key"|"success"|"error"|"analogy"|"formula"|"micrhook"|"normal";
+// ─── Paragraph classifier (no color boxes — just style hints) ─
+type LineStyle = "analogy"|"formula"|"key"|"warning"|"hook"|"normal";
 
-function detectSection(t: string): CardType {
-  if (/^[📖🔷]\s*(EXPLANATION|EXPLAIN)/i.test(t))                     return "explanation";
-  if (/^[💡🔸]\s*(EXAMPLE|EXAMPLES?)/i.test(t))                       return "example";
-  if (/^[⚡🔹]\s*(QUICK\s*SUMMARY|SUMMARY)/i.test(t))                 return "summary";
-  if (/^[❓🔔]\s*(CHECK\s*YOUR\s*UNDERSTANDING)/i.test(t))            return "check";
-  if (/^\d+\.\s*[📖🔷]?\s*(EXPLANATION|EXPLAIN)/i.test(t))           return "explanation";
-  if (/^\d+\.\s*[💡🔸]?\s*EXAMPLE/i.test(t))                         return "example";
-  if (/^\d+\.\s*[⚡🔹]?\s*(QUICK\s*SUMMARY|SUMMARY)/i.test(t))       return "summary";
-  if (/^\d+\.\s*[❓🔔]?\s*CHECK\s*(YOUR\s*)?UNDERSTANDING/i.test(t))  return "check";
-  if (/^(⚠️|🚨|WARNING:|CAUTION:|IMPORTANT:)/i.test(t))              return "warning";
-  if (/^(📌|🔑|🎯|🚀|KEY\s*(POINT|TAKEAWAY)|REMEMBER:|NOTE:)/i.test(t)) return "key";
-  if (/^(✅|🟢|CORRECT:|RIGHT:|PERFECT:|EXCELLENT:)/i.test(t))        return "success";
-  if (/^(❌|🔴|🚫|WRONG:|INCORRECT:|AVOID:|DON'?T:)/i.test(t))        return "error";
-  if (/^(🔥\s*MICRO-LEARNING|🔥\s*BONUS CURIOSITY|Bonus curiosity:|Next level:)/i.test(t)) return "micrhook";
-  return "normal";
-}
-
-// ─── Smart paragraph auto-classifier ─────────────────────────
-function classifyParagraph(text: string): CardType {
+function classifyLine(text: string): LineStyle {
   const lower = text.toLowerCase();
-  if (/[A-Z]\s*=\s*[\w\/+\-×·*]/.test(text) && text.length < 200)     return "formula";
-  if (/think of (it|this)|just like|imagine (you|a )|real.world analogy|for example,|for instance,|consider a /i.test(lower) && text.length < 500) return "analogy";
-  if (/this means|key (point|insight|takeaway)|most important|remember that|note that|in short,/i.test(lower) && text.length < 350) return "key";
-  if (/be careful|don'?t (forget|confuse|mix)|common mistake|watch out|avoid /i.test(lower) && text.length < 350) return "warning";
-  if (/bonus curiosity|next level|if you (understood|get|got)|the next interesting/i.test(lower)) return "micrhook";
+  if (/[A-Z]\s*=\s*[\w\/+\-×·*]/.test(text) && text.length < 200)                              return "formula";
+  if (/think of (it|this)|just like|imagine (you|a )|real.world|for example,|consider a /i.test(lower) && text.length < 500) return "analogy";
+  if (/this means|key (point|insight)|most important|remember that|note that|the key is/i.test(lower) && text.length < 350) return "key";
+  if (/be careful|don'?t (forget|confuse)|common mistake|watch out|avoid /i.test(lower) && text.length < 350)               return "warning";
+  if (/bonus curiosity|next level|if you (understood|get|got)|the next interesting/i.test(lower))                             return "hook";
   return "normal";
 }
 
@@ -157,29 +139,22 @@ function renderInline(text: string): string {
   return text
     .replace(/\$([^$\n]+?)\$/g,(_,m)=>`<span class="katex-il">${renderMath(m,false)}</span>`)
     .replace(/\*\*\*(.+?)\*\*\*/g,"<strong><em>$1</em></strong>")
-    .replace(/\*\*(.+?)\*\*/g,'<strong class="syn-bold">$1</strong>')
+    // Bold → highlighted term (colored underline, no bg)
+    .replace(/\*\*(.+?)\*\*/g,'<strong class="hl-bold">$1</strong>')
     .replace(/\*(?!\*)(.+?)(?<!\*)\*/g,'<em class="syn-italic">$1</em>')
     .replace(/`([^`]+)`/g,'<code class="syn-icode">$1</code>')
     .replace(/==(.+?)==/g,'<mark class="syn-hl">$1</mark>')
     .replace(/~~(.+?)~~/g,'<del class="syn-del">$1</del>')
-    .replace(/\*\*Quick check:\*\*/g,'<span class="qc-label">💬 Quick check:</span>')
+    .replace(/\*\*Quick check:\*\*/g,'<span class="qc-inline-label">Quick check:</span>')
     .replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g,
       '<a href="$2" target="_blank" rel="noopener" class="syn-link">$1 &#8599;</a>');
 }
 
 const BULLET_RE = /^[-*+\u2022\u25CF]\s+\S/;
 
-// ─── Card HTML builders ──────────────────────────────────────
-function buildInlineCallout(type: CardType, icon: string, body: string): string {
-  return `<div class="v10-callout v10-co-${type}"><span class="v10-co-icon">${icon}</span><div class="v10-co-body">${body}</div></div>`;
-}
-
-function buildCard(type: CardType, icon: string, label: string, body: string): string {
-  return `<div class="v10-card v10-card-${type}"><div class="v10-ch"><span class="v10-cico">${icon}</span><span class="v10-clbl">${label}</span></div><div class="v10-cbody">${body}</div></div>`;
-}
-
-function buildSectionLabel(type: CardType, icon: string, label: string): string {
-  return `<div class="v10-sl v10-sl-${type}"><span>${icon}</span><span>${label}</span></div>`;
+// ─── Section label pill (tiny, elegant) ──────────────────────
+function sectionPill(icon: string, label: string, cls: string): string {
+  return `<div class="v11-pill ${cls}"><span>${icon}</span><span>${label}</span></div>`;
 }
 
 // ─── MCQ helpers ─────────────────────────────────────────────
@@ -205,7 +180,7 @@ function buildMcqCard(question: string, options: string[]): string {
   </div>`;
 }
 
-// ─── Main parser ─────────────────────────────────────────────
+// ─── Parser ──────────────────────────────────────────────────
 function parse(md: string): string {
   const lines = md.replace(/\r\n/g,"\n").replace(/\r/g,"\n").split("\n");
   const out: string[] = [];
@@ -220,16 +195,29 @@ function parse(md: string): string {
 
   const flushPara = () => {
     if (!paraBuffer.length) return;
-    const combined = paraBuffer.join(" ");
-    const cls = classifyParagraph(combined);
+    // Classify by first non-empty line
+    const firstLine = paraBuffer.find(l => l.trim()) || "";
+    const style = classifyLine(firstLine.trim());
     const rendered = paraBuffer.map(l => renderInline(l)).join("<br>");
-    const bodyHtml = `<p class="v10-p">${rendered}</p>`;
-    if      (cls === "analogy")  out.push(buildCard("analogy",  "🌍", "Real-world analogy", bodyHtml));
-    else if (cls === "formula")  out.push(buildCard("formula",  "📐", "Formula",            bodyHtml));
-    else if (cls === "micrhook") out.push(buildCard("micrhook", "🔥", "Explore next",       bodyHtml));
-    else if (cls === "key")      out.push(buildInlineCallout("key",  "🔑", `<p class="v10-p">${rendered}</p>`));
-    else if (cls === "warning")  out.push(buildInlineCallout("warning", "⚠️", `<p class="v10-p">${rendered}</p>`));
-    else                         out.push(`<p class="md-p">${rendered}</p>`);
+
+    if (style === "analogy") {
+      // Italic teal, no background — just subtle left border
+      out.push(`<p class="v11-p v11-analogy">${rendered}</p>`);
+    } else if (style === "formula") {
+      // Monospace, indigo tint, left border only
+      out.push(`<p class="v11-p v11-formula">${rendered}</p>`);
+    } else if (style === "key") {
+      // Amber left-border accent, no bg
+      out.push(`<p class="v11-p v11-key">${rendered}</p>`);
+    } else if (style === "warning") {
+      // Red left-border, no bg
+      out.push(`<p class="v11-p v11-warn">${rendered}</p>`);
+    } else if (style === "hook") {
+      // Orange left-border, no bg — micro-learning hook
+      out.push(`<p class="v11-p v11-hook">${rendered}</p>`);
+    } else {
+      out.push(`<p class="v11-p">${rendered}</p>`);
+    }
     paraBuffer = [];
   };
 
@@ -238,10 +226,10 @@ function parse(md: string): string {
     if (mcqOptions.length >= 2) {
       out.push(buildMcqCard(pendingQuestion, mcqOptions));
     } else {
+      // Quick check — green left border, no full bg
       out.push(
-        `<div class="v10-qc-card"><div class="v10-qc-inner">` +
-        `<div class="v10-qc-hdr"><span class="v10-qc-ico">💬</span><span class="v10-qc-ttl">Quick Check</span></div>` +
-        `<p class="v10-qc-txt">${renderInline(pendingQuestion)}</p></div></div>`
+        `<div class="v11-qc"><div class="v11-qc-hdr"><span class="v11-qc-ico">💬</span><span class="v11-qc-ttl">Quick Check</span></div>` +
+        `<p class="v11-qc-txt">${renderInline(pendingQuestion)}</p></div>`
       );
     }
     pendingQuestion = "";
@@ -296,40 +284,79 @@ function parse(md: string): string {
     if(raw.startsWith("## ")){flushPara();closeLists();out.push(`<h2 class="md-h2">${renderInline(raw.slice(3))}</h2>`);i++;continue;}
     if(raw.startsWith("### ")){flushPara();closeLists();out.push(`<h3 class="md-h3">${renderInline(raw.slice(4))}</h3>`);i++;continue;}
 
-    // Section label headers
+    // Section labels → tiny pills only (no background cards)
     if(/^[📖🔷]\s*(EXPLANATION|EXPLAIN)/i.test(t)&&t.length<80){
       flushPara();closeLists();
-      out.push(buildSectionLabel("explanation","📖","Explanation"));
+      out.push(sectionPill("📖","Explanation","v11-pill-explain"));
       i++;continue;
     }
     if(/^\d+\.\s*[📖🔷]?\s*(EXPLANATION|EXPLAIN)/i.test(t)&&t.length<80){
       flushPara();closeLists();
-      out.push(buildSectionLabel("explanation","📖","Explanation"));
+      out.push(sectionPill("📖","Explanation","v11-pill-explain"));
+      i++;continue;
+    }
+    if(/^[💡🔸]\s*(EXAMPLE|EXAMPLES?)/i.test(t)&&t.length<80){
+      flushPara();closeLists();
+      out.push(sectionPill("💡","Example","v11-pill-example"));
+      i++;continue;
+    }
+    if(/^\d+\.\s*[💡🔸]?\s*EXAMPLE/i.test(t)&&t.length<80){
+      flushPara();closeLists();
+      out.push(sectionPill("💡","Example","v11-pill-example"));
+      i++;continue;
+    }
+    if(/^[⚡🔹]\s*(QUICK\s*SUMMARY|SUMMARY)/i.test(t)&&t.length<80){
+      flushPara();closeLists();
+      out.push(sectionPill("⚡","Quick Summary","v11-pill-summary"));
+      i++;continue;
+    }
+    if(/^\d+\.\s*[⚡🔹]?\s*(QUICK\s*SUMMARY|SUMMARY)/i.test(t)&&t.length<80){
+      flushPara();closeLists();
+      out.push(sectionPill("⚡","Quick Summary","v11-pill-summary"));
+      i++;continue;
+    }
+    if(/^[❓🔔]\s*(CHECK\s*YOUR\s*UNDERSTANDING)/i.test(t)&&t.length<80){
+      flushPara();closeLists();
+      out.push(sectionPill("🧠","Check Your Understanding","v11-pill-check"));
+      i++;continue;
+    }
+    if(/^\d+\.\s*[❓🔔]?\s*CHECK\s*(YOUR\s*)?UNDERSTANDING/i.test(t)&&t.length<80){
+      flushPara();closeLists();
+      out.push(sectionPill("🧠","Check Your Understanding","v11-pill-check"));
+      i++;continue;
+    }
+    if(/^(🔥\s*MICRO-LEARNING|🔥\s*BONUS CURIOSITY|Bonus curiosity:|Next level:)/i.test(t)&&t.length<100){
+      flushPara();closeLists();
+      out.push(sectionPill("🔥","Explore Next","v11-pill-hook"));
       i++;continue;
     }
 
-    const sec=detectSection(t);
-    if(sec!=="normal"&&t.length<120){
+    // Inline callouts (warning/key/success/error lines)
+    if(/^(⚠️|🚨|WARNING:|CAUTION:|IMPORTANT:)/i.test(t)){
       flushPara();closeLists();
-      if(sec==="example")    {out.push(buildSectionLabel("example","💡","Example"));i++;continue;}
-      if(sec==="summary")    {out.push(buildSectionLabel("summary","⚡","Quick Summary"));i++;continue;}
-      if(sec==="check")      {out.push(buildSectionLabel("check","🧠","Check Your Understanding"));i++;continue;}
-      if(sec==="micrhook")   {out.push(buildSectionLabel("micrhook","🔥","Explore next"));i++;continue;}
-      if(sec==="warning")    {out.push(buildInlineCallout("warning","⚠️",`<span>${renderInline(t)}</span>`));i++;continue;}
-      if(sec==="key")        {out.push(buildInlineCallout("key","🔑",`<span>${renderInline(t)}</span>`));i++;continue;}
-      if(sec==="success")    {out.push(buildInlineCallout("success","✅",`<span>${renderInline(t)}</span>`));i++;continue;}
-      if(sec==="error")      {out.push(buildInlineCallout("error","❌",`<span>${renderInline(t)}</span>`));i++;continue;}
+      out.push(`<p class="v11-p v11-warn"><span class="v11-ico">⚠️</span>${renderInline(t.replace(/^(⚠️|🚨|WARNING:|CAUTION:|IMPORTANT:)\s*/i,""))}</p>`);
+      i++;continue;
+    }
+    if(/^(📌|🔑|🎯|KEY\s*(POINT|TAKEAWAY)|REMEMBER:|NOTE:)/i.test(t)){
+      flushPara();closeLists();
+      out.push(`<p class="v11-p v11-key"><span class="v11-ico">🔑</span>${renderInline(t.replace(/^(📌|🔑|🎯|KEY\s*(POINT|TAKEAWAY)|REMEMBER:|NOTE:)\s*/i,""))}</p>`);
+      i++;continue;
+    }
+    if(/^(✅|🟢|CORRECT:|RIGHT:)/i.test(t)){
+      flushPara();closeLists();
+      out.push(`<p class="v11-p v11-ok"><span class="v11-ico">✅</span>${renderInline(t.replace(/^(✅|🟢|CORRECT:|RIGHT:)\s*/i,""))}</p>`);
+      i++;continue;
+    }
+    if(/^(❌|🔴|🚫|WRONG:|AVOID:)/i.test(t)){
+      flushPara();closeLists();
+      out.push(`<p class="v11-p v11-err"><span class="v11-ico">❌</span>${renderInline(t.replace(/^(❌|🔴|🚫|WRONG:|AVOID:)\s*/i,""))}</p>`);
+      i++;continue;
     }
 
-    // Blockquote
+    // Blockquote — left border style, no bg
     if(raw.startsWith("> ")){
       flushPara();closeLists();
-      const ct=raw.slice(2);
-      const bsec=detectSection(ct)||classifyParagraph(ct);
-      if(bsec==="warning") {out.push(buildInlineCallout("warning","⚠️",`<span>${renderInline(ct)}</span>`));i++;continue;}
-      if(bsec==="key")     {out.push(buildInlineCallout("key","🔑",`<span>${renderInline(ct)}</span>`));i++;continue;}
-      if(bsec==="analogy") {out.push(buildCard("analogy","🌍","Real-world analogy",`<p class="v10-p">${renderInline(ct)}</p>`));i++;continue;}
-      out.push(`<blockquote class="md-bq">${renderInline(ct)}</blockquote>`);
+      out.push(`<blockquote class="md-bq">${renderInline(raw.slice(2))}</blockquote>`);
       i++; continue;
     }
 
@@ -357,9 +384,7 @@ function parse(md: string): string {
       flushPara();closeOl();
       if(!inUl){out.push('<ul class="md-ul">');inUl=true;}
       const ct=t.replace(/^[-*+\u2022\u25CF]\s+/,"");
-      const bsec=detectSection(ct);
-      const dc=bsec==="warning"?"md-dw":bsec==="key"?"md-dk":bsec==="success"?"md-ds":bsec==="error"?"md-de":"md-d";
-      out.push(`<li class="md-li"><span class="${dc}">◆</span><span class="md-lt">${renderInline(ct)}</span></li>`);
+      out.push(`<li class="md-li"><span class="md-d">◆</span><span class="md-lt">${renderInline(ct)}</span></li>`);
       i++; continue;
     }
 
@@ -373,7 +398,7 @@ function parse(md: string): string {
       i++; continue;
     }
 
-    // Empty line → flush paragraph buffer
+    // Empty line → flush
     if(!t){
       flushPara();
       closeLists();
@@ -381,7 +406,7 @@ function parse(md: string): string {
       i++;continue;
     }
 
-    // "Quick check:" → enhanced card
+    // Quick check
     if(/^\*?\*?Quick check:/i.test(t)){
       flushPara();closeLists();
       const qText=t.replace(/^\*?\*?Quick check:\*?\*?\s*/i,"").trim();
@@ -392,14 +417,13 @@ function parse(md: string): string {
         i++; continue;
       }
       out.push(
-        `<div class="v10-qc-card"><div class="v10-qc-inner">` +
-        `<div class="v10-qc-hdr"><span class="v10-qc-ico">💬</span><span class="v10-qc-ttl">Quick Check</span></div>` +
-        `<p class="v10-qc-txt">${renderInline(qText)}</p></div></div>`
+        `<div class="v11-qc"><div class="v11-qc-hdr"><span class="v11-qc-ico">💬</span><span class="v11-qc-ttl">Quick Check</span></div>` +
+        `<p class="v11-qc-txt">${renderInline(qText)}</p></div>`
       );
       i++; continue;
     }
 
-    // Plain paragraph — buffer for smart classification
+    // Plain paragraph — buffer
     closeLists();
     paraBuffer.push(raw);
     i++;
@@ -411,7 +435,7 @@ function parse(md: string): string {
   return out.join("\n");
 }
 
-// ─── Copy + MCQ handlers ─────────────────────────────────────
+// ─── Handlers ────────────────────────────────────────────────
 function attachCopy(root: HTMLElement) {
   root.querySelectorAll<HTMLButtonElement>("[data-cpb]").forEach((btn) => {
     const clone=btn.cloneNode(true) as HTMLButtonElement;
@@ -453,144 +477,134 @@ function attachMcqHandlers(_root: HTMLElement) {
       fb.className=`mcq-feedback mcq-fb-${isCorrect?"ok":"err"}`;
       fb.innerHTML=isCorrect
         ?`<span>🎉</span><span>Correct! Well done!</span>`
-        :`<span>💡</span><span>Not quite — the highlighted option above is correct.</span>`;
+        :`<span>💡</span><span>Not quite — the highlighted option is correct.</span>`;
     }
   };
 }
 
-// ─── CSS v10 ─────────────────────────────────────────────────
+// ─── CSS v11 — Premium Notes Style ───────────────────────────
 const CSS=`
-.md-root{font-size:14px;line-height:1.9;color:#cbd5e1;word-break:break-word}
+.md-root{font-size:14px;line-height:1.95;color:#cbd5e1;word-break:break-word}
 
 /* Headings */
-.md-h1{font-size:1.25rem;font-weight:700;color:#fff;margin:1.2rem 0 .5rem;padding:.5rem .9rem;background:linear-gradient(90deg,rgba(124,58,237,.2),transparent);border-left:3px solid #7c3aed;border-radius:0 8px 8px 0;line-height:1.4}
-.md-h2{font-size:1.05rem;font-weight:700;color:#93c5fd;margin:.9rem 0 .4rem;padding:.4rem .75rem;background:linear-gradient(90deg,rgba(59,130,246,.14),transparent);border-left:3px solid #3b82f6;border-radius:0 6px 6px 0;line-height:1.4}
-.md-h3{font-size:.95rem;font-weight:700;color:#c4b5fd;margin:.75rem 0 .3rem;padding:.35rem .65rem;border-left:2px solid #8b5cf6;line-height:1.4}
+.md-h1{font-size:1.2rem;font-weight:700;color:#fff;margin:1.1rem 0 .45rem;border-bottom:1px solid rgba(255,255,255,.08);padding-bottom:.35rem;line-height:1.4}
+.md-h2{font-size:1rem;font-weight:700;color:#e2e8f0;margin:.9rem 0 .35rem;line-height:1.4}
+.md-h3{font-size:.9rem;font-weight:700;color:#c4b5fd;margin:.7rem 0 .3rem;line-height:1.4}
 
-/* Section label pills */
-@keyframes v10in{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
-.v10-sl{display:inline-flex;align-items:center;gap:.45rem;padding:.32rem .85rem;border-radius:20px;font-size:.7rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin:.85rem 0 .3rem;animation:v10in .3s ease-out}
-.v10-sl-explanation{background:rgba(139,92,246,.18);border:1px solid rgba(139,92,246,.4);color:#c4b5fd}
-.v10-sl-example{background:rgba(245,158,11,.18);border:1px solid rgba(245,158,11,.4);color:#fde68a}
-.v10-sl-summary{background:rgba(59,130,246,.18);border:1px solid rgba(59,130,246,.4);color:#93c5fd}
-.v10-sl-check{background:rgba(34,197,94,.16);border:1px solid rgba(34,197,94,.4);color:#86efac}
-.v10-sl-micrhook{background:rgba(249,115,22,.16);border:1px solid rgba(249,115,22,.35);color:#fdba74}
+/* ── Section label pills (tiny, no full-width bg) ── */
+@keyframes v11in{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:translateY(0)}}
+.v11-pill{display:inline-flex;align-items:center;gap:.4rem;padding:.22rem .75rem;border-radius:20px;font-size:.68rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin:.85rem 0 .25rem;animation:v11in .25s ease-out;border:1px solid}
+.v11-pill-explain{color:#a78bfa;border-color:rgba(167,139,250,.3);background:rgba(167,139,250,.07)}
+.v11-pill-example{color:#fbbf24;border-color:rgba(251,191,36,.3);background:rgba(251,191,36,.07)}
+.v11-pill-summary{color:#60a5fa;border-color:rgba(96,165,250,.3);background:rgba(96,165,250,.07)}
+.v11-pill-check{color:#4ade80;border-color:rgba(74,222,128,.3);background:rgba(74,222,128,.07)}
+.v11-pill-hook{color:#fb923c;border-color:rgba(251,146,60,.3);background:rgba(251,146,60,.07)}
 
-/* v10 Cards */
-.v10-card{border-radius:13px;margin:.6rem 0;overflow:hidden;animation:v10in .35s ease-out}
-.v10-ch{display:flex;align-items:center;gap:.5rem;padding:.55rem 1rem .4rem}
-.v10-cico{font-size:.95rem;line-height:1}
-.v10-clbl{font-size:.7rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
-.v10-cbody{padding:0 1rem .8rem}
-.v10-p{font-size:.875rem;line-height:1.9;margin:0;color:inherit}
+/* ── Paragraphs — notes style ── */
+.v11-p{font-size:.875rem;color:#cbd5e1;margin:.15rem 0 .6rem;line-height:1.95;animation:v11in .3s ease-out}
 
-.v10-card-analogy{background:linear-gradient(135deg,rgba(20,184,166,.12),rgba(6,182,212,.05));border:1px solid rgba(20,184,166,.3)}
-.v10-card-analogy .v10-clbl{color:#2dd4bf}
-.v10-card-analogy .v10-ch{background:rgba(20,184,166,.08);border-bottom:1px solid rgba(20,184,166,.12)}
-.v10-card-analogy .v10-p{color:#ccfbf1}
+/* Analogy → italic, teal tint, subtle left line */
+.v11-analogy{color:#99f6e4;font-style:italic;padding-left:.85rem;border-left:2px solid rgba(20,184,166,.5);margin-left:.1rem}
 
-.v10-card-formula{background:linear-gradient(135deg,rgba(99,102,241,.14),rgba(129,140,248,.06));border:1px solid rgba(99,102,241,.35)}
-.v10-card-formula .v10-clbl{color:#a5b4fc}
-.v10-card-formula .v10-ch{background:rgba(99,102,241,.1);border-bottom:1px solid rgba(99,102,241,.18)}
-.v10-card-formula .v10-p{font-family:'JetBrains Mono','Fira Code',monospace;font-size:.9rem;color:#c7d2fe;letter-spacing:.03em}
+/* Formula → monospace, indigo, left border */
+.v11-formula{font-family:'JetBrains Mono','Fira Code',monospace;font-size:.85rem;color:#a5b4fc;padding-left:.85rem;border-left:2px solid rgba(99,102,241,.5);margin-left:.1rem;letter-spacing:.025em}
 
-.v10-card-micrhook{background:linear-gradient(135deg,rgba(249,115,22,.11),rgba(251,146,60,.05));border:1px solid rgba(249,115,22,.28)}
-.v10-card-micrhook .v10-clbl{color:#fb923c}
-.v10-card-micrhook .v10-ch{background:rgba(249,115,22,.08);border-bottom:1px solid rgba(249,115,22,.12)}
-.v10-card-micrhook .v10-p{color:#fed7aa}
+/* Key insight → amber left border, slightly brighter text */
+.v11-key{color:#fde68a;padding-left:.85rem;border-left:2px solid rgba(245,158,11,.55);margin-left:.1rem;font-weight:500}
 
-/* Inline callouts */
-.v10-callout{display:flex;align-items:flex-start;gap:.65rem;padding:.6rem .9rem;border-radius:10px;margin:.45rem 0;font-size:.875rem;line-height:1.85;animation:v10in .3s ease-out}
-.v10-co-icon{font-size:.95rem;flex-shrink:0;margin-top:2px}
-.v10-co-body{flex:1;min-width:0}
-.v10-co-key{background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);color:#fde68a}
-.v10-co-warning{background:rgba(239,68,68,.09);border:1px solid rgba(239,68,68,.3);color:#fca5a5}
-.v10-co-success{background:rgba(34,197,94,.09);border:1px solid rgba(34,197,94,.3);color:#86efac}
-.v10-co-error{background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25);color:#fca5a5}
+/* Warning → red left border */
+.v11-warn{color:#fca5a5;padding-left:.85rem;border-left:2px solid rgba(239,68,68,.5);margin-left:.1rem}
 
-/* Quick Check — animated gradient border */
-.v10-qc-card{position:relative;margin:.8rem 0;border-radius:14px;padding:1.5px;background:linear-gradient(135deg,#22c55e,#16a34a,#4ade80,#22c55e);background-size:300% 300%;animation:v10qcb 4s ease infinite,v10in .4s ease-out}
-@keyframes v10qcb{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
-.v10-qc-inner{background:#080e1d;border-radius:12.5px;padding:.85rem 1.05rem}
-.v10-qc-hdr{display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem}
-.v10-qc-ico{font-size:1rem}
-.v10-qc-ttl{font-weight:700;font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:#4ade80}
-.v10-qc-txt{color:#d1fae5;font-size:.875rem;line-height:1.9;margin:0;font-weight:500}
-.qc-label{display:inline-flex;align-items:center;gap:.35rem;font-weight:700;color:#4ade80;background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.25);border-radius:6px;padding:.1em .5em;font-size:.82em}
+/* OK / correct */
+.v11-ok{color:#86efac;padding-left:.85rem;border-left:2px solid rgba(34,197,94,.5);margin-left:.1rem}
 
-/* MCQ */
-.mcq-card{background:rgba(30,27,75,.55);border:1px solid rgba(99,102,241,.3);border-radius:14px;padding:1rem 1.1rem;margin:.75rem 0;animation:v10in .4s ease-out}
-.mcq-q{font-size:.875rem;font-weight:600;color:#e2e8f0;margin-bottom:.85rem;line-height:1.65}
-.mcq-opts{display:flex;flex-direction:column;gap:.5rem}
-.mcq-opt{display:flex;align-items:center;gap:.75rem;padding:.6rem .9rem;border-radius:9px;border:1px solid rgba(99,102,241,.25);background:rgba(99,102,241,.08);cursor:pointer;transition:all .15s;text-align:left;width:100%;color:#cbd5e1;font-size:.85rem;line-height:1.5}
-.mcq-opt:hover:not(:disabled){border-color:rgba(99,102,241,.55);background:rgba(99,102,241,.18);color:#fff;transform:translateX(3px)}
+/* Error */
+.v11-err{color:#fca5a5;padding-left:.85rem;border-left:2px solid rgba(239,68,68,.4);margin-left:.1rem}
+
+/* Micro-learning hook → orange */
+.v11-hook{color:#fed7aa;padding-left:.85rem;border-left:2px solid rgba(249,115,22,.5);margin-left:.1rem;font-style:italic}
+
+.v11-ico{margin-right:.35rem}
+
+/* ── Quick Check — clean left-border card ── */
+.v11-qc{border-left:3px solid #22c55e;padding:.7rem .95rem;margin:.8rem 0;background:rgba(34,197,94,.05);border-radius:0 10px 10px 0;animation:v11in .3s ease-out}
+.v11-qc-hdr{display:flex;align-items:center;gap:.45rem;margin-bottom:.4rem}
+.v11-qc-ico{font-size:.95rem}
+.v11-qc-ttl{font-weight:700;font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;color:#4ade80}
+.v11-qc-txt{color:#d1fae5;font-size:.875rem;line-height:1.9;margin:0;font-weight:500}
+.qc-inline-label{font-weight:700;color:#4ade80;font-size:.85em}
+
+/* ── Bold = highlighted term ── */
+.hl-bold{font-weight:700;color:#fff;text-decoration:underline;text-decoration-color:rgba(139,92,246,.6);text-decoration-thickness:2px;text-underline-offset:3px}
+
+/* ── MCQ ── */
+.mcq-card{border-left:3px solid rgba(99,102,241,.5);padding:.85rem .95rem;margin:.75rem 0;background:rgba(99,102,241,.04);border-radius:0 12px 12px 0;animation:v11in .35s ease-out}
+.mcq-q{font-size:.875rem;font-weight:600;color:#e2e8f0;margin-bottom:.75rem;line-height:1.65}
+.mcq-opts{display:flex;flex-direction:column;gap:.45rem}
+.mcq-opt{display:flex;align-items:center;gap:.7rem;padding:.55rem .85rem;border-radius:8px;border:1px solid rgba(99,102,241,.2);background:rgba(99,102,241,.06);cursor:pointer;transition:all .15s;text-align:left;width:100%;color:#cbd5e1;font-size:.85rem;line-height:1.5}
+.mcq-opt:hover:not(:disabled){border-color:rgba(99,102,241,.5);background:rgba(99,102,241,.15);color:#fff;transform:translateX(3px)}
 .mcq-opt:disabled{cursor:default;transform:none}
-.mcq-letter{font-weight:700;font-size:.78rem;color:#818cf8;background:rgba(99,102,241,.2);border-radius:5px;padding:.15em .45em;flex-shrink:0;min-width:1.5rem;text-align:center;border:1px solid rgba(99,102,241,.3)}
+.mcq-letter{font-weight:700;font-size:.76rem;color:#818cf8;background:rgba(99,102,241,.18);border-radius:4px;padding:.12em .4em;flex-shrink:0;min-width:1.4rem;text-align:center;border:1px solid rgba(99,102,241,.28)}
 .mcq-text{flex:1;min-width:0}
-.mcq-opt.mcq-correct{border-color:rgba(34,197,94,.6)!important;background:rgba(34,197,94,.15)!important;color:#86efac!important}
-.mcq-opt.mcq-correct .mcq-letter{color:#4ade80;background:rgba(34,197,94,.25);border-color:rgba(34,197,94,.4)}
-.mcq-opt.mcq-wrong{border-color:rgba(239,68,68,.5)!important;background:rgba(239,68,68,.1)!important;color:#fca5a5!important}
-.mcq-opt.mcq-wrong .mcq-letter{color:#f87171;background:rgba(239,68,68,.2);border-color:rgba(239,68,68,.35)}
-.mcq-opt.mcq-reveal{border-color:rgba(34,197,94,.45)!important;background:rgba(34,197,94,.08)!important}
-.mcq-feedback{display:none;align-items:center;gap:.55rem;margin-top:.75rem;padding:.6rem .85rem;border-radius:8px;font-size:.82rem;font-weight:600}
-.mcq-feedback.mcq-fb-ok{display:flex;background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.3);color:#86efac}
-.mcq-feedback.mcq-fb-err{display:flex;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);color:#fde68a}
+.mcq-opt.mcq-correct{border-color:rgba(34,197,94,.55)!important;background:rgba(34,197,94,.1)!important;color:#86efac!important}
+.mcq-opt.mcq-correct .mcq-letter{color:#4ade80;background:rgba(34,197,94,.2);border-color:rgba(34,197,94,.35)}
+.mcq-opt.mcq-wrong{border-color:rgba(239,68,68,.45)!important;background:rgba(239,68,68,.08)!important;color:#fca5a5!important}
+.mcq-opt.mcq-wrong .mcq-letter{color:#f87171;background:rgba(239,68,68,.18);border-color:rgba(239,68,68,.3)}
+.mcq-opt.mcq-reveal{border-color:rgba(34,197,94,.4)!important;background:rgba(34,197,94,.07)!important}
+.mcq-feedback{display:none;align-items:center;gap:.5rem;margin-top:.65rem;padding:.55rem .8rem;border-radius:7px;font-size:.82rem;font-weight:600}
+.mcq-feedback.mcq-fb-ok{display:flex;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);color:#86efac}
+.mcq-feedback.mcq-fb-err{display:flex;background:rgba(245,158,11,.09);border:1px solid rgba(245,158,11,.25);color:#fde68a}
 
-/* Base para */
-.md-p{font-size:.875rem;color:#cbd5e1;margin:.2rem 0;line-height:1.9}
-
-/* Inline */
+/* ── Base inline ── */
 .syn-bold{font-weight:700;color:#fff}
 .syn-italic{font-style:italic;color:#e2e8f0}
 .syn-del{text-decoration:line-through;color:#4b5563}
-.syn-hl{background:rgba(251,191,36,.25);color:#fcd34d;border-radius:3px;padding:.05em .25em}
-.syn-icode{background:rgba(99,102,241,.18);color:#a5b4fc;padding:.1em .45em;border-radius:5px;font-family:'JetBrains Mono','Fira Code',monospace;font-size:.82em;border:1px solid rgba(99,102,241,.28)}
+.syn-hl{background:rgba(251,191,36,.2);color:#fcd34d;border-radius:3px;padding:.05em .22em}
+.syn-icode{background:rgba(99,102,241,.16);color:#a5b4fc;padding:.1em .42em;border-radius:4px;font-family:'JetBrains Mono','Fira Code',monospace;font-size:.82em;border:1px solid rgba(99,102,241,.25)}
 .syn-link{color:#60a5fa;text-decoration:underline;text-underline-offset:2px}
 .syn-link:hover{color:#93c5fd}
 
-/* Code block */
-.md-cb{background:#0d1117;border:1px solid rgba(255,255,255,.09);border-radius:12px;overflow:hidden;margin:.8rem 0}
+/* ── Code block ── */
+.md-cb{background:#0d1117;border:1px solid rgba(255,255,255,.08);border-radius:10px;overflow:hidden;margin:.75rem 0}
 .md-cb-s{border-color:rgba(99,102,241,.3);animation:cbpls 1.2s ease-in-out infinite}
-@keyframes cbpls{0%,100%{border-color:rgba(99,102,241,.15)}50%{border-color:rgba(99,102,241,.45)}}
-.md-cbh{display:flex;align-items:center;justify-content:space-between;padding:.4rem .9rem;background:rgba(255,255,255,.035);border-bottom:1px solid rgba(255,255,255,.07)}
-.md-lang{font-size:.7rem;font-family:monospace;color:#475569;text-transform:uppercase;letter-spacing:.07em;font-weight:600}
+@keyframes cbpls{0%,100%{border-color:rgba(99,102,241,.12)}50%{border-color:rgba(99,102,241,.4)}}
+.md-cbh{display:flex;align-items:center;justify-content:space-between;padding:.38rem .85rem;background:rgba(255,255,255,.03);border-bottom:1px solid rgba(255,255,255,.06)}
+.md-lang{font-size:.68rem;font-family:monospace;color:#475569;text-transform:uppercase;letter-spacing:.07em;font-weight:600}
 .md-s-badge{font-size:.65rem;color:#818cf8;animation:cbpls 1s ease-in-out infinite}
-.md-cpb{font-size:.72rem;font-weight:600;color:#64748b;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:5px;padding:.2rem .6rem;cursor:pointer;transition:all .15s;user-select:none}
-.md-cpb:hover{color:#fff;background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.2)}
-.md-cpb[data-done]{color:#4ade80;border-color:rgba(74,222,128,.35)}
-.md-pre{margin:0;padding:.9rem 1rem;overflow-x:auto}
+.md-cpb{font-size:.7rem;font-weight:600;color:#64748b;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);border-radius:4px;padding:.18rem .55rem;cursor:pointer;transition:all .15s;user-select:none}
+.md-cpb:hover{color:#fff;background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.18)}
+.md-cpb[data-done]{color:#4ade80;border-color:rgba(74,222,128,.3)}
+.md-pre{margin:0;padding:.85rem 1rem;overflow-x:auto}
 .md-code{font-family:'JetBrains Mono','Fira Code','Courier New',monospace;font-size:.8rem;line-height:1.75;color:#e2e8f0;display:block;white-space:pre}
 .syn-kw{color:#c792ea;font-weight:600}.syn-str{color:#c3e88d}.syn-num{color:#f78c6c}.syn-cm{color:#546e7a;font-style:italic}.syn-bi{color:#82aaff}.syn-dec{color:#ffcb6b}.syn-tag{color:#f07178}.syn-attr{color:#c792ea}
 
-/* Lists */
-.md-ul,.md-ol{margin:.35rem 0 .35rem .1rem;padding:0;list-style:none}
-.md-li{display:flex;gap:.65rem;align-items:flex-start;padding:.2rem 0}
-.md-lt{font-size:.875rem;color:#cbd5e1;line-height:1.85;flex:1;min-width:0}
-.md-d{color:#7c3aed;font-size:.5rem;flex-shrink:0;margin-top:7px}
-.md-dw{color:#ef4444;font-size:.5rem;flex-shrink:0;margin-top:7px}
-.md-dk{color:#f59e0b;font-size:.5rem;flex-shrink:0;margin-top:7px}
-.md-ds{color:#22c55e;font-size:.5rem;flex-shrink:0;margin-top:7px}
-.md-de{color:#f87171;font-size:.5rem;flex-shrink:0;margin-top:7px}
-.md-n{color:#60a5fa;font-weight:700;font-size:.875rem;flex-shrink:0;min-width:1.9rem;padding-top:1px}
+/* ── Lists ── */
+.md-ul,.md-ol{margin:.3rem 0;padding:0;list-style:none}
+.md-li{display:flex;gap:.6rem;align-items:flex-start;padding:.18rem 0}
+.md-lt{font-size:.875rem;color:#cbd5e1;line-height:1.9;flex:1;min-width:0}
+.md-d{color:rgba(139,92,246,.7);font-size:.45rem;flex-shrink:0;margin-top:8px}
+.md-n{color:#60a5fa;font-weight:700;font-size:.875rem;flex-shrink:0;min-width:1.8rem;padding-top:1px}
 
-/* Table */
-.md-tw{overflow-x:auto;margin:.75rem 0;border-radius:10px;border:1px solid rgba(255,255,255,.09)}
-.md-tbl{width:100%;border-collapse:collapse;font-size:.85rem}
-.md-th{padding:.48rem .85rem;text-align:left;font-weight:600;font-size:.75rem;color:#94a3b8;background:rgba(255,255,255,.04);border-bottom:1px solid rgba(255,255,255,.08);text-transform:uppercase;letter-spacing:.05em}
-.md-td{padding:.42rem .85rem;color:#cbd5e1;border-bottom:1px solid rgba(255,255,255,.04)}
-.md-ta{background:rgba(255,255,255,.01)}.md-tb{background:rgba(255,255,255,.033)}
-.md-bq{border-left:3px solid #4f46e5;background:rgba(79,70,229,.09);padding:.55rem .9rem;border-radius:0 8px 8px 0;margin:.5rem 0;color:#c7d2fe;font-size:.875rem;line-height:1.75}
-.md-hr{border:none;border-top:1px solid rgba(255,255,255,.09);margin:1rem 0}
-.md-gap{height:.35rem}
-.md-math{overflow-x:auto;text-align:center;margin:.75rem 0;padding:.6rem;background:rgba(255,255,255,.02);border-radius:8px}
+/* ── Blockquote ── */
+.md-bq{border-left:2px solid rgba(99,102,241,.4);padding:.5rem .85rem;margin:.45rem 0 .45rem .1rem;color:#c7d2fe;font-size:.875rem;line-height:1.85;font-style:italic}
+
+/* ── Table ── */
+.md-tw{overflow-x:auto;margin:.7rem 0;border-radius:9px;border:1px solid rgba(255,255,255,.08)}
+.md-tbl{width:100%;border-collapse:collapse;font-size:.84rem}
+.md-th{padding:.45rem .8rem;text-align:left;font-weight:600;font-size:.72rem;color:#94a3b8;background:rgba(255,255,255,.03);border-bottom:1px solid rgba(255,255,255,.07);text-transform:uppercase;letter-spacing:.05em}
+.md-td{padding:.4rem .8rem;color:#cbd5e1;border-bottom:1px solid rgba(255,255,255,.04)}
+.md-ta{background:rgba(255,255,255,.01)}.md-tb{background:rgba(255,255,255,.025)}
+.md-hr{border:none;border-top:1px solid rgba(255,255,255,.08);margin:.9rem 0}
+.md-gap{height:.3rem}
+.md-math{overflow-x:auto;text-align:center;margin:.7rem 0;padding:.55rem;background:rgba(255,255,255,.02);border-radius:8px}
 `;
 
 let cssInjected = false;
 function injectCSS() {
   if (cssInjected || typeof document === "undefined") return;
-  ["sea-md-v5","sea-md-v6","sea-md-v7","sea-md-v8","sea-md-v9","sea-md-v10"].forEach(id=>document.getElementById(id)?.remove());
+  ["sea-md-v5","sea-md-v6","sea-md-v7","sea-md-v8","sea-md-v9","sea-md-v10","sea-md-v11"].forEach(id=>document.getElementById(id)?.remove());
   const el = document.createElement("style");
-  el.id = "sea-md-v10";
+  el.id = "sea-md-v11";
   el.textContent = CSS;
   document.head.appendChild(el);
   cssInjected = true;

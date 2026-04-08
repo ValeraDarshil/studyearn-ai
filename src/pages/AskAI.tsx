@@ -535,81 +535,61 @@ function AIBubble({
   }, [showCopy]);
 
   return (
-    <div className="flex gap-3 items-start w-full group/ai">
-      {/* AI avatar — animated gradient ring when streaming */}
-      <div className={`relative flex-shrink-0 mt-0.5 ${isStreaming ? "ai-avatar-ring" : ""}`}>
-        <div className={`w-7 h-7 rounded-full flex items-center justify-center bg-gradient-to-br ${
-          modeConfig?.id === "math"    ? "from-blue-500 to-blue-600"    :
-          modeConfig?.id === "coding"  ? "from-green-500 to-emerald-600" :
-          modeConfig?.id === "science" ? "from-cyan-500 to-cyan-600"    :
-          "from-purple-500 to-blue-600"
+    <div className="w-full group/ai">
+      {/* Mode badge — no avatar, full width response */}
+      {msg.subjectMode && msg.subjectMode !== "auto" && (
+        <div className="mb-1.5"><ModeBadge mode={msg.subjectMode} /></div>
+      )}
+
+      {/* AI response — clean, no box, no border */}
+      <div
+        className={`w-full ${msg.isError ? "text-red-300" : "text-white"}`}
+        onClick={() => { if (!isStreaming && !msg.isError && msg.content) setShowCopy(p => !p); }}
+      >
+        {msg.isError
+          ? <p className="text-sm leading-relaxed">{msg.content}</p>
+          : <MarkdownRenderer content={msg.content} />}
+        {isStreaming && (
+          <span className="inline-block w-0.5 h-4 bg-blue-400 ml-0.5 animate-pulse align-middle" />
+        )}
+      </div>
+
+      {!!msg.pointsAwarded && (
+        <div className="mt-1">
+          <span className="text-xs font-medium text-green-400">
+            +{msg.pointsAwarded} pts ✓{isPremium && msg.pointsAwarded > 10 ? " ⚡" : ""}
+          </span>
+        </div>
+      )}
+
+      {/* Copy button */}
+      {!isStreaming && !msg.isError && msg.content && (
+        <div className={`transition-all duration-150 pt-0.5 ${
+          showCopy ? "opacity-100" : "opacity-0 group-hover/ai:opacity-100"
         }`}>
-          {modeConfig && modeConfig.id !== "auto" && modeConfig.id !== "general"
-            ? <modeConfig.icon className="w-3.5 h-3.5 text-white" />
-            : <Brain className="w-3.5 h-3.5 text-white" />}
+          <button
+            onClick={e => { e.stopPropagation(); handleCopy(); }}
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white/[0.04] border border-white/8 text-[10px] font-medium text-slate-500 hover:text-slate-200 hover:bg-white/[0.08] hover:border-white/15 active:scale-95 transition-all"
+          >
+            {copied
+              ? <><Check className="w-3 h-3 text-green-400" /> Copied!</>
+              : <><Copy className="w-3 h-3" /> Copy</>
+            }
+          </button>
         </div>
-      </div>
+      )}
 
-      <div className="flex-1 min-w-0 space-y-1">
-        {msg.subjectMode && msg.subjectMode !== "auto" && <ModeBadge mode={msg.subjectMode} />}
-
-        {/* AI response bubble — beautiful card with subtle border */}
-        <div
-          className={`w-full rounded-2xl rounded-tl-sm transition-all ${
-            msg.isError
-              ? "text-red-300"
-              : !isStreaming && msg.content
-                ? "bg-white/[0.025] border border-white/[0.07] px-4 py-3"
-                : "text-white"
-          }`}
-          onClick={() => { if (!isStreaming && !msg.isError && msg.content) setShowCopy(p => !p); }}
-        >
-          {msg.isError
-            ? <p className="text-sm leading-relaxed px-1">{msg.content}</p>
-            : <MarkdownRenderer content={msg.content} />}
-          {isStreaming && (
-            <span className="inline-block w-0.5 h-4 bg-blue-400 ml-0.5 animate-pulse align-middle" />
+      {/* Action Buttons — last completed AI message only */}
+      {isLast && !isStreaming && !msg.isError && msg.content && (
+        <>
+          <ActionButtons onAction={onQuickAction} />
+          {(msg.content.includes("📖") || msg.content.includes("EXPLANATION") ||
+            msg.content.toLowerCase().includes("let me explain") ||
+            msg.content.length > 300) && (
+            <StyleChoiceCard onChoice={onStyleChoice} />
           )}
-        </div>
-
-        {!!msg.pointsAwarded && (
-          <div>
-            <span className="text-xs font-medium text-green-400">
-              +{msg.pointsAwarded} pts ✓{isPremium && msg.pointsAwarded > 10 ? " ⚡" : ""}
-            </span>
-          </div>
-        )}
-
-        {/* Copy button — hover (desktop) OR tap (mobile) */}
-        {!isStreaming && !msg.isError && msg.content && (
-          <div className={`transition-all duration-150 pt-0.5 ${
-            showCopy ? "opacity-100" : "opacity-0 group-hover/ai:opacity-100"
-          }`}>
-            <button
-              onClick={e => { e.stopPropagation(); handleCopy(); }}
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white/[0.04] border border-white/8 text-[10px] font-medium text-slate-500 hover:text-slate-200 hover:bg-white/[0.08] hover:border-white/15 active:scale-95 transition-all"
-            >
-              {copied
-                ? <><Check className="w-3 h-3 text-green-400" /> Copied!</>
-                : <><Copy className="w-3 h-3" /> Copy</>
-              }
-            </button>
-          </div>
-        )}
-
-        {/* Action Buttons — last completed AI message only */}
-        {isLast && !isStreaming && !msg.isError && msg.content && (
-          <>
-            <ActionButtons onAction={onQuickAction} />
-            {/* Style Choice Card — show when AI gave an explanation */}
-            {(msg.content.includes("📖") || msg.content.includes("EXPLANATION") ||
-              msg.content.toLowerCase().includes("let me explain") ||
-              msg.content.length > 300) && (
-              <StyleChoiceCard onChoice={onStyleChoice} />
-            )}
-          </>
-        )}
-      </div>
+        </>
+      )}
     </div>
   );
 }
