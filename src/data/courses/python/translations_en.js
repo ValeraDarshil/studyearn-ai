@@ -17,6 +17,63 @@
 const W1 = {
   'py-w1-s1': {
     title_en: 'What is Python and How to Set It Up',
+    richContent_en: [
+      {
+            "type": "concept",
+            "heading": "What is Python?",
+            "body": "Python is a programming language — a way to give instructions to a computer. It is so simple it almost reads like English. Google, Netflix, Instagram — they all use Python."
+      },
+      {
+            "type": "analogy",
+            "text": "Think of a computer as a worker who only understands their own language. Python is the dictionary that lets you give it instructions — simple, clear, and powerful."
+      },
+      {
+            "type": "concept",
+            "heading": "Your first program",
+            "body": "print() is a function that displays anything on the screen. Whatever you write inside the quotes — that is exactly what appears."
+      },
+      {
+            "type": "snippet",
+            "label": "Run it and see",
+            "code": "print(\"Hello World!\")\nprint(\"My name is Python!\")\nprint(\"I will become a pro in 3 months! 💪\")",
+            "expectedOutput": "Hello World!\nMy name is Python!\nI will become a pro in 3 months! 💪"
+      },
+      {
+            "type": "concept",
+            "heading": "Numbers with print()",
+            "body": "Not just text — numbers work too. And you can print multiple things at once:"
+      },
+      {
+            "type": "snippet",
+            "label": "Numbers and text together",
+            "code": "print(42)\nprint(3.14)\nprint(\"Score:\", 100)",
+            "expectedOutput": "42\n3.14\nScore: 100"
+      },
+      {
+            "type": "mistake",
+            "wrong": "Print(\"Hello\")",
+            "right": "print(\"Hello\")",
+            "why": "Python is case-sensitive — Print (capital P) does not exist. Always use lowercase print."
+      },
+      {
+            "type": "mistake",
+            "wrong": "print('Hello\")",
+            "right": "print(\"Hello\")",
+            "why": "Opening and closing quotes must match — both single or both double."
+      },
+      {
+            "type": "checkpoint",
+            "question": "What will print(\"2 + 2\") output?",
+            "options": [
+                  "4",
+                  "\"2 + 2\"",
+                  "2 + 2",
+                  "Error"
+            ],
+            "correct": 2,
+            "explanation": "Anything inside quotes is printed literally — no calculation happens. \"2 + 2\" is a string, not a math expression."
+      }
+],
     content_en: `## What is Python?
 
 Python is a programming language that is **very easy** to learn — almost like English. Google, Netflix, Instagram — they all use Python!
@@ -51,7 +108,9 @@ Python is CASE-SENSITIVE — \`print\` is correct, \`Print\` or \`PRINT\` will c
 print("Hello World! 🌍")
 print("Python is really fun!")
 print("I will become a Python pro in 3 months!")`,
-    task_en: { description: 'Print your name, city and favorite food — each on a separate line!', hint: 'Use three separate print() statements — one for name, one for city, one for food' },
+    task_en: { description: 'Print your name, city and favorite food — each on a separate line!', hint: 'Use three separate print() statements — one for name, one for city, one for food'  starterCode_en: `print("Hello, ???!")
+print("I am from ???")
+print("My favourite food is ???")`,},
     quiz_en: [
       { q: 'Which function is used to print text in Python?', options: ['display()', 'print()', 'show()', 'write()'], correct: 1, explanation: "print() is Python's built-in function that displays output on the screen." },
       { q: 'What will be the output of print("Hello")?', options: ['"Hello"', 'Hello', 'hello', 'HELLO'], correct: 1, explanation: 'print() displays the text without quotes — just the content inside.' },
@@ -60,6 +119,69 @@ print("I will become a Python pro in 3 months!")`,
   },
   'py-w1-s2': {
     title_en: 'Variables — Storing Data',
+    richContent_en: [
+      {
+            "type": "concept",
+            "heading": "What is a variable?",
+            "body": "A variable is a labelled box. Create a box, give it a name, put anything inside. Later, just use the name to get it back."
+      },
+      {
+            "type": "analogy",
+            "text": "You save contacts in your phone, right? \"Rahul — 98765\" — the name is the variable name, the number is the value. Search \"Rahul\" and you get the number. Python variables work exactly the same way."
+      },
+      {
+            "type": "snippet",
+            "label": "Create and use a variable",
+            "code": "name = \"Rahul\"\nage = 18\nprint(name)\nprint(age)",
+            "expectedOutput": "Rahul\n18"
+      },
+      {
+            "type": "concept",
+            "heading": "Three main data types",
+            "body": "Python has three common types: String (text, inside quotes), Integer (whole number), Float (decimal number)."
+      },
+      {
+            "type": "snippet",
+            "label": "See all three types",
+            "code": "student_name = \"Priya\"     # String\nstudent_age  = 17          # Integer\nstudent_gpa  = 9.2         # Float\n\nprint(student_name)\nprint(student_age)\nprint(student_gpa)",
+            "expectedOutput": "Priya\n17\n9.2"
+      },
+      {
+            "type": "concept",
+            "heading": "Updating a variable",
+            "body": "You can change a variable's value any time — just assign again:"
+      },
+      {
+            "type": "snippet",
+            "label": "Update a value",
+            "code": "score = 0\nprint(\"Start:\", score)\n\nscore = 100\nprint(\"After game:\", score)\n\nscore = score + 50\nprint(\"Bonus earned:\", score)",
+            "expectedOutput": "Start: 0\nAfter game: 100\nBonus earned: 150"
+      },
+      {
+            "type": "mistake",
+            "wrong": "2score = 100",
+            "right": "score2 = 100",
+            "why": "Variable names cannot start with a number. Start with a letter or underscore."
+      },
+      {
+            "type": "mistake",
+            "wrong": "student name = \"Rahul\"",
+            "right": "student_name = \"Rahul\"",
+            "why": "No spaces in variable names — use underscore (_) instead."
+      },
+      {
+            "type": "checkpoint",
+            "question": "x = 5, then x = x + 3 — what is x now?",
+            "options": [
+                  "5",
+                  "3",
+                  "8",
+                  "Error"
+            ],
+            "correct": 2,
+            "explanation": "x = x + 3 means: calculate right side first (5 + 3 = 8), then store 8 in x."
+      }
+],
     content_en: `## What are Variables?
 
 A variable is like a **box** where you store data. Just like you save contacts in your phone — a variable works the same way!
@@ -113,7 +235,15 @@ percentage = 87.5
 print("Name:", student_name)
 print("Class:", student_class)
 print("Percentage:", percentage, "%")`,
-    task_en: { description: 'Store your info in variables: name, age, favourite_subject, percentage. Then print all of them!', hint: 'Create 4 variables and print each one. Use quotes for strings, direct value for numbers.' },
+    task_en: { description: 'Store your info in variables: name, age, favourite_subject, percentage. Then print all of them!', hint: 'Create 4 variables and print each one. Use quotes for strings, direct value for numbers.'  starterCode_en: `name = "???"
+age = ???
+favourite_subject = "???"
+percentage = ???
+
+print("Name:", name)
+print("Age:", age)
+print("Subject:", favourite_subject)
+print("Percentage:", percentage)`,},
     quiz_en: [
       { q: 'How do you create a variable in Python?', options: ['var naam = "Rahul"', 'naam = "Rahul"', 'let naam = "Rahul"', 'string naam = "Rahul"'], correct: 1, explanation: 'In Python, you just write name = value directly — no keyword needed!' },
       { q: 'Which variable name is NOT valid?', options: ['my_name', 'name1', '_score', '2score'], correct: 3, explanation: 'Variable names cannot start with a number. "2score" is invalid.' },
@@ -122,6 +252,65 @@ print("Percentage:", percentage, "%")`,
   },
   'py-w1-s3': {
     title_en: 'Getting User Input — input()',
+    richContent_en: [
+      {
+            "type": "concept",
+            "heading": "Make your program interactive",
+            "body": "Until now you wrote values directly in the code. With input(), the program pauses and asks the user — the user types, the value comes in."
+      },
+      {
+            "type": "snippet",
+            "label": "Basic input — try it",
+            "code": "# input() will open a prompt box in the browser\nname = input(\"Enter your name: \")\nprint(\"Hello\", name, \"! Welcome! 🎉\")",
+            "expectedOutput": "(A prompt box will appear — type your name)"
+      },
+      {
+            "type": "concept",
+            "heading": "Important: input() always returns a String",
+            "body": "This is the most common source of confusion. Whether the user types \"25\" or \"hello\" — both are Strings. If you need a number, you must convert it:"
+      },
+      {
+            "type": "snippet",
+            "label": "Number input — convert with int()",
+            "code": "age = int(input(\"What is your age? \"))\nnext_year = age + 1\nprint(f\"Next year you will be {next_year} years old!\")",
+            "expectedOutput": "(Type a number — result will calculate)"
+      },
+      {
+            "type": "snippet",
+            "label": "Float input — for decimal numbers",
+            "code": "score = float(input(\"Your score (0-10): \"))\npercentage = score * 10\nprint(f\"Percentage: {percentage}%\")",
+            "expectedOutput": "(Enter a decimal like 8.5)"
+      },
+      {
+            "type": "mistake",
+            "wrong": "age = input(\"Age: \")\nprint(age + 1)",
+            "right": "age = int(input(\"Age: \"))\nprint(age + 1)",
+            "why": "input() gives a string — \"25\" + 1 will throw a TypeError. Convert with int() first."
+      },
+      {
+            "type": "concept",
+            "heading": "f-strings — cleaner printing",
+            "body": "With f\"...\" you can put variables directly inside {} — no need to join with +:"
+      },
+      {
+            "type": "snippet",
+            "label": "f-string magic",
+            "code": "name = input(\"Name: \")\ncity = input(\"City: \")\nprint(f\"{name} is from {city} — welcome! 🙌\")",
+            "expectedOutput": "(Enter name and city — combined print)"
+      },
+      {
+            "type": "checkpoint",
+            "question": "age = input(\"Age: \") — user types \"20\". What is the type of age?",
+            "options": [
+                  "Integer (20)",
+                  "String (\"20\")",
+                  "Float (20.0)",
+                  "Depends on user"
+            ],
+            "correct": 1,
+            "explanation": "input() always returns a String — even if the user types a number. \"20\" is a string, 20 is an integer."
+      }
+],
     content_en: `## How to Get Input from the User?
 
 So far we hardcoded values. Now let's get data from the user!
@@ -168,7 +357,12 @@ num2 = float(input("Second number: "))
 
 total = num1 + num2
 print("Sum of both:", total)`,
-    task_en: { description: "Get the user's name and favourite number. Then print: \"[name]'s favourite number is [number] and its double is [2x number]!\"", hint: 'Get name using input() (string), number using int(input()), then calculate number * 2' },
+    task_en: { description: "Get the user's name and favourite number. Then print: \"[name]'s favourite number is [number] and its double is [2x number]!\"", hint: 'Get name using input() (string), number using int(input()), then calculate number * 2'  starterCode_en: `name   = input("Your name: ")
+number = int(input("Favourite number: "))
+double = ???
+
+print(f"{name}'s favourite number is {number}!")
+print(f"Its double is: {???}")`,},
     quiz_en: [
       { q: 'What type does input() always return?', options: ['Integer', 'Float', 'String', 'Boolean'], correct: 2, explanation: 'input() always returns a String — even if the user types a number.' },
       { q: 'What is the correct way to get an integer input from the user?', options: ['input(int("Age: "))', 'int(input("Age: "))', 'integer(input("Age: "))', 'input("Age: ", int)'], correct: 1, explanation: 'int() wraps input() — first input() gets the string, then int() converts it.' },
@@ -177,6 +371,65 @@ print("Sum of both:", total)`,
   },
   'py-w1-s4': {
     title_en: 'Basic Math — Python as a Calculator',
+    richContent_en: [
+      {
+            "type": "concept",
+            "heading": "Python is a calculator too",
+            "body": "+ - * / are basic. Python has three more powerful operators that come up in interviews."
+      },
+      {
+            "type": "snippet",
+            "label": "All operators at once — run it",
+            "code": "a = 17\nb = 5\n\nprint(\"Add:     \", a + b)   # 22\nprint(\"Subtract:\", a - b)   # 12\nprint(\"Multiply:\", a * b)   # 85\nprint(\"Divide:  \", a / b)   # 3.4\nprint(\"Floor:   \", a // b)  # 3  (drop decimal)\nprint(\"Modulus: \", a % b)   # 2  (remainder)\nprint(\"Power:   \", a ** b)  # 1419857",
+            "expectedOutput": "Add:      22\nSubtract: 12\nMultiply: 85\nDivide:   3.4\nFloor:    3\nModulus:  2\nPower:    1419857"
+      },
+      {
+            "type": "concept",
+            "heading": "% (modulus) — remainder only",
+            "body": "17 % 5 = 2 because 17 = 5×3 + 2. Commonly used to check even/odd — if number % 2 == 0 then it is even."
+      },
+      {
+            "type": "snippet",
+            "label": "Even/Odd checker — classic % use",
+            "code": "number = 42\nif number % 2 == 0:\n    print(f\"{number} is even\")\nelse:\n    print(f\"{number} is odd\")",
+            "expectedOutput": "42 is even"
+      },
+      {
+            "type": "concept",
+            "heading": "f-string formatting",
+            "body": "{value:.2f} means \"show 2 decimal places\" — essential for percentages and money."
+      },
+      {
+            "type": "snippet",
+            "label": "Percentage calculator — real example",
+            "code": "name     = \"Vikram\"\nmarks    = 450\ntotal    = 500\npercent  = (marks / total) * 100\n\nprint(f\"{name}'s result:\")\nprint(f\"Marks:      {marks}/{total}\")\nprint(f\"Percentage: {percent:.2f}%\")",
+            "expectedOutput": "Vikram's result:\nMarks:      450/500\nPercentage: 90.00%"
+      },
+      {
+            "type": "mistake",
+            "wrong": "print(\"2 + 2\")",
+            "right": "print(2 + 2)",
+            "why": "\"2 + 2\" is inside quotes — it is a string. For calculation, write outside quotes."
+      },
+      {
+            "type": "mistake",
+            "wrong": "result = 10 / 0",
+            "right": "if b != 0:\n    result = a / b",
+            "why": "Dividing by zero gives ZeroDivisionError. Always check in real code."
+      },
+      {
+            "type": "checkpoint",
+            "question": "What will 17 % 5 output?",
+            "options": [
+                  "3",
+                  "2",
+                  "3.4",
+                  "0"
+            ],
+            "correct": 1,
+            "explanation": "Divide 17 by 5: 5×3=15, remainder = 17-15 = 2. Modulus gives only the remainder."
+      }
+],
     content_en: `## Math Operations in Python
 
 Python is a powerful calculator!
@@ -231,7 +484,15 @@ elif percentage >= 60:
     print("Grade: B — Good effort!")
 else:
     print("Grade: C — Keep trying! 💪")`,
-    task_en: { description: 'Build a simple EMI calculator: get loan amount, interest rate (%), and years. Formula: total = amount + (amount * rate * years / 100), monthly = total / (years * 12)', hint: 'total_amount = loan + (loan * rate * years / 100), then monthly = total_amount / (years * 12)' },
+    task_en: { description: 'Build a simple EMI calculator: get loan amount, interest rate (%), and years. Formula: total = amount + (amount * rate * years / 100), monthly = total / (years * 12)', hint: 'total_amount = loan + (loan * rate * years / 100), then monthly = total_amount / (years * 12)'  starterCode_en: `loan  = float(input("Loan amount: "))
+years = int(input("Years: "))
+
+total_payable = loan + (loan * 0.1 * years)
+monthly_emi   = ???
+
+print(f"\\nLoan:          ${loan:,.0f}")
+print(f"Total payable: ${total_payable:,.0f}")
+print(f"Monthly EMI:   ${???:,.0f}")`,},
     quiz_en: [
       { q: 'What will 17 % 5 output?', options: ['3', '2', '3.4', '0'], correct: 1, explanation: '17 divided by 5 = 3 remainder 2. Modulus (%) only returns the remainder.' },
       { q: 'How do you use a variable in an f-string?', options: ['f"Hello {name}"', 'f"Hello name"', '"Hello" + name', 'f("Hello", name)'], correct: 0, explanation: 'In f-strings, write the variable name inside curly braces {}.' },
@@ -4371,6 +4632,7 @@ export function applyEnglishTranslations(courseWeeks, translationMap) {
           ...section.task,
           description_en: trans.task_en.description,
           hint_en: trans.task_en.hint,
+          ...(trans.task_en.starterCode_en ? { starterCode_en: trans.task_en.starterCode_en } : {}),
         };
       }
 

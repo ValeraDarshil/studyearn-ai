@@ -1120,7 +1120,14 @@ export default function SectionViewer({
 
   // Pick starter code: prefer starterCode > codeExample > ''
   const getStarterCode = useCallback(() => {
-    if (lang === 'en' && section.codeExample_en) return section.codeExample_en;
+    // English: prefer task.starterCode_en → codeExample_en → starterCode → codeExample
+    if (lang === 'en') {
+      return section.task?.starterCode_en
+        || section.codeExample_en
+        || section.task?.starterCode
+        || section.codeExample || '';
+    }
+    // Hinglish: starterCode → codeExample
     return section.task?.starterCode || section.codeExample || '';
   }, [section, lang]);
 
@@ -1179,8 +1186,13 @@ export default function SectionViewer({
   };
 
   const displayTitle  = lang === 'en' && section.title_en   ? section.title_en   : section.title;
-  const displayTask   = lang === 'en' && section.task?.description_en ? section.task.description_en : section.task?.description;
-  const hasRichContent = section.richContent && section.richContent.length > 0;
+  const displayTask    = lang === 'en' && section.task?.description_en ? section.task.description_en : section.task?.description;
+  const displayHint    = lang === 'en' && section.task?.hint_en ? section.task.hint_en : section.task?.hint;
+  // Pick richContent based on lang — English gets richContent_en, Hinglish gets richContent
+  const activeRichContent = (lang === 'en' && section.richContent_en?.length)
+    ? section.richContent_en
+    : (section.richContent?.length ? section.richContent : null);
+  const hasRichContent = !!activeRichContent;
 
   const tabs = [
     { id: 'learn', label: lang === 'hi' ? '📖 Padho' : '📖 Learn', onClick: () => setActiveTab('learn') },
@@ -1236,7 +1248,7 @@ export default function SectionViewer({
           <div className="max-w-3xl">
             {hasRichContent
               ? <RichContentRenderer
-                  blocks={section.richContent}
+                  blocks={activeRichContent}
                   language={language}
                   courseInfo={courseInfo}
                   onXP={showXP}
@@ -1282,9 +1294,9 @@ export default function SectionViewer({
                   ⚡ {t.yourTask} <span className="text-gray-600 font-normal ml-1">— ??? ki jagah apna code likho</span>
                 </div>
                 <p className="text-gray-200 text-sm leading-relaxed font-medium">{displayTask}</p>
-                {section.task?.hint && (
+                {displayHint && (
                   <p className="text-gray-500 text-xs mt-2 leading-relaxed">
-                    💡 Hint: {section.task.hint}
+                    💡 Hint: {displayHint}
                   </p>
                 )}
               </div>
