@@ -108,7 +108,7 @@ Python is CASE-SENSITIVE — \`print\` is correct, \`Print\` or \`PRINT\` will c
 print("Hello World! 🌍")
 print("Python is really fun!")
 print("I will become a Python pro in 3 months!")`,
-    task_en: { description: 'Print your name, city and favorite food — each on a separate line!', hint: 'Use three separate print() statements — one for name, one for city, one for food'  starterCode_en: `print("Hello, ???!")
+    task_en: { description: 'Print your name, city and favorite food — each on a separate line!', hint: 'Use three separate print() statements — one for name, one for city, one for food', starterCode_en: `print("Hello, ???!")
 print("I am from ???")
 print("My favourite food is ???")`,},
     quiz_en: [
@@ -235,7 +235,7 @@ percentage = 87.5
 print("Name:", student_name)
 print("Class:", student_class)
 print("Percentage:", percentage, "%")`,
-    task_en: { description: 'Store your info in variables: name, age, favourite_subject, percentage. Then print all of them!', hint: 'Create 4 variables and print each one. Use quotes for strings, direct value for numbers.'  starterCode_en: `name = "???"
+    task_en: { description: 'Store your info in variables: name, age, favourite_subject, percentage. Then print all of them!', hint: 'Create 4 variables and print each one. Use quotes for strings, direct value for numbers.', starterCode_en: `name = "???"
 age = ???
 favourite_subject = "???"
 percentage = ???
@@ -357,7 +357,7 @@ num2 = float(input("Second number: "))
 
 total = num1 + num2
 print("Sum of both:", total)`,
-    task_en: { description: "Get the user's name and favourite number. Then print: \"[name]'s favourite number is [number] and its double is [2x number]!\"", hint: 'Get name using input() (string), number using int(input()), then calculate number * 2'  starterCode_en: `name   = input("Your name: ")
+    task_en: { description: "Get the user's name and favourite number. Then print: \"[name]'s favourite number is [number] and its double is [2x number]!\"", hint: 'Get name using input() (string), number using int(input()), then calculate number * 2', starterCode_en: `name   = input("Your name: ")
 number = int(input("Favourite number: "))
 double = ???
 
@@ -484,15 +484,15 @@ elif percentage >= 60:
     print("Grade: B — Good effort!")
 else:
     print("Grade: C — Keep trying! 💪")`,
-    task_en: { description: 'Build a simple EMI calculator: get loan amount, interest rate (%), and years. Formula: total = amount + (amount * rate * years / 100), monthly = total / (years * 12)', hint: 'total_amount = loan + (loan * rate * years / 100), then monthly = total_amount / (years * 12)'  starterCode_en: `loan  = float(input("Loan amount: "))
+    task_en: { description: 'Build a simple EMI calculator: get loan amount, interest rate (%), and years. Formula: total = amount + (amount * rate * years / 100), monthly = total / (years * 12)', hint: 'total_amount = loan + (loan * rate * years / 100), then monthly = total_amount / (years * 12)', starterCode_en: `loan  = float(input("Loan amount: "))
 years = int(input("Years: "))
 
 total_payable = loan + (loan * 0.1 * years)
-monthly_emi   = ???
+monthly_emi   = total_payable / (years * 12)
 
-print(f"\\nLoan:          ${loan:,.0f}")
-print(f"Total payable: ${total_payable:,.0f}")
-print(f"Monthly EMI:   ${???:,.0f}")`,},
+print(f"Loan:          {loan:,.0f}")
+print(f"Total payable: {total_payable:,.0f}")
+print(f"Monthly EMI:   {monthly_emi:,.0f}")`,},
     quiz_en: [
       { q: 'What will 17 % 5 output?', options: ['3', '2', '3.4', '0'], correct: 1, explanation: '17 divided by 5 = 3 remainder 2. Modulus (%) only returns the remainder.' },
       { q: 'How do you use a variable in an f-string?', options: ['f"Hello {name}"', 'f"Hello name"', '"Hello" + name', 'f("Hello", name)'], correct: 0, explanation: 'In f-strings, write the variable name inside curly braces {}.' },
