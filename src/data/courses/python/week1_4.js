@@ -109,7 +109,7 @@ print("Line 2")`, note: 'Empty print() blank line deta hai — formatting ke liy
               correct: 1,
               explanation: 'print() quotes ke bahar wali text print karta hai — bina quotes ke.',
               wrong_explanations: {
-                0: ''"Hello"' matlab quotes ke saath — print() quotes hata ke text dikhata hai.',
+                0: `'"Hello"' matlab quotes ke saath — print() quotes hata ke text dikhata hai.`,
                 2: 'Python case-sensitive hai lekin print() output case nahi badalta.',
                 3: 'HELLO uppercase nahi hoga — print() exactly wahi dikhata hai.'
               },
