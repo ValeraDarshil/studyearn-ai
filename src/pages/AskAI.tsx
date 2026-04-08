@@ -1,25 +1,23 @@
 // ─────────────────────────────────────────────────────────────
-// AskAI.tsx  (v8 — Ultra-Powerful Teaching Partner)
+// AskAI.tsx  (v12 — Unforgettable AI: All 10 Improvements)
 //
 // ROUTE: src/pages/AskAI.tsx
 //
-// What changed in v8:
-//   1. Action Buttons added to every completed AI response:
-//        "Samajh aaya 👍"  → positive signal, loop continues
-//        "Dubara samjhao 🔁" → re-explain with fresh analogy
-//        "Test me 🧠"      → trigger quiz on current topic
+// NEW IN v12 (Frontend):
+//   Improvement 2 — StyleChoiceCard: "Beginner / Real-world / Future"
+//                   Student gets control over HOW they learn
+//   Improvement 7 — WowMomentBadge: every 5 turns AI observes
+//                   student's learning pattern — makes AI feel alive
 //
-//   2. Emotional Toast component — shows after each response:
-//        correct   → "Nice! 🔥 You got it!"     (green)
-//        confused  → "Let's try a new angle..."  (amber)
-//        frustrated→ "You've got this!"           (blue)
-//        motivated → "Love the energy! 🚀"        (purple)
-//
-//   3. emotionalState read from SSE metadata stream (v8 backend)
-//
-//   4. Comeback nudge — shows after 5min inactivity mid-session
-//
-//   5. Dead commented-out legacy code removed (~850 lines cleaned)
+// BACKEND (askAIService.ts + askAIDbService.ts):
+//   Improvement 1 — Memory Surprise: specific past topic references
+//   Improvement 3 — Micro-Learning Hook: curiosity engine after answers
+//   Improvement 4 — Mood Tone Shift: urgent/confused/general detection
+//   Improvement 5 — Growth Mirror: AI reflects student's progress
+//   Improvement 6 — General → Learning Bridge: personalized connection
+//   Improvement 8 — Identity: calm + sharp + aware academic companion
+//   Improvement 9 — Adaptive Length: quick/detailed prompt detection
+//   Improvement 10 — AI asks questions: branching conversation
 // ─────────────────────────────────────────────────────────────
 
 import { useState, useRef, useCallback, useEffect } from "react";
@@ -253,6 +251,63 @@ function HintBanner({ text, onDismiss }: { text: string; onDismiss: () => void }
   );
 }
 
+// ─── Style Choice Card (Improvement 2) ──────────────────────
+// Shows after AI explains a concept — gives student control
+// over HOW they want to learn: beginner / real-world / future
+// This turns passive reading into active learning choice.
+function StyleChoiceCard({ onChoice }: { onChoice: (prompt: string) => void }) {
+  const [dismissed, setDismissed] = useState(false);
+  if (dismissed) return null;
+
+  const choices = [
+    { label: "🎓 Beginner friendly",  prompt: "Isko aur simple way mein samjhao — jaise main pehli baar sun raha hoon." },
+    { label: "🌍 Real-world example", prompt: "Ek real-world example do jo daily life se relate kare — ekdum relatable." },
+    { label: "🚀 Future impact",       prompt: "Batao yeh topic future mein kaise kaam aayega aur main isko kyun seekhun." },
+  ];
+
+  return (
+    <div className="mt-3 pt-2.5 border-t border-white/5">
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-[11px] text-slate-500 font-medium">Isko kis style mein samajhna chahoge?</p>
+        <button onClick={() => setDismissed(true)} className="text-slate-700 hover:text-slate-500 transition-colors">
+          <X className="w-3 h-3" />
+        </button>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {choices.map(c => (
+          <button
+            key={c.label}
+            onClick={() => { onChoice(c.prompt); setDismissed(true); }}
+            className="px-3 py-1.5 rounded-full text-xs font-medium bg-white/[0.04] border border-white/8 text-slate-400 hover:text-white hover:bg-violet-500/10 hover:border-violet-500/25 transition-all active:scale-95"
+          >
+            {c.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Wow Moment Toast (Improvement 7) ────────────────────────
+// Shows a brief AI observation about student's learning pattern
+// Triggers every 5-6 exchanges — makes AI feel alive + aware
+function WowMomentBadge({ text, onDismiss }: { text: string; onDismiss: () => void }) {
+  useEffect(() => {
+    const t = setTimeout(onDismiss, 5000);
+    return () => clearTimeout(t);
+  }, [onDismiss]);
+
+  return (
+    <div className="mt-2 flex items-start gap-2 px-3 py-2 rounded-xl border border-yellow-500/20 bg-yellow-500/8 text-yellow-300 text-xs leading-relaxed animate-fade-in-up">
+      <span className="flex-shrink-0 mt-0.5">✨</span>
+      <span className="flex-1">{text}</span>
+      <button onClick={onDismiss} className="flex-shrink-0 text-yellow-500/60 hover:text-yellow-300 transition-colors">
+        <X className="w-3 h-3" />
+      </button>
+    </div>
+  );
+}
+
 // ─── Action Buttons ───────────────────────────────────────────
 // Shown below EVERY completed AI response (not while streaming).
 // "Samajh aaya 👍" / "Dubara samjhao 🔁" / "Test me 🧠"
@@ -399,12 +454,14 @@ function AIBubble({
   isStreaming = false,
   isLast = false,
   onQuickAction,
+  onStyleChoice,
 }: {
   msg:           ChatMsg;
   isPremium:     boolean;
   isStreaming?:  boolean;
   isLast?:       boolean;
   onQuickAction: (type: "understood" | "reexplain" | "testme") => void;
+  onStyleChoice: (prompt: string) => void;
 }) {
   const [copied,      setCopied]      = useState(false);
   const [showCopy,    setShowCopy]    = useState(false);
@@ -481,7 +538,15 @@ function AIBubble({
 
         {/* Action Buttons — last completed AI message only */}
         {isLast && !isStreaming && !msg.isError && msg.content && (
-          <ActionButtons onAction={onQuickAction} />
+          <>
+            <ActionButtons onAction={onQuickAction} />
+            {/* Style Choice Card — show when AI gave an explanation */}
+            {(msg.content.includes("📖") || msg.content.includes("EXPLANATION") ||
+              msg.content.toLowerCase().includes("let me explain") ||
+              msg.content.length > 300) && (
+              <StyleChoiceCard onChoice={onStyleChoice} />
+            )}
+          </>
         )}
       </div>
     </div>
@@ -666,6 +731,10 @@ export function AskAI() {
   // ── Emotional State (v8 NEW) ─────────────────────────────
   const [emotionalState,    setEmotionalState]    = useState<EmotionalState>("neutral");
   const [showEmotionalToast, setShowEmotionalToast] = useState(false);
+
+  // ── v12: Wow Moment (Improvement 7) ─────────────────────
+  const [wowMoment,     setWowMoment]     = useState<string | null>(null);
+  const [showWowMoment, setShowWowMoment] = useState(false);
 
   // ── v11: AI-OS Enrichment state ──────────────────────────
   const [enrichment,     setEnrichment]     = useState<AskAIEnrichment | null>(null);
@@ -906,6 +975,7 @@ export function AskAI() {
     setMentorState({ intent: null, strategy: null, skillLevel: null, turnCount: 0 });
     setSessionTopics([]); setMistakeTopics([]); setWeakTopicBanner(null);
     setEmotionalState("neutral"); setShowEmotionalToast(false);
+    setWowMoment(null); setShowWowMoment(false);
     setShowComebackNudge(false);
     setEnrichment(null); setShowHintBanner(false); setHintText(null);
     textareaRef.current?.focus();
@@ -1008,6 +1078,16 @@ export function AskAI() {
       textareaRef.current?.focus();
     }, 50);
   }, [messages]);
+
+  // ─────────────────────────────────────────────────────────
+  // Style Choice Handler (v12 NEW — Improvement 2)
+  // When student picks a learning style from StyleChoiceCard
+  // ─────────────────────────────────────────────────────────
+  const handleStyleChoice = useCallback((prompt: string) => {
+    setQuestion(prompt);
+    setShowComebackNudge(false);
+    setTimeout(() => { textareaRef.current?.focus(); }, 50);
+  }, []);
 
   // ─────────────────────────────────────────────────────────
   // SEND
@@ -1264,6 +1344,22 @@ export function AskAI() {
         checkAndUnlockAchievements({ totalQuestionsAsked: newTotal });
         trackProgressEvent("ai_tutor_used", { mode: subjectMode }).catch(() => {});
         setMentorState(prev => ({ ...prev, turnCount: prev.turnCount + 1 }));
+
+        // ── v12: Wow Moment (Improvement 7) ─────────────────
+        // Trigger every 5-6 turns — makes AI feel alive & observant
+        const newTurnCount = mentorState.turnCount + 1;
+        if (newTurnCount > 0 && newTurnCount % 5 === 0) {
+          const wowObservations = [
+            "✨ I've noticed you understand concepts faster when I use examples — I'll keep doing that for you!",
+            "📈 You've asked some really deep questions today — your understanding is clearly growing!",
+            "🎯 You're mixing theory and practical questions really well — that's a great learning pattern!",
+            "🔥 You've covered a lot of ground this session — keep this momentum going!",
+            "💡 The way you're connecting different topics shows your brain is making strong links!",
+          ];
+          const idx = newTurnCount / 5 - 1;
+          const obs = wowObservations[idx % wowObservations.length];
+          setTimeout(() => { setWowMoment(obs); setShowWowMoment(true); }, 1500);
+        }
       }
 
       if (convoId) {
@@ -1437,6 +1533,16 @@ export function AskAI() {
         />
       )}
 
+      {/* Wow Moment Badge (v12 NEW — Improvement 7) */}
+      {showWowMoment && wowMoment && (
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 w-[90%] max-w-sm">
+          <WowMomentBadge
+            text={wowMoment}
+            onDismiss={() => { setShowWowMoment(false); setWowMoment(null); }}
+          />
+        </div>
+      )}
+
       {/* Comeback Nudge (v8 NEW) */}
       {showComebackNudge && (
         <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-xl border border-orange-500/30 bg-orange-500/10 text-orange-300 text-xs font-semibold shadow-lg flex items-center gap-2">
@@ -1571,6 +1677,7 @@ export function AskAI() {
                   isStreaming={isStreaming && isLastAssistant}
                   isLast={isLastAssistant}
                   onQuickAction={handleQuickAction}
+                  onStyleChoice={handleStyleChoice}
                 />;
           })}
 

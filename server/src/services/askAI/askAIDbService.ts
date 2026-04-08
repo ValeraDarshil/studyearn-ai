@@ -196,26 +196,70 @@ export async function getWeakTopicsFromDB(userId: string): Promise<string[]> {
 }
 
 // ─────────────────────────────────────────────────────────────
-// getSessionSummaryForPrompt — sirf stats, history nahi
+// getSessionSummaryForPrompt — UPGRADED (v12)
+// Returns rich memory context for Memory Surprise (Improvement 1)
+// Now includes: specific past struggles, growth signals, last topic
+// This enables the AI to say "Last time you struggled with base case
+// in recursion — let's connect that to today's topic"
 // ─────────────────────────────────────────────────────────────
 export async function getSessionSummaryForPrompt(userId: string): Promise<string> {
   try {
     const sessions = await AskAISession.find({ userId, deletedAt: null, turnCount: { $gt: 0 } })
       .sort({ lastMessageAt: -1 })
-      .limit(5)
-      .select('weakTopics strongTopics')
+      .limit(7)
+      .select('weakTopics strongTopics detectedTopics title turnCount lastMessageAt messages')
       .lean();
 
     if (!sessions.length) return '';
 
-    const allWeak   = [...new Set(sessions.flatMap((s: any) => s.weakTopics   || []))].slice(0, 5);
-    const allStrong = [...new Set(sessions.flatMap((s: any) => s.strongTopics || []))].slice(0, 5);
+    const allWeak      = [...new Set(sessions.flatMap((s: any) => s.weakTopics      || []))].slice(0, 5);
+    const allStrong    = [...new Set(sessions.flatMap((s: any) => s.strongTopics    || []))].slice(0, 5);
+    const allTopics    = [...new Set(sessions.flatMap((s: any) => s.detectedTopics  || []))].slice(0, 8);
+    const totalTurns   = sessions.reduce((acc: number, s: any) => acc + (s.turnCount || 0), 0);
+
+    // Last session's topic for "last time you asked about X" reference
+    const lastSession       = sessions[0] as any;
+    const lastTopic         = lastSession?.detectedTopics?.[lastSession.detectedTopics.length - 1] ?? null;
+    const lastSessionTitle  = lastSession?.title && lastSession.title !== 'New Chat'
+      ? lastSession.title.slice(0, 60)
+      : null;
+
+    // Growth detection: topics that moved from weak → strong
+    const grownTopics = allStrong.filter((t: string) => allWeak.includes(t));
+    // Currently still weak (not yet mastered)
+    const stillWeakTopics = allWeak.filter((t: string) => !allStrong.includes(t));
+
     const parts: string[] = [];
 
-    if (allWeak.length)   parts.push(`Student previously struggled with: ${allWeak.join(', ')}`);
-    if (allStrong.length) parts.push(`Student has mastered: ${allStrong.join(', ')}`);
+    // Memory context block — used for Memory Surprise moments
+    if (lastTopic) {
+      parts.push(`MEMORY REFERENCE: Student's most recent topic was "${lastTopic}". If today's question relates to this, naturally reference it (e.g., "Last time you were working on ${lastTopic}...").`);
+    }
+    if (lastSessionTitle && lastSessionTitle !== lastTopic) {
+      parts.push(`Last session title: "${lastSessionTitle}".`);
+    }
 
-    return parts.join('. ');
+    // Struggle history — enables specific callouts
+    if (stillWeakTopics.length > 0) {
+      parts.push(`Student HAS STRUGGLED with: ${stillWeakTopics.join(', ')}. If today's question relates — gently acknowledge it: "Since ${stillWeakTopics[0]} was tricky for you before, let's approach it differently this time."`);
+    }
+
+    // Growth moments — enables Growth Mirror (Improvement 5)
+    if (grownTopics.length > 0) {
+      parts.push(`Student HAS GROWN in: ${grownTopics.join(', ')} (previously struggled, now mastered). Celebrate this occasionally.`);
+    }
+
+    // Strong topics
+    if (allStrong.length > 0 && grownTopics.length === 0) {
+      parts.push(`Student has shown mastery in: ${allStrong.join(', ')}.`);
+    }
+
+    // Topics coverage — for wow moments (Improvement 7)
+    if (totalTurns >= 5) {
+      parts.push(`Student has engaged in ${totalTurns} total Q&A turns across ${sessions.length} sessions, covering: ${allTopics.slice(0, 6).join(', ')}. Occasionally (every 5-6 turns) reflect a WOW OBSERVATION about their learning pattern (e.g., "You tend to ask example-based questions — that's a great way to learn!")`);
+    }
+
+    return parts.join('\n');
 
   } catch (err: any) {
     logger.warn(`[AskAI DB] getSessionSummaryForPrompt failed: ${err.message}`);

@@ -68,6 +68,24 @@ Python mein CASE matter karta hai — \`print\` likhna sahi hai, \`Print\` ya \`
 print("Namaste Duniya! 🌍")
 print("Python bahut maza deta hai!")
 print("3 months mein main Python pro ban jaunga!")`,
+          analogy: 'Socho tum ek letter likh rahe ho — print() woh postman hai jo tumhara message duniya tak pahunchata hai. Jo bhi tumne quotes ke andar likha, woh exactly waise hi screen pe aayega — bina kisi badlaav ke.',
+          conceptMap: ["print() function", "Strings vs Numbers", "Comments (#)", "Multiple print statements"],
+          examples: [
+            { type: 'basic', label: 'Basic Example', code: `print("Hello World!")
+print("Mera naam Python hai!")`, note: 'Sabse simple print — text quotes ke andar' },
+            { type: 'realworld', label: 'Real-World', code: `print("Welcome to StudyEarn! 🎓")
+print("Aaj ka score:", 100)
+print("Level:", 3)`, note: 'App mein welcome message aur stats dikhana' },
+            { type: 'mistake', label: 'Common Mistake', code: `# GALAT — quotes nahi lagaye
+print(Hello)
+
+# SAHI
+print("Hello")`, note: 'Quotes bhoolna sabse common mistake hai!' },
+            { type: 'edge', label: 'Edge Case', code: `print()           # blank line print karta hai
+print("Line 1")
+print()           # gap
+print("Line 2")`, note: 'Empty print() blank line deta hai — formatting ke liye useful' }
+          ],
           task: {
             description: 'Apna naam, sheher aur favorite food — teeno alag alag lines mein print karo!',
             expectedOutput: null, // free-form task
@@ -79,18 +97,33 @@ print("3 months mein main Python pro ban jaunga!")`,
               options: ['display()', 'print()', 'show()', 'write()'],
               correct: 1,
               explanation: 'print() function Python ka built-in function hai jo output dikhata hai.',
+              wrong_explanations: {
+                0: 'display() JavaScript ya CSS mein hota hai, Python mein nahi.',
+                2: 'show() Python mein exist hi nahi karta.',
+                3: 'write() file mein likhne ke liye hota hai.'
+              },
             },
             {
               q: 'print("Hello") output kya hoga?',
               options: ['"Hello"', 'Hello', 'hello', 'HELLO'],
               correct: 1,
               explanation: 'print() quotes ke bahar wali text print karta hai — bina quotes ke.',
+              wrong_explanations: {
+                0: ''"Hello"' matlab quotes ke saath — print() quotes hata ke text dikhata hai.',
+                2: 'Python case-sensitive hai lekin print() output case nahi badalta.',
+                3: 'HELLO uppercase nahi hoga — print() exactly wahi dikhata hai.'
+              },
             },
             {
               q: 'Python mein case sensitive hai?',
               options: ['Haan', 'Nahi', 'Kabhi kabhi', 'Depend karta hai OS pe'],
               correct: 0,
               explanation: 'Haan! Python strictly case-sensitive hai. print aur Print different hain.',
+              wrong_explanations: {
+                1: 'Nahi! Python strictly case-sensitive hai.',
+                2: 'Kabhi kabhi nahi — hamesha case-sensitive hai.',
+                3: 'OS se koi fark nahi padta.'
+              },
             },
           ],
         },
@@ -151,6 +184,34 @@ percentage = 87.5
 print("Naam:", student_naam)
 print("Class:", student_class)
 print("Percentage:", percentage, "%")`,
+          analogy: 'Socho tumhare phone ka contact list — har contact ka ek naam (variable name) hota hai, aur usmein number stored hota hai (value). Jaise tum kisi ka number update karte ho waise hi variable ki value kisi bhi waqt badal sakte ho.',
+          conceptMap: ["Variable declare karna", "Data types (str, int, float)", "Variable update karna", "Naming rules", "f-strings"],
+          examples: [
+            { type: 'basic', label: 'Basic Example', code: `naam = "Rahul"
+umar = 18
+height = 5.9
+print(naam)
+print(umar)
+print(height)`, note: 'Teen alag types — string, int, float' },
+            { type: 'realworld', label: 'Real-World', code: `player_name = "Rahul"
+score = 0
+level = 1
+lives = 3
+
+score += 100  # point mila!
+print(f"{player_name} ka score: {score}")`, note: 'Game ke variables — real app mein aise data store hota hai' },
+            { type: 'mistake', label: 'Common Mistake', code: `# GALAT — number ko quotes mein likhna
+age = "18"   # yeh string hai, number nahi!
+
+# SAHI
+age = 18     # ab yeh integer hai
+print(age + 2)  # 20 aayega`, note: '"18" aur 18 alag hain — ek string hai ek number!' },
+            { type: 'edge', label: 'Edge Case', code: `x = 10
+print(type(x))   # <class int>
+
+x = "hello"      # same variable, type badal gaya!
+print(type(x))   # <class str>`, note: 'Python dynamically typed hai — ek variable ka type badal sakta hai' }
+          ],
           task: {
             description: 'Apni info variables mein store karo: naam, age, favourite_subject, percentage. Phir saari info print karo!',
             expectedOutput: null,
@@ -162,18 +223,33 @@ print("Percentage:", percentage, "%")`,
               options: ['var naam = "Rahul"', 'naam = "Rahul"', 'let naam = "Rahul"', 'string naam = "Rahul"'],
               correct: 1,
               explanation: 'Python mein seedha naam = value likhte hain — koi keyword nahi chahiye!',
+              wrong_explanations: {
+                0: '"Rahul" string hai kyunki quotes ke andar hai.',
+                2: 'Float mein decimal point hota hai — 18 mein nahi.',
+                3: 'Boolean sirf True ya False hota hai.'
+              },
             },
             {
               q: 'Kaunsa variable name valid nahi hai?',
               options: ['my_name', 'name1', '_score', '2score'],
               correct: 3,
               explanation: 'Variable name number se start nahi ho sakta. "2score" invalid hai.',
+              wrong_explanations: {
+                0: 'Galat — = assignment hai, == comparison.',
+                2: 'Nahi — variable naam mein spaces nahi hote.',
+                3: 'Galat — type() function se type pata chalta hai.'
+              },
             },
             {
               q: '"Hello" kis data type ka example hai?',
               options: ['Integer', 'Float', 'String', 'Boolean'],
               correct: 2,
               explanation: 'Quotes mein likha text String type hota hai.',
+              wrong_explanations: {
+                0: 'print(naam + umar) TypeError dega — string + int nahi hota.',
+                2: 'f-string mein {} ke andar variable name hota hai, quotes nahi.',
+                3: 'display() Python mein nahi hota.'
+              },
             },
           ],
         },
@@ -227,6 +303,37 @@ num2 = float(input("Doosra number: "))
 
 total = num1 + num2
 print("Dono ka sum:", total)`,
+          analogy: 'Calculator ki tarah socho — tum numbers daalte ho, operations choose karte ho (+, -, *, /), aur answer milta hai. Python ka operator bhi exactly waise hi kaam karta hai, bas tum code mein likhte ho.',
+          conceptMap: ["Arithmetic operators (+, -, *, /)", "Integer division (//) aur modulus (%)", "Power operator (**)", "String concatenation (+)", "Operator precedence"],
+          examples: [
+            { type: 'basic', label: 'Basic Example', code: `a = 10
+b = 3
+print(a + b)   # 13
+print(a - b)   # 7
+print(a * b)   # 30
+print(a / b)   # 3.333...`, note: 'Char basic operators — simple aur seedha' },
+            { type: 'realworld', label: 'Real-World', code: `marks = 450
+total = 500
+percentage = (marks / total) * 100
+print(f"Tumhara percentage: {percentage:.1f}%")
+
+bill = 1200
+discount = bill * 0.1  # 10% off
+final = bill - discount
+print(f"Pay karo: ₹{final}")`, note: 'Percentage calculator aur bill discount — daily life math' },
+            { type: 'mistake', label: 'Common Mistake', code: `# GALAT — string aur number add karna
+age = 20
+print("Age: " + age)   # TypeError!
+
+# SAHI — str() se convert karo
+print("Age: " + str(age))  # Age: 20
+# YA easier way:
+print(f"Age: {age}")       # Age: 20`, note: 'String aur number seedha add nahi hote — type conversion zaruri hai' },
+            { type: 'edge', label: 'Edge Case', code: `print(10 / 3)    # 3.3333... (float division)
+print(10 // 3)   # 3 (integer division — decimal cut)
+print(10 % 3)    # 1 (remainder — kitna bacha?)
+print(2 ** 10)   # 1024 (2 ki power 10)`, note: '//, % aur ** — yeh teen operators interviews mein bahut aate hain' }
+          ],
           task: {
             description: 'User se naam aur favourite number lo. Phir print karo: "[naam] ka favourite number [number] hai aur uska double [2x number] hai!"',
             expectedOutput: null,
@@ -320,6 +427,43 @@ elif percentage >= 60:
     print("Grade: B — Good effort!")
 else:
     print("Grade: C — Keep trying! 💪")`,
+          analogy: 'Socho tum apne dost se poochh rahe ho \'Kal school chaloge?\' — agar woh haan bole toh kuch hoga, na bole toh kuch aur. Python ka if-else exactly aisa hi kaam karta hai — ek sawaal, do raste.',
+          conceptMap: ["if statement", "else block", "elif (multiple conditions)", "Comparison operators", "Logical operators (and, or, not)"],
+          examples: [
+            { type: 'basic', label: 'Basic Example', code: `age = 18
+if age >= 18:
+    print("Vote de sakte ho!")
+else:
+    print("Abhi wait karo")`, note: 'Simple if-else — ek condition, do outcomes' },
+            { type: 'realworld', label: 'Real-World', code: `score = 75
+
+if score >= 90:
+    grade = "A"
+elif score >= 75:
+    grade = "B"
+elif score >= 60:
+    grade = "C"
+else:
+    grade = "F"
+
+print(f"Tumhara grade: {grade}")`, note: 'Grade calculator — multiple elif conditions ka real use' },
+            { type: 'mistake', label: 'Common Mistake', code: `# GALAT — indentation nahi ki
+if True:
+print("hello")  # IndentationError!
+
+# SAHI — 4 spaces (ya Tab) indent karo
+if True:
+    print("hello")  # sahi hai`, note: 'Indentation Python mein mandatory hai — bhoolna nahi!' },
+            { type: 'edge', label: 'Edge Case', code: `# Ek line mein if-else (ternary)
+age = 20
+status = "Adult" if age >= 18 else "Minor"
+print(status)  # Adult
+
+# Nested conditions
+x = 15
+if x > 10 and x < 20:
+    print("10 aur 20 ke beech hai")`, note: 'Ternary operator aur compound conditions — concise code likhne ke liye' }
+          ],
           task: {
             description: 'Simple EMI calculator banao: user se loan amount, interest rate (%), aur years lo. Monthly EMI calculate karo (formula: EMI = (amount * rate/1200) / (1 - (1 + rate/1200)^(-months))). Ya simple karo: total = amount + (amount * rate * years / 100), monthly = total / (years * 12)',
             expectedOutput: null,
@@ -426,6 +570,38 @@ elif username == correct_username:
     print("❌ Wrong password!")
 else:
     print("❌ Username not found!")`,
+          analogy: 'Socho tum apne 30 dosto ko WhatsApp message bhejne ho — ek ek karke manually bhejoge? Nahi na! Loop bolta hai \'yeh kaam X baar kar\' — computer automatically repeat karta rehta hai.',
+          conceptMap: ["for loop", "range() function", "while loop", "break aur continue", "Nested loops"],
+          examples: [
+            { type: 'basic', label: 'Basic Example', code: `for i in range(5):
+    print(f"Count: {i}")
+# Output: 0, 1, 2, 3, 4`, note: 'range(5) = 0 se 4 tak — 5 baar loop chalta hai' },
+            { type: 'realworld', label: 'Real-World', code: `students = ["Rahul", "Priya", "Amit"]
+for student in students:
+    print(f"Good morning, {student}! 🎓")
+
+# Attendance bhi
+for i, name in enumerate(students, 1):
+    print(f"{i}. {name}")`, note: 'Student list pe loop — real school management system mein aisa hota hai' },
+            { type: 'mistake', label: 'Common Mistake', code: `# GALAT — infinite loop!
+count = 0
+while count < 5:
+    print(count)
+    # count++ nahi kiya — kabhi khatam nahi hoga!
+
+# SAHI
+count = 0
+while count < 5:
+    print(count)
+    count += 1  # yeh zaruri hai!`, note: 'While loop mein counter update karna mat bhoolna — warna program hang ho jayega' },
+            { type: 'edge', label: 'Edge Case', code: `for i in range(10):
+    if i == 3:
+        continue  # 3 skip karo
+    if i == 7:
+        break     # 7 pe ruk jao
+    print(i)
+# Output: 0 1 2 4 5 6`, note: 'break = loop band karo, continue = is iteration skip karo' }
+          ],
           task: {
             description: 'Movie ticket price calculator: Adult (18+) = ₹200, Senior (60+) = ₹100, Child (under 18) = ₹120. User se age lo aur ticket price print karo. Bonus: Weekend pe ₹50 extra — user se weekday/weekend bhi poocho!',
             expectedOutput: null,
@@ -525,6 +701,47 @@ for i in range(1, 13):
     print(f"  {num:2d} × {i:2d} = {num*i:3d}")
 
 print(f"{'='*25}")`,
+          analogy: 'Functions ek recipe ki tarah hain — ek baar recipe likhlo (define karo), phir jitni baar chaaho use karo (call karo). Biryani banana seekha ek baar, phir 100 baar bana sakte ho — code dobara likhne ki zarurat nahi.',
+          conceptMap: ["Function define karna (def)", "Parameters aur arguments", "Return values", "Default parameters", "Scope (local vs global)"],
+          examples: [
+            { type: 'basic', label: 'Basic Example', code: `def greet(name):
+    return f"Hello, {name}!"
+
+result = greet("Rahul")
+print(result)  # Hello, Rahul!
+print(greet("Priya"))  # Hello, Priya!`, note: 'Simple function — ek baar define, baar baar use' },
+            { type: 'realworld', label: 'Real-World', code: `def calculate_grade(marks, total=100):
+    percent = (marks / total) * 100
+    if percent >= 90: return "A"
+    elif percent >= 75: return "B"
+    elif percent >= 60: return "C"
+    else: return "F"
+
+print(calculate_grade(85))   # B
+print(calculate_grade(45, 50))  # A (45/50 = 90%)`, note: 'Default parameter total=100 — agar nahi diya toh 100 use hoga automatically' },
+            { type: 'mistake', label: 'Common Mistake', code: `# GALAT — return ke baad print karna
+def add(a, b):
+    return a + b
+    print("Done")  # yeh kabhi nahi chalega!
+
+# GALAT — return bhool gaye
+def multiply(a, b):
+    result = a * b  # sirf calculate kiya, return nahi kiya
+
+print(multiply(3, 4))  # None aayega!`, note: 'return ke baad code nahi chalta, aur return bhoolne pe None milta hai' },
+            { type: 'edge', label: 'Edge Case', code: `def power(base, exp=2):  # default exp=2
+    return base ** exp
+
+print(power(3))     # 9 (3^2)
+print(power(3, 3))  # 27 (3^3)
+
+# Multiple return values
+def min_max(lst):
+    return min(lst), max(lst)
+
+lo, hi = min_max([3,1,4,1,5,9])
+print(lo, hi)  # 1 9`, note: 'Python mein multiple values return ho sakti hain — tuple ki form mein' }
+          ],
           task: {
             description: 'Number guessing game banao! Computer 1-100 ke beech ek secret number rakhe (hardcode karo pehle). User guess kare. Agar zyada ho toh "Kam karo!", kam ho toh "Zyada karo!", sahi ho toh "Sahi! X attempts mein guessa!" — while loop use karo!',
             expectedOutput: null,
@@ -623,6 +840,65 @@ for i in range(len(students)):
 
 print(f"\\nClass Average: {sum(marks)/len(marks):.2f}")
 print(f"Highest: {max(marks)} ({students[marks.index(max(marks))]})")`,
+          analogy: 'List ek dabbi ki tarah hai jisme kai cheezein rakh sakte ho — pehli cheez slot 0 mein, doosri slot 1 mein, aur aage. Bilkul jaise fridge ke drawers — pehla drawer index 0, doosra index 1.',
+          conceptMap: ["List create karna", "Indexing (0 se start)", "List methods (append, remove, sort)", "Slicing", "List comprehension"],
+          examples: [
+            { type: 'basic', label: 'Basic Example', code: `fruits = ["apple", "banana", "mango"]
+print(fruits[0])   # apple
+print(fruits[-1])  # mango (last element)
+fruits.append("guava")
+print(len(fruits))  # 4`, note: 'Index 0 se start, -1 matlab last element' },
+            { type: 'realworld', label: 'Real-World', code: `shopping_cart = []
+shopping_cart.append("Shirt")
+shopping_cart.append("Jeans")
+shopping_cart.append("Shoes")
+
+for item in shopping_cart:
+    print(f"✓ {item}")
+
+print(f"Total items: {len(shopping_cart)}")`, note: 'E-commerce cart — real apps mein lists aise hi use hoti hain' },
+            { type: 'mistake', label: 'Common Mistake', code: `items = ["a", "b", "c"]
+
+# GALAT — index 3 exist nahi karta (0,1,2 hain)
+print(items[3])  # IndexError!
+
+# SAHI — last item
+print(items[2])   # c
+print(items[-1])  # c (easier way)`, note: 'IndexError sabse common error hai — list 0 se shuru hoti hai, len() se nahi' },
+            { type: 'edge', label: 'Edge Case', code: `nums = [1, 2, 3, 4, 5]
+print(nums[1:4])   # [2, 3, 4] slicing
+print(nums[::-1])  # [5, 4, 3, 2, 1] reverse
+
+# List comprehension — compact way
+squares = [x**2 for x in range(5)]
+print(squares)  # [0, 1, 4, 9, 16]`, note: 'Slicing aur list comprehension — yeh Python ki special powers hain' }
+          ],
+          analogy: 'Socho ek dabba jisme numbered slots hain — slot 0, 1, 2, 3... Tum kisi bhi slot mein directly jaake cheez rakh ya nikal sakte ho. Python list bilkul aisi hai.',
+          conceptMap: ["List create karna", "Indexing (0 se start)", "List methods (append, remove, sort)", "Slicing", "List comprehension"],
+          examples: [
+            { type: 'basic', label: 'Basic Example', code: `fruits = ["apple", "banana", "mango"]
+print(fruits[0])    # apple
+print(fruits[-1])   # mango
+fruits.append("guava")
+print(len(fruits))  # 4`, note: 'Index 0 se start — pehla element [0] pe' },
+            { type: 'realworld', label: 'Real-World', code: `cart = []
+cart.append("Shirt")
+cart.append("Jeans")
+cart.sort()
+for item in cart:
+    print(f"checkmark {item}")
+print(f"Total: {len(cart)} items")`, note: 'Shopping cart — real e-commerce apps lists aise use karti hain' },
+            { type: 'mistake', label: 'Common Mistake', code: `items = ["a", "b", "c"]
+print(items[3])   # IndexError!
+# SAHI
+print(items[2])   # c
+print(items[-1])  # c`, note: '3 items mein indices 0,1,2 hote hain — 3 nahi!' },
+            { type: 'edge', label: 'Edge Case', code: `nums = [1, 2, 3, 4, 5]
+print(nums[1:4])    # [2, 3, 4]
+print(nums[::-1])   # [5, 4, 3, 2, 1]
+squares = [x**2 for x in range(5)]
+print(squares)  # [0, 1, 4, 9, 16]`, note: 'Slicing aur list comprehension — Python ki most-used features' }
+          ],
           task: {
             description: '5 numbers user se lo list mein. Phir print karo: original list, sorted list, reversed list, sum, average, max aur min.',
             expectedOutput: null,
@@ -737,6 +1013,75 @@ category = get_category(bmi)
 
 print(f"\\nBMI: {bmi}")
 print(f"Category: {category}")`,
+          analogy: 'Dictionary ek actual dictionary ki tarah hai — alag dict mein word dhundho, meaning milti hai. Python dict mein \'word\' = key aur \'meaning\' = value. Sirf word se directly meaning milti hai — poori book nahi padni.',
+          conceptMap: ["Dictionary create karna", "Key-value pairs", "Dict methods (get, keys, values)", "Nested dictionaries", "Dict comprehension"],
+          examples: [
+            { type: 'basic', label: 'Basic Example', code: `student = {
+    "name": "Rahul",
+    "age": 20,
+    "grade": "A"
+}
+print(student["name"])   # Rahul
+print(student.get("age"))  # 20`, note: 'Key se directly value access — O(1) speed' },
+            { type: 'realworld', label: 'Real-World', code: `user_profile = {
+    "username": "rahul_22",
+    "xp": 1250,
+    "level": 5,
+    "badges": ["First Code", "7-Day Streak"],
+}
+
+user_profile["xp"] += 50  # XP badha
+print(f"Level {user_profile['level']}: {user_profile['xp']} XP")`, note: 'User profile data — exactly aise hi apps backend mein store karta hai' },
+            { type: 'mistake', label: 'Common Mistake', code: `d = {"name": "Rahul"}
+
+# GALAT — exist nahi karta
+print(d["age"])  # KeyError!
+
+# SAHI — .get() use karo
+print(d.get("age"))         # None (no error)
+print(d.get("age", 0))     # 0 (default value)`, note: '.get() use karo direct [] ki jagah — KeyError se bachoge' },
+            { type: 'edge', label: 'Edge Case', code: `# Nested dict — dict ke andar dict
+school = {
+    "class_10": {"students": 40, "teacher": "Mr. Sharma"},
+    "class_11": {"students": 35, "teacher": "Ms. Gupta"},
+}
+print(school["class_10"]["teacher"])  # Mr. Sharma
+
+# All keys aur values
+for key, val in school.items():
+    print(key, "->", val["students"], "students")`, note: 'Nested dicts real databases ki tarah kaam karte hain' }
+          ],
+          analogy: 'Dictionary ek actual dictionary ki tarah — word (key) se seedha meaning (value) milti hai. Poori book nahi padni — seedha word dhundho, meaning lo.',
+          conceptMap: ["Dictionary create karna", "Key-value pairs", "Dict methods (get, keys, values)", "Nested dictionaries", "Dict comprehension"],
+          examples: [
+            { type: 'basic', label: 'Basic Example', code: `student = {
+    "name": "Rahul",
+    "age": 20,
+    "grade": "A"
+}
+print(student["name"])
+print(student.get("marks"))  # None, no KeyError`, note: '.get() safer hai direct [] se' },
+            { type: 'realworld', label: 'Real-World', code: `profile = {
+    "username": "rahul_22",
+    "xp": 1250,
+    "level": 5,
+    "badges": ["First Code"],
+}
+profile["xp"] += 50
+profile["badges"].append("Quiz Master")
+print(f"Level {profile['level']}: {profile['xp']} XP")`, note: 'User profile — apps backend mein exactly aisa data hota hai' },
+            { type: 'mistake', label: 'Common Mistake', code: `d = {"name": "Rahul"}
+print(d["age"])      # KeyError!
+# SAHI
+print(d.get("age"))       # None
+print(d.get("age", 0))   # 0 default`, note: '.get() use karo — KeyError se bachne ka ek hi tarika' },
+            { type: 'edge', label: 'Edge Case', code: `school = {
+    "class_10": {"students": 40, "teacher": "Mr. Sharma"},
+}
+print(school["class_10"]["teacher"])
+for cls, info in school.items():
+    print(f"{cls}: {info['students']} students")`, note: 'Nested dicts — real JSON APIs bilkul aisa structure use karte hain' }
+          ],
           task: {
             description: 'Temperature converter functions banao: celsius_to_fahrenheit(c), fahrenheit_to_celsius(f), celsius_to_kelvin(c). Formulas: F = (C × 9/5) + 32, K = C + 273.15. User se temperature aur unit lo, phir dono conversions print karo!',
             expectedOutput: null,
@@ -841,6 +1186,104 @@ def validate_username(username):
 user = input("Enter username: ")
 valid, message = validate_username(user)
 print(message)`,
+          analogy: 'Socho ek blueprint — ek hi blueprint se hazaron ghar bana sakte ho. Python mein class woh blueprint hai, aur har ghar ek object. Blueprint ek baar banao, objects jitne chaaho banao.',
+          conceptMap: ["Class define karna", "__init__ method", "Attributes aur methods", "Object create karna", "self keyword"],
+          examples: [
+            { type: 'basic', label: 'Basic Example', code: `class Dog:
+    def __init__(self, name, breed):
+        self.name = name
+        self.breed = breed
+    
+    def bark(self):
+        return f"{self.name} says: Woof!"
+
+dog1 = Dog("Tommy", "Labrador")
+print(dog1.bark())  # Tommy says: Woof!`, note: 'Class = blueprint, dog1 = object. self matlab "yeh specific object"' },
+            { type: 'realworld', label: 'Real-World', code: `class BankAccount:
+    def __init__(self, owner, balance=0):
+        self.owner = owner
+        self.balance = balance
+    
+    def deposit(self, amount):
+        self.balance += amount
+        return f"Deposited ₹{amount}. Balance: ₹{self.balance}"
+    
+    def withdraw(self, amount):
+        if amount > self.balance:
+            return "Insufficient funds!"
+        self.balance -= amount
+        return f"₹{amount} withdrawn."
+
+acc = BankAccount("Rahul", 5000)
+print(acc.deposit(2000))
+print(acc.withdraw(10000))`, note: 'Real bank account — OOP se data aur logic ek saath rakho' },
+            { type: 'mistake', label: 'Common Mistake', code: `class Car:
+    def __init__(self, brand):
+        self.brand = brand
+    
+    def info():
+        # GALAT — self nahi likha!
+        print(self.brand)  # NameError
+
+# SAHI
+    def info(self):  # self hamesha pehla parameter
+        print(self.brand)`, note: 'self bhoolna sabse common OOP mistake hai — har method mein pehla parameter self hona chahiye' },
+            { type: 'edge', label: 'Edge Case', code: `class Counter:
+    count = 0  # class variable — sabhi objects share karte hain
+    
+    def __init__(self):
+        Counter.count += 1
+        self.id = Counter.count  # instance variable — har object ka alag
+
+c1 = Counter()
+c2 = Counter()
+c3 = Counter()
+print(Counter.count)  # 3
+print(c1.id, c2.id, c3.id)  # 1 2 3`, note: 'Class variable vs instance variable — ek shared hota hai, ek har object ka apna' }
+          ],
+          analogy: 'Socho ek blueprint — ek hi blueprint se hazaron ghar bana sakte ho. Python mein class blueprint hai, object us blueprint se bana ghar. Ek baar banao, baar baar use karo.',
+          conceptMap: ["Class define karna", "__init__ method", "Attributes aur methods", "Object create karna", "self keyword"],
+          examples: [
+            { type: 'basic', label: 'Basic Example', code: `class Dog:
+    def __init__(self, name):
+        self.name = name
+    def bark(self):
+        return f"{self.name} says: Woof!"
+
+dog1 = Dog("Tommy")
+print(dog1.bark())`, note: 'Class = blueprint, dog1 = object, self = yeh specific object' },
+            { type: 'realworld', label: 'Real-World', code: `class BankAccount:
+    def __init__(self, owner, balance=0):
+        self.owner = owner
+        self.balance = balance
+    def deposit(self, amount):
+        self.balance += amount
+        return f"Balance: {self.balance}"
+    def withdraw(self, amount):
+        if amount > self.balance:
+            return "Insufficient funds!"
+        self.balance -= amount
+        return f"Done"
+
+acc = BankAccount("Rahul", 5000)
+print(acc.deposit(2000))`, note: 'Real bank logic — OOP se data aur logic ek jagah' },
+            { type: 'mistake', label: 'Common Mistake', code: `class Car:
+    def __init__(self, brand):
+        self.brand = brand
+    def info():        # GALAT - self nahi!
+        print(self.brand)
+    def info(self):    # SAHI
+        print(self.brand)`, note: 'self bhoolna sabse common OOP mistake' },
+            { type: 'edge', label: 'Edge Case', code: `class Counter:
+    count = 0
+    def __init__(self):
+        Counter.count += 1
+        self.id = Counter.count
+c1 = Counter()
+c2 = Counter()
+print(Counter.count)   # 2
+print(c1.id, c2.id)    # 1 2`, note: 'Class variable shared, instance variable alag alag' }
+          ],
           task: {
             description: 'Password strength checker banao. User se password lo. Check karo: length (8+), uppercase letter hai, lowercase hai, digit hai, special char (@#$! etc) hai. Har check ke liye score +1. "Weak/Medium/Strong/Very Strong" print karo.',
             expectedOutput: null,
@@ -946,6 +1389,114 @@ for name, marks in grade_book.items():
     elif marks >= 60: grade = "C"
     else: grade = "F"
     print(f"{name}: {marks} → Grade {grade}")`,
+          analogy: 'Inheritance matlab \'baap ka maal beta ko milega\'. Parent class mein jo kuch bhi hai — properties aur methods — woh automatically child class mein aa jaata hai. Fir child apni extra cheezein bhi add kar sakta hai.',
+          conceptMap: ["Inheritance (class Child(Parent))", "super() function", "Method overriding", "Multiple inheritance", "isinstance() check"],
+          examples: [
+            { type: 'basic', label: 'Basic Example', code: `class Animal:
+    def __init__(self, name):
+        self.name = name
+    
+    def speak(self):
+        return f"{self.name} makes a sound"
+
+class Dog(Animal):  # Animal se inherit kiya
+    def speak(self):  # override kiya
+        return f"{self.name} says Woof!"
+
+d = Dog("Tommy")
+print(d.speak())  # Tommy says Woof!`, note: 'Dog ne Animal ka __init__ liya, aur speak() override kiya' },
+            { type: 'realworld', label: 'Real-World', code: `class User:
+    def __init__(self, name, email):
+        self.name = name
+        self.email = email
+    
+    def greet(self):
+        return f"Hello, {self.name}!"
+
+class PremiumUser(User):
+    def __init__(self, name, email, plan):
+        super().__init__(name, email)  # parent init call
+        self.plan = plan
+    
+    def greet(self):
+        return f"Welcome back, {self.name}! ({self.plan} plan)"
+
+pu = PremiumUser("Rahul", "r@r.com", "Pro")
+print(pu.greet())`, note: 'SaaS apps mein exactly aisa User → PremiumUser hierarchy hoti hai' },
+            { type: 'mistake', label: 'Common Mistake', code: `class Parent:
+    def __init__(self, x):
+        self.x = x
+
+class Child(Parent):
+    def __init__(self, x, y):
+        # GALAT — super() call nahi kiya!
+        self.y = y  # self.x nahi milega!
+
+    # SAHI
+    def __init__(self, x, y):
+        super().__init__(x)  # parent ka init call karo
+        self.y = y`, note: 'super().__init__() bhoolna — parent ke attributes set nahi honge' },
+            { type: 'edge', label: 'Edge Case', code: `class A:
+    def hello(self):
+        return "A"
+
+class B(A):
+    def hello(self):
+        return "B + " + super().hello()
+
+class C(B):
+    def hello(self):
+        return "C + " + super().hello()
+
+print(C().hello())  # C + B + A
+# MRO: Method Resolution Order`, note: 'MRO — Python left to right, depth first chain follow karta hai' }
+          ],
+          analogy: 'Inheritance matlab baap ka maal beta ko milega. Parent class ke properties aur methods child ko automatically milte hain. Child apni extra cheezein bhi add kar sakta hai.',
+          conceptMap: ["Inheritance class Child(Parent)", "super() function", "Method overriding", "isinstance() check", "MRO"],
+          examples: [
+            { type: 'basic', label: 'Basic Example', code: `class Animal:
+    def __init__(self, name):
+        self.name = name
+    def speak(self):
+        return f"{self.name} makes a sound"
+
+class Dog(Animal):
+    def speak(self):
+        return f"{self.name} says Woof!"
+
+d = Dog("Tommy")
+print(d.speak())`, note: 'Dog ne Animal ka __init__ inherit kiya, speak() override kiya' },
+            { type: 'realworld', label: 'Real-World', code: `class User:
+    def __init__(self, name, email):
+        self.name = name
+        self.email = email
+    def greet(self):
+        return f"Hello, {self.name}!"
+
+class PremiumUser(User):
+    def __init__(self, name, email, plan):
+        super().__init__(name, email)
+        self.plan = plan
+    def greet(self):
+        return f"Welcome, {self.name}! ({self.plan})"
+
+pu = PremiumUser("Rahul", "r@r.com", "Pro")
+print(pu.greet())`, note: 'SaaS apps mein User to PremiumUser hierarchy exactly aisi hoti hai' },
+            { type: 'mistake', label: 'Common Mistake', code: `class Child(Parent):
+    def __init__(self, x, y):
+        # GALAT
+        self.y = y   # self.x nahi milega!
+        # SAHI
+        super().__init__(x)
+        self.y = y`, note: 'super().__init__() bhoolna — parent attributes set nahi honge' },
+            { type: 'edge', label: 'Edge Case', code: `class A:
+    def hello(self): return "A"
+class B(A):
+    def hello(self): return "B+" + super().hello()
+class C(B):
+    def hello(self): return "C+" + super().hello()
+print(C().hello())  # C+B+A`, note: 'MRO — Method Resolution Order — Python chain follow karta hai' }
+          ],
           task: {
             description: 'Mini shopping cart banao using dictionary. Items aur price hardcode karo (5 items). User item name aur quantity lo, cart mein add karo. "done" type karne par total bill print karo itemwise aur grand total.',
             expectedOutput: null,
@@ -1056,6 +1607,77 @@ while True:
         read_diary()
     elif choice == "3":
         break`,
+          analogy: 'File handling ek notebook ki tarah hai — pehle open karo, phir likho ya padho, phir band karo. Notebook band karna mat bhoolna — warna data corrupt ho sakta hai!',
+          conceptMap: ["File open karna (open())", "Read modes (r, w, a)", "with statement", "Read aur write operations", "Exception handling with files"],
+          examples: [
+            { type: 'basic', label: 'Basic Example', code: `# File mein likhna
+with open("notes.txt", "w") as f:
+    f.write("Hello File!\\n")
+    f.write("Python maza deta hai!")
+
+# File padhna
+with open("notes.txt", "r") as f:
+    content = f.read()
+    print(content)`, note: 'with open() best practice hai — automatically file close ho jaati hai' },
+            { type: 'realworld', label: 'Real-World', code: `import json
+
+# User data save karna
+user_data = {"name": "Rahul", "score": 1250, "level": 5}
+
+with open("user.json", "w") as f:
+    json.dump(user_data, f, indent=2)
+
+# Wapas load karna
+with open("user.json", "r") as f:
+    loaded = json.load(f)
+    print(f"Welcome back, {loaded['name']}! Score: {loaded['score']}")`, note: 'JSON file = game save system. Apps data aise hi persist karte hain' },
+            { type: 'mistake', label: 'Common Mistake', code: `# GALAT — with ke bina
+f = open("data.txt", "w")
+f.write("some data")
+# agar error aaye toh file kabhi close nahi hogi!
+
+# SAHI — with use karo
+with open("data.txt", "w") as f:
+    f.write("some data")
+# automatically close — chahe error aaye ya na aaye`, note: 'with statement use karo — file automatically aur safely close hogi' },
+            { type: 'edge', label: 'Edge Case', code: `# Line by line padhna (badi files ke liye)
+with open("bigfile.txt", "r") as f:
+    for line in f:  # ek ek line, memory efficient
+        print(line.strip())
+
+# Append mode — existing data preserve
+with open("log.txt", "a") as f:
+    f.write("New entry\\n")  # purana data nahi jayega`, note: '"a" mode = append, "w" mode = overwrite. "a" se purana data safe rehta hai' }
+          ],
+          analogy: 'File handling ek notebook ki tarah — open karo, likho ya padho, band karo. Notebook band karna mat bhoolna — warna data safe nahi rahega!',
+          conceptMap: ["open() function", "File modes r w a", "with statement", "read aur write operations", "JSON files"],
+          examples: [
+            { type: 'basic', label: 'Basic Example', code: `with open("notes.txt", "w") as f:
+    f.write("Hello File!\\n")
+    f.write("Python rocks!")
+with open("notes.txt", "r") as f:
+    print(f.read())`, note: 'with open() best practice — auto close hoti hai' },
+            { type: 'realworld', label: 'Real-World', code: `import json
+user = {"name": "Rahul", "score": 1250}
+with open("user.json", "w") as f:
+    json.dump(user, f, indent=2)
+with open("user.json", "r") as f:
+    loaded = json.load(f)
+    print(f"Welcome, {loaded['name']}!")`, note: 'JSON file = game save system — apps data aise persist karte hain' },
+            { type: 'mistake', label: 'Common Mistake', code: `# GALAT
+f = open("data.txt", "w")
+f.write("data")
+# error aaye toh file close nahi hogi!
+# SAHI
+with open("data.txt", "w") as f:
+    f.write("data")`, note: 'with use karo hamesha — auto close guaranteed' },
+            { type: 'edge', label: 'Edge Case', code: `with open("big.txt") as f:
+    for line in f:          # memory efficient
+        print(line.strip())
+
+with open("log.txt", "a") as f:
+    f.write("entry\\n")     # append, no overwrite`, note: '"a" append karta hai, "w" overwrite — dhyan se choose karo' }
+          ],
           task: {
             description: 'To-do list app banao with file storage. User tasks add kar sake, list dekh sake, task complete mark kar sake (❌ se ✅), aur program band karke dobara open karne par tasks remain karein!',
             expectedOutput: null,
@@ -1177,6 +1799,100 @@ def safe_calculator():
             break
 
 safe_calculator()`,
+          analogy: 'Exception handling ek safety net ki tarah hai — jaise trapeze artists ke neeche net hoti hai. Program toh chal raha hai, lekin agar kuch galat ho jaaye, toh crash nahi hoga — net pakad legi.',
+          conceptMap: ["try-except block", "Common exceptions (ValueError, TypeError, KeyError)", "finally block", "Custom exceptions", "raise statement"],
+          examples: [
+            { type: 'basic', label: 'Basic Example', code: `try:
+    num = int(input("Number daalo: "))
+    result = 10 / num
+    print(f"Result: {result}")
+except ValueError:
+    print("Yeh number nahi hai!")
+except ZeroDivisionError:
+    print("Zero se divide nahi kar sakte!")`, note: 'Alag alag exceptions ke liye alag except blocks — precise error handling' },
+            { type: 'realworld', label: 'Real-World', code: `import json
+
+def load_user(filename):
+    try:
+        with open(filename) as f:
+            return json.load(f)
+    except FileNotFoundError:
+        print("User file nahi mili — new user banao")
+        return {"name": "Guest", "score": 0}
+    except json.JSONDecodeError:
+        print("Corrupt file — resetting...")
+        return {"name": "Guest", "score": 0}
+
+user = load_user("user.json")
+print(f"Hello, {user['name']}!")`, note: 'Production apps mein har file operation mein exception handling hoti hai' },
+            { type: 'mistake', label: 'Common Mistake', code: `# GALAT — sab kuch ek saath pakadna
+try:
+    risky_code()
+except Exception:  # bahut broad!
+    pass  # silently fail — debug impossible!
+
+# SAHI — specific exceptions pakdo
+try:
+    risky_code()
+except ValueError as e:
+    print(f"Value error: {e}")
+except FileNotFoundError as e:
+    print(f"File missing: {e}")`, note: 'bare except ya except Exception bad practice hai — specific errors pakdo' },
+            { type: 'edge', label: 'Edge Case', code: `def divide(a, b):
+    try:
+        return a / b
+    except ZeroDivisionError:
+        raise ValueError("b zero nahi ho sakta!") from None
+    finally:
+        print("Division attempt kiya")  # hamesha chalta hai
+
+try:
+    print(divide(10, 0))
+except ValueError as e:
+    print(f"Error: {e}")`, note: 'finally hamesha chalta hai — cleanup code ke liye. raise se custom error throw karo' }
+          ],
+          analogy: 'Exception handling ek safety net — jaise trapeze artists ke neeche net hoti hai. Program crash nahi hoga, error gracefully handle hogi.',
+          conceptMap: ["try-except block", "Common exceptions", "finally block", "Custom exceptions", "raise statement"],
+          examples: [
+            { type: 'basic', label: 'Basic Example', code: `try:
+    num = int(input("Number: "))
+    print(10 / num)
+except ValueError:
+    print("Number nahi hai!")
+except ZeroDivisionError:
+    print("Zero se divide nahi!")`, note: 'Specific exceptions pakado — precise handling' },
+            { type: 'realworld', label: 'Real-World', code: `import json
+def load_user(f):
+    try:
+        with open(f) as fp:
+            return json.load(fp)
+    except FileNotFoundError:
+        return {"name": "Guest"}
+    except json.JSONDecodeError:
+        return {"name": "Guest"}
+print(load_user("user.json"))`, note: 'Production code mein file ops mein hamesha exception handling hoti hai' },
+            { type: 'mistake', label: 'Common Mistake', code: `# GALAT — too broad
+try:
+    code()
+except Exception:
+    pass   # silently fail!
+# SAHI
+try:
+    code()
+except ValueError as e:
+    print(f"Error: {e}")`, note: 'bare except avoid karo — specific pakdo warna debug impossible' },
+            { type: 'edge', label: 'Edge Case', code: `def divide(a, b):
+    try:
+        return a / b
+    except ZeroDivisionError:
+        raise ValueError("b zero nahi") from None
+    finally:
+        print("Attempt done")  # always runs
+try:
+    print(divide(10, 0))
+except ValueError as e:
+    print(e)`, note: 'finally = cleanup, raise = custom error throw karo' }
+          ],
           task: {
             description: 'Robust age calculator banao. User se DOB lo (YYYY-MM-DD format). Calculate karo exact age in years, months, days. Handle karo: wrong format, future date, invalid month/day. Use datetime module!',
             expectedOutput: null,
@@ -1304,6 +2020,119 @@ account = BankAccount("Rahul", 1000)
 account.deposit(500)
 account.withdraw(200)
 print(f"Current balance: ₹{account.get_balance()}")`,
+          analogy: 'Decorator ek gift wrapper ki tarah hai — gift (function) same rehta hai andar, bas upar se extra wrapping (extra functionality) add ho jaati hai. Gift kholta hai toh original gift milta hai, lekin presentation better ho gayi.',
+          conceptMap: ["Decorator syntax (@)", "First-class functions", "Closure concept", "functools.wraps", "Practical decorators (timing, logging)"],
+          examples: [
+            { type: 'basic', label: 'Basic Example', code: `def my_decorator(func):
+    def wrapper():
+        print("Pehle yeh")
+        func()
+        print("Baad mein yeh")
+    return wrapper
+
+@my_decorator
+def say_hello():
+    print("Hello!")
+
+say_hello()
+# Pehle yeh
+# Hello!
+# Baad mein yeh`, note: '@my_decorator = say_hello = my_decorator(say_hello) — shorthand hai' },
+            { type: 'realworld', label: 'Real-World', code: `import time
+
+def timer(func):
+    def wrapper(*args, **kwargs):
+        start = time.time()
+        result = func(*args, **kwargs)
+        end = time.time()
+        print(f"{func.__name__} laga: {end-start:.4f}s")
+        return result
+    return wrapper
+
+@timer
+def slow_search(n):
+    return sum(range(n))
+
+print(slow_search(1000000))`, note: 'Performance profiling decorator — real apps mein slow functions detect karne ke liye' },
+            { type: 'mistake', label: 'Common Mistake', code: `from functools import wraps
+
+def decorator(func):
+    # GALAT — wraps nahi lagaya
+    def wrapper(*args, **kwargs):
+        return func(*args, **kwargs)
+    return wrapper  # func ka naam kho gaya!
+
+    # SAHI
+    @wraps(func)  # original function info preserve karo
+    def wrapper(*args, **kwargs):
+        return func(*args, **kwargs)
+    return wrapper`, note: '@wraps(func) lagana zaruri hai — warna debugging mein function ka naam kho jaata hai' },
+            { type: 'edge', label: 'Edge Case', code: `def repeat(n):
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            for _ in range(n):
+                func(*args, **kwargs)
+        return wrapper
+    return decorator
+
+@repeat(3)  # parameter wala decorator!
+def greet(name):
+    print(f"Hello, {name}!")
+
+greet("Rahul")  # 3 baar print hoga`, note: 'Decorator factory — decorator ko bhi parameters de sakte ho' }
+          ],
+          analogy: 'Decorator ek gift wrapper — gift same rehta hai andar, packaging better ho jaati hai. Function same kaam karta hai, decorator upar se extra functionality deta hai.',
+          conceptMap: ["Decorator syntax @", "First-class functions", "Closure", "functools.wraps", "Timer aur logging decorators"],
+          examples: [
+            { type: 'basic', label: 'Basic Example', code: `def my_decorator(func):
+    def wrapper():
+        print("Pehle")
+        func()
+        print("Baad mein")
+    return wrapper
+
+@my_decorator
+def say_hello():
+    print("Hello!")
+
+say_hello()`, note: '@decorator = say_hello = my_decorator(say_hello) shorthand' },
+            { type: 'realworld', label: 'Real-World', code: `import time
+def timer(func):
+    def wrapper(*args, **kwargs):
+        start = time.time()
+        result = func(*args, **kwargs)
+        print(f"{func.__name__}: {time.time()-start:.4f}s")
+        return result
+    return wrapper
+
+@timer
+def slow_fn(n):
+    return sum(range(n))
+print(slow_fn(1000000))`, note: 'Performance timer — slow functions detect karne ke liye' },
+            { type: 'mistake', label: 'Common Mistake', code: `from functools import wraps
+def decorator(func):
+    # GALAT — no wraps
+    def wrapper(*a, **kw):
+        return func(*a, **kw)
+    return wrapper
+
+    # SAHI
+    @wraps(func)
+    def wrapper(*a, **kw):
+        return func(*a, **kw)
+    return wrapper`, note: '@wraps(func) lagao — function name preserve hoga' },
+            { type: 'edge', label: 'Edge Case', code: `def repeat(n):
+    def decorator(func):
+        def wrapper(*a, **kw):
+            for _ in range(n): func(*a, **kw)
+        return wrapper
+    return decorator
+
+@repeat(3)
+def greet(name):
+    print(f"Hello, {name}!")
+greet("Rahul")  # 3 baar`, note: 'Parametrized decorator — decorator ko bhi arguments de sakte ho' }
+          ],
           task: {
             description: 'Library system banao with classes: Book (title, author, copies), Library (name, books list). Methods: add_book(), borrow_book(title), return_book(title), available_books(). Proper error handling karo if book not found ya copies=0.',
             expectedOutput: null,
@@ -1407,6 +2236,89 @@ for i, item in enumerate(questions[:3]):
 
 now = datetime.datetime.now().strftime("%H:%M")
 print(f"Score: {score}/30 at {now}")`,
+          analogy: 'Python ki standard library ek bhari puri dukaan ki tarah hai — tum kuch bhi kharidna chahte ho, woh wahan milega. import karna matlab \'dukaan se ek shelf apne ghar la lena\'.',
+          conceptMap: ["import statement", "Standard library (os, sys, math, random)", "pip aur third-party packages", "Virtual environments", "__name__ == \"__main__\""],
+          examples: [
+            { type: 'basic', label: 'Basic Example', code: `import math
+import random
+
+print(math.pi)           # 3.14159...
+print(math.sqrt(144))    # 12.0
+print(random.randint(1, 100))  # random number
+print(random.choice(["Rock", "Paper", "Scissors"]))`, note: 'math aur random — sab already installed hain, bas import karo' },
+            { type: 'realworld', label: 'Real-World', code: `import os
+import json
+from datetime import datetime
+
+# Current directory files list
+files = os.listdir(".")
+print("Files:", files)
+
+# Current time
+now = datetime.now()
+print(f"Aaj: {now.strftime('%d/%m/%Y %H:%M')}")
+
+# Config file banana
+config = {"version": "1.0", "debug": False}
+with open("config.json", "w") as f:
+    json.dump(config, f)`, note: 'Real app ka typical setup — os, datetime, json sab ek saath' },
+            { type: 'mistake', label: 'Common Mistake', code: `# GALAT — wildcard import
+from math import *  # sab kuch import — conflicts ho sakte hain!
+
+# GALAT — circular import
+# file_a.py: import file_b
+# file_b.py: import file_a  # infinite loop!
+
+# SAHI — specific import
+from math import sqrt, pi
+from datetime import datetime, timedelta`, note: 'from module import * avoid karo — namespace pollute hota hai aur conflicts aate hain' },
+            { type: 'edge', label: 'Edge Case', code: `# __name__ trick — module vs script
+def main():
+    print("Main function chal raha hai")
+
+if __name__ == "__main__":
+    main()
+# Directly run karo — chalega
+# import karo — nahi chalega
+
+# Alias import
+import numpy as np  # long name ko short karo
+import pandas as pd`, note: '__name__ == "__main__" professional Python code mein hamesha hota hai' }
+          ],
+          analogy: 'Python standard library ek bhari puri dukaan — import karna matlab shelf apne ghar lana. Sab kuch pehle se available, bas import karo.',
+          conceptMap: ["import statement", "Standard library os math random", "pip packages", "Virtual environments", "__name__ check"],
+          examples: [
+            { type: 'basic', label: 'Basic Example', code: `import math
+import random
+print(math.pi)
+print(math.sqrt(144))
+print(random.randint(1, 100))
+print(random.choice(["Rock","Paper","Scissors"]))`, note: 'math aur random already installed — sirf import karo' },
+            { type: 'realworld', label: 'Real-World', code: `import os
+from datetime import datetime
+import json
+
+print(os.listdir("."))
+now = datetime.now()
+print(now.strftime("%d/%m/%Y %H:%M"))
+with open("config.json", "w") as f:
+    json.dump({"v": "1.0"}, f)`, note: 'Real app setup — os, datetime, json sab ek saath' },
+            { type: 'mistake', label: 'Common Mistake', code: `# GALAT
+from math import *   # namespace pollute!
+# GALAT — circular
+# a.py import b, b.py import a
+
+# SAHI
+from math import sqrt, pi
+from datetime import datetime`, note: 'wildcard import avoid karo — conflicts aate hain' },
+            { type: 'edge', label: 'Edge Case', code: `def main():
+    print("Script chal raha!")
+
+if __name__ == "__main__":
+    main()
+# Direct run = chalega
+# import = nahi chalega`, note: '__name__ == "__main__" professional Python ka standard pattern' }
+          ],
           task: {
             description: 'Weather simulator banao using random module — fake weather app! Random temperature (15-45°C), random weather (sunny/cloudy/rainy/stormy), random humidity (30-90%). 7-day forecast print karo with emojis. datetime se actual dates use karo!',
             expectedOutput: null,
@@ -1527,6 +2439,115 @@ class StudentDB:
 # Main menu — tum complete karo!
 db = StudentDB()
 print("Student Management System")`,
+          analogy: 'Month 1 ka project ek exam ki tarah hai — jo seekha woh apply karo. Variables, loops, functions, OOP, file handling — sab ek saath use honga. Yeh woh moment hai jab real learning hoti hai.',
+          conceptMap: ["Project planning", "Data structures choose karna", "Function design", "File persistence", "CLI interface banana"],
+          examples: [
+            { type: 'basic', label: 'Core Structure', code: `students = []  # list of dicts
+
+def add_student(name, marks):
+    students.append({
+        "name": name,
+        "marks": marks,
+        "grade": get_grade(marks)
+    })
+
+def get_grade(marks):
+    if marks >= 90: return "A"
+    elif marks >= 75: return "B"
+    elif marks >= 60: return "C"
+    else: return "F"`, note: 'Core data structure aur functions — yahan se shuru karo' },
+            { type: 'realworld', label: 'Complete Flow', code: `import json
+
+def save_data(filename="students.json"):
+    with open(filename, "w") as f:
+        json.dump(students, f, indent=2)
+
+def load_data(filename="students.json"):
+    try:
+        with open(filename) as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return []
+
+def display_all():
+    for s in sorted(students, key=lambda x: x["marks"], reverse=True):
+        print(f"{s['name']:20} | {s['marks']}% | {s['grade']}")`, note: 'Save/load + sorted display — yeh sab features ek real app mein hote hain' },
+            { type: 'mistake', label: 'Common Mistake', code: `# GALAT — sab kuch ek function mein
+def do_everything():
+    # 200 lines ka monster function
+    pass
+
+# SAHI — single responsibility
+def add_student(name, marks): ...
+def delete_student(name): ...
+def search_student(name): ...
+def display_report(): ...
+def save_data(): ...`, note: 'Ek function = ek kaam. Chhote focused functions = clean, testable code' },
+            { type: 'edge', label: 'Bonus Feature', code: `# Statistics add karo
+def get_stats():
+    if not students:
+        return "No students yet!"
+    marks_list = [s["marks"] for s in students]
+    return {
+        "total": len(students),
+        "average": sum(marks_list) / len(marks_list),
+        "highest": max(marks_list),
+        "lowest": min(marks_list),
+        "pass_rate": len([m for m in marks_list if m >= 60]) / len(marks_list) * 100
+    }
+
+stats = get_stats()
+print(f"Class average: {stats['average']:.1f}%")`, note: 'Statistics feature — list comprehension + math sab ek saath use ho raha hai' }
+          ],
+          analogy: 'Month 1 project ek exam — jo seekha sab apply karo. Variables, loops, functions, OOP, files sab ek saath. Yahi real learning hai.',
+          conceptMap: ["Project planning", "Data structures", "Function design", "File persistence", "CLI interface"],
+          examples: [
+            { type: 'basic', label: 'Core Structure', code: `students = []
+
+def add_student(name, marks):
+    students.append({
+        "name": name, "marks": marks,
+        "grade": get_grade(marks)
+    })
+
+def get_grade(m):
+    if m >= 90: return "A"
+    elif m >= 75: return "B"
+    elif m >= 60: return "C"
+    else: return "F"`, note: 'Core structure — yahan se shuru karo project' },
+            { type: 'realworld', label: 'Complete Flow', code: `import json
+def save_data():
+    with open("students.json","w") as f:
+        json.dump(students, f, indent=2)
+def load_data():
+    try:
+        with open("students.json") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return []
+def display_all():
+    for s in sorted(students,key=lambda x:x["marks"],reverse=True):
+        print(f"{s['name']:20} | {s['marks']}%")`, note: 'Save, load, sorted display — real app features' },
+            { type: 'mistake', label: 'Common Mistake', code: `# GALAT
+def do_everything():
+    # 200 lines
+    pass
+# SAHI
+def add_student(n,m): ...
+def delete_student(n): ...
+def display_report(): ...`, note: 'Ek function = ek kaam. Single responsibility principle' },
+            { type: 'edge', label: 'Bonus Feature', code: `def get_stats():
+    if not students: return {}
+    m = [s["marks"] for s in students]
+    return {
+        "avg": sum(m)/len(m),
+        "top": max(m),
+        "pass": len([x for x in m if x>=60])/len(m)*100
+    }
+stats = get_stats()
+if stats:
+    print(f"Avg: {stats['avg']:.1f}%")`, note: 'Stats feature — list comprehension + math ek saath' }
+          ],
           task: {
             description: 'Upar diya starter code use karke PURA system complete karo — saare 8 features implement karo. Ek menu-driven CLI app banana hai jo properly kaam kare!',
             expectedOutput: null,
@@ -1596,6 +2617,66 @@ print("Phones found:", phones)
 # import requests
 # r = requests.get("https://api.github.com")
 # print(r.status_code)  # 200 = success!`,
+          analogy: 'Month 1 review ek milestone ki tarah hai — peeche dekho kitna seekha, aage dekho kya aane wala hai. Jaise long drive mein fuel check karte ho aur map dekhte ho.',
+          conceptMap: ["Month 1 concepts recap", "Quiz aur self-assessment", "Month 2 preview (APIs, Web scraping)", "Learning path visualization", "Certificate milestone"],
+          examples: [
+            { type: 'basic', label: 'Month 1 Recap', code: `# Tumne yeh sab seekha:
+concepts = [
+    "print() aur input()",
+    "Variables aur data types",
+    "if-elif-else",
+    "for aur while loops",
+    "Functions aur return",
+    "Lists aur Dictionaries",
+    "OOP — Classes aur Objects",
+    "File handling",
+    "Exception handling",
+    "Modules aur imports",
+]
+
+print(f"Total concepts: {len(concepts)}")
+for i, c in enumerate(concepts, 1):
+    print(f"  {i}. ✓ {c}")`, note: '10 major concepts in 1 month — ek beginner ke liye bahut badi achievement hai!' },
+            { type: 'realworld', label: 'Month 2 Preview', code: `# Agle mahine kya seekhoge:
+month_2 = {
+    "Week 5": "APIs aur requests library",
+    "Week 6": "Web scraping (BeautifulSoup)",
+    "Week 7": "Database (SQLite)",
+    "Week 8": "Flask web framework basics",
+}
+
+for week, topic in month_2.items():
+    print(f"📚 {week}: {topic}")
+
+print("\\nReal-world projects banane shuru hoga! 🚀")`, note: 'Month 2 mein practical, job-relevant skills aayengi — APIs, databases, web!' },
+            { type: 'mistake', label: 'What to Avoid in Month 2', code: `# Month 2 mein yeh mistakes mat karna:
+
+# 1. Copy-paste karna bina samjhe
+# 2. Syntax ratta lagana — logic samjho
+# 3. Projects skip karna
+# 4. Stack Overflow se seedha copy
+# 5. Ek topic pe stuck rehna — aage badho
+
+# Sahi approach:
+# - Concepts samjho, phir khud likho
+# - Errors ko daro mat — debug karo
+# - Chhota project har week banao`, note: 'Learning style month 2 mein shift hogi — theory se practical ki taraf' },
+            { type: 'edge', label: 'Self Assessment', code: `# Khud test karo — bina dekhte likho:
+# 1. Fibonacci series print karo (loop se)
+# 2. List mein se duplicates hatao
+# 3. Dictionary se sabse zyada value wala key nikalo
+# 4. File mein student data save karo
+
+# Agar yeh sab likh sake bina hint ke —
+# tum Month 2 ke liye ready ho! 💪
+
+# Challenge:
+def fibonacci(n):
+    a, b = 0, 1
+    for _ in range(n):
+        print(a, end=" ")
+        a, b = b, a + b`, note: 'Self-assessment sabse honest feedback deta hai — actually try karo' }
+          ],
           task: {
             description: 'Month 1 ka celebration! Apna best project choose karo aur isko beautify karo: clear menu, better output formatting, color aur emojis, proper error messages. Phir isko GitHub pe upload karo (free account banao) aur link share karo!',
             expectedOutput: null,

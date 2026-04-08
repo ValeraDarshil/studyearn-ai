@@ -1,16 +1,19 @@
 // ─────────────────────────────────────────────────────────────
-// AskAI — askAIService.ts  (v11 — Bug fixes applied)
+// AskAI — askAIService.ts  (v12 — Unforgettable AI: All 10 Improvements)
+//
+// NEW IN v12:
+//   Imp 1: Memory Surprise — specific past topic references in system prompt
+//   Imp 3: Micro-Learning Hook — curiosity engine after every answer
+//   Imp 4: Mood-based tone shift — urgent/confused/general detection
+//   Imp 5: Growth Mirror — AI reflects student's progress back to them
+//   Imp 6: General → Learning Bridge — personalized topic connection
+//   Imp 7: Wow Moments — observation about student's learning pattern
+//   Imp 8: Identity — "calm, sharp, aware academic companion"
+//   Imp 9: Adaptive response length — quick/detailed detection
+//   Imp 10: AI-initiated questions — branching conversation ownership
 //
 // Bug #4 FIXED: turnCount passed correctly to buildResponsePlan
-//   Before: buildResponsePlan(..., 0) then plan.turnCount = history.length
-//   After:  currentTurnCount computed once, passed correctly
-//
 // Bug #3 FIXED: afterResponse RAM drift documented
-//   RAM (conversationMemoryEngine) is kept ONLY for getMemorySummary
-//   in contextEnhancer Layer 3. DB is the source of truth.
-//   DB persistence (persistAIMessage) happens in aiController.ts only.
-//
-// Everything else unchanged from v10.
 // ─────────────────────────────────────────────────────────────
 
 // v10: RAM memory engine kept only for in-session getMemorySummary
@@ -160,44 +163,100 @@ export async function buildMasterPrompt(
   const personality = inferPersonality(message);
   const isFirstTurn = currentTurnCount === 0;
 
-  // Step 7: Build Master System Prompt
+  // ── Mood detection for tone adaptation (Improvement 4) ───────────────
+  const msgLower = message.toLowerCase();
+  const isUrgentMode   = /jaldi|fast|quick|exam|test kal|aaj exam|time nahi|hurry|asap/.test(msgLower);
+  const isConfusedMode = /samajh nahi|nahi samajh|confused|not getting|what is even|phir se|dubara/.test(msgLower);
+  const isGeneral      = /trend|news|world|latest|kya chal raha|general|current/.test(msgLower) && !detectedTopic;
+
+  // ── Response length signal (Improvement 9) ────────────────────────────
+  const wantsQuick   = /quick|jaldi|short|brief|summary|tldr|tl;dr|concise|2 lines|ek line/.test(msgLower);
+  const wantsDetailed = /detail|explain properly|poora|complete|full|in depth|deeply|thoroughly/.test(msgLower);
+  const responseLengthNote = wantsQuick
+    ? '\nRESPONSE LENGTH: Student wants a QUICK answer. Max 4-5 lines. No headers, no long examples. Sharp and direct.'
+    : wantsDetailed
+    ? '\nRESPONSE LENGTH: Student wants a DETAILED explanation. Use full structure, multiple examples, comprehensive coverage.'
+    : plan.strategy === 'SHORT'
+    ? '\nRESPONSE LENGTH: Keep it short — 2-3 sentences unless a brief example is essential.'
+    : '';
+
+  // Step 7: Build Master System Prompt (v12 — All 10 Improvements)
   const sections: string[] = [
 
-    // A) PERSONALITY BLOCK
-    buildPersonalityBlock(personality),
+    // A) IDENTITY — calm + sharp + aware academic companion (Improvement 8)
+    `You are AskAI — an intelligent academic companion. NOT a chatbot. NOT a search engine.
+You are calm, sharp, and deeply aware of this student's learning journey.
+You remember their past struggles. You notice their growth. You adapt to their mood.
+Your tone: warm and encouraging, never robotic. Like a brilliant senior who genuinely cares.`,
 
     // B) CONTEXT BLOCK (AI Brain + Tutor data)
     context.contextBlock,
 
-    // C) DB SESSION HISTORY — cross-session learning memory
+    // C) DB SESSION MEMORY — Memory Surprise moments (Improvement 1)
     dbSessionSummary
-      ? `\n=== STUDENT'S LEARNING HISTORY (from past sessions) ===\n${dbSessionSummary}\nUSE THIS: Reference past struggles naturally. E.g., "Since you've been working on recursion, let's connect this concept..."`
+      ? `\n=== 🧠 STUDENT'S LEARNING MEMORY (cross-session intelligence) ===
+${dbSessionSummary}
+
+MEMORY SURPRISE RULES:
+- If today's question relates to a past struggle topic → naturally reference it.
+  Example: "Last time you were working on recursion and base cases gave you trouble — this concept connects directly to that!"
+- If student asks something you've covered before → acknowledge it warmly.
+  Example: "You've actually asked about this before — let's build on what you already know 🎯"
+- Keep memory references natural and brief — don't force them if irrelevant.
+- Once every 5-6 exchanges, show a GROWTH MIRROR observation (Improvement 5+7):
+  E.g., "I notice you're asking more conceptual questions now — your understanding is clearly deepening 📈"
+  E.g., "You've gone from asking 'what is X' to 'how does X work in real life' — that's significant growth!"
+  E.g., "You tend to understand things faster with examples — I'll keep using that approach for you."`
       : '',
 
-    // D) INSTRUCTION LAYER
+    // D) MOOD-BASED TONE SHIFT (Improvement 4)
+    isUrgentMode
+      ? `\n⚡ EXAM MODE DETECTED: Student needs info FAST.
+- Skip the intro fluff. Go straight to the key points.
+- Format: "Fast track version 👇" then 3 bullet points MAX.
+- End with: "This is the exam-important part — don't forget this!"`
+      : isConfusedMode
+      ? `\n💙 CONFUSION DETECTED: Student is struggling.
+- Don't start with theory. Start with the SIMPLEST daily-life example possible.
+- Say: "Koi baat nahi — let's start fresh with something super simple 😊"
+- Use everyday Indian analogies (chai, cricket, mobile recharge, etc.)
+- Be extra patient. Break it into the tiniest possible steps.`
+      : '',
+
+    // E) GENERAL TOPIC → LEARNING BRIDGE (Improvement 6)
+    isGeneral
+      ? `\n🌍 GENERAL QUESTION BRIDGE:
+When answering general/trending topics, always end with a personalized learning bridge:
+Example: "Globally, AI, crypto, and climate tech are trending. Based on what you've been studying, [topic] is especially relevant to your future — want me to connect it to what you already know? 🎯"
+Make it feel personal, not generic.`
+      : '',
+
+    // F) INSTRUCTION LAYER
     '\n=== HOW TO RESPOND ===',
     'Before answering, internally:',
-    '1. Check the student\'s level and learning state',
-    '2. Check if they struggled with related topics before',
-    '3. Decide explanation depth based on skill level',
-    '4. Think step by step before giving the final answer',
+    '1. Check the student\'s mood signal (urgent/confused/motivated/general)',
+    '2. Check memory — have they struggled with this topic before?',
+    '3. Check if this is a repeat question — if so, reference the previous discussion',
+    '4. Decide response length (short prompt = concise answer, detail prompt = full answer)',
+    '5. Think step by step before giving the final answer',
 
-    // E) DIFFICULTY ADAPTER
+    // G) DIFFICULTY ADAPTER
     '\n' + buildDifficultyInstruction(skillLevel),
+    responseLengthNote,
     getResponseStyleNote(skillLevel, allWeakTopics.length > 0),
 
-    // F) TEACHING MODE
+    // H) TEACHING MODE
     buildTeachingInstruction(plan.strategy),
 
-    // G) FOLLOW-UP + CONFIDENCE + CORRECTION
+    // I) FOLLOW-UP + CONFIDENCE + CORRECTION
     buildFollowUpInstruction(plan.followUpQuestion, detectedTopic ?? undefined),
     buildConfidenceBoost(plan.boostConfidence, isFirstTurn),
     buildCorrectionInstruction(plan.correctGently),
 
-    // H) PERSONALITY POST-PROCESS
+    // J) PERSONALITY POST-PROCESS
     getPersonalityPostProcessNote(personality, isFirstTurn, plan.correctGently),
 
-    // I) SUBJECT MODE
+    // K) SUBJECT MODE
     subjectMode === 'math'
       ? '\nMATH: Show formula → substitution → every step → boxed final answer.'
       : subjectMode === 'coding'
@@ -206,46 +265,59 @@ export async function buildMasterPrompt(
       ? '\nSCIENCE: State law/principle → formula with units → worked example.'
       : '',
 
-    // J) MODEL NOTE
+    // L) MODEL NOTE
     '\n' + getModelNote(modelConfig),
 
-    // K) MANDATORY RESPONSE STRUCTURE
-    plan.strategy !== 'QUIZ' && plan.strategy !== 'SHORT' ? `
+    // M) MANDATORY RESPONSE STRUCTURE (Imp 3: Smart Follow-Up, Imp 10: AI asks questions)
+    plan.strategy !== 'QUIZ' && plan.strategy !== 'SHORT' && !isUrgentMode ? `
 
-=== MANDATORY RESPONSE STRUCTURE (follow this EVERY single time) ===
+=== MANDATORY RESPONSE STRUCTURE (follow EVERY time) ===
 
-You MUST structure EVERY response in exactly these 4 sections:
-
+${wantsDetailed || (!wantsQuick) ? `
 1. 📖 EXPLANATION
    - Start with the core concept in 1-2 simple sentences
-   - Match language complexity to the student's level (${skillLevel})
-   - Use a real-world analogy if it helps
+   - Match complexity to student's level (${skillLevel})
+   - Use a real-world analogy (preferably relatable to Indian students)
 
 2. 💡 EXAMPLE
-   - Give exactly 1 concrete example (real-life scenario or exam-style)
+   - Give exactly 1 concrete, memorable example
    - For math/coding: show the complete worked solution step by step
-   - Keep it short, memorable, and directly relevant
 
 3. ⚡ QUICK SUMMARY
-   - Write exactly 2-3 lines summing up the key takeaway
-   - Should be something they can remember 1 week from now
+   - Exactly 2-3 lines summing up the key takeaway
+   - Something they can recall in an exam 1 week from now
+` : ''}
 
-4. ❓ CHECK YOUR UNDERSTANDING  ← NEVER EVER SKIP THIS
-   - Ask exactly 1 question to verify they understood
-   - Make it slightly different from your example (test transfer, not recall)
-   - Format EXACTLY as: "**Quick check:** [your question here]"
+4. 🔥 MICRO-LEARNING HOOK (Improvement 3 — NEVER skip)
+   - After your answer, add 1 sentence that sparks curiosity for the NEXT concept.
+   - Format: "**Bonus curiosity:** If you understood [topic], the next interesting thing to explore is [related concept] — it'll blow your mind! 🚀"
+   - OR: "**Next level:** Once you get this, [next concept] becomes 10x easier to understand."
+   - Keep it SHORT — 1 sentence only. Make it irresistible.
+
+5. ❓ AI-INITIATED QUESTION (Improvement 10 — NEVER skip)
+   - End with 1 smart question that drives the conversation forward.
+   - This is NOT just a "did you understand" question. It should branch the learning.
+   - Examples:
+     * "Do you want me to show you this with a real exam problem, or would you prefer the theory side first?"
+     * "Are you learning this for a specific exam, or just exploring? (That'll help me customize!)"
+     * "Would you like to try solving one yourself, or should I show another example first?"
+     * "Tumhara focus kya hai — concept clear karna hai ya exam ke liye shortcuts chahiye? 🎯"
+   - Format: "**Quick check:** [your question here]"
 
 ═══════════════════════════════════════════════════════
 ABSOLUTE RULES:
-- You MUST end EVERY response with a "**Quick check:**" question — NO exceptions
-- Keep total response tight and focused — no information overload
-- After student answers your check question, give EMOTIONAL feedback:
-  ✓ Correct answer   → "Nice! 🔥" / "Exactly right!" / "You got it!"
-  ✗ Wrong answer     → "Almost there! The key thing is..." (warm, not harsh)
-  ? Confused         → "No worries, let's try a completely different angle..."
-  ↩ Wants re-explain → Give same concept with NEW analogy/example
+- ALWAYS end with "**Quick check:**" — NO exceptions
+- Response to student's own answer:
+  ✓ Correct → "Nice! 🔥 You got it!" + show next micro-learning hook
+  ✗ Wrong   → "Almost! The key thing is..." (warm, build on what they got right)
+  ? Confused → "Koi baat nahi 😊 Let's try a completely different angle..."
+  ↩ Re-explain → Give same concept with NEW analogy, mention their learning pattern
+- For "**Samajh aaya 👍**" response: celebrate briefly, then offer next level
+- For "**Dubara samjhao**" response: pick a DIFFERENT approach, mention you noticed this topic is challenging
 ═══════════════════════════════════════════════════════
-` : '',
+` : plan.strategy === 'QUIZ' ? '' :
+    // SHORT strategy or urgent mode — still needs a follow-up question
+    '\nEven in short mode: end with ONE brief question to keep the conversation going. Format: "**Quick check:** [question]"',
   ];
 
   const systemPrompt = sections.filter(Boolean).join('\n');
