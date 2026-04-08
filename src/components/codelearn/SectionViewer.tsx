@@ -623,11 +623,18 @@
 
 
 /**
- * StudyEarn AI — SectionViewer Component
- * FIXED: No separate useCodeLearn hook — state comes from CoursePage
- * Flow: Read → Mark as Read → Quiz → 70%+ Pass → Next Section unlocks
+ * StudyEarn AI — SectionViewer Component (Unforgettable Edition)
+ *
+ * New flow (no tab-switching for content):
+ *   1. Rich scroll content — concept blocks, inline runnable snippets,
+ *      mistake blocks, inline checkpoints
+ *   2. Code tab — ??? starter code, guided task
+ *   3. Quiz tab — existing QuizModal, unlocked after Mark as Read
+ *
+ * richContent array in section data drives the learn tab.
+ * Falls back to legacy `content` markdown if richContent not present.
  */
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { CheckCircle, Lightbulb, Play, RotateCcw, ChevronRight, X, Zap, Bot, Loader2, Lock } from 'lucide-react';
 import QuizModal from './QuizModal.jsx';
 
@@ -640,7 +647,7 @@ const UI_TEXT = {
     takeQuiz: 'Take Quiz 🎯',
     quizLockedBtn: '🔒 Quiz Locked',
     quizLocked: 'Read the content first, then take the quiz',
-    runBtn: 'Run Code', running: 'Running...',
+    runBtn: 'Run', running: 'Running...',
     ctrlEnter: 'Ctrl+Enter to run',
     aiHint: 'AI Hint (-5 XP)', gettingHint: 'Getting hint...',
     explainCode: 'Explain My Code', explaining: 'Explaining...',
@@ -656,7 +663,7 @@ const UI_TEXT = {
     yourTask: 'Your Task:',
     quizPassed: 'Quiz Passed! 🎉',
     quizFailed: 'Not quite there yet!',
-    quizFailedMsg: 'Go back and re-read the content carefully, then try again.',
+    quizFailedMsg: 'Re-read the content carefully, then try again.',
     goBackRead: '← Re-read Content',
     readFirst: 'Please read the content first before taking the quiz.',
   },
@@ -667,15 +674,15 @@ const UI_TEXT = {
     takeQuiz: 'Quiz Do 🎯',
     quizLockedBtn: '🔒 Quiz Locked',
     quizLocked: 'Pehle content padho, phir quiz do',
-    runBtn: 'Code Chalao', running: 'Chal raha hai...',
-    ctrlEnter: 'Ctrl+Enter se bhi chala sakte ho',
+    runBtn: 'Run Karo', running: 'Chal raha...',
+    ctrlEnter: 'Ctrl+Enter se chala sakte ho',
     aiHint: 'AI Hint (-5 XP)', gettingHint: 'Hint aa rahi hai...',
     explainCode: 'Mera Code Samjhao', explaining: 'Samjha raha hai...',
-    output: 'Output', success: '✓ Sahi Hai', error: '✗ Error',
+    output: 'Output', success: '✓ Sahi', error: '✗ Error',
     aiHintLabel: 'AI Hint', explanationLabel: 'Code Explanation',
     quizTitle: 'Section Quiz',
-    quizDesc: (n) => `${n} sawaal · 70%+ score karo pass hone ke liye`,
-    quizXp: 'Pass karo toh +30 XP milega aur agla section khulega!',
+    quizDesc: (n) => `${n} sawaal · 70%+ chahiye`,
+    quizXp: 'Pass karo → +30 XP + agla section unlock!',
     startQuiz: 'Quiz Shuru Karo →', retakeQuiz: 'Dobara Try Karo',
     nextSection: 'Agla Section →',
     completed: 'Ho Gaya', reset: 'Reset',
@@ -683,23 +690,19 @@ const UI_TEXT = {
     yourTask: 'Tumhara Task:',
     quizPassed: 'Quiz Pass! 🎉',
     quizFailed: 'Abhi aur mehnat chahiye!',
-    quizFailedMsg: 'Wapas jao aur content dhyan se padho, phir dobara try karo.',
-    goBackRead: '← Content Dobara Padho',
-    readFirst: 'Quiz lene se pehle please content padho.',
+    quizFailedMsg: 'Wapas jao, dhyan se padho, phir try karo.',
+    goBackRead: '← Content Padho',
+    readFirst: 'Quiz se pehle content padho.',
   },
 };
 
-// ─── C/C++ Runner — backend /run-code (public, no login needed) ──
+// ─── C/C++ Runner ────────────────────────────────────────────────
 async function runCWithBackend(code, language) {
-  // Smart stdin: auto-detect what scanf needs
   function makeStdin(src) {
     const n = (src.match(/scanf\s*\(/g) || []).length + (src.match(/fgets\s*\(/g) || []).length;
     if (!n) return '';
-    if (src.includes('1234') && src.includes('pin')) return '1234\n5000\n';
-    if (src.includes('choice') && src.includes('scanf')) return '1\n10\n5\n0\n';
-    if (src.includes('secret') && src.includes('guess')) return '42\n';
     const vals = [];
-    const re = /scanf\s*\(\s*["'](.*?)["\']/g;
+    const re = /scanf\s*\(\s*["'](.*?)["\\']/g;
     let m;
     while ((m = re.exec(src)) !== null) {
       const f = m[1];
@@ -712,28 +715,23 @@ async function runCWithBackend(code, language) {
     for (let i = 0; i < (src.match(/fgets\s*\(/g)||[]).length; i++) vals.push('Rahul Sharma');
     return vals.slice(0,12).join('\n') + '\n';
   }
-
   const API = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-    ? 'http://localhost:5000'
-    : 'https://studyearn-backend.onrender.com';
-
+    ? 'http://localhost:5000' : 'https://studyearn-backend.onrender.com';
   try {
     const resp = await fetch(`${API}/api/codelearn/run-code`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      // No credentials — public endpoint, no auth needed
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ language, code, stdin: makeStdin(code) }),
     });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const data = await resp.json();
     const out = data.output || '(No output)';
     return { output: out, isError: out.startsWith('Compile Error') || out.startsWith('❌') };
-  } catch (err) {
+  } catch {
     return { output: '⚠️ Compiler unavailable. Try onlinegdb.com', isError: true };
   }
 }
 
-// ─── Skulpt ─────────────────────────────────────────────────────
+// ─── Skulpt Python Runner ────────────────────────────────────────
 let skulptLoaded = false, skulptLoading = false, skulptCallbacks = [];
 function loadSkulptScripts() {
   return new Promise((resolve, reject) => {
@@ -787,7 +785,37 @@ function runPythonWithSkulpt(code) {
   });
 }
 
-// ─── Markdown renderer ──────────────────────────────────────────
+async function runCode(code, language) {
+  if (language === 'python') return runPythonWithSkulpt(code);
+  if (language === 'javascript') {
+    try {
+      const logs = [];
+      const fakeConsole = { log: (...a) => logs.push(a.join(' ')), error: (...a) => logs.push('Error: '+a.join(' ')), warn: (...a) => logs.push('Warn: '+a.join(' ')) };
+      // eslint-disable-next-line no-new-func
+      new Function('console', code)(fakeConsole);
+      return { output: logs.join('\n') || '(No output)', isError: false };
+    } catch (err) {
+      return { output: 'Error: ' + err.message, isError: true };
+    }
+  }
+  if (language === 'c' || language === 'cpp') return runCWithBackend(code, language);
+  if (language === 'html') return { output: 'HTML: Copy paste at codepen.io for live preview!', isError: false };
+  return { output: `${language.toUpperCase()}: Not supported for in-browser run.`, isError: false };
+}
+
+// ─── XP Toast ────────────────────────────────────────────────────
+function XPToast({ xp, message, onClose }) {
+  useEffect(() => { const t = setTimeout(onClose, 3000); return () => clearTimeout(t); }, [onClose]);
+  return (
+    <div className="fixed top-20 right-4 z-50 bg-violet-600 text-white px-4 py-3 rounded-xl shadow-lg flex items-center gap-3 animate-in slide-in-from-right">
+      <Zap size={18} className="text-yellow-300" />
+      <div><div className="font-bold">+{xp} XP!</div><div className="text-xs text-violet-200">{message}</div></div>
+      <button onClick={onClose} className="ml-2 text-violet-300 hover:text-white"><X size={14} /></button>
+    </div>
+  );
+}
+
+// ─── Legacy Markdown Renderer (fallback) ─────────────────────────
 function CodeBlock({ code }) {
   return (
     <pre className="bg-[#0d1117] border border-white/5 rounded-xl p-4 overflow-x-auto text-sm font-mono leading-relaxed">
@@ -795,7 +823,7 @@ function CodeBlock({ code }) {
     </pre>
   );
 }
-function ContentRenderer({ markdown }) {
+function LegacyContentRenderer({ markdown }) {
   const parts = markdown.split('\n');
   const elements = [];
   let i = 0;
@@ -843,55 +871,261 @@ function ContentRenderer({ markdown }) {
   return <div className="space-y-1">{elements}</div>;
 }
 
-// ─── XP Toast ───────────────────────────────────────────────────
-function XPToast({ xp, message, onClose }) {
-  useEffect(() => { const t = setTimeout(onClose, 3000); return () => clearTimeout(t); }, []);
+// ─── Inline Snippet Block ─────────────────────────────────────────
+function InlineSnippet({ block, language, courseInfo, onXP }) {
+  const [output, setOutput]     = useState('');
+  const [isError, setIsError]   = useState(false);
+  const [running, setRunning]   = useState(false);
+  const [hasRun, setHasRun]     = useState(false);
+  const [code, setCode]         = useState(block.code);
+
+  const handleRun = async () => {
+    if (running) return;
+    setRunning(true);
+    setOutput('Running...');
+    const result = await runCode(code, language);
+    setOutput(result.output);
+    setIsError(result.isError);
+    setRunning(false);
+    if (!hasRun && !result.isError) {
+      setHasRun(true);
+      onXP?.(5, 'Code run kiya!');
+    }
+  };
+
   return (
-    <div className="fixed top-20 right-4 z-50 bg-violet-600 text-white px-4 py-3 rounded-xl shadow-lg flex items-center gap-3">
-      <Zap size={18} className="text-yellow-300" />
-      <div><div className="font-bold">+{xp} XP!</div><div className="text-xs text-violet-200">{message}</div></div>
-      <button onClick={onClose} className="ml-2 text-violet-300 hover:text-white"><X size={14} /></button>
+    <div className="my-4 rounded-xl overflow-hidden border border-white/10">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-2 bg-[#161b22] border-b border-white/5">
+        <div className="flex items-center gap-2">
+          <div className="w-2.5 h-2.5 rounded-full bg-red-500/70" />
+          <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/70" />
+          <div className="w-2.5 h-2.5 rounded-full bg-green-500/70" />
+          {block.label && <span className="text-xs text-gray-500 ml-2">{block.label}</span>}
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setCode(block.code)} className="text-xs text-gray-600 hover:text-gray-400 flex items-center gap-1 transition-colors">
+            <RotateCcw size={10} /> Reset
+          </button>
+          <button
+            onClick={handleRun}
+            disabled={running}
+            className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium transition-all disabled:opacity-50
+              ${hasRun ? 'bg-green-500/15 text-green-400 border border-green-500/30' : `bg-gradient-to-r ${courseInfo?.color} text-white`}`}
+          >
+            {running ? <Loader2 size={11} className="animate-spin" /> : <Play size={11} />}
+            {running ? 'Running...' : hasRun ? 'Run Again' : 'Run Code ▶'}
+          </button>
+        </div>
+      </div>
+
+      {/* Code editor */}
+      <textarea
+        value={code}
+        onChange={e => setCode(e.target.value)}
+        className="w-full bg-[#0d1117] text-gray-200 font-mono text-sm p-4 outline-none resize-none leading-relaxed"
+        style={{ minHeight: `${Math.max(3, code.split('\n').length) * 1.6 + 2}rem` }}
+        spellCheck={false}
+        onKeyDown={e => {
+          if (e.key === 'Tab') {
+            e.preventDefault();
+            const s = e.target.selectionStart;
+            const nc = code.substring(0, s) + '    ' + code.substring(e.target.selectionEnd);
+            setCode(nc);
+            setTimeout(() => { e.target.selectionStart = e.target.selectionEnd = s + 4; }, 0);
+          }
+          if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); handleRun(); }
+        }}
+      />
+
+      {/* Output */}
+      {output && output !== 'Running...' && (
+        <div className={`border-t border-white/5 px-4 py-3 font-mono text-sm whitespace-pre-wrap leading-relaxed
+          ${isError ? 'bg-red-500/5 text-red-400' : 'bg-[#0d1117] text-green-300'}`}>
+          <span className={`text-xs font-sans mr-2 ${isError ? 'text-red-500' : 'text-green-500'}`}>
+            {isError ? '✗ Error' : '✓ Output:'}
+          </span>
+          {output}
+        </div>
+      )}
     </div>
   );
 }
 
-// ─── Main Component ──────────────────────────────────────────────
-// Props: isContentRead, isQuizPassed come from CoursePage (single source of truth)
-// onComplete, onQuizSubmit callbacks update CoursePage's progress state directly
+// ─── Mistake Block ────────────────────────────────────────────────
+function MistakeBlock({ block }) {
+  const [showFix, setShowFix] = useState(false);
+  return (
+    <div className="my-4 rounded-xl overflow-hidden border border-red-500/20">
+      <div className="flex items-center gap-2 px-4 py-2.5 bg-red-500/5 border-b border-red-500/15">
+        <span className="text-xs font-semibold text-red-400">⚠ Common Mistake — Beginners yeh karte hain</span>
+      </div>
+      <div className="bg-[#0d1117] px-4 py-3">
+        <div className="text-xs text-red-400 mb-1.5 font-medium">✗ Galat:</div>
+        <pre className="font-mono text-sm text-red-300/70 line-through leading-relaxed">{block.wrong}</pre>
+      </div>
+      {showFix ? (
+        <>
+          <div className="bg-[#0d1117] px-4 py-3 border-t border-white/5">
+            <div className="text-xs text-green-400 mb-1.5 font-medium">✓ Sahi:</div>
+            <pre className="font-mono text-sm text-green-300 leading-relaxed">{block.right}</pre>
+          </div>
+          <div className="px-4 py-3 bg-blue-500/5 border-t border-blue-500/15 text-sm text-gray-300 leading-relaxed">
+            <span className="text-blue-400 text-xs font-medium">Kyun? </span>{block.why}
+          </div>
+        </>
+      ) : (
+        <button
+          onClick={() => setShowFix(true)}
+          className="w-full py-2.5 text-xs text-red-400 hover:text-white hover:bg-red-500/10 transition-all border-t border-red-500/15"
+        >
+          Sahi tarika dekho →
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ─── Inline Checkpoint ────────────────────────────────────────────
+function InlineCheckpoint({ block, onCorrect }) {
+  const [selected, setSelected]   = useState(null);
+  const [answered, setAnswered]   = useState(false);
+
+  const handleAnswer = (idx) => {
+    if (answered) return;
+    setSelected(idx);
+    setAnswered(true);
+    if (idx === block.correct) onCorrect?.();
+  };
+
+  return (
+    <div className="my-5 rounded-xl overflow-hidden border border-violet-500/20 bg-violet-500/5">
+      <div className="px-4 py-3 border-b border-violet-500/15">
+        <div className="text-xs text-violet-400 font-medium mb-1.5">⚡ Quick Check</div>
+        <p className="text-gray-200 text-sm font-medium leading-relaxed">{block.question}</p>
+      </div>
+      <div className="p-3 grid grid-cols-1 gap-2">
+        {block.options.map((opt, idx) => {
+          let style = 'border-white/10 text-gray-400 hover:border-violet-500/40 hover:bg-violet-500/5';
+          if (answered) {
+            if (idx === block.correct) style = 'border-green-500/50 bg-green-500/10 text-green-300';
+            else if (idx === selected) style = 'border-red-500/50 bg-red-500/10 text-red-300';
+            else style = 'border-white/5 text-gray-600';
+          }
+          return (
+            <button
+              key={idx}
+              onClick={() => handleAnswer(idx)}
+              disabled={answered}
+              className={`text-left px-3 py-2.5 rounded-lg border text-sm transition-all ${style} ${answered ? 'cursor-default' : 'cursor-pointer'}`}
+            >
+              <span className="text-xs opacity-60 mr-2">{String.fromCharCode(65+idx)}.</span>{opt}
+            </button>
+          );
+        })}
+      </div>
+      {answered && block.explanation && (
+        <div className={`px-4 py-3 border-t text-sm leading-relaxed
+          ${selected === block.correct
+            ? 'bg-green-500/5 border-green-500/15 text-green-300'
+            : 'bg-orange-500/5 border-orange-500/15 text-orange-300'}`}>
+          <span className="font-medium mr-1">{selected === block.correct ? '✓ Bilkul sahi!' : '✗ Nahi —'}</span>
+          {block.explanation}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Rich Content Renderer ────────────────────────────────────────
+function RichContentRenderer({ blocks, language, courseInfo, onXP }) {
+  return (
+    <div className="space-y-1">
+      {blocks.map((block, idx) => {
+        if (block.type === 'concept') {
+          return (
+            <div key={idx} className="mb-1">
+              {block.heading && (
+                <h3 className="text-base font-semibold text-gray-200 mt-5 mb-2">{block.heading}</h3>
+              )}
+              {block.body && (
+                <p className="text-gray-400 leading-relaxed"
+                  dangerouslySetInnerHTML={{ __html: block.body
+                    .replace(/`([^`]+)`/g, '<code class="bg-white/10 text-violet-300 px-1.5 py-0.5 rounded text-xs font-mono">$1</code>')
+                    .replace(/\*\*([^*]+)\*\*/g, '<strong class="text-white font-semibold">$1</strong>') }} />
+              )}
+            </div>
+          );
+        }
+
+        if (block.type === 'analogy') {
+          return (
+            <div key={idx} className="my-4 flex gap-3 px-4 py-3 bg-amber-500/5 border border-amber-500/20 rounded-xl">
+              <span className="text-lg mt-0.5 shrink-0">🔗</span>
+              <div>
+                <div className="text-xs text-amber-400 font-medium mb-1">Real Life Analogy</div>
+                <p className="text-gray-300 text-sm leading-relaxed">{block.text}</p>
+              </div>
+            </div>
+          );
+        }
+
+        if (block.type === 'snippet') {
+          return <InlineSnippet key={idx} block={block} language={language} courseInfo={courseInfo} onXP={onXP} />;
+        }
+
+        if (block.type === 'mistake') {
+          return <MistakeBlock key={idx} block={block} />;
+        }
+
+        if (block.type === 'checkpoint') {
+          return <InlineCheckpoint key={idx} block={block} onCorrect={() => onXP?.(10, 'Checkpoint sahi kiya!')} />;
+        }
+
+        return null;
+      })}
+    </div>
+  );
+}
+
+// ─── Main Component ───────────────────────────────────────────────
 export default function SectionViewer({
   language,
   lang = 'en',
   courseInfo,
   weekNumber,
   section,
-  isContentRead = false,   // From CoursePage — based on live progress
-  isQuizPassed  = false,   // From CoursePage — based on live progress (quizScore >= 70)
-  onComplete,              // Calls backend + refreshes progress in CoursePage
-  onQuizSubmit,            // Calls backend + refreshes progress in CoursePage
+  isContentRead = false,
+  isQuizPassed  = false,
+  onComplete,
+  onQuizSubmit,
   onNext,
   onGetHint,
   onGetExplanation,
 }) {
   const t = UI_TEXT[lang] || UI_TEXT.en;
 
-  const [activeTab, setActiveTab] = useState('learn');
-  const displayCodeExample = lang === 'en' && section.codeExample_en ? section.codeExample_en : (section.codeExample || '');
-  const [userCode, setUserCode] = useState(displayCodeExample);
-  const [output, setOutput] = useState('');
+  const [activeTab, setActiveTab]         = useState('learn');
+  const [userCode, setUserCode]           = useState('');
+  const [output, setOutput]               = useState('');
   const [outputIsError, setOutputIsError] = useState(false);
-  const [running, setRunning] = useState(false);
-  const [hint, setHint] = useState('');
-  const [loadingHint, setLoadingHint] = useState(false);
-  const [explanation, setExplanation] = useState('');
+  const [running, setRunning]             = useState(false);
+  const [hint, setHint]                   = useState('');
+  const [loadingHint, setLoadingHint]     = useState(false);
+  const [explanation, setExplanation]     = useState('');
   const [loadingExplain, setLoadingExplain] = useState(false);
   const [showQuizModal, setShowQuizModal] = useState(false);
-  const [quizResult, setQuizResult] = useState(null);
-  const [xpToast, setXpToast] = useState(null);
+  const [quizResult, setQuizResult]       = useState(null);
+  const [xpToast, setXpToast]             = useState(null);
 
-  // Reset UI when section changes
+  // Pick starter code: prefer starterCode > codeExample > ''
+  const getStarterCode = useCallback(() => {
+    if (lang === 'en' && section.codeExample_en) return section.codeExample_en;
+    return section.task?.starterCode || section.codeExample || '';
+  }, [section, lang]);
+
   useEffect(() => {
-    const langCode = lang === 'en' && section.codeExample_en ? section.codeExample_en : (section.codeExample || '');
-    setUserCode(langCode);
+    setUserCode(getStarterCode());
     setOutput(''); setOutputIsError(false);
     setHint(''); setExplanation('');
     setActiveTab('learn');
@@ -899,19 +1133,16 @@ export default function SectionViewer({
     setShowQuizModal(false);
   }, [section.id]);
 
-  // Preload Skulpt when Code tab opens
   useEffect(() => {
     if (activeTab === 'code' && language === 'python') loadSkulptScripts().catch(() => {});
   }, [activeTab, language]);
 
-  // ── Handlers ─────────────────────────────────────────────────
+  const showXP = (xp, message) => setXpToast({ xp, message });
+
   const handleMarkRead = async () => {
     if (isContentRead) return;
     const result = await onComplete(weekNumber, section.sectionNumber || 1, section.id);
-    // isContentRead will update via props from CoursePage after progress refresh
-    if (result?.xpEarned > 0) {
-      setXpToast({ xp: result.xpEarned, message: lang === 'hi' ? 'Section padh liya!' : 'Section read!' });
-    }
+    if (result?.xpEarned > 0) showXP(result.xpEarned, lang === 'hi' ? 'Section padh liya!' : 'Section read!');
   };
 
   const handleQuizTabClick = () => {
@@ -923,62 +1154,15 @@ export default function SectionViewer({
     setShowQuizModal(false);
     const result = await onQuizSubmit(weekNumber, section.sectionNumber || 1, section.id, score, total);
     setQuizResult(result);
-    // isQuizPassed will update via props from CoursePage after progress refresh
-    if (result?.passed && result.xpEarned > 0) {
-      setXpToast({ xp: result.xpEarned, message: result.message });
-    }
+    if (result?.passed && result.xpEarned > 0) showXP(result.xpEarned, result.message);
     return result;
   };
 
   const handleRunCode = useCallback(async () => {
     if (running) return;
     setRunning(true); setOutput(t.running); setOutputIsError(false);
-
-    // ── Python: run in-browser with Skulpt (no network needed) ──
-    if (language === 'python') {
-      const r = await runPythonWithSkulpt(userCode);
-      setOutput(r.output); setOutputIsError(r.isError);
-      setRunning(false);
-      return;
-    }
-
-    // ── HTML preview ──
-    if (language === 'html') {
-      setOutput('HTML Preview: Copy code → paste at codepen.io for live preview!');
-      setRunning(false);
-      return;
-    }
-
-    // ── C / C++ → Claude AI (instant, free, no login needed) ──
-    if (language === 'c' || language === 'cpp') {
-      const r = await runCWithBackend(userCode, language);
-      setOutput(r.output);
-      setOutputIsError(r.isError);
-      setRunning(false);
-      return;
-    }
-
-    // ── JavaScript → run in browser via Function() ──
-    if (language === 'javascript') {
-      try {
-        const logs = [];
-        const fakeConsole = { log: (...a) => logs.push(a.join(' ')), error: (...a) => logs.push('Error: '+a.join(' ')), warn: (...a) => logs.push('Warn: '+a.join(' ')) };
-        // eslint-disable-next-line no-new-func
-        const fn = new Function('console', userCode);
-        fn(fakeConsole);
-        setOutput(logs.join('\n') || '(No output — use console.log() to print)');
-        setOutputIsError(false);
-      } catch (err) {
-        setOutput('Error: ' + err.message);
-        setOutputIsError(true);
-      }
-      setRunning(false);
-      return;
-    }
-
-    setOutput(`${language.toUpperCase()}: Not supported for in-browser execution.`);
-    setOutputIsError(false);
-
+    const result = await runCode(userCode, language);
+    setOutput(result.output); setOutputIsError(result.isError);
     setRunning(false);
   }, [language, userCode, running, t]);
 
@@ -994,21 +1178,19 @@ export default function SectionViewer({
     setExplanation(r.explanation); setLoadingExplain(false);
   };
 
-  const displayContent = lang === 'en' && section.content_en ? section.content_en : section.content;
-  const displayTitle   = lang === 'en' && section.title_en   ? section.title_en   : section.title;
-  const displayTask    = lang === 'en' && section.task?.description_en ? section.task.description_en : section.task?.description;
+  const displayTitle  = lang === 'en' && section.title_en   ? section.title_en   : section.title;
+  const displayTask   = lang === 'en' && section.task?.description_en ? section.task.description_en : section.task?.description;
+  const hasRichContent = section.richContent && section.richContent.length > 0;
 
   const tabs = [
-    { id: 'learn',    label: lang === 'hi' ? '📖 Padho' : '📖 Learn', onClick: () => setActiveTab('learn') },
-    { id: 'examples', label: '💡 Examples', onClick: () => setActiveTab('examples') },
-    { id: 'code',     label: '💻 Code',     onClick: () => setActiveTab('code') },
-    ...(section.task ? [{ id: 'task', label: isContentRead ? '⚡ Task' : '🔒 Task', onClick: () => { if (isContentRead) setActiveTab('task'); }, locked: !isContentRead }] : []),
-    { id: 'quiz',     label: isContentRead ? '🎯 Quiz' : '🔒 Quiz', onClick: handleQuizTabClick, locked: !isContentRead },
+    { id: 'learn', label: lang === 'hi' ? '📖 Padho' : '📖 Learn', onClick: () => setActiveTab('learn') },
+    { id: 'code',  label: '💻 Code',  onClick: () => setActiveTab('code') },
+    { id: 'quiz',  label: isContentRead ? '🎯 Quiz' : '🔒 Quiz', onClick: handleQuizTabClick, locked: !isContentRead },
   ];
 
   return (
     <div className="h-full flex flex-col">
-      {/* Header */}
+      {/* ── Header ── */}
       <div className="p-6 border-b border-white/5">
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -1030,7 +1212,8 @@ export default function SectionViewer({
             <button key={tab.id} onClick={tab.onClick}
               title={tab.locked ? t.quizLocked : undefined}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all
-                ${activeTab === tab.id ? `bg-gradient-to-r ${courseInfo?.color} text-white shadow-sm`
+                ${activeTab === tab.id
+                  ? `bg-gradient-to-r ${courseInfo?.color} text-white shadow-sm`
                   : tab.locked ? 'text-gray-600 cursor-not-allowed'
                   : 'text-gray-500 hover:text-gray-300 cursor-pointer'}`}>
               {tab.label}
@@ -1040,46 +1223,30 @@ export default function SectionViewer({
 
         {activeTab === 'learn' && !isContentRead && (
           <p className="text-xs text-amber-500/70 mt-2">
-            💡 {lang === 'hi' ? 'Pehle content padho aur "Padh Liya" click karo, phir Quiz unlock hoga' : 'Read the content and click "Mark as Read" to unlock the Quiz'}
+            💡 {lang === 'hi' ? 'Pehle content padho — tab Quiz unlock hoga' : 'Read through and click "Mark as Read" to unlock Quiz'}
           </p>
         )}
       </div>
 
-      {/* Content */}
+      {/* ── Content ── */}
       <div className="flex-1 overflow-y-auto p-6">
 
-        {/* LEARN TAB */}
+        {/* ══ LEARN TAB ══ */}
         {activeTab === 'learn' && (
           <div className="max-w-3xl">
-            {/* Phase 2 — Real-life analogy card */}
-            {section.analogy && (
-              <div className="bg-violet-500/5 border border-violet-500/20 rounded-xl p-4 mb-6">
-                <div className="text-xs text-violet-400 font-medium mb-2">🔗 Real Life Analogy</div>
-                <p className="text-gray-300 text-sm leading-relaxed">{section.analogy}</p>
-              </div>
-            )}
+            {hasRichContent
+              ? <RichContentRenderer
+                  blocks={section.richContent}
+                  language={language}
+                  courseInfo={courseInfo}
+                  onXP={showXP}
+                />
+              : <LegacyContentRenderer markdown={
+                  lang === 'en' && section.content_en ? section.content_en : section.content
+                } />
+            }
 
-            {/* Phase 2 — Concept map */}
-            {section.conceptMap && section.conceptMap.length > 0 && (
-              <div className="mb-6 p-4 bg-white/[0.02] border border-white/5 rounded-xl">
-                <div className="text-xs text-gray-500 mb-3">Is section mein cover hoga 👇</div>
-                <div className="flex flex-wrap gap-2">
-                  {section.conceptMap.map((topic, idx) => (
-                    <span key={idx} className={`text-xs px-3 py-1.5 rounded-full border ${
-                      idx === 0
-                        ? 'bg-green-500/10 border-green-500/30 text-green-400'
-                        : idx === 1
-                        ? `${courseInfo?.bgClass} ${courseInfo?.textClass}`
-                        : 'bg-white/[0.02] border-white/10 text-gray-600'
-                    }`}>
-                      {idx === 0 ? '✓ ' : idx === 1 ? '→ ' : '🔒 '}{topic}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <ContentRenderer markdown={displayContent} />
+            {/* Bottom actions */}
             <div className="mt-8 pt-6 border-t border-white/5 flex items-center gap-3 flex-wrap">
               {!isContentRead ? (
                 <button onClick={handleMarkRead}
@@ -1091,165 +1258,75 @@ export default function SectionViewer({
                   <CheckCircle size={15} />{t.alreadyRead}
                 </div>
               )}
-              {isContentRead ? (
+              {isContentRead && (
                 <button onClick={() => setActiveTab('quiz')}
                   className="px-6 py-3 rounded-xl border border-violet-500/30 text-violet-400 hover:bg-violet-500/10 font-medium transition-all flex items-center gap-2">
                   🎯 {t.takeQuiz}
                 </button>
-              ) : (
-                <div className="flex items-center gap-2 text-gray-600 text-sm px-4 py-2 rounded-xl border border-white/5 cursor-not-allowed">
-                  <Lock size={14} />{t.quizLockedBtn}
-                </div>
               )}
-              {isContentRead && (
-                <button onClick={() => setActiveTab('code')}
-                  className="px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-gray-400 hover:text-white hover:bg-white/10 text-sm font-medium transition-all">
-                  {t.practiceCode}
-                </button>
-              )}
+              <button onClick={() => setActiveTab('code')}
+                className="px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-gray-400 hover:text-white hover:bg-white/10 text-sm font-medium transition-all">
+                {t.practiceCode}
+              </button>
             </div>
           </div>
         )}
 
-        {/* EXAMPLES TAB — Phase 3 */}
-        {activeTab === 'examples' && (
-          <div className="max-w-3xl">
-            {!section.examples || section.examples.length === 0 ? (
-              <p className="text-gray-500 text-sm">Is section ke liye examples jald aayenge.</p>
-            ) : (
-              <>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                  {section.examples.map((ex, idx) => {
-                    const typeStyle = {
-                      basic:     'bg-green-500/10 border-green-500/30 text-green-400',
-                      realworld: 'bg-blue-500/10  border-blue-500/30  text-blue-400',
-                      mistake:   'bg-red-500/10   border-red-500/30   text-red-400',
-                      edge:      'bg-amber-500/10 border-amber-500/30 text-amber-400',
-                    }[ex.type] || 'bg-white/5 border-white/10 text-gray-400';
-                    return (
-                      <div key={idx} className="border border-white/10 rounded-xl overflow-hidden">
-                        <div className={`px-3 py-2 text-xs font-medium border-b border-white/10 ${typeStyle}`}>
-                          {ex.type === 'basic' ? '📘' : ex.type === 'realworld' ? '🌍' : ex.type === 'mistake' ? '⚠️' : '🔬'} {ex.label}
-                        </div>
-                        <pre className="bg-[#0d1117] text-gray-300 text-xs font-mono p-3 overflow-x-auto leading-relaxed">
-                          <code>{ex.code}</code>
-                        </pre>
-                        {ex.note && (
-                          <div className="px-3 py-2 text-xs text-gray-500 border-t border-white/5">{ex.note}</div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-                <div className="text-center py-4">
-                  <button onClick={() => setActiveTab('code')}
-                    className={`px-6 py-2.5 rounded-xl bg-gradient-to-r ${courseInfo?.color} text-white text-sm font-medium hover:opacity-90 transition-all`}>
-                    Ab code practice karo →
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        )}
-
-        {/* MINI TASK TAB — Phase 4 */}
-        {activeTab === 'task' && (
-          <div className="max-w-3xl">
-            {section.task ? (
-              <>
-                <div className="bg-blue-500/5 border border-blue-500/30 rounded-xl p-5 mb-5">
-                  <div className="flex items-center gap-2 text-blue-400 text-xs font-medium mb-3">
-                    ⚡ Tumhara Task — complete karo aur +20 XP pao!
-                  </div>
-                  <p className="text-gray-200 text-base leading-relaxed font-medium">{displayTask}</p>
-                </div>
-                <div className="bg-[#0d1117] border border-white/10 rounded-xl overflow-hidden">
-                  <div className="flex items-center justify-between px-4 py-2.5 bg-white/[0.02] border-b border-white/5">
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full bg-red-500/60" />
-                      <div className="w-3 h-3 rounded-full bg-yellow-500/60" />
-                      <div className="w-3 h-3 rounded-full bg-green-500/60" />
-                      <span className="text-xs text-gray-600 ml-2 font-mono">task.{language === 'python' ? 'py' : language === 'javascript' ? 'js' : language}</span>
-                    </div>
-                  </div>
-                  <textarea value={userCode} onChange={e => setUserCode(e.target.value)}
-                    className="w-full bg-transparent text-gray-200 font-mono text-sm p-4 outline-none resize-none min-h-[180px] leading-relaxed"
-                    placeholder="Yahan code likho..." spellCheck={false}
-                    onKeyDown={e => {
-                      if (e.key === 'Tab') { e.preventDefault(); const s = e.target.selectionStart; const nc = userCode.substring(0, s) + '    ' + userCode.substring(e.target.selectionEnd); setUserCode(nc); setTimeout(() => { e.target.selectionStart = e.target.selectionEnd = s + 4; }, 0); }
-                      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); handleRunCode(); }
-                    }} />
-                </div>
-                <div className="flex items-center gap-3 mt-3 flex-wrap">
-                  <button onClick={handleRunCode} disabled={running}
-                    className={`flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r ${courseInfo?.color} text-white font-medium text-sm hover:opacity-90 transition-all disabled:opacity-50`}>
-                    {running ? <><Loader2 size={14} className="animate-spin" /> Chal raha...</> : <><Play size={14} /> Code Chalao</>}
-                  </button>
-                  <button onClick={handleGetHint} disabled={loadingHint}
-                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-amber-500/30 text-amber-400 text-sm hover:bg-amber-500/10 transition-all disabled:opacity-50">
-                    <Lightbulb size={14} />{loadingHint ? 'Hint aa rahi hai...' : 'Hint lo (-5 XP)'}
-                  </button>
-                </div>
-                {output && output !== t.running && (
-                  <div className={`mt-4 rounded-xl overflow-hidden border ${outputIsError ? 'border-red-500/30' : 'border-green-500/30'}`}>
-                    <pre className={`p-4 text-sm font-mono whitespace-pre-wrap leading-relaxed ${outputIsError ? 'text-red-400 bg-red-500/5' : 'text-green-300 bg-green-500/5'}`}>{output}</pre>
-                  </div>
-                )}
-                {hint && (
-                  <div className="mt-4 bg-amber-500/5 border border-amber-500/20 rounded-xl p-4">
-                    <div className="flex items-center gap-2 text-amber-400 text-xs font-medium mb-2"><Lightbulb size={13} /> AI Hint</div>
-                    <p className="text-gray-300 text-sm leading-relaxed">{hint}</p>
-                  </div>
-                )}
-                <div className="mt-6 pt-4 border-t border-white/5">
-                  <button onClick={() => setActiveTab('quiz')}
-                    className="text-violet-400 text-sm hover:text-violet-300 transition-colors">
-                    Task done? Ab Quiz do 🎯 →
-                  </button>
-                </div>
-              </>
-            ) : (
-              <p className="text-gray-500 text-sm">Is section ke liye task abhi available nahi hai.</p>
-            )}
-          </div>
-        )}
-
-        {/* CODE TAB */}
+        {/* ══ CODE TAB ══ */}
         {activeTab === 'code' && (
           <div className="max-w-4xl">
+            {/* Task description */}
             {section.task && (
-              <div className="bg-blue-500/5 border border-blue-500/20 rounded-xl p-4 mb-4">
-                <div className="text-xs text-blue-400 font-medium mb-1">{t.yourTask}</div>
-                <p className="text-gray-300 text-sm leading-relaxed">{displayTask}</p>
+              <div className="bg-blue-500/5 border border-blue-500/20 rounded-xl p-4 mb-5">
+                <div className="text-xs text-blue-400 font-medium mb-1.5">
+                  ⚡ {t.yourTask} <span className="text-gray-600 font-normal ml-1">— ??? ki jagah apna code likho</span>
+                </div>
+                <p className="text-gray-200 text-sm leading-relaxed font-medium">{displayTask}</p>
+                {section.task?.hint && (
+                  <p className="text-gray-500 text-xs mt-2 leading-relaxed">
+                    💡 Hint: {section.task.hint}
+                  </p>
+                )}
               </div>
             )}
+
+            {/* Editor */}
             <div className="bg-[#0d1117] border border-white/10 rounded-xl overflow-hidden">
               <div className="flex items-center justify-between px-4 py-2.5 bg-white/[0.02] border-b border-white/5">
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full bg-red-500/60" />
                   <div className="w-3 h-3 rounded-full bg-yellow-500/60" />
                   <div className="w-3 h-3 rounded-full bg-green-500/60" />
-                  <span className="text-xs text-gray-600 ml-2 font-mono">main.{language === 'python' ? 'py' : language === 'javascript' ? 'js' : language}</span>
+                  <span className="text-xs text-gray-600 ml-2 font-mono">
+                    task.{language === 'python' ? 'py' : language === 'javascript' ? 'js' : language}
+                  </span>
                 </div>
-                <button onClick={() => { const lc = lang === 'en' && section.codeExample_en ? section.codeExample_en : (section.codeExample || ''); setUserCode(lc); setOutput(''); }}
+                <button
+                  onClick={() => { setUserCode(getStarterCode()); setOutput(''); setHint(''); setExplanation(''); }}
                   className="text-xs text-gray-600 hover:text-gray-400 flex items-center gap-1 transition-colors">
                   <RotateCcw size={11} />{t.reset}
                 </button>
               </div>
-              <textarea value={userCode} onChange={e => setUserCode(e.target.value)}
-                className="w-full bg-transparent text-gray-200 font-mono text-sm p-4 outline-none resize-none min-h-[280px] leading-relaxed"
-                placeholder={language === 'python' ? '# Write Python code here...' : (language === 'c' || language === 'cpp') ? '// Write C code here...' : '// Write code here...'} spellCheck={false}
+              <textarea
+                value={userCode}
+                onChange={e => setUserCode(e.target.value)}
+                className="w-full bg-transparent text-gray-200 font-mono text-sm p-4 outline-none resize-none min-h-[240px] leading-relaxed"
+                placeholder={`# ${language === 'python' ? '??? ki jagah apna code likho' : '// Write your code here'}`}
+                spellCheck={false}
                 onKeyDown={e => {
                   if (e.key === 'Tab') {
                     e.preventDefault();
-                    const s = e.target.selectionStart, end = e.target.selectionEnd;
-                    const nc = userCode.substring(0, s) + '    ' + userCode.substring(end);
+                    const s = e.target.selectionStart;
+                    const nc = userCode.substring(0, s) + '    ' + userCode.substring(e.target.selectionEnd);
                     setUserCode(nc);
                     setTimeout(() => { e.target.selectionStart = e.target.selectionEnd = s + 4; }, 0);
                   }
                   if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); handleRunCode(); }
-                }} />
+                }}
+              />
             </div>
+
+            {/* Run buttons */}
             <div className="flex items-center gap-3 mt-3 flex-wrap">
               <button onClick={handleRunCode} disabled={running}
                 className={`flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r ${courseInfo?.color} text-white font-medium text-sm hover:opacity-90 transition-all disabled:opacity-50`}>
@@ -1266,6 +1343,8 @@ export default function SectionViewer({
                 <Bot size={14} />{loadingExplain ? t.explaining : t.explainCode}
               </button>
             </div>
+
+            {/* Output */}
             {output && output !== t.running && (
               <div className="mt-4 bg-[#0d1117] border border-white/10 rounded-xl overflow-hidden">
                 <div className="px-4 py-2 bg-white/[0.02] border-b border-white/5 flex items-center justify-between">
@@ -1297,11 +1376,9 @@ export default function SectionViewer({
           </div>
         )}
 
-        {/* QUIZ TAB */}
+        {/* ══ QUIZ TAB ══ */}
         {activeTab === 'quiz' && (
           <div className="max-w-2xl">
-
-            {/* Locked */}
             {!isContentRead && (
               <div className="bg-amber-500/5 border border-amber-500/20 rounded-2xl p-8 text-center">
                 <div className="text-5xl mb-4">🔒</div>
@@ -1314,7 +1391,6 @@ export default function SectionViewer({
               </div>
             )}
 
-            {/* Failed */}
             {isContentRead && quizResult && !quizResult.passed && (
               <div className="bg-red-500/5 border border-red-500/20 rounded-2xl p-8 text-center">
                 <div className="text-5xl mb-4">😅</div>
@@ -1326,7 +1402,7 @@ export default function SectionViewer({
                     className="px-6 py-3 rounded-xl border border-white/10 text-gray-300 hover:bg-white/5 font-medium transition-all">
                     {t.goBackRead}
                   </button>
-                  <button onClick={() => setShowQuizModal(true)}
+                  <button onClick={() => { setQuizResult(null); setShowQuizModal(true); }}
                     className={`px-6 py-3 rounded-xl bg-gradient-to-r ${courseInfo?.color} text-white font-medium hover:opacity-90 transition-all`}>
                     {t.retakeQuiz}
                   </button>
@@ -1334,7 +1410,6 @@ export default function SectionViewer({
               </div>
             )}
 
-            {/* Passed */}
             {isContentRead && isQuizPassed && (
               <div className="bg-green-500/5 border border-green-500/20 rounded-2xl p-8 text-center">
                 <div className="text-5xl mb-4">🏆</div>
@@ -1348,7 +1423,6 @@ export default function SectionViewer({
               </div>
             )}
 
-            {/* Ready to take */}
             {isContentRead && !isQuizPassed && !quizResult && (
               <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-8 text-center">
                 <div className="text-5xl mb-4">🎯</div>
@@ -1366,9 +1440,14 @@ export default function SectionViewer({
       </div>
 
       {showQuizModal && (
-        <QuizModal questions={section.quiz || []} sectionTitle={displayTitle}
-          courseInfo={courseInfo} onComplete={handleQuizComplete}
-          onClose={() => setShowQuizModal(false)} lang={lang} />
+        <QuizModal
+          questions={section.quiz || []}
+          sectionTitle={displayTitle}
+          courseInfo={courseInfo}
+          onComplete={handleQuizComplete}
+          onClose={() => setShowQuizModal(false)}
+          lang={lang}
+        />
       )}
       {xpToast && <XPToast xp={xpToast.xp} message={xpToast.message} onClose={() => setXpToast(null)} />}
     </div>

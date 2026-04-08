@@ -536,27 +536,36 @@ function AIBubble({
 
   return (
     <div className="flex gap-3 items-start w-full group/ai">
-      <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 bg-gradient-to-br ${
-        modeConfig?.id === "math"    ? "from-blue-500 to-blue-600"    :
-        modeConfig?.id === "coding"  ? "from-green-500 to-emerald-600" :
-        modeConfig?.id === "science" ? "from-cyan-500 to-cyan-600"    :
-        "from-purple-500 to-blue-600"
-      }`}>
-        {modeConfig && modeConfig.id !== "auto" && modeConfig.id !== "general"
-          ? <modeConfig.icon className="w-3.5 h-3.5 text-white" />
-          : <Brain className="w-3.5 h-3.5 text-white" />}
+      {/* AI avatar — animated gradient ring when streaming */}
+      <div className={`relative flex-shrink-0 mt-0.5 ${isStreaming ? "ai-avatar-ring" : ""}`}>
+        <div className={`w-7 h-7 rounded-full flex items-center justify-center bg-gradient-to-br ${
+          modeConfig?.id === "math"    ? "from-blue-500 to-blue-600"    :
+          modeConfig?.id === "coding"  ? "from-green-500 to-emerald-600" :
+          modeConfig?.id === "science" ? "from-cyan-500 to-cyan-600"    :
+          "from-purple-500 to-blue-600"
+        }`}>
+          {modeConfig && modeConfig.id !== "auto" && modeConfig.id !== "general"
+            ? <modeConfig.icon className="w-3.5 h-3.5 text-white" />
+            : <Brain className="w-3.5 h-3.5 text-white" />}
+        </div>
       </div>
 
       <div className="flex-1 min-w-0 space-y-1">
         {msg.subjectMode && msg.subjectMode !== "auto" && <ModeBadge mode={msg.subjectMode} />}
 
-        {/* Tap on AI response to reveal copy button on mobile */}
+        {/* AI response bubble — beautiful card with subtle border */}
         <div
-          className={`w-full ${msg.isError ? "text-red-300" : "text-white"}`}
+          className={`w-full rounded-2xl rounded-tl-sm transition-all ${
+            msg.isError
+              ? "text-red-300"
+              : !isStreaming && msg.content
+                ? "bg-white/[0.025] border border-white/[0.07] px-4 py-3"
+                : "text-white"
+          }`}
           onClick={() => { if (!isStreaming && !msg.isError && msg.content) setShowCopy(p => !p); }}
         >
           {msg.isError
-            ? <p className="text-sm leading-relaxed">{msg.content}</p>
+            ? <p className="text-sm leading-relaxed px-1">{msg.content}</p>
             : <MarkdownRenderer content={msg.content} />}
           {isStreaming && (
             <span className="inline-block w-0.5 h-4 bg-blue-400 ml-0.5 animate-pulse align-middle" />

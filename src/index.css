@@ -475,3 +475,31 @@ html, body {
     font-size: 14px;
   }
 }
+/* ── AskAI v10 Visual Upgrades ── */
+
+/* AI Avatar streaming ring */
+@keyframes ai-ring-spin {
+  0%   { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+.ai-avatar-ring::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, #7c3aed, #3b82f6, #06b6d4, #7c3aed);
+  animation: ai-ring-spin 1.5s linear infinite;
+  z-index: -1;
+}
+.ai-avatar-ring {
+  position: relative;
+}
+
+/* Fade-in-up for toast/badge */
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in-up {
+  animation: fade-in-up 0.35s ease-out;
+}
