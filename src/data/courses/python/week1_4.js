@@ -2896,8 +2896,8 @@ export const PYTHON_COURSE = {
             {
               type: 'snippet',
               label: 'Value update karo',
-              code: 'score = 0\nprint("Shuruaat:", score)\n\nscore = 100\nprint("Game ke baad:", score)\n\nscore = score + 50\nprint("Bonus mila:", score)',
-              expectedOutput: 'Shuruaat: 0\nGame ke baad: 100\nBonus mila: 150',
+              code: 'praaptank = 0\nprint("Shuruaat:", praaptank)\n\npraaptank = 100\nprint("Khel ke baad:", praaptank)\n\npraaptank = praaptank + 50\nprint("Bonus mila:", praaptank)',
+              expectedOutput: 'Shuruaat: 0\nKhel ke baad: 100\nBonus mila: 150',
             },
             {
               type: 'mistake',
@@ -2922,7 +2922,7 @@ export const PYTHON_COURSE = {
 
           content: `## Variables kya hote hain?\n\nVariable ek **box** ki tarah hai jisme tum data store karte ho. Jaise tum phone mein contact save karte ho — variable bhi waise hi kaam karta hai!\n\n### Variable banana\n\`\`\`python\nnaam = "Rahul"\numar = 18\nsheher = "Mumbai"\n\nprint(naam)\nprint(umar)\nprint(sheher)\n\`\`\`\n\n### Types of Data\nPython mein teen main types hain:\n\n| Type | Example | Kab use karein |\n|------|---------|----------------|\n| String (str) | \`"Hello"\` | Text ke liye |\n| Integer (int) | \`25\` | Whole numbers |\n| Float | \`9.5\` | Decimal numbers |\n\n### Variables ko Mix karna\n\`\`\`python\nnaam = "Priya"\nscore = 95.5\n\nprint("Student:", naam)\nprint("Score:", score)\nprint(naam, "ka score hai", score)\n\`\`\``,
 
-          codeExample: `# ??? ki jagah apni real info daal do!\nstudent_naam = "???"\nstudent_age  = ???\nfavourite_subject = "???"\n\nprint("Naam:", student_naam)\nprint("Age:", student_age)\nprint("Subject:", favourite_subject)`,
+          codeExample: `# ??? ki jagah apni real info daal do!\nstudent_naam   = "???"\nstudent_umar   = ???\npasand_subject = "???"\n\nprint("Naam:", student_naam)\nprint("Umar:", student_umar)\nprint("Pasand Vishay:", pasand_subject)`,
 
           task: {
             description: 'Apna profile banao — naam, umar, pasandida_subject, percentage — 4 variables. Phir saari info print karo. ??? ki jagah apni asli values daalo.',
@@ -2992,14 +2992,14 @@ export const PYTHON_COURSE = {
             {
               type: 'snippet',
               label: 'Number input — int() se badlo',
-              code: 'umar = int(input("Tumhari umar kitni hai? "))\nagla_saal = umar + 1\nprint(f"Agle saal tum {agla_saal} saal ke hoge!")',
+              code: 'umar = int(input("Tumhari umar kitni hai? "))\nagla_saal = umar + 1\nprint(f"Agle saal tum {agla_saal} saal ke honge!")',
               expectedOutput: '(Apni umar likho — hisaab ho jaayega)',
             },
             {
               type: 'snippet',
               label: 'Float input — dasamlav numbers ke liye',
-              code: 'score = float(input("Tumhara score (0-10): "))\npercentage = score * 10\nprint(f"Percentage: {percentage}%")',
-              expectedOutput: '(Jaise 8.5 likho — percentage niklega)',
+              code: 'ank = float(input("Tumhara ank (0-10): "))\npratishat = ank * 10\nprint(f"Pratishat: {pratishat}%")',
+              expectedOutput: '(Jaise 8.5 daalo — pratishat niklega)',
             },
             {
               type: 'mistake',
@@ -3015,7 +3015,7 @@ export const PYTHON_COURSE = {
             {
               type: 'snippet',
               label: 'f-string ka kamal',
-              code: 'naam = input("Naam: ")\nsheher = input("Sheher: ")\nprint(f"{naam} {sheher} se hai — swagat! 🙌")',
+              code: 'naam = input("Apna naam: ")\nsheher = input("Sheher: ")\nprint(f"{naam} {sheher} se hai — swagat! 🙌")',
               expectedOutput: '(Naam aur sheher dalo — dono ek saath print honge)',
             },
             {
@@ -3029,12 +3029,12 @@ export const PYTHON_COURSE = {
 
           content: `## User se Input kaise lein?\n\nAbhi tak humne hardcode kiya tha. Ab user se data lete hain!\n\n### input() function\n\`\`\`python\nnaam = input("Apna naam batao: ")\nprint("Hello", naam, "! Welcome to Python! 🎉")\n\`\`\`\n\n### Numbers as Input\ninput() hamesha **String** return karta hai. Number chahiye toh convert karo:\n\n\`\`\`python\numar = int(input("Tumhari age kya hai? "))\nagla_saal = umar + 1\nprint("Agle saal tum", agla_saal, "saal ke hoge!")\n\`\`\``,
 
-          codeExample: `# ??? ki jagah prompt text daalo, aur calculation complete karo\nnaam  = input("???")\numar  = int(input("???")\n\n# Ek interesting fact calculate karo — jitne din zinda ho!\ndins_zinda = umar * 365\nprint(f"{naam}, tum ab tak {???} din zinda reh chuke ho! 🎂")`,
+          codeExample: `# ??? ki jagah apna prompt likho, aur hisaab poora karo\nnaam       = input("???")\numar       = int(input("???"))\n\n# Ek mazedar hisaab — kitne din zinda reh chuke ho!\ndin_zinda  = umar * 365\nprint(f"{naam}, tum ab tak {din_zinda} din zinda reh chuke ho! 🎂")`,
 
           task: {
-            description: 'User se naam aur pasandida number lo. Phir print karo: "[naam] ka pasandida number [number] hai, aur uska double [2x] hai!"',
-            hint: 'naam = input(...), number = int(input(...)), phir double = number * 2',
-            starterCode: 'naam   = input("Apna naam: ")\nnumber = int(input("Pasandida number: "))\ndouble = ???\n\nprint(f"{naam} ka pasandida number {number} hai!")\nprint(f"Uska double hai: {???}")',
+            description: 'User se naam aur pasandida sankhya lo. Phir print karo: "[naam] ki pasandida sankhya [sankhya] hai, aur uska dugna [2x] hai!"',
+            hint: 'naam = input(...), sankhya = int(input(...)), phir dugna = sankhya * 2',
+            starterCode: 'naam    = input("Apna naam: ")\nsankhya = int(input("Pasandida sankhya: "))\ndugna   = ???\n\nprint(f"{naam} ki pasandida sankhya {sankhya} hai!")\nprint(f"Uska dugna hai: {dugna}")',
           },
 
           quiz: [
@@ -3100,7 +3100,7 @@ export const PYTHON_COURSE = {
               type: 'snippet',
               label: 'Even/Odd pehchano — % ka asli use',
               code: 'number = 42\nif number % 2 == 0:\n    print(f"{number} even (jugal) hai")\nelse:\n    print(f"{number} odd (ek) hai")',
-              expectedOutput: '42 even (jugal) hai',
+              expectedOutput: '42 jugal (even) hai',
             },
             {
               type: 'concept',
@@ -3110,7 +3110,7 @@ export const PYTHON_COURSE = {
             {
               type: 'snippet',
               label: 'Percentage calculator — asli misaal',
-              code: 'naam     = "Vikram"\nmarks    = 450\ntotal    = 500\npercent  = (marks / total) * 100\n\nprint(f"{naam} ka natija:")\nprint(f"Ank:        {marks}/{total}")\nprint(f"Pratishat:  {percent:.2f}%")',
+              code: 'naam     = "Vikram"\nanks     = 450\nkul_ank  = 500\npratishat = (anks / kul_ank) * 100\n\nprint(f"{naam} ka natija:")\nprint(f"Ank:        {anks}/{kul_ank}")\nprint(f"Pratishat:  {pratishat:.2f}%")',
               expectedOutput: 'Vikram ka natija:\nAnk:        450/500\nPratishat:  90.00%',
             },
             {
@@ -3136,12 +3136,12 @@ export const PYTHON_COURSE = {
 
           content: `## Python mein Math Operations\n\nPython ek powerful calculator hai!\n\n### Basic Operators\n\`\`\`python\na = 20\nb = 6\n\nprint(a + b)   # 26\nprint(a - b)   # 14\nprint(a * b)   # 120\nprint(a / b)   # 3.333...\nprint(a // b)  # 3 (floor division)\nprint(a % b)   # 2 (remainder)\nprint(a ** b)  # power\n\`\`\`\n\n### f-strings\n\`\`\`python\nnaam = "Vikram"\nmarks = 450\ntotal = 500\npercentage = (marks / total) * 100\nprint(f"{naam} ka result: {percentage:.2f}%")\n\`\`\``,
 
-          codeExample: `# Simple tip calculator — ??? fill karo\nbill   = float(input("Bill amount (₹): "))\ntip_pc = float(input("Tip percentage: "))\n\ntip_amount = ???\ntotal      = ???\n\nprint(f"\\nBill:   ₹{bill:.2f}")\nprint(f"Tip:    ₹{???:.2f}")\nprint(f"Total:  ₹{???:.2f}")`,
+          codeExample: `# Bakshish hisaab — ??? ki jagah apna code likho\nbill       = float(input("Bill raashi (₹): "))\nbakshish_p = float(input("Bakshish (%) kitni deni hai: "))\n\nbakshish = ???\nkul      = ???\n\nprint(f"\\nBill:      ₹{bill:.2f}")\nprint(f"Bakshish:  ₹{bakshish:.2f}")\nprint(f"Kul Total: ₹{kul:.2f}")`,
 
           task: {
-            description: 'Simple EMI calculator: user se loan raashi aur saal lo. Kul = raashi + (raashi × 0.1 × saal), Maasik = kul ÷ (saal × 12). ??? fill karo.',
-            hint: 'total_payable = loan + (loan * 0.1 * years), phir monthly_emi = total_payable / (years * 12). {variable:,.0f} se saaf number dikhega.',
-            starterCode: 'loan  = float(input("Loan amount (₹): "))\nyears = int(input("Years: "))\n\ntotal_payable = loan + (loan * 0.1 * years)\nmonthly_emi   = ???\n\nprint(f"\\nLoan:          ₹{loan:,.0f}")\nprint(f"Total payable: ₹{total_payable:,.0f}")\nprint(f"Monthly EMI:   ₹{???:,.0f}")',
+            description: 'EMI hisaab karo: user se loan raashi aur saal lo. Kul = raashi + (raashi × 0.1 × saal), Maasik = kul ÷ (saal × 12). ??? fill karo.',
+            hint: 'kul_rakam = udhaar + (udhaar * 0.1 * saal), phir maasik_emi = kul_rakam / (saal * 12). {variable:,.0f} se saaf number dikhega.',
+            starterCode: 'udhaar     = float(input("Loan raashi (₹): "))\nsaal       = int(input("Kitne saal ke liye: "))\n\nkul_rakam  = udhaar + (udhaar * 0.1 * saal)\nmaasik_emi = ???\n\nprint(f"\\nLoan:       ₹{udhaar:,.0f}")\nprint(f"Kul Rakam:  ₹{kul_rakam:,.0f}")\nprint(f"Maasik EMI: ₹{maasik_emi:,.0f}")',
           },
 
           quiz: [
