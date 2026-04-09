@@ -310,17 +310,17 @@
 // ─── DOTENV: Sabse pehle — env vars load karo ────────────────
 import dotenv from 'dotenv';
 dotenv.config();
-
+ 
 // ─── SENTRY ───────────────────────────────────────────────────
 import './instrument.js';
-
+ 
 import express, { Request, Response, NextFunction } from 'express';
 import cors        from 'cors';
 import helmet      from 'helmet';
 import compression from 'compression';
-
+ 
 import codelearnRoutes  from './routes/codelearnRoutes.js';
-
+ 
 /* ─── 1. ENV VALIDATION ─────────────────────────────────── */
 const REQUIRED_ENV = ['MONGODB_URI', 'JWT_SECRET', 'GROQ_API_KEY'];
 const missing      = REQUIRED_ENV.filter(key => !process.env[key]);
@@ -328,13 +328,13 @@ if (missing.length > 0) {
   console.error(`❌ Missing required environment variables: ${missing.join(', ')}`);
   process.exit(1);
 }
-
+ 
 /* ─── 2. IMPORTS ────────────────────────────────────────── */
 import { connectDB }     from './config/db.js';
 import { logger }        from './utils/logger.js';
 import { globalLimiter } from './middleware/rateLimiter.js';
 import { errorHandler }  from './middleware/errorHandler.js';
-
+ 
 import authRoutes        from './auth.js';
 import userRoutes        from './user-routes.js';
 import leaderboardRoutes from './leaderboard-routes.js';
@@ -349,19 +349,21 @@ import brainRoutes       from './routes/brainRoutes.js';
 import learningRoutes    from './routes/learningEngineRoutes.js';
 import progressRoutes    from './routes/progressRoutes.js';
 import './models/AskAISession.model.js';
-
+ 
 // ── Stage 6: AI Mentor ────────────────────────────────────────
 import mentorRoutes      from './routes/mentorRoutes.js';
 import { mentorScheduler } from './services/aiMentor/mentorScheduler.js';
-
+ 
 // ── Stage 7: Retention Engine ─────────────────────────────────
 import retentionRoutes   from './routes/retentionRoutes.js';
-
+import generalRoutes     from './routes/generalRoutes.js';
+import imageGenRoutes    from './routes/imageGenRoutes.js';
+ 
 // ── Stage 7 Advanced: Urgency Scheduler (precise 20h detection) ──
 import { UrgencyScheduler } from './services/retentionEngine/urgencyScheduler.js';
-
+ 
 import { fixStuckRedemptions, processPendingPremiums } from './controllers/rewardsController.js';
-
+ 
 /* ─── 3. PROCESS ERROR HANDLERS ────────────────────────── */
 process.on('unhandledRejection', (reason: any) => {
   logger.error({ err: reason?.message || reason }, 'Unhandled Promise Rejection');
@@ -370,11 +372,11 @@ process.on('uncaughtException', (err: Error) => {
   logger.error({ err: err.message, stack: err.stack || '' }, 'Uncaught Exception');
   setTimeout(() => process.exit(1), 1000);
 });
-
+ 
 /* ─── 4. EXPRESS SETUP ──────────────────────────────────── */
 const app  = express();
 const PORT = process.env.PORT || 5000;
-
+ 
 /* ─── 5. CORS ───────────────────────────────────────────── */
 const ALLOWED_ORIGINS = [
   'https://studyearnai.tech',
@@ -384,7 +386,7 @@ const ALLOWED_ORIGINS = [
   'https://studyearn-ai.vercel.app',
   process.env.FRONTEND_URL,
 ].filter(Boolean) as string[];
-
+ 
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin) return callback(null, true);
@@ -393,12 +395,12 @@ app.use(cors({
   },
   credentials: true,
 }));
-
+ 
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
   contentSecurityPolicy: false,
 }));
-
+ 
 // ─── FIX: SSE routes pe compression SKIP karo ────────────────
 // /api/ai/ask-stream aur /api/retention/stream dono SSE hain
 app.use(compression({
@@ -408,17 +410,17 @@ app.use(compression({
     return compression.filter(req, _res);
   },
 }));
-
+ 
 /* ─── 6. MIDDLEWARE ─────────────────────────────────────── */
 app.set('trust proxy', 1);
 app.use(globalLimiter);
 app.use(express.json({ limit: '20mb' }));
-
+ 
 /* ─── 7. HEALTH CHECK ───────────────────────────────────── */
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', port: PORT });
 });
-
+ 
 /* ─── 8. ROUTES ─────────────────────────────────────────── */
 app.use('/api/auth',        authRoutes);
 app.use('/api/user',        userRoutes);
@@ -438,10 +440,12 @@ app.use('/api/progress',    progressRoutes);
 app.use('/api/mentor',      mentorRoutes);
 // ── Stage 7: Retention Engine ─────────────────────────────────
 app.use('/api/retention',   retentionRoutes);
-
+app.use('/api/general',     generalRoutes);
+app.use('/api/image',       imageGenRoutes);
+ 
 /* ─── 9. GLOBAL ERROR HANDLER ───────────────────────────── */
 app.use(errorHandler);
-
+ 
 /* ─── 10. SERVER START ──────────────────────────────────── */
 connectDB().then(() => {
   app.listen(PORT, () => {
@@ -461,16 +465,16 @@ connectDB().then(() => {
     logger.info('✅ SSE Push Ready          (Stage 7 Advanced — Real-time Notifications)');
     logger.info('✅ Emotional AI Ready      (Stage 7 Advanced — Mentor + Retention Merge)');
   });
-
+ 
   fixStuckRedemptions()
     .then(() => processPendingPremiums())
     .catch((e: unknown) => logger.error({ err: e }, 'background task failed'));
-
+ 
   setInterval(processPendingPremiums, 5 * 60 * 1000);
-
+ 
   // ── Stage 6: Start AI Mentor Scheduler ───────────────────
   mentorScheduler.start();
-
+ 
   // ── Stage 7 Advanced: Start Urgency Scheduler ────────────
   // Precise 20h/36h/48h cron detection — not request-driven
   const urgencyScheduler = new UrgencyScheduler();

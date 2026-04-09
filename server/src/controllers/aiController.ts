@@ -50,6 +50,9 @@ import {
   detectTopicExpanded,
 }                               from '../services/askAI/askAIOrchestrator.js';
 
+// v12: Visual Brain — analyzes response and returns visual rendering instructions
+import { analyzeWithVisualBrain } from '../services/askAI/visualBrain.js';
+
 // v9: DB persistence layer
 import {
   getOrCreateAskAISession,
@@ -464,6 +467,16 @@ export async function askAIStream(req: Request, res: Response): Promise<void> {
           res.write('data: ' + JSON.stringify({ enrichment }) + '\n\n');
         }
       }).catch(() => { /* enrichment failure never blocks the stream */ });
+    }
+
+    // ── v12: Visual Brain — sends visual rendering instructions ──
+    // Runs in parallel with enrichment — analyzes fullResponse and
+    // returns segment classifications for premium visual rendering
+    if (fullResponse && fullResponse.length > 100) {
+      analyzeWithVisualBrain(fullResponse, subjectMode).then(brain => {
+        if (res.writableEnded || !brain.rawUsed || !brain.segments.length) return;
+        res.write('data: ' + JSON.stringify({ visualBrain: brain.segments }) + '\n\n');
+      }).catch(() => { /* visual brain failure is non-critical */ });
     }
 
   } catch (err: any) {

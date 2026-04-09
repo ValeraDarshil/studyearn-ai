@@ -37,6 +37,8 @@ import { API_URL }            from "../utils/api";
 import { incrementAction }    from "../utils/user-api";
 import { MarkdownRenderer }   from "../components/MarkdownRenderer";
 import { trackProgressEvent } from "../utils/progress-api";
+import { checkIsGeneral, fetchGeneralKnowledge, type GKData } from "../utils/general-api";
+import { checkIsImageRequest, generateImage as generateAIImage, type ImageGenResult } from "../utils/image-api";
 import {
   MentorIntelligenceBar,
   WeakTopicBanner,
@@ -74,6 +76,14 @@ interface AskAIEnrichment {
   wowObservation?: string | null;
 }
 
+// v12: Visual Brain segment type
+interface VisualSegment {
+  type:       'lead' | 'body' | 'key' | 'analogy' | 'formula' | 'warning' | 'hook' | 'heading';
+  content:    string;
+  highlights: string[];
+  emoji?:     string;
+}
+
 interface ChatMsg {
   role:           Role;
   content:        string;
@@ -83,6 +93,9 @@ interface ChatMsg {
   pointsAwarded?: number;
   isError?:       boolean;
   subjectMode?:   SubjectMode;
+  visualBrain?:   VisualSegment[];  // v12: visual rendering instructions
+  gkData?:        GKData;           // v12: general knowledge from Wikipedia
+  imageGen?:      ImageGenResult;   // v12: generated image result
 }
 interface ConvoSummary {
   _id:           string;
@@ -258,6 +271,172 @@ function HintBanner({ text, onDismiss }: { text: string; onDismiss: () => void }
       <button onClick={onDismiss} className="ml-auto flex-shrink-0 text-cyan-400/60 hover:text-cyan-300 transition-colors">
         <X className="w-3 h-3" />
       </button>
+    </div>
+  );
+}
+
+// ─── Image Result Card (v12 — Feature 2) ────────────────────
+// Shows generated image/diagram inline in chat
+// Supports: base64 PNG, URL, SVG diagrams
+function ImageResultCard({ result, prompt }: { result: ImageGenResult; prompt: string }) {
+  const [downloaded, setDownloaded] = useState(false);
+
+  if (!result.success || (!result.imageB64 && !result.imageUrl && !result.svgContent)) {
+    return (
+      <div className="mt-1 px-4 py-3 rounded-xl border border-red-500/20 bg-red-500/5 text-red-300 text-sm">
+        ⚠️ {result.error || "Image generation failed. Please try again."}
+      </div>
+    );
+  }
+
+  const handleDownload = () => {
+    if (result.imageB64) {
+      const a = document.createElement("a");
+      a.href = `data:image/png;base64,${result.imageB64}`;
+      a.download = `studyearn-${Date.now()}.png`;
+      a.click();
+    } else if (result.imageUrl) {
+      window.open(result.imageUrl, "_blank");
+    } else if (result.svgContent) {
+      const blob = new Blob([result.svgContent], { type: "image/svg+xml" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `studyearn-diagram-${Date.now()}.svg`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+    setDownloaded(true);
+    setTimeout(() => setDownloaded(false), 2000);
+  };
+
+  const providerLabel = result.provider?.includes("svg") ? "SVG Diagram" :
+                        result.provider?.includes("nvidia") ? "NVIDIA Flux" :
+                        result.provider?.includes("openrouter") ? "AI Generated" : "AI Generated";
+
+  return (
+    <div className="mt-1 mb-2">
+      {/* Provider badge */}
+      <div className="flex items-center gap-2 mb-2">
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold border border-violet-500/30 bg-violet-500/8 text-violet-300">
+          🎨 {providerLabel}
+        </span>
+        <span className="text-[10px] text-slate-600 truncate">{prompt.slice(0, 50)}</span>
+      </div>
+
+      {/* Image display */}
+      {result.isSvg && result.svgContent ? (
+        <div
+          className="w-full max-w-2xl rounded-xl overflow-hidden border border-white/10 bg-white"
+          style={{ maxHeight: "500px" }}
+          dangerouslySetInnerHTML={{ __html: result.svgContent }}
+        />
+      ) : (
+        <img
+          src={result.imageB64
+            ? `data:image/png;base64,${result.imageB64}`
+            : result.imageUrl}
+          alt={prompt}
+          className="w-full max-w-2xl rounded-xl border border-white/10 object-contain"
+          style={{ maxHeight: "500px", background: "#0a0f1e" }}
+        />
+      )}
+
+      {/* Download button */}
+      <div className="mt-2 flex items-center gap-2">
+        <button
+          onClick={handleDownload}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-white/[0.04] border border-white/10 text-slate-400 hover:text-white hover:bg-white/[0.08] transition-all active:scale-95"
+        >
+          {downloaded ? "✓ Saved!" : "⬇ Download"}
+        </button>
+        <span className="text-[10px] text-slate-600">Not stored — re-generate if needed</span>
+      </div>
+    </div>
+  );
+}
+
+// ─── General Knowledge Card (v12 — Feature 3) ──────────────
+// Shown when student asks a "who is / what is" general question.
+// Data comes from Wikipedia — FREE, unlimited, no API key.
+// Includes: image, key facts, wiki link.
+function GKCard({ data }: { data: GKData }) {
+  const typeEmoji: Record<string, string> = {
+    person:  "👤",
+    place:   "🌍",
+    concept: "💡",
+    event:   "📅",
+    unknown: "🔍",
+  };
+  const emoji = typeEmoji[data.type] || "🔍";
+  const typeColor: Record<string, string> = {
+    person:  "text-violet-300 border-violet-500/30 bg-violet-500/8",
+    place:   "text-teal-300 border-teal-500/30 bg-teal-500/8",
+    concept: "text-blue-300 border-blue-500/30 bg-blue-500/8",
+    event:   "text-amber-300 border-amber-500/30 bg-amber-500/8",
+    unknown: "text-slate-300 border-slate-500/30 bg-slate-500/8",
+  };
+  const badgeCls = typeColor[data.type] || typeColor.unknown;
+
+  return (
+    <div className="mt-1 mb-2">
+      {/* Header with type badge */}
+      <div className="flex items-center gap-2 mb-3">
+        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border ${badgeCls}`}>
+          {emoji} {data.type.charAt(0).toUpperCase() + data.type.slice(1)}
+        </span>
+        <h2 className="text-white font-bold text-base">{data.title}</h2>
+      </div>
+
+      {/* Image + summary side by side on desktop */}
+      <div className="flex gap-4 items-start">
+        {data.imageUrl && (
+          <div className="flex-shrink-0">
+            <img
+              src={data.imageUrl}
+              alt={data.imageCaption || data.title}
+              className="w-24 h-28 object-cover rounded-xl border border-white/10 shadow-lg"
+              onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+            />
+          </div>
+        )}
+        <div className="flex-1 min-w-0">
+          <p className="text-slate-300 text-sm leading-relaxed line-clamp-4">
+            {data.summary}
+          </p>
+        </div>
+      </div>
+
+      {/* Key facts */}
+      {data.keyFacts.length > 0 && (
+        <div className="mt-3 space-y-1.5">
+          <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Key Facts</p>
+          {data.keyFacts.slice(0, 3).map((fact, i) => (
+            <div key={i} className="flex items-start gap-2 text-xs text-slate-400">
+              <span className="text-violet-400 flex-shrink-0 mt-0.5">◆</span>
+              <span className="leading-relaxed">{fact}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Wikipedia link */}
+      {data.wikiUrl && (
+        <div className="mt-3">
+          <a
+            href={data.wikiUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 text-[11px] text-blue-400 hover:text-blue-300 transition-colors"
+          >
+            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/>
+              <path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/>
+            </svg>
+            Read more on Wikipedia ↗
+          </a>
+        </div>
+      )}
     </div>
   );
 }
@@ -548,7 +727,16 @@ function AIBubble({
       >
         {msg.isError
           ? <p className="text-sm leading-relaxed">{msg.content}</p>
-          : <MarkdownRenderer content={msg.content} />}
+          : msg.imageGen
+            ? (
+              <div>
+                <p className="text-sm text-slate-300 mb-2">{msg.content}</p>
+                <ImageResultCard result={msg.imageGen} prompt={messages.find(m => m.role === "user")?.content || ""} />
+              </div>
+            )
+            : msg.gkData
+              ? <GKCard data={msg.gkData} />
+              : <MarkdownRenderer content={msg.content} visualBrain={msg.visualBrain} />}
         {isStreaming && (
           <span className="inline-block w-0.5 h-4 bg-blue-400 ml-0.5 animate-pulse align-middle" />
         )}
@@ -776,6 +964,10 @@ export function AskAI() {
   // ── v12: Wow Moment (Improvement 7) ─────────────────────
   const [wowMoment,     setWowMoment]     = useState<string | null>(null);
   const [showWowMoment, setShowWowMoment] = useState(false);
+
+  // ── v12: Visual Brain state ───────────────────────────
+  // Maps message content hash → visual segments from brain
+  const [visualBrainMap, setVisualBrainMap] = useState<Record<string, VisualSegment[]>>({});
 
   // ── v11: AI-OS Enrichment state ──────────────────────────
   const [enrichment,     setEnrichment]     = useState<AskAIEnrichment | null>(null);
@@ -1175,6 +1367,61 @@ export function AskAI() {
       if (convoId) convoIdRef.current = convoId;
     }
 
+    // ── PATH GK: General Knowledge (Wikipedia — free, no quota) ──
+    // Check if question is factual/general — handle without using AI quota
+    if (!currentType && text && !uploadedFile) {
+      const isGK = await checkIsGeneral(text);
+      if (isGK) {
+        setLoadingStep("🌍 Fetching from Wikipedia…");
+        try {
+          const gkResult = await fetchGeneralKnowledge(text);
+          if (gkResult && gkResult.summary) {
+            const gkMsg: ChatMsg = {
+              role: "assistant",
+              content: gkResult.summary,
+              gkData: gkResult,
+              subjectMode,
+            };
+            const finalMsgs = [...withUserRef.current, gkMsg];
+            setMessages(finalMsgs);
+            if (convoId) { await saveMessages(convoId, [userMsg, gkMsg]); fetchConvos(); }
+            setLoading(false); setLoadingStep(""); textareaRef.current?.focus();
+            return;
+          }
+        } catch { /* If GK fails, fall through to normal AI */ }
+        setLoadingStep("");
+      }
+    }
+
+    // ── PATH IMG: AI Image Generation ───────────────────────
+    // Detect "create an image/diagram" requests — handle specially
+    if (!currentType && text) {
+      const isImgReq = await checkIsImageRequest(text);
+      if (isImgReq) {
+        setLoadingStep("🎨 Generating image…");
+        try {
+          const imgResult = await generateAIImage(text);
+          const statusText = imgResult.success
+            ? (imgResult.isSvg ? "📐 Here's your diagram!" : "🎨 Here's your generated image!")
+            : "⚠️ Image generation failed.";
+          const imgMsg: ChatMsg = {
+            role: "assistant",
+            content: statusText,
+            imageGen: imgResult,
+            subjectMode,
+          };
+          const finalMsgs = [...withUserRef.current, imgMsg];
+          setMessages(finalMsgs);
+          if (convoId) { await saveMessages(convoId, [userMsg, imgMsg]); fetchConvos(); }
+          setLoading(false); setLoadingStep(""); textareaRef.current?.focus();
+          return;
+        } catch {
+          /* If image gen fails, fall through to normal AI */
+          setLoadingStep("");
+        }
+      }
+    }
+
     // ── PATH A: Image or PDF (non-streaming) ─────────────
     if (currentType) {
       try {
@@ -1350,6 +1597,19 @@ export function AskAI() {
             // Arrives AFTER stream ends — shows recommendations,
             // progress insights, hint nudges, emotional nudges,
             // growth mirror (Imp 5), wow observation (Imp 7)
+            // ── v12: Visual Brain segments ────────────────────
+            if (parsed.visualBrain && Array.isArray(parsed.visualBrain)) {
+              // Attach visual brain directly to the last AI message
+              setMessages(prev => {
+                const updated = [...prev];
+                const aiIdx = updated.length - 1;
+                if (updated[aiIdx]?.role === "assistant") {
+                  updated[aiIdx] = { ...updated[aiIdx], visualBrain: parsed.visualBrain };
+                }
+                return updated;
+              });
+            }
+
             if (parsed.enrichment) {
               const e: AskAIEnrichment = parsed.enrichment;
               setEnrichment(e);
