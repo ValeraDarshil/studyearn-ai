@@ -953,25 +953,25 @@ function InlineSnippet({ block, language, courseInfo, onXP }) {
 }
 
 // ─── Mistake Block ────────────────────────────────────────────────
-function MistakeBlock({ block }) {
+function MistakeBlock({ block, lang = "hi" }) {
   const [showFix, setShowFix] = useState(false);
   return (
     <div className="my-4 rounded-xl overflow-hidden border border-red-500/20">
       <div className="flex items-center gap-2 px-4 py-2.5 bg-red-500/5 border-b border-red-500/15">
-        <span className="text-xs font-semibold text-red-400">⚠ Common Mistake — Beginners yeh karte hain</span>
+        <span className="text-xs font-semibold text-red-400">⚠ {lang === "hi" ? "Aam Galati — Shuruaati log yeh karte hain" : "Common Mistake — Beginners do this"}</span>
       </div>
       <div className="bg-[#0d1117] px-4 py-3">
-        <div className="text-xs text-red-400 mb-1.5 font-medium">✗ Galat:</div>
+        <div className="text-xs text-red-400 mb-1.5 font-medium">{lang === "hi" ? "✗ Galat:" : "✗ Wrong:"}</div>
         <pre className="font-mono text-sm text-red-300/70 line-through leading-relaxed">{block.wrong}</pre>
       </div>
       {showFix ? (
         <>
           <div className="bg-[#0d1117] px-4 py-3 border-t border-white/5">
-            <div className="text-xs text-green-400 mb-1.5 font-medium">✓ Sahi:</div>
+            <div className="text-xs text-green-400 mb-1.5 font-medium">{lang === "hi" ? "✓ Sahi:" : "✓ Correct:"}</div>
             <pre className="font-mono text-sm text-green-300 leading-relaxed">{block.right}</pre>
           </div>
           <div className="px-4 py-3 bg-blue-500/5 border-t border-blue-500/15 text-sm text-gray-300 leading-relaxed">
-            <span className="text-blue-400 text-xs font-medium">Kyun? </span>{block.why}
+            <span className="text-blue-400 text-xs font-medium">{lang === "hi" ? "Kyun? " : "Why? "}</span>{block.why}
           </div>
         </>
       ) : (
@@ -979,7 +979,7 @@ function MistakeBlock({ block }) {
           onClick={() => setShowFix(true)}
           className="w-full py-2.5 text-xs text-red-400 hover:text-white hover:bg-red-500/10 transition-all border-t border-red-500/15"
         >
-          Sahi tarika dekho →
+          {lang === "hi" ? "Sahi tarika dekho →" : "Show the fix →"}
         </button>
       )}
     </div>
@@ -987,7 +987,7 @@ function MistakeBlock({ block }) {
 }
 
 // ─── Inline Checkpoint ────────────────────────────────────────────
-function InlineCheckpoint({ block, onCorrect }) {
+function InlineCheckpoint({ block, onCorrect, lang = "hi" }) {
   const [selected, setSelected]   = useState(null);
   const [answered, setAnswered]   = useState(false);
 
@@ -1001,7 +1001,7 @@ function InlineCheckpoint({ block, onCorrect }) {
   return (
     <div className="my-5 rounded-xl overflow-hidden border border-violet-500/20 bg-violet-500/5">
       <div className="px-4 py-3 border-b border-violet-500/15">
-        <div className="text-xs text-violet-400 font-medium mb-1.5">⚡ Quick Check</div>
+        <div className="text-xs text-violet-400 font-medium mb-1.5">⚡ {lang === "hi" ? "Jaldi Jaancho" : "Quick Check"}</div>
         <p className="text-gray-200 text-sm font-medium leading-relaxed">{block.question}</p>
       </div>
       <div className="p-3 grid grid-cols-1 gap-2">
@@ -1029,7 +1029,7 @@ function InlineCheckpoint({ block, onCorrect }) {
           ${selected === block.correct
             ? 'bg-green-500/5 border-green-500/15 text-green-300'
             : 'bg-orange-500/5 border-orange-500/15 text-orange-300'}`}>
-          <span className="font-medium mr-1">{selected === block.correct ? '✓ Bilkul sahi!' : '✗ Nahi —'}</span>
+          <span className="font-medium mr-1">{selected === block.correct ? (lang === "hi" ? "✓ Bilkul sahi!" : "✓ Correct!") : (lang === "hi" ? "✗ Nahi —" : "✗ Not quite —")}</span>
           {block.explanation}
         </div>
       )}
@@ -1038,15 +1038,27 @@ function InlineCheckpoint({ block, onCorrect }) {
 }
 
 // ─── Rich Content Renderer ────────────────────────────────────────
-function RichContentRenderer({ blocks, language, courseInfo, onXP }) {
+function RichContentRenderer({ blocks, language, courseInfo, onXP, lang = "hi" }) {
   return (
     <div className="space-y-1">
       {blocks.map((block, idx) => {
         if (block.type === 'concept') {
+          // Cycle through heading accent colors for visual variety
+          const accentColors = [
+            { bg: 'bg-violet-500/10', border: 'border-violet-500/25', text: 'text-violet-300', dot: 'bg-violet-400' },
+            { bg: 'bg-blue-500/10',   border: 'border-blue-500/25',   text: 'text-blue-300',   dot: 'bg-blue-400' },
+            { bg: 'bg-emerald-500/10',border: 'border-emerald-500/25',text: 'text-emerald-300', dot: 'bg-emerald-400' },
+            { bg: 'bg-amber-500/10',  border: 'border-amber-500/25',  text: 'text-amber-300',  dot: 'bg-amber-400' },
+            { bg: 'bg-pink-500/10',   border: 'border-pink-500/25',   text: 'text-pink-300',   dot: 'bg-pink-400' },
+          ];
+          const accent = accentColors[idx % accentColors.length];
           return (
-            <div key={idx} className="mb-1">
+            <div key={idx} className="mb-4 mt-5">
               {block.heading && (
-                <h3 className="text-base font-semibold text-gray-200 mt-5 mb-2">{block.heading}</h3>
+                <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg mb-3 ${accent.bg} border ${accent.border}`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${accent.dot} shrink-0`} />
+                  <h3 className={`text-sm font-semibold ${accent.text}`}>{block.heading}</h3>
+                </div>
               )}
               {block.body && (
                 <p className="text-gray-400 leading-relaxed"
@@ -1063,7 +1075,7 @@ function RichContentRenderer({ blocks, language, courseInfo, onXP }) {
             <div key={idx} className="my-4 flex gap-3 px-4 py-3 bg-amber-500/5 border border-amber-500/20 rounded-xl">
               <span className="text-lg mt-0.5 shrink-0">🔗</span>
               <div>
-                <div className="text-xs text-amber-400 font-medium mb-1">Real Life Analogy</div>
+                <div className="text-xs text-amber-400 font-medium mb-1">{lang === "hi" ? "Asli Zindagi se Misaal" : "Real Life Analogy"}</div>
                 <p className="text-gray-300 text-sm leading-relaxed">{block.text}</p>
               </div>
             </div>
@@ -1071,15 +1083,15 @@ function RichContentRenderer({ blocks, language, courseInfo, onXP }) {
         }
 
         if (block.type === 'snippet') {
-          return <InlineSnippet key={idx} block={block} language={language} courseInfo={courseInfo} onXP={onXP} />;
+          return <InlineSnippet key={idx} block={block} language={language} courseInfo={courseInfo} onXP={onXP} lang={lang} />;
         }
 
         if (block.type === 'mistake') {
-          return <MistakeBlock key={idx} block={block} />;
+          return <MistakeBlock key={idx} block={block} lang={lang} />;
         }
 
         if (block.type === 'checkpoint') {
-          return <InlineCheckpoint key={idx} block={block} onCorrect={() => onXP?.(10, 'Checkpoint sahi kiya!')} />;
+          return <InlineCheckpoint key={idx} block={block} lang={lang} onCorrect={() => onXP?.(10, lang === 'hi' ? 'Checkpoint sahi kiya!' : 'Checkpoint correct!')} />;
         }
 
         return null;
@@ -1252,6 +1264,7 @@ export default function SectionViewer({
                   language={language}
                   courseInfo={courseInfo}
                   onXP={showXP}
+                  lang={lang}
                 />
               : <LegacyContentRenderer markdown={
                   lang === 'en' && section.content_en ? section.content_en : section.content

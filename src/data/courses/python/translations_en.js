@@ -21,11 +21,11 @@ const W1 = {
       {
             "type": "concept",
             "heading": "What is Python?",
-            "body": "Python is a programming language — a way to give instructions to a computer. It is so simple it almost reads like English. Google, Netflix, Instagram — they all use Python."
+            "body": "Python is a programming language — a way to give instructions to a computer. It is so simple it almost reads like English. Google, Netflix, Instagram — they all use Python!"
       },
       {
             "type": "analogy",
-            "text": "Think of a computer as a worker who only understands their own language. Python is the dictionary that lets you give it instructions — simple, clear, and powerful."
+            "text": "Think of a computer as an employee who only understands their own language. Python is the phrase book that lets you give it instructions — simple, clear, and powerful."
       },
       {
             "type": "concept",
@@ -40,7 +40,7 @@ const W1 = {
       },
       {
             "type": "concept",
-            "heading": "Numbers with print()",
+            "heading": "print() with numbers too",
             "body": "Not just text — numbers work too. And you can print multiple things at once:"
       },
       {
@@ -57,7 +57,7 @@ const W1 = {
       },
       {
             "type": "mistake",
-            "wrong": "print('Hello\")",
+            "wrong": "print('Hello\")  # mismatched quotes",
             "right": "print(\"Hello\")",
             "why": "Opening and closing quotes must match — both single or both double."
       },
@@ -71,7 +71,7 @@ const W1 = {
                   "Error"
             ],
             "correct": 2,
-            "explanation": "Anything inside quotes is printed literally — no calculation happens. \"2 + 2\" is a string, not a math expression."
+            "explanation": "Anything inside quotes is printed literally — no calculation. \"2 + 2\" is a string, not math."
       }
 ],
     content_en: `## What is Python?
@@ -123,11 +123,11 @@ print("My favourite food is ???")`,},
       {
             "type": "concept",
             "heading": "What is a variable?",
-            "body": "A variable is a labelled box. Create a box, give it a name, put anything inside. Later, just use the name to get it back."
+            "body": "A variable is a labelled box. Name it, put any value inside, retrieve it anytime using just the name."
       },
       {
             "type": "analogy",
-            "text": "You save contacts in your phone, right? \"Rahul — 98765\" — the name is the variable name, the number is the value. Search \"Rahul\" and you get the number. Python variables work exactly the same way."
+            "text": "You save contacts in your phone, right? \"Rahul — 98765\" — \"Rahul\" is the variable name, \"98765\" is the value. Search \"Rahul\" and the number appears instantly. Python variables work exactly the same way."
       },
       {
             "type": "snippet",
@@ -149,7 +149,7 @@ print("My favourite food is ???")`,},
       {
             "type": "concept",
             "heading": "Updating a variable",
-            "body": "You can change a variable's value any time — just assign again:"
+            "body": "You can change a variable's value any time — just assign again, the old value is replaced:"
       },
       {
             "type": "snippet",
@@ -161,7 +161,7 @@ print("My favourite food is ???")`,},
             "type": "mistake",
             "wrong": "2score = 100",
             "right": "score2 = 100",
-            "why": "Variable names cannot start with a number. Start with a letter or underscore."
+            "why": "Variable names cannot start with a number. Always start with a letter or underscore."
       },
       {
             "type": "mistake",
@@ -171,7 +171,7 @@ print("My favourite food is ???")`,},
       },
       {
             "type": "checkpoint",
-            "question": "x = 5, then x = x + 3 — what is x now?",
+            "question": "x = 5, then x = x + 3. What is x now?",
             "options": [
                   "5",
                   "3",
@@ -179,7 +179,7 @@ print("My favourite food is ???")`,},
                   "Error"
             ],
             "correct": 2,
-            "explanation": "x = x + 3 means: calculate right side first (5 + 3 = 8), then store 8 in x."
+            "explanation": "Right side calculates first: 5 + 3 = 8. Then 8 is stored in x."
       }
 ],
     content_en: `## What are Variables?
@@ -256,36 +256,36 @@ print("Percentage:", percentage)`,},
       {
             "type": "concept",
             "heading": "Make your program interactive",
-            "body": "Until now you wrote values directly in the code. With input(), the program pauses and asks the user — the user types, the value comes in."
+            "body": "So far you hardcoded values. With input(), the program pauses and asks the user directly — they type, the value comes in."
       },
       {
             "type": "snippet",
             "label": "Basic input — try it",
-            "code": "# input() will open a prompt box in the browser\nname = input(\"Enter your name: \")\nprint(\"Hello\", name, \"! Welcome! 🎉\")",
+            "code": "# input() opens a prompt box in the browser\nname = input(\"Enter your name: \")\nprint(\"Hello\", name, \"! Welcome! 🎉\")",
             "expectedOutput": "(A prompt box will appear — type your name)"
       },
       {
             "type": "concept",
             "heading": "Important: input() always returns a String",
-            "body": "This is the most common source of confusion. Whether the user types \"25\" or \"hello\" — both are Strings. If you need a number, you must convert it:"
+            "body": "This is the most common confusion. Whether the user types \"25\" or \"hello\" — both are Strings. If you need a number, you must convert:"
       },
       {
             "type": "snippet",
             "label": "Number input — convert with int()",
-            "code": "age = int(input(\"What is your age? \"))\nnext_year = age + 1\nprint(f\"Next year you will be {next_year} years old!\")",
-            "expectedOutput": "(Type a number — result will calculate)"
+            "code": "age = int(input(\"How old are you? \"))\nnext_year = age + 1\nprint(f\"Next year you will be {next_year} years old!\")",
+            "expectedOutput": "(Type your age — result will calculate)"
       },
       {
             "type": "snippet",
             "label": "Float input — for decimal numbers",
             "code": "score = float(input(\"Your score (0-10): \"))\npercentage = score * 10\nprint(f\"Percentage: {percentage}%\")",
-            "expectedOutput": "(Enter a decimal like 8.5)"
+            "expectedOutput": "(Enter something like 8.5)"
       },
       {
             "type": "mistake",
             "wrong": "age = input(\"Age: \")\nprint(age + 1)",
             "right": "age = int(input(\"Age: \"))\nprint(age + 1)",
-            "why": "input() gives a string — \"25\" + 1 will throw a TypeError. Convert with int() first."
+            "why": "input() gives a string — \"25\" + 1 throws TypeError. Convert with int() first."
       },
       {
             "type": "concept",
@@ -300,7 +300,7 @@ print("Percentage:", percentage)`,},
       },
       {
             "type": "checkpoint",
-            "question": "age = input(\"Age: \") — user types \"20\". What is the type of age?",
+            "question": "age = input(\"Age: \") — user types \"20\". What type is age?",
             "options": [
                   "Integer (20)",
                   "String (\"20\")",
@@ -375,18 +375,18 @@ print(f"Its double is: {???}")`,},
       {
             "type": "concept",
             "heading": "Python is a calculator too",
-            "body": "+ - * / are basic. Python has three more powerful operators that come up in interviews."
+            "body": "+ - * / are basics. Python has three more powerful operators that come up in every interview — make sure you know them."
       },
       {
             "type": "snippet",
             "label": "All operators at once — run it",
-            "code": "a = 17\nb = 5\n\nprint(\"Add:     \", a + b)   # 22\nprint(\"Subtract:\", a - b)   # 12\nprint(\"Multiply:\", a * b)   # 85\nprint(\"Divide:  \", a / b)   # 3.4\nprint(\"Floor:   \", a // b)  # 3  (drop decimal)\nprint(\"Modulus: \", a % b)   # 2  (remainder)\nprint(\"Power:   \", a ** b)  # 1419857",
+            "code": "a = 17\nb = 5\n\nprint(\"Add:     \", a + b)   # 22\nprint(\"Subtract:\", a - b)   # 12\nprint(\"Multiply:\", a * b)   # 85\nprint(\"Divide:  \", a / b)   # 3.4\nprint(\"Floor:   \", a // b)  # 3\nprint(\"Modulus: \", a % b)   # 2\nprint(\"Power:   \", a ** b)  # 1419857",
             "expectedOutput": "Add:      22\nSubtract: 12\nMultiply: 85\nDivide:   3.4\nFloor:    3\nModulus:  2\nPower:    1419857"
       },
       {
             "type": "concept",
             "heading": "% (modulus) — remainder only",
-            "body": "17 % 5 = 2 because 17 = 5×3 + 2. Commonly used to check even/odd — if number % 2 == 0 then it is even."
+            "body": "17 % 5 = 2 because 17 = 5x3 + 2. Most commonly used to check even/odd — if number % 2 == 0 then it is even."
       },
       {
             "type": "snippet",
@@ -397,13 +397,13 @@ print(f"Its double is: {???}")`,},
       {
             "type": "concept",
             "heading": "f-string formatting",
-            "body": "{value:.2f} means \"show 2 decimal places\" — essential for percentages and money."
+            "body": "{value:.2f} means \"show 2 decimal places\" — essential for percentages and money displays."
       },
       {
             "type": "snippet",
             "label": "Percentage calculator — real example",
-            "code": "name     = \"Vikram\"\nmarks    = 450\ntotal    = 500\npercent  = (marks / total) * 100\n\nprint(f\"{name}'s result:\")\nprint(f\"Marks:      {marks}/{total}\")\nprint(f\"Percentage: {percent:.2f}%\")",
-            "expectedOutput": "Vikram's result:\nMarks:      450/500\nPercentage: 90.00%"
+            "code": "name     = \"Vikram\"\nmarks    = 450\ntotal    = 500\npercent  = (marks / total) * 100\n\nprint(f\"Result for {name}:\")\nprint(f\"Marks:      {marks}/{total}\")\nprint(f\"Percentage: {percent:.2f}%\")",
+            "expectedOutput": "Result for Vikram:\nMarks:      450/500\nPercentage: 90.00%"
       },
       {
             "type": "mistake",
@@ -427,7 +427,7 @@ print(f"Its double is: {???}")`,},
                   "0"
             ],
             "correct": 1,
-            "explanation": "Divide 17 by 5: 5×3=15, remainder = 17-15 = 2. Modulus gives only the remainder."
+            "explanation": "Divide 17 by 5: 5x3=15, remainder = 17-15 = 2. Modulus gives only the remainder."
       }
 ],
     content_en: `## Math Operations in Python
