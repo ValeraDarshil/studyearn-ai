@@ -278,13 +278,26 @@ function HintBanner({ text, onDismiss }: { text: string; onDismiss: () => void }
 // ─── Image Result Card (v12 — Feature 2) ────────────────────
 // Shows generated image/diagram inline in chat
 // Supports: base64 PNG, URL, SVG diagrams
+// Handles: expired base64 (not stored in DB) with regenerate prompt
 function ImageResultCard({ result, prompt }: { result: ImageGenResult; prompt: string }) {
   const [downloaded, setDownloaded] = useState(false);
 
-  if (!result.success || (!result.imageB64 && !result.imageUrl && !result.svgContent)) {
+  // Error case
+  if (!result.success) {
     return (
       <div className="mt-1 px-4 py-3 rounded-xl border border-red-500/20 bg-red-500/5 text-red-300 text-sm">
         ⚠️ {result.error || "Image generation failed. Please try again."}
+      </div>
+    );
+  }
+
+  // Base64 image was not stored in DB (too large) — show regenerate notice
+  if (!result.imageB64 && !result.imageUrl && !result.svgContent) {
+    return (
+      <div className="mt-1 px-4 py-3 rounded-xl border border-amber-500/20 bg-amber-500/5 text-amber-300 text-sm space-y-1.5">
+        <p className="font-semibold">🖼️ Image not available</p>
+        <p className="text-amber-300/70 text-xs">Generated images aren't stored to save space. Ask again to regenerate!</p>
+        <p className="text-slate-500 text-[11px] font-mono">Original prompt: {prompt}</p>
       </div>
     );
   }
@@ -1125,10 +1138,16 @@ export function AskAI() {
       const data = await res.json();
       if (data.success) {
         setMessages(data.conversation.messages.map((m: any) => ({
-          role: m.role, content: m.content,
-          fileName: m.fileName || undefined, fileType: m.fileType || undefined,
-          pointsAwarded: m.pointsAwarded || undefined, isError: m.isError || false,
-          subjectMode: m.subjectMode || undefined,
+          role:          m.role,
+          content:       m.content,
+          fileName:      m.fileName      || undefined,
+          fileType:      m.fileType      || undefined,
+          pointsAwarded: m.pointsAwarded || undefined,
+          isError:       m.isError       || false,
+          subjectMode:   m.subjectMode   || undefined,
+          // v12: restore image gen and GK data from DB
+          imageGen:      m.imageGen      || undefined,
+          gkData:        m.gkData        || undefined,
         })));
       }
     } catch {}
@@ -1155,12 +1174,34 @@ export function AskAI() {
     try {
       const res = await fetch(`${API_URL}/api/chat/${convoId}/messages`, {
         method: "POST", headers: { ...authHeaders(), "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: msgs.map(m => ({
-          role: m.role, content: m.content,
-          fileName: m.fileName || null, fileType: m.fileType || null,
-          pointsAwarded: m.pointsAwarded || null, isError: m.isError || false,
-          subjectMode: m.subjectMode || null,
-        })) }),
+        body: JSON.stringify({ messages: msgs.map(m => {
+          // For imageGen: store SVG (small) or URL, but NOT full base64 (too large for DB)
+          let imageGenToStore: any = null;
+          if (m.imageGen) {
+            imageGenToStore = {
+              success:    m.imageGen.success,
+              provider:   m.imageGen.provider,
+              prompt:     m.imageGen.prompt,
+              isSvg:      m.imageGen.isSvg     || false,
+              svgContent: m.imageGen.svgContent || null,  // SVG is small text — store it
+              imageUrl:   m.imageGen.imageUrl   || null,  // URL is tiny — store it
+              // base64 images NOT stored (too large) — show "expired" message instead
+              imageB64:   null,
+              error:      m.imageGen.error || null,
+            };
+          }
+          return {
+            role:          m.role,
+            content:       m.content,
+            fileName:      m.fileName      || null,
+            fileType:      m.fileType      || null,
+            pointsAwarded: m.pointsAwarded || null,
+            isError:       m.isError       || false,
+            subjectMode:   m.subjectMode   || null,
+            imageGen:      imageGenToStore,
+            gkData:        m.gkData        || null,
+          };
+        }) }),
       });
       const data = await res.json();
       if (data.success && data.title) {

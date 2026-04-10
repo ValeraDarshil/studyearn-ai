@@ -76,15 +76,43 @@ export function isImageGenRequest(prompt: string): boolean {
   return IMAGE_GEN_PATTERNS.some(p => p.test(prompt));
 }
 
-// ─── Detect if it's a diagram (science/educational) ──────────
+// ─── Detect if it's a REAL diagram request (educational only) ──
+// STRICT rules:
+//   ✅ "diagram of photosynthesis" → diagram
+//   ✅ "explain photosynthesis with diagram" → diagram
+//   ✅ "labeled diagram of a cell" → diagram
+//   ❌ "animated car image" → NOT diagram (creative image)
+//   ❌ "cartoon character" → NOT diagram
+//   ❌ "neon car design" → NOT diagram
+//   ❌ "create a drawing of a robot" → NOT diagram
+
+// Things that override diagram detection — clearly creative/artistic
+const CREATIVE_OVERRIDE = [
+  /\b(animated|cartoon|anime|neon|futuristic|pixel|3d|cute|cool|crazy|stylized|realistic|fantasy|sci-fi)\b/i,
+  /\b(character|avatar|logo|mascot|poster|art|artwork|portrait|illustration|landscape|scene|render)\b/i,
+  /\b(car|bike|vehicle|robot|monster|creature|superhero|animal|person|face|character)\b/i,
+  /\b(design|style|look|appearance|visual|drawing|sketch)\b/i,
+];
+
+// Only these are genuine diagram requests
 const DIAGRAM_PATTERNS = [
-  /\b(diagram|flowchart|labeled|label)\b/i,
-  /\b(photosynthesis|cell|atom|circuit|structure|process|cycle|system)\s+(diagram|structure)\b/i,
-  /\bdiagram\s+(of|for|about|showing|of\s+the)\b/i,
+  /\bdiagram\s+(of|for|about|showing|of\s+the)\b/i,       // "diagram of X"
+  /\b(explain|show|describe).*with\s+(a\s+)?diagram\b/i, // "explain X with diagram"
+  /\blabeled\s+diagram\b/i,                                 // "labeled diagram"
+  /\b(flowchart|mindmap|mind\s+map|schematic|blueprint)\s+(of|for|showing)?\b/i,
+  // Science-specific ONLY when "diagram" is explicitly mentioned
+  /\b(photosynthesis|cellular|anatomy|circuit|molecular|biological)\s+diagram\b/i,
+  /\b(process|cycle|system|structure)\s+diagram\b/i,
 ];
 
 export function isDiagramRequest(prompt: string): boolean {
-  return DIAGRAM_PATTERNS.some(p => p.test(prompt));
+  const lower = prompt.toLowerCase();
+  
+  // If it has creative/artistic signals → NOT a diagram
+  if (CREATIVE_OVERRIDE.some(p => p.test(lower))) return false;
+  
+  // Must explicitly mention "diagram" or "flowchart" etc.
+  return DIAGRAM_PATTERNS.some(p => p.test(lower));
 }
 
 // ─── Build optimized image prompt ────────────────────────────
@@ -260,11 +288,11 @@ export async function generateImage(userPrompt: string): Promise<ImageGenResult>
     }
   }
 
-  // Provider chain: NVIDIA → OpenRouter → SVG fallback
+  // Provider chain: NVIDIA → OpenRouter
+  // SVG only used for explicit diagram requests (handled above)
   const providers = [
-    { name: 'NVIDIA',      fn: () => generateWithNvidia(optimizedPrompt) },
-    { name: 'OpenRouter',  fn: () => generateWithOpenRouter(optimizedPrompt) },
-    { name: 'SVG-fallback',fn: () => generateSvgDiagram(userPrompt) },
+    { name: 'NVIDIA',     fn: () => generateWithNvidia(optimizedPrompt) },
+    { name: 'OpenRouter', fn: () => generateWithOpenRouter(optimizedPrompt) },
   ];
 
   for (const { name, fn } of providers) {

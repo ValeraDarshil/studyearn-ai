@@ -10,12 +10,43 @@ import mongoose from 'mongoose';
 const MessageSchema = new mongoose.Schema({
   role:    { type: String, enum: ['user', 'assistant'], required: true },
   content: { type: String, required: true },
-  // Only for user messages with file
+  // User message file fields
   fileName:     { type: String, default: null },
   fileType:     { type: String, enum: ['image', 'pdf', null], default: null },
-  // Only for assistant messages
-  pointsAwarded: { type: Number, default: null },
+  // Assistant message fields
+  pointsAwarded: { type: Number,  default: null },
   isError:       { type: Boolean, default: false },
+  subjectMode:   { type: String,  default: null },
+  // v12: Image generation result (SVG stored, base64 NOT stored to save space)
+  imageGen: {
+    type: {
+      success:    Boolean,
+      provider:   String,
+      prompt:     String,
+      isSvg:      Boolean,
+      svgContent: String,  // SVG markup (text — small size)
+      imageUrl:   String,  // External URL if available
+      imageB64:   String,  // null always (not stored)
+      error:      String,
+    },
+    default: null,
+    _id: false,
+  },
+  // v12: General knowledge data from Wikipedia
+  gkData: {
+    type: {
+      isGeneral:    Boolean,
+      title:        String,
+      summary:      String,
+      imageUrl:     String,
+      imageCaption: String,
+      wikiUrl:      String,
+      type:         String,
+      keyFacts:     [String],
+    },
+    default: null,
+    _id: false,
+  },
 }, { _id: false, timestamps: false });
 
 const ConversationSchema = new mongoose.Schema({

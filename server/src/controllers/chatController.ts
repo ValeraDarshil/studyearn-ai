@@ -422,14 +422,43 @@ export async function appendMessages(req: Request, res: Response) {
     // Sanitize & append messages
     for (const m of messages) {
       if (!m.role || !m.content) continue;
-      convo.messages.push({
+      // Build message object — include v12 fields (imageGen, gkData)
+      const msgObj: any = {
         role:          m.role,
-        content:       m.content.slice(0, 20000), // max 20k chars per message
+        content:       m.content.slice(0, 20000),
         fileName:      m.fileName      || null,
         fileType:      m.fileType      || null,
         pointsAwarded: m.pointsAwarded || null,
         isError:       m.isError       || false,
-      } as any);
+        subjectMode:   m.subjectMode   || null,
+      };
+      // v12: imageGen — store SVG and URL, skip base64 to save DB space
+      if (m.imageGen) {
+        msgObj.imageGen = {
+          success:    m.imageGen.success    ?? false,
+          provider:   m.imageGen.provider   || null,
+          prompt:     m.imageGen.prompt     || null,
+          isSvg:      m.imageGen.isSvg      || false,
+          svgContent: m.imageGen.svgContent ? m.imageGen.svgContent.slice(0, 50000) : null,
+          imageUrl:   m.imageGen.imageUrl   || null,
+          imageB64:   null, // never store base64 in DB
+          error:      m.imageGen.error      || null,
+        };
+      }
+      // v12: gkData from Wikipedia
+      if (m.gkData) {
+        msgObj.gkData = {
+          isGeneral:    m.gkData.isGeneral    ?? true,
+          title:        m.gkData.title        || null,
+          summary:      m.gkData.summary      || null,
+          imageUrl:     m.gkData.imageUrl     || null,
+          imageCaption: m.gkData.imageCaption || null,
+          wikiUrl:      m.gkData.wikiUrl      || null,
+          type:         m.gkData.type         || 'unknown',
+          keyFacts:     Array.isArray(m.gkData.keyFacts) ? m.gkData.keyFacts.slice(0, 5) : [],
+        };
+      }
+      convo.messages.push(msgObj);
     }
 
     // Update title from first user message (if still default)
