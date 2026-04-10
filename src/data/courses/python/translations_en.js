@@ -505,6 +505,69 @@ print(f"Monthly EMI:   {monthly_emi:,.0f}")`,},
 const W2_4 = {
   'py-w2-s1': {
     title_en: 'if / elif / else — Decision Making',
+    richContent_en: [
+      {
+            "type": "concept",
+            "heading": "Teach Python to think",
+            "body": "In real life we check conditions every day — \"If it rains, take an umbrella.\" Python does exactly the same. With if-else, your program does different things in different situations."
+      },
+      {
+            "type": "analogy",
+            "text": "Think of an ATM. It checks: \"Is there enough balance?\" — Yes means cash out, No means show Insufficient Funds. if-else works exactly like this."
+      },
+      {
+            "type": "snippet",
+            "label": "First if-else — run it",
+            "code": "temperature = 38\n\nif temperature > 37.5:\n    print(\"You have a fever! Visit the doctor.\")\nelse:\n    print(\"Temperature is normal.\")",
+            "expectedOutput": "You have a fever! Visit the doctor."
+      },
+      {
+            "type": "concept",
+            "heading": "elif — multiple conditions",
+            "body": "Not just two paths — you can have many choices. elif checks conditions one after another:"
+      },
+      {
+            "type": "snippet",
+            "label": "Grade calculator — elif chain",
+            "code": "score = 85\n\nif score >= 90:\n    print(\"Outstanding! A+ Grade\")\nelif score >= 80:\n    print(\"Excellent! A Grade\")\nelif score >= 70:\n    print(\"Good! B Grade\")\nelif score >= 60:\n    print(\"Average. C Grade\")\nelse:\n    print(\"Keep working. Fail\")",
+            "expectedOutput": "Excellent! A Grade"
+      },
+      {
+            "type": "concept",
+            "heading": "and / or — combining conditions",
+            "body": "and: both conditions must be true. or: at least one condition needs to be true."
+      },
+      {
+            "type": "snippet",
+            "label": "and and or in action",
+            "code": "age = 20\ncitizen = True\n\nif age >= 18 and citizen == True:\n    print(\"You can vote!\")\n\nif age < 13 or age > 60:\n    print(\"Special discount!\")",
+            "expectedOutput": "You can vote!"
+      },
+      {
+            "type": "mistake",
+            "wrong": "if age = 18:\n    print(\"Adult\")",
+            "right": "if age == 18:\n    print(\"Adult\")",
+            "why": "Single = only assigns values. For comparison always use == (double equals)."
+      },
+      {
+            "type": "mistake",
+            "wrong": "if age > 18\n    print(\"Adult\")",
+            "right": "if age > 18:\n    print(\"Adult\")",
+            "why": "Colon (:) after if is required, and the body must be indented with 4 spaces."
+      },
+      {
+            "type": "checkpoint",
+            "question": "age = 20. Will \"if age >= 18 and age < 60:\" be True?",
+            "options": [
+                  "Yes, both are true",
+                  "No, first is false",
+                  "No, second is false",
+                  "Both are false"
+            ],
+            "correct": 0,
+            "explanation": "20 >= 18 is true and 20 < 60 is also true. With and, both must be true — so overall True."
+      }
+],
     content_en: `## Conditions — Teach Python to Think!
 
 In real life we check conditions: "If it rains, take an umbrella." Python does exactly the same!
@@ -560,7 +623,16 @@ elif marks >= 40:
     print("Grade: C — Keep improving!")
 else:
     print("Grade: F — Study harder! 💪")`,
-    task_en: { description: 'Build a BMI calculator. Take weight (kg) and height (cm). Calculate BMI = weight / (height/100)². Show: Underweight (<18.5), Normal (18.5-24.9), Overweight (25-29.9), Obese (>=30).', hint: 'height_m = height / 100. BMI = weight / (height_m ** 2). Use if/elif/else to show category.' },
+    task_en: { description: 'Build a BMI calculator. Take weight (kg) and height (cm). Calculate BMI = weight / (height/100)². Show: Underweight (<18.5), Normal (18.5-24.9), Overweight (25-29.9), Obese (>=30).', hint: 'height_m = height / 100. BMI = weight / (height_m ** 2). Use if/elif/else to show category.', starterCode_en: `age = int(input("Your age: "))
+
+if age >= 60:
+    ticket = ???
+elif age >= 18:
+    ticket = ???
+else:
+    ticket = ???
+
+print(f"Your ticket: ${ticket}")`,},
     quiz_en: [
       { q: 'What is the correct syntax for checking multiple conditions?', options: ['if/else if/else', 'if/elif/else', 'if/elseif/else', 'if/or/else'], correct: 1, explanation: 'Python uses elif (not "else if"). It checks conditions in order and runs the first True block.' },
       { q: 'What does the "and" operator do?', options: ['Returns True if either is True', 'Returns True only if BOTH are True', 'Combines two numbers', 'Checks equality'], correct: 1, explanation: '"and" requires both conditions to be True. "or" requires at least one.' },
@@ -569,6 +641,69 @@ else:
   },
   'py-w2-s2': {
     title_en: 'Loops — Repeating Tasks',
+    richContent_en: [
+      {
+            "type": "concept",
+            "heading": "What is a loop?",
+            "body": "Need to print \"Hello\" 100 times? A loop does it in one go. A loop repeats a task over and over — as many times as you say."
+      },
+      {
+            "type": "analogy",
+            "text": "Imagine you need to send the same message to 40 classmates. Would you type each one individually? Or write once and let a machine send 40 copies? A loop is that machine — same task, repeated without effort."
+      },
+      {
+            "type": "snippet",
+            "label": "for loop — with a counter",
+            "code": "for i in range(5):\n    print(f\"Loop number: {i}\")\n\nprint(\"Done!\")",
+            "expectedOutput": "Loop number: 0\nLoop number: 1\nLoop number: 2\nLoop number: 3\nLoop number: 4\nDone!"
+      },
+      {
+            "type": "concept",
+            "heading": "How range() works",
+            "body": "range(5) gives 0 to 4. range(1,6) gives 1 to 5. range(1,10,2) gives 1,3,5,7,9 — every other number."
+      },
+      {
+            "type": "snippet",
+            "label": "Times table — real loop use",
+            "code": "num = 5\nprint(f\"=== Times Table of {num} ===\")\n\nfor i in range(1, 11):\n    print(f\"{num} x {i} = {num * i}\")",
+            "expectedOutput": "=== Times Table of 5 ===\n5 x 1 = 5\n5 x 2 = 10\n5 x 3 = 15\n5 x 4 = 20\n5 x 5 = 25\n5 x 6 = 30\n5 x 7 = 35\n5 x 8 = 40\n5 x 9 = 45\n5 x 10 = 50"
+      },
+      {
+            "type": "concept",
+            "heading": "while loop — runs while condition is true",
+            "body": "for loop counts. while loop checks a condition — it keeps running as long as the condition stays true."
+      },
+      {
+            "type": "snippet",
+            "label": "while loop — counter style",
+            "code": "count = 1\nwhile count <= 5:\n    print(f\"Count: {count}\")\n    count += 1\n\nprint(\"Done!\")",
+            "expectedOutput": "Count: 1\nCount: 2\nCount: 3\nCount: 4\nCount: 5\nDone!"
+      },
+      {
+            "type": "mistake",
+            "wrong": "count = 1\nwhile count <= 5:\n    print(count)\n    # forgot to increment!",
+            "right": "count = 1\nwhile count <= 5:\n    print(count)\n    count += 1",
+            "why": "Forgetting to update the counter creates an infinite loop — the program hangs. Press Ctrl+C to stop it."
+      },
+      {
+            "type": "mistake",
+            "wrong": "for i in range(5):\nprint(i)",
+            "right": "for i in range(5):\n    print(i)",
+            "why": "Code inside the loop must be indented with 4 spaces — otherwise IndentationError."
+      },
+      {
+            "type": "checkpoint",
+            "question": "What numbers will range(2, 10, 3) give?",
+            "options": [
+                  "2, 5, 8",
+                  "2, 4, 6, 8, 10",
+                  "3, 6, 9",
+                  "2, 3, 4, 5, 6, 7, 8, 9"
+            ],
+            "correct": 0,
+            "explanation": "Start=2, Step=3: 2 then 5 then 8 then 11 — but 11 exceeds 10 so we stop. Answer: 2, 5, 8."
+      }
+],
     content_en: `## Loops — Make Python Do Repetitive Work!
 
 ### for Loop
@@ -630,7 +765,16 @@ while True:
 if count > 0:
     print(f"Sum: {total}")
     print(f"Average: {total/count:.2f}")`,
-    task_en: { description: 'Build a multiplication table generator. Ask the user for a number and how many rows. Print the full table. Example: 5 × 1 = 5 ... 5 × 10 = 50.', hint: "Use for loop with range(1, rows+1). Print: f'{num} × {i} = {num*i}'" },
+    task_en: { description: 'Build a multiplication table generator. Ask the user for a number and how many rows. Print the full table. Example: 5 × 1 = 5 ... 5 × 10 = 50.', hint: "Use for loop with range(1, rows+1). Print: f'{num} × {i} = {num*i}'", starterCode_en: `num = int(input("Which times table? "))
+
+print(f"\\n{'='*20}")
+print(f"   Times Table of {num}")
+print(f"{'='*20}")
+
+for i in range(1, ???):
+    print(f"  {num} x {i} = {???}")
+
+print(f"{'='*20}")`,},
     quiz_en: [
       { q: 'What does range(2, 10, 3) produce?', options: ['2, 5, 8', '2, 4, 6, 8', '3, 6, 9', '2,3,4,5,6,7,8,9'], correct: 0, explanation: 'range(start, stop, step) = 2, 5, 8 — starts at 2, adds 3 each time, stops before 10.' },
       { q: 'What does break do inside a loop?', options: ['Pauses the loop', 'Skips current iteration', 'Exits the loop immediately', 'Restarts the loop'], correct: 2, explanation: 'break exits the entire loop immediately. continue skips only the current iteration.' },
@@ -639,6 +783,69 @@ if count > 0:
   },
   'py-w2-s3': {
     title_en: 'Lists — Storing Collections of Data',
+    richContent_en: [
+      {
+            "type": "concept",
+            "heading": "What is a list?",
+            "body": "A variable holds one value. A list holds many values together — like a numbered box where each item has its own slot."
+      },
+      {
+            "type": "analogy",
+            "text": "Think of a class attendance register — everyone's name in numbered order. First name at position 0, second at 1, last at -1. A Python list is exactly that register."
+      },
+      {
+            "type": "snippet",
+            "label": "Create and use a list",
+            "code": "fruits = [\"apple\", \"mango\", \"banana\", \"grapes\"]\n\nprint(fruits[0])    # first\nprint(fruits[1])    # second\nprint(fruits[-1])   # last\nprint(len(fruits))  # total count",
+            "expectedOutput": "apple\nmango\ngrapes\n4"
+      },
+      {
+            "type": "concept",
+            "heading": "Adding and removing items",
+            "body": "You can add items later, remove them, sort them — lists are very flexible:"
+      },
+      {
+            "type": "snippet",
+            "label": "List operations — all in one",
+            "code": "marks = [85, 92, 78]\n\nmarks.append(95)      # add to end\nmarks.insert(0, 100)  # add at start\nmarks.remove(78)      # remove this value\nmarks.sort()          # sort smallest to largest\n\nprint(marks)\nprint(\"Max:\", max(marks))\nprint(\"Min:\", min(marks))\nprint(\"Total:\", sum(marks))",
+            "expectedOutput": "[85, 92, 95, 100]\nMax: 100\nMin: 85\nTotal: 372"
+      },
+      {
+            "type": "concept",
+            "heading": "Looping through a list",
+            "body": "Use a for loop to work on each item in a list one by one:"
+      },
+      {
+            "type": "snippet",
+            "label": "Greet every student",
+            "code": "students = [\"Rahul\", \"Priya\", \"Arjun\", \"Neha\"]\n\nfor name in students:\n    print(f\"Hello {name}!\")",
+            "expectedOutput": "Hello Rahul!\nHello Priya!\nHello Arjun!\nHello Neha!"
+      },
+      {
+            "type": "mistake",
+            "wrong": "fruits = [\"apple\", \"mango\", \"banana\"]\nprint(fruits[3])",
+            "right": "fruits = [\"apple\", \"mango\", \"banana\"]\nprint(fruits[2])  # or fruits[-1]",
+            "why": "3 items means indices go from 0 to 2. Index 3 does not exist — IndexError will occur."
+      },
+      {
+            "type": "mistake",
+            "wrong": "marks = [85, 92, 78]\nmarks.add(95)",
+            "right": "marks = [85, 92, 78]\nmarks.append(95)",
+            "why": "Lists have no add() method. Use append() to add to the end."
+      },
+      {
+            "type": "checkpoint",
+            "question": "items = [10, 20, 30]. What does items[-1] return?",
+            "options": [
+                  "10",
+                  "20",
+                  "30",
+                  "Error"
+            ],
+            "correct": 2,
+            "explanation": "-1 always refers to the last element. With 3 items, the last is 30."
+      }
+],
     content_en: `## Lists — Store Multiple Items in One Variable!
 
 ### Creating and Accessing Lists
@@ -690,7 +897,23 @@ print("Shopping list:", shopping)
 print("Total items:", len(shopping))
 print("First item:", shopping[0])
 print("Sorted:", sorted(shopping))`,
-    task_en: { description: "Create a student grade manager. Store 5 students' marks. Calculate: average, highest mark, lowest mark, how many passed (>=40), print all sorted highest to lowest.", hint: 'sum(marks)/len(marks) for average. marks.index(max(marks)) gives the index of highest mark.' },
+    task_en: { description: "Create a student grade manager. Store 5 students' marks. Calculate: average, highest mark, lowest mark, how many passed (>=40), print all sorted highest to lowest.", hint: 'sum(marks)/len(marks) for average. marks.index(max(marks)) gives the index of highest mark.', starterCode_en: `students = []
+marks = []
+
+n = int(input("How many students: "))
+
+for i in range(n):
+    name = input(f"Student {i+1} name: ")
+    score = float(input(f"{name}'s marks: "))
+    students.???(name)
+    marks.???(score)
+
+print("\\n=== Results ===")
+for i in range(len(students)):
+    status = "PASS" if marks[i] >= 40 else "FAIL"
+    print(f"{students[i]}: {marks[i]} — {status}")
+
+print(f"\\nClass Average: {sum(marks)/len(marks):.2f}")`,},
     quiz_en: [
       { q: 'What is the index of the last item in a 5-element list?', options: ['5', '4', '-1', 'Both B and C'], correct: 3, explanation: 'Last element is at index 4 (length-1) OR -1 (negative indexing). Both work!' },
       { q: 'What is the difference between append() and insert()?', options: ['No difference', 'append() adds to end, insert() adds at a specific position', 'insert() adds to end', 'append() is faster'], correct: 1, explanation: 'append(item) always adds to the end. insert(index, item) adds at the specified position.' },
@@ -699,6 +922,69 @@ print("Sorted:", sorted(shopping))`,
   },
   'py-w2-s4': {
     title_en: 'Functions — Writing Reusable Code',
+    richContent_en: [
+      {
+            "type": "concept",
+            "heading": "What is a function?",
+            "body": "A function is a named block of code. Write it once, use it as many times as you want — no need to rewrite the same logic."
+      },
+      {
+            "type": "analogy",
+            "text": "A function is like a recipe. Learn to make biryani once — now cook it whenever you want without rewriting the recipe. Python functions work exactly the same way."
+      },
+      {
+            "type": "snippet",
+            "label": "First function — define and call",
+            "code": "def greet():\n    print(\"Hello!\")\n    print(\"How is Python going?\")\n\ngreet()\ngreet()\ngreet()",
+            "expectedOutput": "Hello!\nHow is Python going?\nHello!\nHow is Python going?\nHello!\nHow is Python going?"
+      },
+      {
+            "type": "concept",
+            "heading": "Parameters — passing data to a function",
+            "body": "Parameters let you send different input each time you call the function:"
+      },
+      {
+            "type": "snippet",
+            "label": "Function with parameter",
+            "code": "def say_hello(name):\n    print(f\"Hello {name}!\")\n    print(f\"How are you, {name}?\")\n\nsay_hello(\"Rahul\")\nsay_hello(\"Priya\")",
+            "expectedOutput": "Hello Rahul!\nHow are you, Rahul?\nHello Priya!\nHow are you, Priya?"
+      },
+      {
+            "type": "concept",
+            "heading": "return — getting a result back",
+            "body": "return sends a value back from the function — which you can store in a variable:"
+      },
+      {
+            "type": "snippet",
+            "label": "Function with return",
+            "code": "def add(a, b):\n    result = a + b\n    return result\n\ntotal = add(10, 20)\nprint(f\"10 + 20 = {total}\")\nprint(add(5, 7))",
+            "expectedOutput": "10 + 20 = 30\n12"
+      },
+      {
+            "type": "mistake",
+            "wrong": "def calculator(a, b):\n    result = a + b\n    return result\n    print(\"Done!\")  # never runs",
+            "right": "def calculator(a, b):\n    print(\"Calculating!\")\n    result = a + b\n    return result",
+            "why": "Nothing after return ever runs. Put print() before return, not after."
+      },
+      {
+            "type": "mistake",
+            "wrong": "def greet(name):\n    print(f\"Hello {name}\")\n\nprint(greet(\"Rahul\"))",
+            "right": "def greet(name):\n    print(f\"Hello {name}\")\n\ngreet(\"Rahul\")",
+            "why": "greet() returns nothing — so print(greet()) will also print \"None\". Just call greet() directly."
+      },
+      {
+            "type": "checkpoint",
+            "question": "def add(a, b): return a + b — what does add(3, 4) return?",
+            "options": [
+                  "34",
+                  "7",
+                  "None",
+                  "Error"
+            ],
+            "correct": 1,
+            "explanation": "a=3, b=4. a + b = 7. return sends 7 back."
+      }
+],
     content_en: `## Functions — Write Once, Use Many Times!
 
 ### Creating a Function
@@ -759,7 +1045,22 @@ if unit == 'C':
     print(f"{temp}°C = {celsius_to_fahrenheit(temp):.1f}°F")
 elif unit == 'F':
     print(f"{temp}°F = {fahrenheit_to_celsius(temp):.1f}°C")`,
-    task_en: { description: 'Build a calculator with separate functions: add(a,b), subtract(a,b), multiply(a,b), divide(a,b). Create a main calculator() function with a menu loop.', hint: 'divide() should check if b==0 first. Return an error string if so.' },
+    task_en: { description: 'Build a calculator with separate functions: add(a,b), subtract(a,b), multiply(a,b), divide(a,b). Create a main calculator() function with a menu loop.', hint: 'divide() should check if b==0 first. Return an error string if so.', starterCode_en: `def calculate_bmi(weight, height):
+    bmi = weight / (height ** 2)
+    return ???
+
+def get_category(bmi):
+    if bmi < 18.5: return "Underweight"
+    elif bmi < 25: return "Normal"
+    elif bmi < 30: return "Overweight"
+    else: return "Obese"
+
+weight = float(input("Weight (kg): "))
+height = float(input("Height (m): "))
+
+bmi = ???(weight, height)
+print(f"BMI: {bmi:.2f}")
+print(f"Category: {???(bmi)}")`,},
     quiz_en: [
       { q: 'What does "return" do in a function?', options: ['Prints a value', 'Sends a value back to caller and exits the function', 'Repeats the function', 'Stops the program'], correct: 1, explanation: 'return sends a value back and immediately exits the function.' },
       { q: 'What is a default parameter?', options: ['Always required', 'Has a pre-set value used when no argument is passed', 'The first parameter', 'A global variable'], correct: 1, explanation: 'Default parameters are optional — they use their default value if the caller does not provide one.' },

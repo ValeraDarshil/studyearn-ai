@@ -32,15 +32,47 @@ export interface ImageGenResult {
 }
 
 // ─── Detect if this is an image generation request ───────────
+// Much broader detection — catches creative/visual requests
+// even when user doesn't explicitly say "image"
 const IMAGE_GEN_PATTERNS = [
-  /\b(create|generate|draw|make|show|give me|produce)\s+(an?\s+)?(image|picture|photo|diagram|illustration|chart|visual|figure|sketch)\b/i,
-  /\b(diagram|flowchart|mind\s*map|timeline|infographic)\s+(of|for|about|showing)\b/i,
-  /\bimage\s+(of|for|about|showing)\b/i,
-  /\bvisualize\b/i,
-  /\bshow\s+me\s+a\b/i,
+  // Explicit image words
+  /\b(create|generate|draw|make|show|give me|produce|design|build|render)\s+(an?\s+)?(image|picture|photo|diagram|illustration|chart|visual|figure|sketch|drawing|artwork|poster|banner)\b/i,
+  // Diagram-first patterns
+  /\b(diagram|flowchart|mind\s*map|timeline|infographic|blueprint|schematic)\s+(of|for|about|showing)?/i,
+  /\b(image|picture|photo|visual|illustration)\s+(of|for|about|showing)\b/i,
+  // Creative design requests
+  /\b(design|draw|sketch|illustrate|depict|visualize|show)\s+(me\s+)?(a|an|the)?\s/i,
+  // Character/scene creation
+  /\b(create|generate|make|draw)\s+(a|an)\s+(cartoon|character|logo|icon|avatar|scene|landscape|portrait|anime|monster|robot|superhero|car|animal|creature|sprite)/i,
+  // Animated/styled
+  /\b(animated|anime|cartoon|pixel|3d|realistic|stylized|neon|futuristic|cute|cool|crazy)\s+(version|style|design|art|picture|image|illustration|character)/i,
+  // Photo-realistic requests
+  /\b(photo|photograph)\s+(of|showing|depicting)/i,
+  // "Show me how X looks"
+  /show\s+me\s+(how|what)\s+.{0,30}\s+(looks?|appears?)/i,
+  // Asking for visualization
+  /\bvisuali(ze|se)\b/i,
 ];
 
+// Additional heuristic: short creative prompts that are likely image requests
+function looksLikeCreativePrompt(prompt: string): boolean {
+  const lower = prompt.toLowerCase().trim();
+  // Phrases that strongly suggest image generation
+  const STRONG_SIGNALS = [
+    'create an image', 'generate an image', 'create a picture', 'make an image',
+    'draw me', 'draw a', 'create a diagram', 'generate a diagram',
+    'create a cartoon', 'design a', 'create a logo', 'generate a logo',
+    'animated car', 'animated character', 'cartoon version', 'anime style',
+    'create art', 'generate art', 'make a drawing', 'create a sketch',
+    'neon car', 'futuristic design', 'create an illustration',
+    'generate an illustration', 'make me a', 'show me a picture',
+    'create an animated', 'generate an animated',
+  ];
+  return STRONG_SIGNALS.some(s => lower.includes(s));
+}
+
 export function isImageGenRequest(prompt: string): boolean {
+  if (looksLikeCreativePrompt(prompt)) return true;
   return IMAGE_GEN_PATTERNS.some(p => p.test(prompt));
 }
 

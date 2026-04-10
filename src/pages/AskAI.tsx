@@ -731,7 +731,7 @@ function AIBubble({
             ? (
               <div>
                 <p className="text-sm text-slate-300 mb-2">{msg.content}</p>
-                <ImageResultCard result={msg.imageGen} prompt={messages.find(m => m.role === "user")?.content || ""} />
+                <ImageResultCard result={msg.imageGen} prompt={msg.imageGen.prompt} />
               </div>
             )
             : msg.gkData
@@ -1332,7 +1332,7 @@ export function AskAI() {
   // ─────────────────────────────────────────────────────────
   const handleSend = async () => {
     const text = question.trim();
-    if ((!text && !uploadedFile) || loading || isStreaming || questionsLeft <= 0) return;
+    if ((!text && !uploadedFile) || loading || isStreaming) return;
 
     // Dismiss comeback nudge
     setShowComebackNudge(false);
@@ -1398,26 +1398,49 @@ export function AskAI() {
     if (!currentType && text) {
       const isImgReq = await checkIsImageRequest(text);
       if (isImgReq) {
-        setLoadingStep("🎨 Generating image…");
+        setLoadingStep("🎨 Generating your image…");
         try {
           const imgResult = await generateAIImage(text);
-          const statusText = imgResult.success
-            ? (imgResult.isSvg ? "📐 Here's your diagram!" : "🎨 Here's your generated image!")
-            : "⚠️ Image generation failed.";
+
+          let statusText: string;
+          if (!imgResult.success) {
+            statusText = "⚠️ Image generation failed — all providers tried. Please try again or rephrase your request.";
+          } else if (imgResult.isSvg) {
+            statusText = "📐 Here's your diagram! You can download it using the button below.";
+          } else {
+            statusText = "🎨 Here's your generated image! Download it below.";
+          }
+
           const imgMsg: ChatMsg = {
-            role: "assistant",
-            content: statusText,
-            imageGen: imgResult,
+            role:      "assistant",
+            content:   statusText,
+            imageGen:  imgResult,
             subjectMode,
           };
           const finalMsgs = [...withUserRef.current, imgMsg];
           setMessages(finalMsgs);
-          if (convoId) { await saveMessages(convoId, [userMsg, imgMsg]); fetchConvos(); }
-          setLoading(false); setLoadingStep(""); textareaRef.current?.focus();
-          return;
-        } catch {
-          /* If image gen fails, fall through to normal AI */
+          if (convoId) {
+            await saveMessages(convoId, [userMsg, imgMsg]);
+            fetchConvos();
+          }
+          setLoading(false);
           setLoadingStep("");
+          textareaRef.current?.focus();
+          return;
+        } catch (imgErr) {
+          // Image gen completely crashed — show error message, don't fall through
+          const errMsg: ChatMsg = {
+            role:    "assistant",
+            content: "⚠️ Image generation service is temporarily unavailable. Please try again in a moment.",
+            isError: true,
+            subjectMode,
+          };
+          const finalMsgs = [...withUserRef.current, errMsg];
+          setMessages(finalMsgs);
+          setLoading(false);
+          setLoadingStep("");
+          textareaRef.current?.focus();
+          return;
         }
       }
     }
@@ -1471,6 +1494,19 @@ export function AskAI() {
       } finally {
         setLoading(false); setLoadingStep(""); textareaRef.current?.focus();
       }
+      return;
+    }
+
+    // ── Quota check — only for AI streaming (not image gen / GK) ──
+    if (questionsLeft <= 0) {
+      setMessages(prev => [...prev, {
+        role: "assistant" as const,
+        content: "⏳ Daily question limit reached. Watch an ad to get more questions, or wait for the hourly refill.",
+        isError: true,
+        subjectMode,
+      }]);
+      setLoading(false);
+      setLoadingStep("");
       return;
     }
 

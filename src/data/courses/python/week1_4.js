@@ -3183,417 +3183,454 @@ export const PYTHON_COURSE = {
       ],
     },
 
+
     // WEEK 2
     {
       week: 2,
-      title: 'Decisions — If/Else Conditions',
-      description: 'Python ko sochna sikhao — conditions aur decision making!',
+      title: 'Faisle aur Loops',
+      description: 'Python ko sochna aur doharana sikhao!',
       xpReward: 120,
       sections: [
         {
           id: 'py-w2-s1',
-          title: 'if / elif / else — Decision Making',
+          title: 'if / elif / else — Faisla Karna',
           emoji: '🤔',
-          content: `## Conditions — Python ko Sochna Sikhao!
 
-Real life mein hum conditions check karte hain: "Agar rain ho toh umbrella lao." Python bhi yahi karta hai!
+          richContent: [
+            {
+              type: 'concept',
+              heading: 'Python ko sochna sikhao',
+              body: 'Asli zindagi mein hum roz conditions check karte hain — "Agar baarish ho toh chhaata lo." Python bhi bilkul yehi karta hai. if-else se program alag alag situations mein alag kaam karta hai.',
+            },
+            {
+              type: 'analogy',
+              text: 'Socho tum ATM pe ho. Machine check karti hai: "Kya balance kaafi hai?" — Haan toh paisa niklega, Nahi toh "Kam balance" dikhega. if-else exactly aisa hi kaam karta hai.',
+            },
+            {
+              type: 'snippet',
+              label: 'Pehla if-else — chalao dekho',
+              code: 'taapman = 38\n\nif taapman > 37.5:\n    print("Bukhaar hai! Doctor ke paas jao.")\nelse:\n    print("Taapman theek hai.")',
+              expectedOutput: 'Bukhaar hai! Doctor ke paas jao.',
+            },
+            {
+              type: 'concept',
+              heading: 'elif — kai conditions ek saath',
+              body: 'Sirf do raste nahi — kai choices bhi ho sakti hain. elif se ek ke baad ek conditions check hoti hain:',
+            },
+            {
+              type: 'snippet',
+              label: 'Grade calculator — elif chain dekho',
+              code: 'ank = 85\n\nif ank >= 90:\n    print("Zabardast! A+ Grade")\nelif ank >= 80:\n    print("Bahut acha! A Grade")\nelif ank >= 70:\n    print("Theek hai! B Grade")\nelif ank >= 60:\n    print("Aur mehnat karo. C Grade")\nelse:\n    print("Haar mat maano. Fail")',
+              expectedOutput: 'Bahut acha! A Grade',
+            },
+            {
+              type: 'concept',
+              heading: 'and / or — do conditions ek saath',
+              body: 'and: dono conditions sachi honi chahiye. or: koi bhi ek sachi ho kaafi hai.',
+            },
+            {
+              type: 'snippet',
+              label: 'and aur or ka farak dekho',
+              code: 'umar = 20\nnagrik = True\n\nif umar >= 18 and nagrik == True:\n    print("Aap vote de sakte hain!")\n\nif umar < 13 or umar > 60:\n    print("Special chhuut milegi!")',
+              expectedOutput: 'Aap vote de sakte hain!',
+            },
+            {
+              type: 'mistake',
+              wrong: 'if umar = 18:\n    print("Baligha ho")',
+              right: 'if umar == 18:\n    print("Baligha ho")',
+              why: 'Ek = sirf value assign karta hai. Comparison ke liye hamesha == (double equal) use karo.',
+            },
+            {
+              type: 'mistake',
+              wrong: 'if umar > 18\n    print("Baligha")',
+              right: 'if umar > 18:\n    print("Baligha")',
+              why: 'if ke baad colon (:) zaroori hai aur andar wala code 4 spaces andar hona chahiye.',
+            },
+            {
+              type: 'checkpoint',
+              question: 'umar = 20. "if umar >= 18 and umar < 60:" — kya yeh sach hoga?',
+              options: ['Haan, dono sach hain', 'Nahi, pehli galat hai', 'Nahi, doosri galat hai', 'Dono galat hain'],
+              correct: 0,
+              explanation: '20 >= 18 sach hai aur 20 < 60 bhi sach hai. and mein dono zaroori hain — toh poora sach hai.',
+            },
+          ],
 
-### Basic if-else
-\`\`\`python
-temperature = 38
+          content: `## Conditions kya hain?\n\nif-else se program sochta hai aur alag alag kaam karta hai!`,
 
-if temperature > 37.5:
-    print("🤒 Fever hai! Doctor ke paas jao.")
-else:
-    print("✅ Temperature normal hai.")
-\`\`\`
+          codeExample: `# Login system — ??? fill karo\nsahi_user = "admin"\nsahi_pass = "python123"\n\nuser = input("Username: ")\npassword = input("Password: ")\n\nif user == sahi_user and password == ???:\n    print("Login ho gaya! Swagat hai!")\nelif user == ???:\n    print("Password galat hai!")\nelse:\n    print("Username nahi mila!")`,
 
-### elif — Multiple Conditions
-\`\`\`python
-score = int(input("Score batao (0-100): "))
-
-if score >= 90:
-    print("🏆 Outstanding! A+ Grade")
-elif score >= 80:
-    print("🎉 Excellent! A Grade")
-elif score >= 70:
-    print("👍 Good! B Grade")
-elif score >= 60:
-    print("📚 Average. C Grade")
-else:
-    print("💪 Mehnat karo. Fail")
-\`\`\`
-
-### Comparison Operators
-| Operator | Matlab |
-|----------|--------|
-| == | equal to |
-| != | not equal |
-| > | greater than |
-| < | less than |
-| >= | greater or equal |
-| <= | less or equal |
-
-### Logical Operators
-\`\`\`python
-umar = 20
-citizen = True
-
-# and — dono conditions true honi chahiye
-if umar >= 18 and citizen == True:
-    print("Vote de sakte ho! 🗳️")
-
-# or — koi bhi ek true ho
-if umar < 13 or umar > 60:
-    print("Special discount!")
-\`\`\``,
-          codeExample: `# Login system banao
-correct_username = "admin"
-correct_password = "python123"
-
-username = input("Username: ")
-password = input("Password: ")
-
-if username == correct_username and password == correct_password:
-    print("✅ Login successful! Welcome!")
-elif username == correct_username:
-    print("❌ Wrong password!")
-else:
-    print("❌ Username not found!")`,
           task: {
-            description: 'Movie ticket price calculator: Adult (18+) = ₹200, Senior (60+) = ₹100, Child (under 18) = ₹120. User se age lo aur ticket price print karo. Bonus: Weekend pe ₹50 extra — user se weekday/weekend bhi poocho!',
-            expectedOutput: null,
-            hint: 'Pehle age check karo elif chain se, phir ticket price set karo variable mein, phir weekday/weekend ke liye extra add karo.',
+            description: 'Movie ticket price calculator: Baligha (18+) = 200 rupay, Buzurg (60+) = 100 rupay, Bachcha (18 se kam) = 120 rupay. User se umar lo aur ticket price batao.',
+            hint: 'Pehle buzurg (60+) check karo — warna 60+ wale "adult" mein aa jaenge. Phir baligha, phir bachcha.',
+            starterCode: 'umar = int(input("Aapki umar: "))\n\nif umar >= 60:\n    ticket = ???\nelif umar >= 18:\n    ticket = ???\nelse:\n    ticket = ???\n\nprint(f"Aapka ticket: {ticket} rupay")',
           },
+
           quiz: [
             {
-              q: 'Python mein "equal to" check karne ka operator kaunsa hai?',
+              q: 'Python mein barabar check karne ka sahi operator kaunsa hai?',
               options: ['=', '==', '===', 'equals'],
               correct: 1,
-              explanation: '= assignment ke liye hai, == comparison ke liye. Confusion mat karna!',
+              explanation: '= sirf value assign karta hai. == se tulna (comparison) hoti hai. Dono bilkul alag hain!',
+              wrong_explanations: {
+                0: '= assignment ke liye hai — if x = 5 likhoge toh galati aayegi.',
+                2: '=== JavaScript mein hota hai — Python mein nahi.',
+                3: 'equals() naam ka Python mein koi operator nahi.',
+              },
             },
             {
-              q: '"and" operator kab True return karta hai?',
-              options: ['Koi bhi ek true ho', 'Dono conditions true hon', 'Dono false hon', 'Kabhi nahi'],
+              q: '"and" operator kab sach (True) deta hai?',
+              options: ['Koi bhi ek sach ho', 'Dono conditions sach hon', 'Dono galat hon', 'Kabhi nahi'],
               correct: 1,
-              explanation: '"and" sirf tab True hota hai jab DONO conditions True hon.',
+              explanation: 'and sirf tab True deta hai jab DONO conditions True hon — ek bhi False toh poora False.',
+              wrong_explanations: {
+                0: 'Yeh "or" ki baat hai — and mein dono zaroori hain.',
+                2: 'Dono galat hone pe False milega.',
+                3: 'Haan milta hai — sirf dono sach hone pe.',
+              },
             },
             {
-              q: 'if ke baad kya likhte hain Python mein?',
+              q: 'if ke baad kya likhna zaroori hai Python mein?',
               options: ['{}', 'then', ':', 'do'],
               correct: 2,
-              explanation: 'Python mein if condition ke baad colon (:) likhte hain, aur body indented hoti hai.',
+              explanation: 'Python mein if condition ke baad colon (:) zaroori hai — yeh Python ka block shuru karne ka tarika hai.',
+              wrong_explanations: {
+                0: '{} JavaScript aur C mein hote hain — Python mein nahi.',
+                1: 'then JavaScript mein hota hai — Python mein nahi.',
+                3: 'do Python mein koi keyword nahi.',
+              },
             },
           ],
         },
+
         {
           id: 'py-w2-s2',
-          title: 'Loops — Kaam Repeat Karna',
+          title: 'Loops — Kaam Baar Baar Karna',
           emoji: '🔄',
-          content: `## Loops — Boring Kaam Machine Se Karao!
 
-100 baar "Hello" print karna hai? Loop se ek line mein hoga!
+          richContent: [
+            {
+              type: 'concept',
+              heading: 'Loop kya hota hai?',
+              body: '100 baar "Namaste" print karna hai? Loop se yeh ek hi jagah se hoga. Loop ek kaam ko baar baar karta rehta hai — jab tak tum kaho.',
+            },
+            {
+              type: 'analogy',
+              text: 'Socho tumhe apni class ke 40 bacchon ko ek hi message dena hai. Ek ek karke 40 baar likhoge? Ya ek likhke machine se 40 copies nikalo? Loop woh machine hai — ek kaam baar baar, bina thake.',
+            },
+            {
+              type: 'snippet',
+              label: 'for loop — ginti ke saath',
+              code: 'for i in range(5):\n    print(f"Loop number: {i}")\n\nprint("Khatam!")',
+              expectedOutput: 'Loop number: 0\nLoop number: 1\nLoop number: 2\nLoop number: 3\nLoop number: 4\nKhatam!',
+            },
+            {
+              type: 'concept',
+              heading: 'range() kaise kaam karta hai',
+              body: 'range(5) matlab 0 se 4 tak. range(1,6) matlab 1 se 5 tak. range(1,10,2) matlab 1,3,5,7,9 — har doosra number.',
+            },
+            {
+              type: 'snippet',
+              label: 'Pahada — loop ka asli use',
+              code: 'num = 5\nprint(f"=== {num} ka Pahada ===")\n\nfor i in range(1, 11):\n    print(f"{num} x {i} = {num * i}")',
+              expectedOutput: '=== 5 ka Pahada ===\n5 x 1 = 5\n5 x 2 = 10\n5 x 3 = 15\n5 x 4 = 20\n5 x 5 = 25\n5 x 6 = 30\n5 x 7 = 35\n5 x 8 = 40\n5 x 9 = 45\n5 x 10 = 50',
+            },
+            {
+              type: 'concept',
+              heading: 'while loop — jab tak condition sach ho',
+              body: 'for loop ginti karta hai. while loop condition check karta hai — jab tak sach ho, tab tak chalta rehta hai.',
+            },
+            {
+              type: 'snippet',
+              label: 'while loop — counter wala',
+              code: 'ginti = 1\nwhile ginti <= 5:\n    print(f"Ginti: {ginti}")\n    ginti += 1\n\nprint("Ho gaya!")',
+              expectedOutput: 'Ginti: 1\nGinti: 2\nGinti: 3\nGinti: 4\nGinti: 5\nHo gaya!',
+            },
+            {
+              type: 'mistake',
+              wrong: 'ginti = 1\nwhile ginti <= 5:\n    print(ginti)\n    # ginti badhana bhool gaye!',
+              right: 'ginti = 1\nwhile ginti <= 5:\n    print(ginti)\n    ginti += 1',
+              why: 'Counter update karna bhoolne se loop kabhi khatam nahi hota — program hang ho jaata hai. Ctrl+C dabao band karne ke liye.',
+            },
+            {
+              type: 'mistake',
+              wrong: 'for i in range(5):\nprint(i)',
+              right: 'for i in range(5):\n    print(i)',
+              why: 'Loop ke andar ka code 4 spaces andar (indent) hona zaroori hai — warna IndentationError aayega.',
+            },
+            {
+              type: 'checkpoint',
+              question: 'range(2, 10, 3) kaunse numbers dega?',
+              options: ['2, 5, 8', '2, 4, 6, 8, 10', '3, 6, 9', '2, 3, 4, 5, 6, 7, 8, 9'],
+              correct: 0,
+              explanation: 'Start=2, Step=3: 2 phir 5 phir 8 phir 11 — lekin 11 range se bahar hai toh ruk gaye. Jawab: 2, 5, 8.',
+            },
+          ],
 
-### for loop — Count karke repeat karo
-\`\`\`python
-# 5 baar print karo
-for i in range(5):
-    print(f"Loop number: {i}")
-\`\`\`
-Output:
-\`\`\`
-Loop number: 0
-Loop number: 1
-Loop number: 2
-Loop number: 3
-Loop number: 4
-\`\`\`
+          content: `## Loops kya hain?\n\nLoop se baar baar kaam machine se karao!`,
 
-### range() samjho
-\`\`\`python
-range(5)       # 0, 1, 2, 3, 4
-range(1, 6)    # 1, 2, 3, 4, 5
-range(1, 10, 2) # 1, 3, 5, 7, 9 (step=2)
-\`\`\`
+          codeExample: `# Pahada generator — ??? fill karo\nnum = int(input("Kaunsa pahada chahiye? "))\n\nprint(f"\\n{'='*20}")\nprint(f"   {num} ka Pahada")\nprint(f"{'='*20}")\n\nfor i in range(1, ???):\n    print(f"  {num} x {i} = {???}")\n\nprint(f"{'='*20}")`,
 
-### while loop — Condition true ho tab tak chalo
-\`\`\`python
-count = 1
-while count <= 5:
-    print(f"Count: {count}")
-    count += 1  # count = count + 1
-\`\`\`
-
-### Practical — Tables Print Karo
-\`\`\`python
-num = int(input("Kaunsi table chahiye? "))
-print(f"\\n=== {num} ki Table ===")
-
-for i in range(1, 11):
-    result = num * i
-    print(f"{num} × {i} = {result}")
-\`\`\`
-
-### break aur continue
-\`\`\`python
-# break — loop rok do
-for i in range(10):
-    if i == 5:
-        break  # 5 aate hi stop
-    print(i)  # 0 1 2 3 4
-
-# continue — ek step skip karo
-for i in range(10):
-    if i % 2 == 0:
-        continue  # even skip karo
-    print(i)  # 1 3 5 7 9
-\`\`\``,
-          codeExample: `# Multiplication table generator
-num = int(input("Table of: "))
-
-print(f"\\n{'='*25}")
-print(f"   Table of {num}")
-print(f"{'='*25}")
-
-for i in range(1, 13):
-    print(f"  {num:2d} × {i:2d} = {num*i:3d}")
-
-print(f"{'='*25}")`,
           task: {
-            description: 'Number guessing game banao! Computer 1-100 ke beech ek secret number rakhe (hardcode karo pehle). User guess kare. Agar zyada ho toh "Kam karo!", kam ho toh "Zyada karo!", sahi ho toh "Sahi! X attempts mein guessa!" — while loop use karo!',
-            expectedOutput: null,
-            hint: 'secret = 42 set karo. attempts counter rakho. while True loop chalao. input lo, compare karo, break karo jab sahi ho.',
+            description: 'Number guessing game! Secret number 42 hai. User guess kare — zyada ho toh "Kam karo!", kam ho toh "Zyada karo!", sahi ho toh "Shabash! X tries mein pakda!"',
+            hint: 'secret = 42. tries = 0. while True loop mein input lo, tries badhao. Sahi pe break karo.',
+            starterCode: 'secret = 42\ntries = 0\n\nwhile True:\n    guess = int(input("Andaza karo (1-100): "))\n    tries += 1\n\n    if guess > secret:\n        print("Kam karo!")\n    elif guess < secret:\n        print("Zyada karo!")\n    else:\n        print(f"Shabash! {???} tries mein pakda!")\n        ???',
           },
+
           quiz: [
             {
-              q: 'range(2, 10, 3) kya generate karega?',
+              q: 'range(2, 10, 3) kya dega?',
               options: ['2, 5, 8', '2, 4, 6, 8, 10', '3, 6, 9', '2, 3, 4...9'],
               correct: 0,
-              explanation: 'Start=2, Stop=10 (exclusive), Step=3. So: 2, 5, 8.',
+              explanation: 'Start=2, Step=3: 2, 5, 8 — aur 11 range se bahar toh ruk gaye.',
+              wrong_explanations: {
+                1: 'Yeh range(2,11,2) hota — step 2 ke saath.',
+                2: 'Yeh range(3,10,3) hota — 3 se shuru.',
+                3: 'Yeh range(2,10) hota — koi step nahi.',
+              },
             },
             {
-              q: 'Loop se bahar nikalne ke liye kaunsa keyword use karte hain?',
+              q: 'Loop se turant bahar nikalne ke liye kaunsa keyword?',
               options: ['exit', 'stop', 'break', 'end'],
               correct: 2,
-              explanation: '"break" statement loop ko turant rok deta hai.',
+              explanation: '"break" loop ko turant rokta hai — baaki iterations nahi chaltein.',
+              wrong_explanations: {
+                0: 'exit() poora program band karta hai — sirf loop nahi.',
+                1: 'stop naam ka Python mein koi keyword nahi.',
+                3: 'end Python mein koi keyword nahi.',
+              },
             },
             {
-              q: 'while loop kab chalta rehta hai?',
-              options: ['Ek baar', 'Hamesha', 'Jab tak condition True ho', 'Jab tak condition False ho'],
+              q: 'while loop kab tak chalta rehta hai?',
+              options: ['Sirf ek baar', 'Hamesha', 'Jab tak condition sach ho', 'Jab tak condition galat ho'],
               correct: 2,
-              explanation: 'while loop condition True rehne tak chalta hai — False hote hi ruk jaata hai.',
+              explanation: 'while loop tab tak chalta hai jab tak condition True ho — False hote hi band ho jaata hai.',
+              wrong_explanations: {
+                0: 'Ek baar ke liye for loop bhi kaam karta hai — range(1).',
+                1: 'Hamesha sirf while True: mein — warna condition pe depend karta hai.',
+                3: 'Ulta — False hone pe ruk jaata hai, sach hone pe chalta hai.',
+              },
             },
           ],
         },
+
         {
           id: 'py-w2-s3',
-          title: 'Lists — Data Collection Banana',
+          title: 'Lists — Data Ek Jagah Rakhna',
           emoji: '📋',
-          content: `## Lists — Multiple Values Ek Jagah!
 
-Variable mein ek value. List mein **multiple values** — jaise student roster!
+          richContent: [
+            {
+              type: 'concept',
+              heading: 'List kya hoti hai?',
+              body: 'Variable mein sirf ek value hoti hai. List mein kai values ek saath rakh sakte ho — jaise ek numbered dabba jisme kai cheezein numbered order mein hain.',
+            },
+            {
+              type: 'analogy',
+              text: 'Socho class ka attendance register — ek book mein sab bacchon ke naam numbered order mein. Pehla naam number 0 pe, doosra 1 pe, aakhri -1 pe. Python ki list bilkul aisa hi register hai.',
+            },
+            {
+              type: 'snippet',
+              label: 'List banao aur use karo',
+              code: 'phal = ["seb", "aam", "kela", "angoor"]\n\nprint(phal[0])    # pehla\nprint(phal[1])    # doosra\nprint(phal[-1])   # aakhri\nprint(len(phal))  # kitne hain total',
+              expectedOutput: 'seb\naam\nangoor\n4',
+            },
+            {
+              type: 'concept',
+              heading: 'List mein cheezein daalna aur nikalna',
+              body: 'List ke baad mein bhi cheezein jod sakte ho, nikal sakte ho, sort bhi kar sakte ho:',
+            },
+            {
+              type: 'snippet',
+              label: 'List operations — sab ek jagah',
+              code: 'ank = [85, 92, 78]\n\nank.append(95)      # aakhir mein jodo\nank.insert(0, 100)  # shuruaat mein daalo\nank.remove(78)      # yeh value hataao\nank.sort()          # chhote se bade karo\n\nprint(ank)\nprint("Sabse zyada:", max(ank))\nprint("Sabse kam:", min(ank))\nprint("Kul:", sum(ank))',
+              expectedOutput: '[85, 92, 95, 100]\nSabse zyada: 100\nSabse kam: 85\nKul: 372',
+            },
+            {
+              type: 'concept',
+              heading: 'List ke saath loop',
+              body: 'for loop se list ke har item pe kaam kar sakte ho — ek ek karke:',
+            },
+            {
+              type: 'snippet',
+              label: 'Har student ko greet karo',
+              code: 'chhatra = ["Rahul", "Priya", "Arjun", "Neha"]\n\nfor naam in chhatra:\n    print(f"Namaste {naam}!")',
+              expectedOutput: 'Namaste Rahul!\nNamaste Priya!\nNamaste Arjun!\nNamaste Neha!',
+            },
+            {
+              type: 'mistake',
+              wrong: 'phal = ["seb", "aam", "kela"]\nprint(phal[3])',
+              right: 'phal = ["seb", "aam", "kela"]\nprint(phal[2])  # ya phal[-1]',
+              why: '3 items hain — indices 0, 1, 2 tak hote hain. 3 ka index nahi hota — IndexError aayega.',
+            },
+            {
+              type: 'mistake',
+              wrong: 'ank = [85, 92, 78]\nank.add(95)',
+              right: 'ank = [85, 92, 78]\nank.append(95)',
+              why: 'List mein add() nahi hota. Aakhir mein jodne ke liye append() use karo.',
+            },
+            {
+              type: 'checkpoint',
+              question: 'suchi = [10, 20, 30]. suchi[-1] kya dega?',
+              options: ['10', '20', '30', 'Galati (Error)'],
+              correct: 2,
+              explanation: '-1 index hamesha aakhri element deta hai — 3 items mein aakhri = 30.',
+            },
+          ],
 
-### List banana
-\`\`\`python
-# Empty list
-students = []
+          content: `## Lists — Kai Values Ek Saath!\n\nList mein multiple values rakh sakte hain.`,
 
-# Values ke saath
-fruits = ["apple", "mango", "banana", "grapes"]
-marks = [85, 92, 78, 95, 88]
-mixed = ["Rahul", 18, 9.5, True]  # Mix bhi ho sakta hai!
-\`\`\`
+          codeExample: `# Chhatra ank manager — ??? fill karo\nchhatra = []\nank = []\n\nn = int(input("Kitne chhatra hain: "))\n\nfor i in range(n):\n    naam = input(f"Chhatra {i+1} ka naam: ")\n    marks = float(input(f"{naam} ke ank: "))\n    chhatra.???(naam)\n    ank.???(marks)\n\nprint("\\n=== Natija ===")\nfor i in range(len(chhatra)):\n    sthiti = "PASS" if ank[i] >= 40 else "FAIL"\n    print(f"{chhatra[i]}: {ank[i]} — {sthiti}")\n\nprint(f"\\nKaksha Ausat: {sum(ank)/len(ank):.2f}")`,
 
-### List Access — Indexing
-\`\`\`python
-fruits = ["apple", "mango", "banana"]
-#           0         1        2      (index)
-
-print(fruits[0])   # apple (pehla)
-print(fruits[1])   # mango (doosra)
-print(fruits[-1])  # banana (aakhri)
-\`\`\`
-
-### List Operations
-\`\`\`python
-marks = [85, 92, 78]
-
-marks.append(95)        # End mein add karo → [85,92,78,95]
-marks.insert(0, 100)    # Position 0 pe insert → [100,85,92,78,95]
-marks.remove(78)        # Value remove karo → [100,85,92,95]
-marks.pop()             # Aakhri remove karo
-marks.sort()            # Sort karo
-marks.reverse()         # Ulta karo
-
-print(len(marks))       # Length
-print(max(marks))       # Maximum value
-print(min(marks))       # Minimum value
-print(sum(marks))       # Total
-\`\`\`
-
-### List Loop
-\`\`\`python
-students = ["Rahul", "Priya", "Arjun", "Neha"]
-
-for student in students:
-    print(f"Hello {student}! 👋")
-\`\`\``,
-          codeExample: `# Student marks manager
-students = []
-marks = []
-
-n = int(input("Kitne students: "))
-
-for i in range(n):
-    name = input(f"Student {i+1} naam: ")
-    mark = float(input(f"{name} ke marks: "))
-    students.append(name)
-    marks.append(mark)
-
-print("\\n=== Results ===")
-for i in range(len(students)):
-    status = "PASS ✅" if marks[i] >= 40 else "FAIL ❌"
-    print(f"{students[i]}: {marks[i]} — {status}")
-
-print(f"\\nClass Average: {sum(marks)/len(marks):.2f}")
-print(f"Highest: {max(marks)} ({students[marks.index(max(marks))]})")`,
           task: {
-            description: '5 numbers user se lo list mein. Phir print karo: original list, sorted list, reversed list, sum, average, max aur min.',
-            expectedOutput: null,
-            hint: 'Loop mein 5 baar input() se numbers lo aur append() karo. Phir sort(), reverse() use karo. sum()/len() se average nikalo.',
+            description: '5 numbers user se lo list mein. Phir print karo: asli list, sorted list, ulti list, kul (sum), ausat (average), sabse zyada aur sabse kam.',
+            hint: 'Loop mein 5 baar input() se numbers lo aur append() karo. sorted(suchi) se sorted list. sum()/len() se ausat.',
+            starterCode: 'suchi = []\n\nfor i in range(5):\n    num = float(input(f"Number {i+1}: "))\n    suchi.???(num)\n\nprint(f"Asli: {suchi}")\nprint(f"Sorted: {sorted(suchi)}")\nprint(f"Ulti: {suchi[::-1]}")\nprint(f"Kul: {sum(suchi)}")\nprint(f"Ausat: {sum(suchi)/len(suchi):.2f}")\nprint(f"Zyada: {max(suchi)}")\nprint(f"Kam: {min(suchi)}")',
           },
+
           quiz: [
             {
-              q: 'list = [10, 20, 30] mein list[-1] kya return karega?',
-              options: ['10', '20', '30', 'Error'],
+              q: 'suchi = [10, 20, 30]. suchi[-1] kya return karega?',
+              options: ['10', '20', '30', 'Galati'],
               correct: 2,
-              explanation: 'Negative index list ke end se count karta hai. -1 matlab aakhri element = 30.',
+              explanation: '-1 index hamesha aakhri element deta hai — 3 items mein aakhri = 30.',
+              wrong_explanations: {
+                0: '10 pehle index (0) pe hai.',
+                1: '20 doosre index (1) pe hai.',
+                3: '-1 valid index hai Python mein — koi galati nahi.',
+              },
             },
             {
-              q: 'List mein nayi value end mein add karne ke liye?',
-              options: ['list.add()', 'list.push()', 'list.append()', 'list.insert()'],
+              q: 'List mein aakhir mein nayi value jodne ke liye?',
+              options: ['suchi.add()', 'suchi.push()', 'suchi.append()', 'suchi.insert()'],
               correct: 2,
-              explanation: 'append() end mein add karta hai. insert() specific position pe.',
+              explanation: 'append() hamesha aakhir mein jodta hai. insert(0, value) shuruaat mein dalta hai.',
+              wrong_explanations: {
+                0: 'add() list mein nahi hota — set mein hota hai.',
+                1: 'push() JavaScript mein hota hai — Python mein nahi.',
+                3: 'insert() specific jagah ke liye hota hai — aakhir ke liye append() better hai.',
+              },
             },
             {
-              q: 'len([1, 2, 3, 4, 5]) kya return karega?',
+              q: 'len(["a", "b", "c", "d", "e"]) kya dega?',
               options: ['4', '5', '6', '0'],
               correct: 1,
-              explanation: 'len() list ki length return karta hai — total elements ki count = 5.',
+              explanation: 'len() list mein total items ki ginti deta hai — 5 items hain toh 5.',
+              wrong_explanations: {
+                0: '4 hota agar 4 items hote.',
+                2: '6 nahi — sirf 5 items hain.',
+                3: '0 khali list ke liye hota.',
+              },
             },
           ],
         },
+
         {
           id: 'py-w2-s4',
           title: 'Functions — Reusable Code Banana',
           emoji: '⚙️',
-          content: `## Functions — Code Ek Baar Likho, Baar Baar Use Karo!
 
-Function ek recipe ki tarah hai — ek baar likho, jab chahiye tab use karo!
+          richContent: [
+            {
+              type: 'concept',
+              heading: 'Function kya hota hai?',
+              body: 'Function ek naamzad kaam ka tarika hai. Ek baar likho, jab chahiye tab baar baar use karo — code dobara likhne ki zarurat nahi.',
+            },
+            {
+              type: 'analogy',
+              text: 'Function ek recipe ki tarah hai. Biryani banana seekha ek baar — ab jab bhi chahiye, wahi recipe follow karo. Recipe dobara likhne ki zarurat nahi. Python mein function bhi aisa hi hai.',
+            },
+            {
+              type: 'snippet',
+              label: 'Pehla function — define aur call karo',
+              code: 'def greet():\n    print("Namaste!")\n    print("Python seekhna kaisa lag raha hai?")\n\ngreet()\ngreet()\ngreet()',
+              expectedOutput: 'Namaste!\nPython seekhna kaisa lag raha hai?\nNamaste!\nPython seekhna kaisa lag raha hai?\nNamaste!\nPython seekhna kaisa lag raha hai?',
+            },
+            {
+              type: 'concept',
+              heading: 'Parameters — function ko data dena',
+              body: 'Parameters se function ko alag alag input de sakte ho — har baar alag data:',
+            },
+            {
+              type: 'snippet',
+              label: 'Parameter wala function',
+              code: 'def namaste(naam):\n    print(f"Namaste {naam}!")\n    print(f"Kya haal hai, {naam}?")\n\nnamaste("Rahul")\nnamaste("Priya")',
+              expectedOutput: 'Namaste Rahul!\nKya haal hai, Rahul?\nNamaste Priya!\nKya haal hai, Priya?',
+            },
+            {
+              type: 'concept',
+              heading: 'return — function se jawab lena',
+              body: 'return se function apna jawab wapas bhejta hai — jo tum variable mein pakad sakte ho:',
+            },
+            {
+              type: 'snippet',
+              label: 'return wala function',
+              code: 'def jodo(a, b):\n    jawab = a + b\n    return jawab\n\nresult = jodo(10, 20)\nprint(f"10 + 20 = {result}")\nprint(jodo(5, 7))',
+              expectedOutput: '10 + 20 = 30\n12',
+            },
+            {
+              type: 'mistake',
+              wrong: 'def calculator(a, b):\n    result = a + b\n    return result\n    print("Done!")  # yeh kabhi nahi chalega',
+              right: 'def calculator(a, b):\n    print("Hisaab ho gaya!")\n    result = a + b\n    return result',
+              why: 'return ke baad ka code kabhi nahi chalta. print() pehle likho, return hamesha function ka aakhri kaam hona chahiye.',
+            },
+            {
+              type: 'mistake',
+              wrong: 'def greet(naam):\n    print(f"Namaste {naam}")\n\nprint(greet("Rahul"))',
+              right: 'def greet(naam):\n    print(f"Namaste {naam}")\n\ngreet("Rahul")',
+              why: 'greet() kuch return nahi karta — print(greet()) likhoge toh "None" bhi print hoga. Seedha greet() call karo.',
+            },
+            {
+              type: 'checkpoint',
+              question: 'def jodo(a, b): return a + b — jodo(3, 4) ka jawab kya hoga?',
+              options: ['34', '7', 'None', 'Galati'],
+              correct: 1,
+              explanation: 'a=3, b=4. a + b = 7. return 7 wapas bhejta hai.',
+            },
+          ],
 
-### Function define karna
-\`\`\`python
-def greet():
-    print("Namaste! 🙏")
-    print("Welcome to Python!")
+          content: `## Functions — Reusable Code!\n\nEk baar likho, baar baar use karo.`,
 
-# Function call karo
-greet()
-greet()
-greet()  # 3 baar same code run hoga!
-\`\`\`
+          codeExample: `# BMI Calculator — ??? fill karo\ndef bmi_nikalo(wajan, unchai):\n    bmi = wajan / (unchai ** 2)\n    return ???\n\ndef category_batao(bmi):\n    if bmi < 18.5:\n        return "Kam Wajan"\n    elif bmi < 25:\n        return "Theek Hai"\n    elif bmi < 30:\n        return "Thoda Zyada"\n    else:\n        return "Bahut Zyada"\n\nwajan = float(input("Wajan (kg): "))\nunchai = float(input("Unchai (meter): "))\n\nbmi = ???(wajan, unchai)\ncategory = ???(bmi)\n\nprint(f"BMI: {bmi}")\nprint(f"Sthiti: {category}")`,
 
-### Parameters — Input dena Function ko
-\`\`\`python
-def greet(naam):
-    print(f"Namaste {naam}! 🙏")
-    print(f"Python seekhna kaisa lag raha hai, {naam}?")
-
-greet("Rahul")
-greet("Priya")
-greet("Arjun")
-\`\`\`
-
-### Return — Function se Value Wapas Lena
-\`\`\`python
-def add(a, b):
-    result = a + b
-    return result
-
-total = add(10, 20)
-print(f"10 + 20 = {total}")  # 30
-
-# Directly use bhi kar sakte ho
-print(add(5, 7))  # 12
-\`\`\`
-
-### Default Parameters
-\`\`\`python
-def greet(naam, language="Python"):
-    print(f"Hello {naam}! {language} seekh rahe ho? 🔥")
-
-greet("Rahul")              # Hello Rahul! Python seekh rahe ho?
-greet("Priya", "JavaScript") # Hello Priya! JavaScript seekh rahe ho?
-\`\`\`
-
-### Practical Example — Calculator Function
-\`\`\`python
-def calculate(a, b, operation):
-    if operation == "+": return a + b
-    elif operation == "-": return a - b
-    elif operation == "*": return a * b
-    elif operation == "/": return a / b if b != 0 else "Error: Divide by zero!"
-    else: return "Invalid operation"
-
-print(calculate(10, 5, "+"))  # 15
-print(calculate(20, 4, "/"))  # 5.0
-\`\`\``,
-          codeExample: `# BMI Calculator function
-def calculate_bmi(weight_kg, height_m):
-    bmi = weight_kg / (height_m ** 2)
-    return round(bmi, 2)
-
-def get_category(bmi):
-    if bmi < 18.5:
-        return "Underweight 😟"
-    elif bmi < 25:
-        return "Normal ✅"
-    elif bmi < 30:
-        return "Overweight ⚠️"
-    else:
-        return "Obese 🔴"
-
-weight = float(input("Weight (kg): "))
-height = float(input("Height (meters): "))
-
-bmi = calculate_bmi(weight, height)
-category = get_category(bmi)
-
-print(f"\\nBMI: {bmi}")
-print(f"Category: {category}")`,
           task: {
-            description: 'Temperature converter functions banao: celsius_to_fahrenheit(c), fahrenheit_to_celsius(f), celsius_to_kelvin(c). Formulas: F = (C × 9/5) + 32, K = C + 273.15. User se temperature aur unit lo, phir dono conversions print karo!',
-            expectedOutput: null,
-            hint: 'Teen alag functions banao return ke saath. Main code mein user se input lo aur sahi function call karo.',
+            description: 'Temperature converter functions banao: celsius_se_fahrenheit(c), fahrenheit_se_celsius(f). Formulas: F = (C x 9/5) + 32, C = (F - 32) x 5/9. User se temperature aur unit lo, dono conversions print karo.',
+            hint: 'Do alag functions banao — har ek mein return likhna. Main code mein input lo aur sahi function call karo.',
+            starterCode: 'def celsius_se_fahrenheit(c):\n    return ???\n\ndef fahrenheit_se_celsius(f):\n    return ???\n\ntemp = float(input("Temperature: "))\nunit = input("Unit (C/F): ").upper()\n\nif unit == "C":\n    print(f"Fahrenheit: {celsius_se_fahrenheit(temp):.2f}")\nelse:\n    print(f"Celsius: {???:.2f}")',
           },
+
           quiz: [
             {
               q: 'Function define karne ka keyword kya hai?',
               options: ['function', 'func', 'def', 'define'],
               correct: 2,
-              explanation: 'Python mein "def" keyword se function define karte hain.',
+              explanation: 'Python mein "def" se function define hota hai — phir naam, phir brackets, phir colon.',
+              wrong_explanations: {
+                0: 'function JavaScript mein use hota hai — Python mein def.',
+                1: 'func Python mein valid keyword nahi.',
+                3: 'define Python mein valid keyword nahi.',
+              },
             },
             {
-              q: 'Function se value return karne ke liye?',
+              q: 'Function se value wapas bhejne ke liye?',
               options: ['send', 'output', 'return', 'give'],
               correct: 2,
-              explanation: '"return" statement function se value wapas bhejta hai caller ko.',
+              explanation: '"return" function se value bahar bhejta hai — jo call karne wala pakad sakta hai.',
+              wrong_explanations: {
+                0: 'send Python mein function ke liye valid nahi.',
+                1: 'output Python mein valid keyword nahi.',
+                3: 'give Python mein valid keyword nahi.',
+              },
             },
             {
-              q: 'Default parameter kya karta hai?',
-              options: ['Parameter mandatory banata hai', 'Parameter optional banata hai', 'Parameter delete karta hai', 'Error deta hai'],
+              q: 'Default parameter kya kaam karta hai?',
+              options: ['Parameter zaroori banata hai', 'Parameter optional banata hai', 'Parameter delete karta hai', 'Galati deta hai'],
               correct: 1,
-              explanation: 'Default value dene se parameter optional ho jaata hai — call karte waqt nahi dena padta.',
+              explanation: 'Default value dene se parameter optional ho jaata hai — call karte waqt na dena padhe toh default use hoti hai.',
+              wrong_explanations: {
+                0: 'Zaroori banane ke liye sirf parameter likhte hain — default nahi dete.',
+                2: 'Delete nahi karta — sirf optional banata hai.',
+                3: 'Galati nahi — yeh sahi Python tarika hai.',
+              },
             },
           ],
         },
