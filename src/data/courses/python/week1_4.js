@@ -2718,14 +2718,8 @@
 
 
 /**
- * StudyEarn AI — Python Course Data
- * ─────────────────────────────────────────────────────────────
- * 12 weeks, ~4 sections per week = 48 sections
- * Each section has: theory content, code example, a "try it" task, and quiz questions
- *
- * Month 1 (Weeks 1-4):  Absolute Beginner
- * Month 2 (Weeks 5-8):  Intermediate Concepts
- * Month 3 (Weeks 9-12): Advanced + Real Projects
+ * StudyEarn AI — Python Course Data (Weeks 1-4)
+ * Active code — richContent, starterCode, quiz with wrong_explanations
  */
 
 export const PYTHON_COURSE = {

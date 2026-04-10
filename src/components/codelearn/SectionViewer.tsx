@@ -624,16 +624,9 @@
 
 /**
  * StudyEarn AI — SectionViewer Component (Unforgettable Edition)
- *
- * New flow (no tab-switching for content):
- *   1. Rich scroll content — concept blocks, inline runnable snippets,
- *      mistake blocks, inline checkpoints
- *   2. Code tab — ??? starter code, guided task
- *   3. Quiz tab — existing QuizModal, unlocked after Mark as Read
- *
- * richContent array in section data drives the learn tab.
- * Falls back to legacy `content` markdown if richContent not present.
+ * Rich content: concept, analogy, inline snippets, mistake blocks, checkpoints
  */
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { CheckCircle, Lightbulb, Play, RotateCcw, ChevronRight, X, Zap, Bot, Loader2, Lock } from 'lucide-react';
 import QuizModal from './QuizModal.jsx';

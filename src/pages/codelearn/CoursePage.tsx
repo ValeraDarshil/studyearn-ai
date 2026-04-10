@@ -40,7 +40,11 @@ export default function CoursePage() {
   useEffect(() => {
     loadCourse(language)
       .then(data => { setCourseData(data); setLoadingCourse(false); })
-      .catch(() => navigate('/codelearn'));
+      .catch((err) => {
+        console.error('[CodeLearn] loadCourse failed:', err);
+        // Don't redirect — show error so we can debug
+        setLoadingCourse(false);
+      });
   }, [language]);
 
   const initialSelectionDone = React.useRef(false);
