@@ -302,30 +302,68 @@ function ImageResultCard({ result, prompt }: { result: ImageGenResult; prompt: s
     );
   }
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
+    const filename = `studyearn-${Date.now()}`;
+
     if (result.imageB64) {
+      // Real image from NVIDIA FLUX / Pollinations → download as PNG
       const a = document.createElement("a");
       a.href = `data:image/png;base64,${result.imageB64}`;
-      a.download = `studyearn-${Date.now()}.png`;
+      a.download = `${filename}.png`;
       a.click();
     } else if (result.imageUrl) {
       window.open(result.imageUrl, "_blank");
     } else if (result.svgContent) {
-      const blob = new Blob([result.svgContent], { type: "image/svg+xml" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `studyearn-diagram-${Date.now()}.svg`;
-      a.click();
-      URL.revokeObjectURL(url);
+      // SVG → convert to PNG using canvas, then download
+      try {
+        const svgBlob = new Blob([result.svgContent], { type: "image/svg+xml;charset=utf-8" });
+        const svgUrl  = URL.createObjectURL(svgBlob);
+        const img     = new Image();
+
+        await new Promise<void>((resolve, reject) => {
+          img.onload = () => resolve();
+          img.onerror = () => reject(new Error("SVG load failed"));
+          img.src = svgUrl;
+        });
+
+        const canvas = document.createElement("canvas");
+        canvas.width  = 1200;
+        canvas.height = 900;
+        const ctx = canvas.getContext("2d")!;
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        URL.revokeObjectURL(svgUrl);
+
+        canvas.toBlob((blob) => {
+          if (!blob) return;
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `${filename}.png`;
+          a.click();
+          URL.revokeObjectURL(url);
+        }, "image/png");
+      } catch {
+        // Fallback: download as SVG if canvas conversion fails
+        const blob = new Blob([result.svgContent], { type: "image/svg+xml" });
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement("a");
+        a.href     = url;
+        a.download = `${filename}.svg`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
     }
     setDownloaded(true);
     setTimeout(() => setDownloaded(false), 2000);
   };
 
-  const providerLabel = result.provider?.includes("svg") ? "SVG Diagram" :
-                        result.provider?.includes("nvidia") ? "NVIDIA Flux" :
-                        result.provider?.includes("openrouter") ? "AI Generated" : "AI Generated";
+  const providerLabel = result.provider?.includes("svg")          ? "SVG Diagram"    :
+                        result.provider?.includes("nvidia")        ? "NVIDIA FLUX"    :
+                        result.provider?.includes("pollinations")   ? "Pollinations AI" :
+                        result.provider?.includes("huggingface")    ? "HuggingFace AI" :
+                        "AI Generated";
 
   return (
     <div className="mt-1 mb-2">
@@ -1408,34 +1446,9 @@ export function AskAI() {
       if (convoId) convoIdRef.current = convoId;
     }
 
-    // ── PATH GK: General Knowledge (Wikipedia — free, no quota) ──
-    // Check if question is factual/general — handle without using AI quota
-    if (!currentType && text && !uploadedFile) {
-      const isGK = await checkIsGeneral(text);
-      if (isGK) {
-        setLoadingStep("🌍 Fetching from Wikipedia…");
-        try {
-          const gkResult = await fetchGeneralKnowledge(text);
-          if (gkResult && gkResult.summary) {
-            const gkMsg: ChatMsg = {
-              role: "assistant",
-              content: gkResult.summary,
-              gkData: gkResult,
-              subjectMode,
-            };
-            const finalMsgs = [...withUserRef.current, gkMsg];
-            setMessages(finalMsgs);
-            if (convoId) { await saveMessages(convoId, [userMsg, gkMsg]); fetchConvos(); }
-            setLoading(false); setLoadingStep(""); textareaRef.current?.focus();
-            return;
-          }
-        } catch { /* If GK fails, fall through to normal AI */ }
-        setLoadingStep("");
-      }
-    }
-
     // ── PATH IMG: AI Image Generation ───────────────────────
-    // Detect "create an image/diagram" requests — handle specially
+    // IMPORTANT: Check for image requests BEFORE GK check
+    // "Create a beautiful nature image" → image gen, NOT Wikipedia
     if (!currentType && text) {
       const isImgReq = await checkIsImageRequest(text);
       if (isImgReq) {
@@ -1469,7 +1482,6 @@ export function AskAI() {
           textareaRef.current?.focus();
           return;
         } catch (imgErr) {
-          // Image gen completely crashed — show error message, don't fall through
           const errMsg: ChatMsg = {
             role:    "assistant",
             content: "⚠️ Image generation service is temporarily unavailable. Please try again in a moment.",
@@ -1483,6 +1495,32 @@ export function AskAI() {
           textareaRef.current?.focus();
           return;
         }
+      }
+    }
+
+    // ── PATH GK: General Knowledge (Wikipedia — free, no quota) ──
+    // Only runs if NOT an image generation request
+    if (!currentType && text && !uploadedFile) {
+      const isGK = await checkIsGeneral(text);
+      if (isGK) {
+        setLoadingStep("🌍 Fetching from Wikipedia…");
+        try {
+          const gkResult = await fetchGeneralKnowledge(text);
+          if (gkResult && gkResult.summary) {
+            const gkMsg: ChatMsg = {
+              role: "assistant",
+              content: gkResult.summary,
+              gkData: gkResult,
+              subjectMode,
+            };
+            const finalMsgs = [...withUserRef.current, gkMsg];
+            setMessages(finalMsgs);
+            if (convoId) { await saveMessages(convoId, [userMsg, gkMsg]); fetchConvos(); }
+            setLoading(false); setLoadingStep(""); textareaRef.current?.focus();
+            return;
+          }
+        } catch { /* If GK fails, fall through to normal AI */ }
+        setLoadingStep("");
       }
     }
 
