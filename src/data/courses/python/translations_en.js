@@ -632,7 +632,7 @@ elif age >= 18:
 else:
     ticket = ???
 
-print(f"Your ticket: ${ticket}")`,},
+print(f"Your ticket: \${ticket}")`,},
     quiz_en: [
       { q: 'What is the correct syntax for checking multiple conditions?', options: ['if/else if/else', 'if/elif/else', 'if/elseif/else', 'if/or/else'], correct: 1, explanation: 'Python uses elif (not "else if"). It checks conditions in order and runs the first True block.' },
       { q: 'What does the "and" operator do?', options: ['Returns True if either is True', 'Returns True only if BOTH are True', 'Combines two numbers', 'Checks equality'], correct: 1, explanation: '"and" requires both conditions to be True. "or" requires at least one.' },
