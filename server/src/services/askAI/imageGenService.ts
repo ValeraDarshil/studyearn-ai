@@ -1,21 +1,4 @@
-// ─────────────────────────────────────────────────────────────
-// Image Generation Service — imageGenService.ts  (v3 — NVIDIA FLUX)
-//
-// PROVIDER CHAIN:
-//   1. NVIDIA FLUX.1-schnell  — fastest, great quality
-//   2. NVIDIA FLUX.1-dev      — higher quality, slower
-//   3. NVIDIA flux.2-klein-4b — compact, efficient
-//   4. NVIDIA FLUX.1-Kontext-dev — context-aware
-//   5. Pollinations.ai        — 100% free fallback
-//   6. HuggingFace            — free tier fallback
-//   7. Groq SVG               — ONLY for actual educational diagrams
-//
-// FIX 1: Creative image requests (animated car, nature image, etc.)
-//         → ALWAYS go to NVIDIA FLUX providers, NEVER to SVG
-// FIX 2: Diagram requests (flowchart, photosynthesis diagram, etc.)
-//         → Go to SVG generator (only strict diagrams)
-// FIX 3: Download as PNG (SVG converted to PNG on frontend)
-// ─────────────────────────────────────────────────────────────
+// imageGenService.ts (v5 — Smart SD-style prompt detection + Node.js fix)
 
 import { logger } from '../../utils/logger.js';
 
@@ -24,26 +7,23 @@ const GROQ_KEY       = (globalThis as any).process?.env?.GROQ_API_KEY   || '';
 const HF_TOKEN       = (globalThis as any).process?.env?.HF_TOKEN        || '';
 
 export interface ImageGenResult {
-  success:     boolean;
-  imageB64?:   string;
-  imageUrl?:   string;
-  provider:    string;
-  prompt:      string;
-  error?:      string;
-  isSvg?:      boolean;
-  svgContent?: string;
-  format?:     'png' | 'jpeg' | 'svg';
+  success: boolean; imageB64?: string; imageUrl?: string;
+  provider: string; prompt: string; error?: string;
+  isSvg?: boolean; svgContent?: string; format?: 'png' | 'jpeg' | 'svg';
 }
 
-// ─── NVIDIA FLUX Models ───────────────────────────────────────
 const NVIDIA_MODELS = [
-  { id: 'black-forest-labs/flux.1-schnell',      name: 'FLUX.1-schnell',      timeout: 45000 },
-  { id: 'black-forest-labs/flux.1-dev',          name: 'FLUX.1-dev',          timeout: 90000 },
-  { id: 'black-forest-labs/flux.2-klein-4b',     name: 'FLUX.2-klein-4b',     timeout: 60000 },
-  { id: 'black-forest-labs/flux.1-kontext-dev',  name: 'FLUX.1-Kontext-dev',  timeout: 90000 },
+  { id: 'black-forest-labs/flux.1-schnell',     name: 'FLUX.1-schnell',     timeout: 45000 },
+  { id: 'black-forest-labs/flux.1-dev',         name: 'FLUX.1-dev',         timeout: 90000 },
+  { id: 'black-forest-labs/flux.2-klein-4b',    name: 'FLUX.2-klein-4b',    timeout: 60000 },
+  { id: 'black-forest-labs/flux.1-kontext-dev', name: 'FLUX.1-Kontext-dev', timeout: 90000 },
 ];
 
-// ─── Strict diagram patterns — ONLY educational diagrams ──────
+// Node.js safe base64
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  return Buffer.from(buffer).toString('base64');
+}
+
 const DIAGRAM_PATTERNS = [
   /\b(flowchart|mindmap|mind\s+map|schematic|blueprint)\s+(of|for|showing)?\b/i,
   /\b(photosynthesis|cellular|anatomy|circuit|molecular|biological)\s+diagram\b/i,
@@ -53,14 +33,12 @@ const DIAGRAM_PATTERNS = [
   /\blabeled\s+diagram\b/i,
 ];
 
-// Creative signals — these ALWAYS mean image generation
 const CREATIVE_SIGNALS = [
-  /\b(animated|cartoon|anime|neon|futuristic|pixel|3d|cute|cool|crazy|stylized|realistic|fantasy|beautiful|stunning|vibrant)\b/i,
-  /\b(image|picture|photo|art|artwork|drawing|painting|sketch|illustration|poster|wallpaper|landscape|scene|portrait)\b/i,
-  /\b(car|bike|vehicle|robot|monster|creature|superhero|animal|person|face|nature|mountain|ocean|forest|sky|sunset|sunrise)\b/i,
+  /\b(animated|cartoon|anime|neon|futuristic|pixel|3d|cute|cool|crazy|stylized|realistic|fantasy|beautiful|stunning|vibrant|hyperreal|photorealistic|cinematic)\b/i,
+  /\b(image|picture|photo|art|artwork|drawing|painting|sketch|illustration|poster|wallpaper|landscape|scene|portrait|render|rendering)\b/i,
+  /\b(car|bike|vehicle|robot|monster|creature|superhero|animal|person|face|nature|mountain|ocean|forest|sky|sunset|sunrise|character|protagonist)\b/i,
 ];
 
-// Strong image generation phrases
 const IMAGE_GEN_PHRASES = [
   'create an image', 'generate an image', 'create a picture', 'make an image',
   'draw me', 'draw a', 'create a cartoon', 'design a', 'create a logo',
@@ -69,237 +47,157 @@ const IMAGE_GEN_PHRASES = [
   'neon car', 'futuristic design', 'create an illustration', 'generate an illustration',
   'make me a', 'show me a picture', 'create an animated', 'generate an animated',
   'create a poster', 'generate a poster', 'make a cartoon', 'pixel art',
-  '3d render', 'realistic image', 'create a character', 'cartoon character',
+  '3d render', '3d character', 'realistic image', 'create a character', 'cartoon character',
   'create a nature', 'generate a nature', 'beautiful nature', 'beautiful image',
-  'create a beautiful', 'generate a beautiful', 'show me a', 'create a scene',
-  'generate a scene', 'make a picture', 'create a photo', 'generate a photo',
-  'create a landscape', 'create a drawing', 'create a painting', 'create an art',
+  'create a beautiful', 'generate a beautiful', 'create a scene', 'generate a scene',
+  'make a picture', 'create a photo', 'generate a photo', 'create a landscape',
+  'create a drawing', 'create a painting',
+  'hyperreal', 'ultra realistic', 'ultra-realistic', 'hyper realistic', 'hyperrealism',
+  'photorealistic', 'unreal engine', 'octane render', 'ray tracing', 'subsurface scattering',
+  'global illumination', 'high poly', '8k resolution', '4k resolution',
+  'masterpiece', 'best quality', 'highly detailed', 'ultra detailed', 'cinematic lighting',
+  'depth of field', 'bokeh', 'rim light',
+  'quality tags:', 'rendering style:', 'camera:', 'outfit:', 'pose:', 'environment:', 'lighting:',
 ];
 
+function isSDStylePrompt(prompt: string): boolean {
+  const lower = prompt.toLowerCase();
+  const SD_HEADERS = ['outfit:', 'pose:', 'environment:', 'lighting:', 'camera:', 'quality tags:', 'rendering style:', 'art style:', 'negative prompt:'];
+  if (SD_HEADERS.some(h => lower.includes(h))) return true;
+
+  const commas = (prompt.match(/,/g) || []).length;
+  if (commas >= 5) {
+    const visualTerms = [
+      'photorealistic', 'cinematic', 'detailed', 'realistic', 'lighting', 'render',
+      'resolution', 'quality', 'bokeh', 'depth of field', 'subsurface', 'unreal',
+      'hyperreal', 'masterpiece', 'ray trac', 'ambient', 'textur', 'poly',
+      'skin pore', 'facial', 'jawline', 'stubble', 'aaa', 'game character',
+    ];
+    const matches = visualTerms.filter(t => lower.includes(t)).length;
+    if (matches >= 3) return true;
+  }
+  return false;
+}
+
 export function isImageGenRequest(prompt: string): boolean {
+  if (isSDStylePrompt(prompt)) return true;
   const lower = prompt.toLowerCase().trim();
   if (IMAGE_GEN_PHRASES.some(p => lower.includes(p))) return true;
   const IMAGE_PATTERNS = [
     /\b(create|generate|draw|make|show|produce|design|render)\s+(an?\s+)?(image|picture|photo|illustration|sketch|artwork|poster|cartoon|character|scene|landscape|painting|drawing)/i,
     /\b(design|draw|sketch|illustrate|visualize)\s+(me\s+)?(a|an|the)?\s/i,
-    /\b(animated|anime|cartoon|pixel|neon|futuristic|cute|cool|crazy|stylized|beautiful|realistic)\s+(version|style|design|art|picture|image|character|car|robot|nature|scene)/i,
+    /\b(animated|anime|cartoon|pixel|neon|futuristic|cute|cool|crazy|stylized|beautiful|realistic|hyperreal|photorealistic)\s+(version|style|design|art|picture|image|character|car|robot|nature|scene)/i,
+    /\b(ultra[\s-]?realistic|hyper[\s-]?realistic|photo[\s-]?realistic)\s+\w+/i,
+    /\b(3d|aaa)\s+(game|character|render|model|art)/i,
   ];
   return IMAGE_PATTERNS.some(p => p.test(prompt));
 }
 
 export function isDiagramRequest(prompt: string): boolean {
+  if (isSDStylePrompt(prompt)) return false;
   const lower = prompt.toLowerCase();
-  // If it has creative signals → image generation, not a diagram
   if (CREATIVE_SIGNALS.some(p => p.test(lower))) return false;
   return DIAGRAM_PATTERNS.some(p => p.test(lower));
 }
 
-// ─── Build optimized prompt for FLUX models ───────────────────
 function buildImagePrompt(userPrompt: string): string {
+  if (isSDStylePrompt(userPrompt)) return userPrompt; // Use as-is
   const clean = userPrompt
     .replace(/\b(create|generate|draw|make|show me|give me|produce)\s+(an?\s+)?/i, '')
     .replace(/\b(image|picture|photo|illustration|visual)\s+(of|for|about|showing)?\s*/i, '')
     .trim();
-  return `${clean}, masterpiece, highly detailed, vibrant colors, professional quality, 8k resolution, sharp focus, perfect composition, cinematic lighting`;
+  return `${clean}, masterpiece, highly detailed, vibrant colors, professional quality, 8k resolution, sharp focus, cinematic lighting`;
 }
 
-// ─── Provider 1: NVIDIA FLUX Models ──────────────────────────
 async function generateWithNvidia(prompt: string): Promise<ImageGenResult> {
   if (!NVIDIA_API_KEY) throw new Error('No NVIDIA_API_KEY set');
-
   for (const model of NVIDIA_MODELS) {
     try {
-      logger.info(`[ImageGen] Trying NVIDIA ${model.name}…`);
-
       const res = await fetch(`https://ai.api.nvidia.com/v1/genai/${model.id}`, {
-        method:  'POST',
-        headers: {
-          'Authorization': `Bearer ${NVIDIA_API_KEY}`,
-          'Content-Type':  'application/json',
-          'Accept':        'application/json',
-        },
-        body: JSON.stringify({
-          prompt,
-          cfg_scale:       7.5,
-          aspect_ratio:    '1:1',
-          seed:            Math.floor(Math.random() * 999999),
-          steps:           20,
-          negative_prompt: 'blurry, low quality, distorted, ugly, bad anatomy, watermark, text overlay',
-        }),
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${NVIDIA_API_KEY}`, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({ prompt, cfg_scale: 7.5, aspect_ratio: '1:1', seed: Math.floor(Math.random() * 999999), steps: 20, negative_prompt: 'blurry, low quality, distorted, watermark' }),
         signal: AbortSignal.timeout(model.timeout),
       });
-
-      if (!res.ok) {
-        const errText = await res.text().catch(() => '');
-        logger.debug(`[ImageGen] NVIDIA ${model.name} HTTP ${res.status}: ${errText.slice(0, 150)}`);
-        continue;
-      }
-
+      if (!res.ok) { logger.debug(`[NVIDIA] ${model.name} HTTP ${res.status}`); continue; }
       const data = await res.json();
-
-      // NVIDIA returns base64 in different fields depending on model version
-      let b64: string | null = null;
-      if (data.artifacts?.[0]?.base64)      b64 = data.artifacts[0].base64;
-      else if (data.image)                   b64 = data.image;
-      else if (data.b64_json)                b64 = data.b64_json;
-      else if (data.images?.[0])             b64 = data.images[0];
-      else if (typeof data === 'string' && data.length > 100) b64 = data;
-
-      if (!b64 || b64.length < 100) {
-        logger.debug(`[ImageGen] NVIDIA ${model.name}: empty response`);
-        continue;
-      }
-
-      // Strip data URI prefix if present
+      let b64: string | null = data.artifacts?.[0]?.base64 || data.image || data.b64_json || data.images?.[0] || null;
+      if (!b64 || b64.length < 100) continue;
       b64 = b64.replace(/^data:image\/[a-z]+;base64,/, '');
-
-      logger.info(`[ImageGen] ✅ NVIDIA ${model.name} success`);
       return { success: true, imageB64: b64, format: 'png', provider: `nvidia-${model.name}`, prompt };
-    } catch (e: any) {
-      logger.debug(`[ImageGen] NVIDIA ${model.name} error: ${e.message}`);
-    }
+    } catch (e: any) { logger.debug(`[NVIDIA] ${model.name}: ${e.message}`); }
   }
-
-  throw new Error('All NVIDIA FLUX models failed');
+  throw new Error('All NVIDIA models failed');
 }
 
-// ─── Helper: ArrayBuffer → base64 (Node.js safe) ─────────────
-// btoa() is browser-only! In Node.js, use Buffer.from()
-function arrayBufferToBase64(buffer: ArrayBuffer): string {
-  return Buffer.from(buffer).toString('base64');
-}
-
-// ─── Provider 2: Pollinations.ai — FREE fallback ──────────────
 async function generateWithPollinations(prompt: string): Promise<ImageGenResult> {
-  const encoded  = encodeURIComponent(prompt);
-  const seed     = Math.floor(Math.random() * 99999);
-  const imageUrl = `https://image.pollinations.ai/prompt/${encoded}?width=1024&height=1024&seed=${seed}&nologo=true&enhance=true&model=flux`;
-
-  const res = await fetch(imageUrl, {
-    method: 'GET',
-    signal: AbortSignal.timeout(40000),
-    headers: { 'User-Agent': 'StudyEarnAI/1.0' },
-  });
+  const truncated = prompt.length > 500 ? prompt.slice(0, 500) : prompt;
+  const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(truncated)}?width=1024&height=1024&seed=${Math.floor(Math.random() * 99999)}&nologo=true&enhance=true&model=flux`;
+  const res = await fetch(url, { method: 'GET', signal: AbortSignal.timeout(40000), headers: { 'User-Agent': 'StudyEarnAI/1.0' } });
   if (!res.ok) throw new Error(`Pollinations HTTP ${res.status}`);
-
-  const contentType = res.headers.get('content-type') || '';
-  if (!contentType.includes('image')) throw new Error(`Pollinations: not an image (got ${contentType})`);
-
-  // ✅ Node.js compatible
+  const ct = res.headers.get('content-type') || '';
+  if (!ct.includes('image')) throw new Error(`Not an image: ${ct}`);
   const b64 = arrayBufferToBase64(await res.arrayBuffer());
-  if (!b64 || b64.length < 100) throw new Error('Pollinations: empty image');
-
+  if (!b64 || b64.length < 100) throw new Error('Empty image');
   return { success: true, imageB64: b64, format: 'png', provider: 'pollinations', prompt };
 }
 
-// ─── Provider 3: HuggingFace ──────────────────────────────────
 async function generateWithHuggingFace(prompt: string): Promise<ImageGenResult> {
   if (!HF_TOKEN) throw new Error('No HF_TOKEN');
-
+  const truncated = prompt.length > 500 ? prompt.slice(0, 500) : prompt;
   for (const model of ['black-forest-labs/FLUX.1-schnell', 'stabilityai/stable-diffusion-xl-base-1.0']) {
     try {
       const res = await fetch(`https://api-inference.huggingface.co/models/${model}`, {
-        method:  'POST',
-        headers: { 'Authorization': `Bearer ${HF_TOKEN}`, 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ inputs: prompt, parameters: { width: 1024, height: 1024 } }),
-        signal:  AbortSignal.timeout(60000),
+        method: 'POST', headers: { 'Authorization': `Bearer ${HF_TOKEN}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ inputs: truncated, parameters: { width: 1024, height: 1024 } }), signal: AbortSignal.timeout(60000),
       });
-
-      if (!res.ok) continue;
-      const contentType = res.headers.get('content-type') || '';
-      if (!contentType.includes('image')) continue;
-
-      // ✅ Node.js compatible
+      if (!res.ok || !res.headers.get('content-type')?.includes('image')) continue;
       const b64 = arrayBufferToBase64(await res.arrayBuffer());
       if (!b64 || b64.length < 100) continue;
-
       return { success: true, imageB64: b64, format: 'png', provider: `huggingface-${model.split('/')[1]}`, prompt };
     } catch {}
   }
-  throw new Error('HuggingFace: all models failed');
+  throw new Error('HuggingFace failed');
 }
 
-// ─── Provider 4: Groq SVG — ONLY for actual diagrams ─────────
 async function generateSvgDiagram(userPrompt: string): Promise<ImageGenResult> {
   if (!GROQ_KEY) throw new Error('No Groq key');
-
-  const subject = userPrompt
-    .replace(/\b(diagram|create|generate|draw|make|show me|of|for|about)\b/gi, '')
-    .trim() || userPrompt;
-
+  const subject = userPrompt.replace(/\b(diagram|create|generate|draw|make|show me|of|for|about)\b/gi, '').trim() || userPrompt;
   const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_KEY}` },
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_KEY}` },
     body: JSON.stringify({
-      model:       'llama-3.3-70b-versatile',
-      max_tokens:  3000,
-      temperature: 0.3,
-      messages: [{ role: 'user', content: `Create an educational SVG diagram for "${subject}".
-Output ONLY valid SVG starting with <svg viewBox="0 0 800 600"> and ending with </svg>.
-Requirements: colored labeled boxes/shapes, arrows, white background (#f8fafc), sans-serif text 14px, professional style.
-Colors: #3b82f6 blue, #10b981 green, #f59e0b amber, #ef4444 red, #8b5cf6 violet.
-NO JavaScript. Output ONLY the SVG:` }],
+      model: 'llama-3.3-70b-versatile', max_tokens: 3000, temperature: 0.3,
+      messages: [{ role: 'user', content: `Create an educational SVG diagram for "${subject}". Output ONLY valid SVG <svg viewBox="0 0 800 600">...</svg>. White background, labeled shapes, arrows. NO JavaScript.` }],
     }),
     signal: AbortSignal.timeout(30000),
   });
-
   if (!res.ok) throw new Error(`Groq HTTP ${res.status}`);
   const data = await res.json();
-  let svg = data.choices?.[0]?.message?.content || '';
-
-  const match = svg.match(/<svg[\s\S]*<\/svg>/i);
-  if (!match) throw new Error('No SVG in response');
-
-  return {
-    success:    true,
-    isSvg:      true,
-    svgContent: match[0],
-    format:     'svg',
-    provider:   'groq-svg-diagram',
-    prompt:     userPrompt,
-  };
+  const match = (data.choices?.[0]?.message?.content || '').match(/<svg[\s\S]*<\/svg>/i);
+  if (!match) throw new Error('No SVG');
+  return { success: true, isSvg: true, svgContent: match[0], format: 'svg', provider: 'groq-svg-diagram', prompt: userPrompt };
 }
 
-// ─── Main export ──────────────────────────────────────────────
 export async function generateImage(userPrompt: string): Promise<ImageGenResult> {
   const isDiagram  = isDiagramRequest(userPrompt);
   const isCreative = isImageGenRequest(userPrompt);
+  logger.info(`[ImageGen] "${userPrompt.slice(0, 80)}" isDiagram=${isDiagram} isCreative=${isCreative}`);
 
-  logger.info(`[ImageGen] "${userPrompt.slice(0, 60)}" isDiagram=${isDiagram} isCreative=${isCreative}`);
-
-  // Pure educational diagram (no creative signals) → SVG
   if (isDiagram && !isCreative) {
-    try {
-      const r = await generateSvgDiagram(userPrompt);
-      logger.info('[ImageGen] ✅ Groq SVG diagram');
-      return r;
-    } catch (e: any) {
-      logger.debug(`[ImageGen] SVG diagram failed: ${e.message}, falling to image providers`);
-    }
+    try { return await generateSvgDiagram(userPrompt); } catch (e: any) { logger.debug(`SVG failed: ${e.message}`); }
   }
 
-  // Creative images → NVIDIA FLUX → Pollinations → HuggingFace
-  const optimizedPrompt = buildImagePrompt(userPrompt);
-  const providers = [
-    { name: 'NVIDIA-FLUX',  fn: () => generateWithNvidia(optimizedPrompt)      },
-    { name: 'Pollinations', fn: () => generateWithPollinations(optimizedPrompt) },
-    { name: 'HuggingFace',  fn: () => generateWithHuggingFace(optimizedPrompt)  },
-  ];
-
-  for (const { name, fn } of providers) {
-    try {
-      const r = await fn();
-      logger.info(`[ImageGen] ✅ ${name}`);
-      return r;
-    } catch (e: any) {
-      logger.debug(`[ImageGen] ${name} failed: ${e.message}`);
-    }
+  const prompt = buildImagePrompt(userPrompt);
+  for (const { name, fn } of [
+    { name: 'NVIDIA',       fn: () => generateWithNvidia(prompt)       },
+    { name: 'Pollinations', fn: () => generateWithPollinations(prompt)  },
+    { name: 'HuggingFace',  fn: () => generateWithHuggingFace(prompt)   },
+  ]) {
+    try { const r = await fn(); logger.info(`[ImageGen] ✅ ${name}`); return r; }
+    catch (e: any) { logger.debug(`[ImageGen] ${name} failed: ${e.message}`); }
   }
 
-  return {
-    success:  false,
-    error:    'Image generation failed. NVIDIA API key check karo ya thodi der baad try karo.',
-    provider: 'none',
-    prompt:   userPrompt,
-  };
+  if (GROQ_KEY) { try { return await generateSvgDiagram(userPrompt); } catch {} }
+
+  return { success: false, error: 'Image generation failed. Please try again.', provider: 'none', prompt: userPrompt };
 }
