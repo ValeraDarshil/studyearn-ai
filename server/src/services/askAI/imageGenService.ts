@@ -163,23 +163,30 @@ async function generateWithNvidia(prompt: string): Promise<ImageGenResult> {
   throw new Error('All NVIDIA FLUX models failed');
 }
 
+// ─── Helper: ArrayBuffer → base64 (Node.js safe) ─────────────
+// btoa() is browser-only! In Node.js, use Buffer.from()
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  return Buffer.from(buffer).toString('base64');
+}
+
 // ─── Provider 2: Pollinations.ai — FREE fallback ──────────────
 async function generateWithPollinations(prompt: string): Promise<ImageGenResult> {
   const encoded  = encodeURIComponent(prompt);
   const seed     = Math.floor(Math.random() * 99999);
   const imageUrl = `https://image.pollinations.ai/prompt/${encoded}?width=1024&height=1024&seed=${seed}&nologo=true&enhance=true&model=flux`;
 
-  const res = await fetch(imageUrl, { method: 'GET', signal: AbortSignal.timeout(35000) });
+  const res = await fetch(imageUrl, {
+    method: 'GET',
+    signal: AbortSignal.timeout(40000),
+    headers: { 'User-Agent': 'StudyEarnAI/1.0' },
+  });
   if (!res.ok) throw new Error(`Pollinations HTTP ${res.status}`);
 
   const contentType = res.headers.get('content-type') || '';
-  if (!contentType.includes('image')) throw new Error('Pollinations: not an image response');
+  if (!contentType.includes('image')) throw new Error(`Pollinations: not an image (got ${contentType})`);
 
-  const buffer = await res.arrayBuffer();
-  const bytes  = new Uint8Array(buffer);
-  let   binary = '';
-  for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
-  const b64 = btoa(binary);
+  // ✅ Node.js compatible
+  const b64 = arrayBufferToBase64(await res.arrayBuffer());
   if (!b64 || b64.length < 100) throw new Error('Pollinations: empty image');
 
   return { success: true, imageB64: b64, format: 'png', provider: 'pollinations', prompt };
@@ -202,11 +209,8 @@ async function generateWithHuggingFace(prompt: string): Promise<ImageGenResult> 
       const contentType = res.headers.get('content-type') || '';
       if (!contentType.includes('image')) continue;
 
-      const buffer = await res.arrayBuffer();
-      const bytes  = new Uint8Array(buffer);
-      let   binary = '';
-      for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
-      const b64 = btoa(binary);
+      // ✅ Node.js compatible
+      const b64 = arrayBufferToBase64(await res.arrayBuffer());
       if (!b64 || b64.length < 100) continue;
 
       return { success: true, imageB64: b64, format: 'png', provider: `huggingface-${model.split('/')[1]}`, prompt };
