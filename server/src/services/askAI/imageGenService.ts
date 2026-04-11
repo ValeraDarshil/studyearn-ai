@@ -103,7 +103,15 @@ async function tryNvidia(prompt: string): Promise<ImageGenResult> {
       const res = await fetch(model.url, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${NVIDIA_API_KEY}`, 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify({ prompt, cfg_scale: 7.5, aspect_ratio: '1:1', seed: Math.floor(Math.random() * 9999999), steps: 20, negative_prompt: 'blurry, ugly, distorted, low quality, watermark' }),
+        body: JSON.stringify({
+          prompt,
+          width: 1024,
+          height: 1024,
+          guidance_scale: 3.5,
+          num_inference_steps: 20,
+          seed: Math.floor(Math.random() * 9999999),
+          negative_prompt: 'blurry, ugly, distorted, low quality, watermark',
+        }),
         signal: AbortSignal.timeout(model.timeout),
       });
       if (!res.ok) { logger.debug(`[NVIDIA] ${model.name} ${res.status}`); continue; }

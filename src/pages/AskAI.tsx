@@ -291,13 +291,13 @@ function ImageResultCard({ result, prompt }: { result: ImageGenResult; prompt: s
     );
   }
 
-  // Base64 image was not stored in DB (too large) — show regenerate notice
+  // Base64 image was not stored in DB
   if (!result.imageB64 && !result.imageUrl && !result.svgContent) {
     return (
       <div className="mt-1 px-4 py-3 rounded-xl border border-amber-500/20 bg-amber-500/5 text-amber-300 text-sm space-y-1.5">
         <p className="font-semibold">🖼️ Image not available</p>
-        <p className="text-amber-300/70 text-xs">Generated images aren't stored to save space. Ask again to regenerate!</p>
-        <p className="text-slate-500 text-[11px] font-mono">Original prompt: {prompt}</p>
+        <p className="text-amber-300/70 text-xs">This image was generated before storage was enabled. Ask again to regenerate!</p>
+        <p className="text-slate-500 text-[11px] font-mono">Prompt: {prompt.slice(0, 80)}…</p>
       </div>
     );
   }
@@ -399,9 +399,9 @@ function ImageResultCard({ result, prompt }: { result: ImageGenResult; prompt: s
           onClick={handleDownload}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-white/[0.04] border border-white/10 text-slate-400 hover:text-white hover:bg-white/[0.08] transition-all active:scale-95"
         >
-          {downloaded ? "✓ Saved!" : "⬇ Download"}
+          {downloaded ? "✓ Saved!" : "⬇ Download PNG"}
         </button>
-        <span className="text-[10px] text-slate-600">Not stored — re-generate if needed</span>
+        <span className="text-[10px] text-slate-600">via {result.provider}</span>
       </div>
     </div>
   );
@@ -1213,7 +1213,8 @@ export function AskAI() {
       const res = await fetch(`${API_URL}/api/chat/${convoId}/messages`, {
         method: "POST", headers: { ...authHeaders(), "Content-Type": "application/json" },
         body: JSON.stringify({ messages: msgs.map(m => {
-          // For imageGen: store SVG (small) or URL, but NOT full base64 (too large for DB)
+          // For imageGen: send base64 to server — server will compress it (512px JPEG ~80KB)
+          // SVG stored as-is (small text), base64 compressed by server before DB storage
           let imageGenToStore: any = null;
           if (m.imageGen) {
             imageGenToStore = {
@@ -1221,10 +1222,9 @@ export function AskAI() {
               provider:   m.imageGen.provider,
               prompt:     m.imageGen.prompt,
               isSvg:      m.imageGen.isSvg     || false,
-              svgContent: m.imageGen.svgContent || null,  // SVG is small text — store it
-              imageUrl:   m.imageGen.imageUrl   || null,  // URL is tiny — store it
-              // base64 images NOT stored (too large) — show "expired" message instead
-              imageB64:   null,
+              svgContent: m.imageGen.svgContent || null,
+              imageUrl:   m.imageGen.imageUrl   || null,
+              imageB64:   m.imageGen.imageB64   || null, // send to server for compression
               error:      m.imageGen.error || null,
             };
           }

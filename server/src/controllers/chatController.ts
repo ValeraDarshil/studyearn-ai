@@ -432,8 +432,22 @@ export async function appendMessages(req: Request, res: Response) {
         isError:       m.isError       || false,
         subjectMode:   m.subjectMode   || null,
       };
-      // v12: imageGen — store SVG and URL, skip base64 to save DB space
+      // v12: imageGen — store compressed base64 (512px JPEG ~80KB) + SVG + URL
       if (m.imageGen) {
+        let storedB64: string | null = null;
+        if (m.imageGen.imageB64 && !m.imageGen.isSvg) {
+          try {
+            const sharp = (await import('sharp')).default;
+            const imgBuffer = Buffer.from(m.imageGen.imageB64, 'base64');
+            const compressed = await sharp(imgBuffer)
+              .resize(512, 512, { fit: 'inside', withoutEnlargement: true })
+              .jpeg({ quality: 70, mozjpeg: true })
+              .toBuffer();
+            if (compressed.length < 200 * 1024) {
+              storedB64 = compressed.toString('base64');
+            }
+          } catch { storedB64 = null; }
+        }
         msgObj.imageGen = {
           success:    m.imageGen.success    ?? false,
           provider:   m.imageGen.provider   || null,
@@ -441,7 +455,7 @@ export async function appendMessages(req: Request, res: Response) {
           isSvg:      m.imageGen.isSvg      || false,
           svgContent: m.imageGen.svgContent ? m.imageGen.svgContent.slice(0, 50000) : null,
           imageUrl:   m.imageGen.imageUrl   || null,
-          imageB64:   null, // never store base64 in DB
+          imageB64:   storedB64,
           error:      m.imageGen.error      || null,
         };
       }
