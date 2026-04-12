@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-// AskAI — askAIService.ts  (v12 — Unforgettable AI: All 10 Improvements)
+// AskAI — askAIService.ts  (v13 — Gap #5+#6: Adaptive Planner + Smart Context)
 //
 // NEW IN v12:
 //   Imp 1: Memory Surprise — specific past topic references in system prompt
@@ -48,10 +48,13 @@ import {
 import {
   routeToModel,
   getModelNote,
+  recordQualityPenalty,
+  type RouterContextSignals,
 } from './aiModelRouter.js';
 
 import {
   validateResponse,
+  getQualityLabel,
   type ValidationResult,
 } from './responseValidator.js';
 
@@ -74,6 +77,13 @@ export interface AskAIServiceInput {
   // v9: persistent data from MongoDB
   persistentWeakTopics?: string[];
   dbSessionSummary?:     string;
+  // v13: Gap #1+#2 — frontend live intelligence
+  smartMemoryContext?:      string;
+  comprehensionContext?:    string;
+  adaptiveHint?:            string;
+  // v14: Gap #3+#4
+  teachingContext?:         string;
+  personalizationContext?:  string;
 }
 
 export interface AskAIPromptPackage {
@@ -104,9 +114,18 @@ export async function buildMasterPrompt(
   } = input;
 
   // Step 1: Rich context from AI Brain (orchestrator + tutor)
+  // v13: Pass frontend intelligence for weighted fusion (Gap #6)
+  const frontendIntel = {
+    smartMemoryContext:     input.smartMemoryContext,
+    comprehensionContext:   input.comprehensionContext,
+    adaptiveHint:           input.adaptiveHint,
+    teachingContext:        input.teachingContext,
+    personalizationContext: input.personalizationContext,
+  };
+
   let context: EnhancedContext;
   try {
-    context = await buildEnhancedContext(userId, message);
+    context = await buildEnhancedContext(userId, message, frontendIntel);
   } catch {
     const fallbackLevel = detectSkillLevelFromMessage(message);
     context = {
@@ -135,11 +154,33 @@ export async function buildMasterPrompt(
   // Step 3: Response Planning
   // Bug #4 FIX: pass correct turnCount directly — was passing 0 then overriding
   const currentTurnCount = input.history?.length ?? 0;
+  // v13: Gap #5 — pass live intelligence to adaptive planner
+  // Parse comprehension stats from frontend context string
+  const compMatch    = input.comprehensionContext?.match(/(\d+)%/);
+  const reMatch      = input.comprehensionContext?.match(/(\d+) re-explained/);
+  const streakMatch  = input.comprehensionContext?.match(/(\d+)-question understanding streak/);
+  const phaseMatch   = input.teachingContext?.match(/TEACHING PHASE:\s*(\w+)/i);
+  const loadMatch    = input.personalizationContext?.match(/overloaded|high|low|normal/i);
+  const styleMatch   = input.personalizationContext?.match(/beginner|real.?world|future/i);
+  const densityMatch = input.personalizationContext?.match(/brief|detailed/i);
+
+  const plannerIntel = (input.comprehensionContext || input.teachingContext || input.personalizationContext) ? {
+    comprehensionRate:  compMatch    ? parseInt(compMatch[1])   : undefined,
+    reexplainRate:      reMatch      ? parseInt(reMatch[1])     : undefined,
+    sessionStreak:      streakMatch  ? parseInt(streakMatch[1]) : undefined,
+    topWeakTopics:      allWeakTopics.slice(0, 3),
+    teachingPhase:      phaseMatch   ? phaseMatch[1].toLowerCase() : undefined,
+    cognitiveLoad:      loadMatch    ? loadMatch[0].toLowerCase()   : undefined,
+    learningStyle:      styleMatch   ? styleMatch[0].toLowerCase().replace('-', '_') : undefined,
+    responseDensity:    densityMatch ? densityMatch[0].toLowerCase() : undefined,
+  } : undefined;
+
   const plan = buildResponsePlan(
     message,
     skillLevel,
     allWeakTopics,
     currentTurnCount,
+    plannerIntel,   // v13: adaptive intelligence
   );
   plan.turnCount = currentTurnCount;
 
@@ -147,13 +188,18 @@ export async function buildMasterPrompt(
     plan.strategy = 'STEP_BY_STEP';
   }
 
-  // Step 4: Model Routing
+  // Step 4: Model Routing (v13: pass context signals for smart routing)
+  const routerSignals: RouterContextSignals = plannerIntel ? {
+    comprehensionRate: plannerIntel.comprehensionRate,
+    cognitiveLoad:     plannerIntel.cognitiveLoad,
+  } : {};
   const modelConfig = routeToModel(
     plan.intent,
     subjectMode,
     skillLevel,
     message.length,
     'text',
+    routerSignals,
   );
 
   // Step 5: Topic Detection (base — aiController uses detectTopicExpanded on top)
@@ -240,10 +286,23 @@ Make it feel personal, not generic.`
     '4. Decide response length (short prompt = concise answer, detail prompt = full answer)',
     '5. Think step by step before giving the final answer',
 
-    // G) DIFFICULTY ADAPTER
+    // G) DIFFICULTY ADAPTER + v13 adaptive signals from planner
     '\n' + buildDifficultyInstruction(skillLevel),
     responseLengthNote,
     getResponseStyleNote(skillLevel, allWeakTopics.length > 0),
+    // v13: Gap #5 — inject planner's adaptive decisions into prompt
+    plan.useAnalogy
+      ? '\nANALOGY REQUIRED: Use a real-world analogy for this explanation. Student learns better with concrete examples from daily life.'
+      : '',
+    plan.emphasizeEncourage
+      ? '\nENCOURAGEMENT REQUIRED: Student is struggling. Start with a warm, encouraging opening before explaining. Make them feel capable.'
+      : '',
+    plan.keepShort
+      ? '\nRESPONSE LENGTH: Keep very concise — student prefers brief answers right now.'
+      : '',
+    plan.adaptationReason
+      ? `\n[AI-OS: strategy adapted because: ${plan.adaptationReason}]`
+      : '',
 
     // H) TEACHING MODE
     buildTeachingInstruction(plan.strategy),
@@ -326,13 +385,15 @@ ABSOLUTE RULES:
   const history = (input.history ?? []).slice(-20);
 
   logger.info(
-    'AskAI v11 prompt | intent=' + plan.intent +
-    ' strategy=' + plan.strategy +
-    ' skill='    + skillLevel +
-    ' model='    + modelConfig.modelId +
-    ' history='  + history.length + 'msgs' +
-    ' weakDB='   + persistentWeakTopics.length +
-    ' turns='    + currentTurnCount,
+    'AskAI v13 prompt | intent='  + plan.intent +
+    ' strategy='  + plan.strategy +
+    ' skill='     + skillLevel +
+    ' model='     + modelConfig.modelId +
+    ' history='   + history.length + 'msgs' +
+    ' weakDB='    + persistentWeakTopics.length +
+    ' turns='     + currentTurnCount +
+    ' adapted='   + (plan.adaptationReason ?? 'none') +
+    ' hasFrontendIntel=' + !!(input.comprehensionContext || input.teachingContext),
   );
 
   return { systemPrompt, history, userMessage: message, modelConfig, plan, context, detectedTopic };

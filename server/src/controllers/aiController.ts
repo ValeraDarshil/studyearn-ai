@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-// AskAI — aiController.ts  (v11 — AI-OS Full Integration)
+// AskAI — aiController.ts  (v13 — +evaluateAnswer, +v13 context fields)
 //
 // ROUTES HANDLED:
 //   POST /api/ai/ask           → askAI()         (image / text non-stream)
@@ -52,6 +52,16 @@ import {
 
 // v12: Visual Brain — analyzes response and returns visual rendering instructions
 import { analyzeWithVisualBrain } from '../services/askAI/visualBrain.js';
+
+// v13: Gap #7 — model performance tracking
+import {
+  recordModelSuccess,
+  recordModelFailure,
+  recordQualityPenalty,
+} from '../services/askAI/aiModelRouter.js';
+
+// v13: Gap #8 — quality label for logging
+import { getQualityLabel } from '../services/askAI/responseValidator.js';
 
 // v9: DB persistence layer
 import {
@@ -294,10 +304,17 @@ export async function askAI(req: Request, res: Response) {
 export async function askAIStream(req: Request, res: Response): Promise<void> {
   const {
     prompt,
-    history     = [],
-    subjectMode = 'auto',
-    stepByStep  = false,
-    convoId     = null,
+    history              = [],
+    subjectMode          = 'auto',
+    stepByStep           = false,
+    convoId              = null,
+    // v13: Gap #1 + #2 — frontend sends these; backend injects into prompt
+    smartMemoryContext   = '',
+    comprehensionContext = '',
+    adaptiveHint         = '',
+    // v14: Gap #3 + #4
+    teachingContext      = '',
+    personalizationContext = '',
   } = req.body;
 
   const userId  = getUserIdFromToken(req) ?? '';
@@ -346,6 +363,13 @@ export async function askAIStream(req: Request, res: Response): Promise<void> {
       history:              contextHistory,
       persistentWeakTopics: dbWeakTopics,
       dbSessionSummary,
+      // v13: frontend-computed intelligence — injected into system prompt
+      smartMemoryContext,
+      comprehensionContext,
+      adaptiveHint,
+      // v14: teaching + personalization context
+      teachingContext,
+      personalizationContext,
     });
 
     const emotionalState = detectEmotionalState(prompt, pkg.plan.turnCount ?? 0);
@@ -424,7 +448,22 @@ export async function askAIStream(req: Request, res: Response): Promise<void> {
 
     // Validate + persist AI message (fire-and-forget)
     if (fullResponse && userId) {
-      validateAndLog(fullResponse, pkg.plan.intent, prompt, userId);
+      const validation = validateAndLog(fullResponse, pkg.plan.intent, prompt, userId);
+      // v13: Gap #7+#8 — feed quality result back into model router
+      // so poor-performing models get deprioritized next time
+      if (validation.pedagogyScore !== undefined) {
+        if (validation.pedagogyScore < 40) {
+          // Poor teaching quality — penalize this model
+          recordQualityPenalty(pkg.modelConfig.modelId, 2);
+          logger.warn(`[Router] Quality penalty x2 | model=${pkg.modelConfig.modelId} pedagogy=${validation.pedagogyScore} quality=${getQualityLabel(validation)}`);
+        } else if (validation.pedagogyScore >= 80) {
+          // Excellent quality — record success
+          recordModelSuccess(pkg.modelConfig.modelId, Date.now() - startMs);
+        }
+      }
+      if (!validation.isValid) {
+        recordQualityPenalty(pkg.modelConfig.modelId, 1);
+      }
     }
 
     if (fullResponse && userId && sessionId) {
@@ -635,6 +674,48 @@ export async function getQuota(req: Request, res: Response) {
 }
 
 // ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────
+// POST /api/ai/evaluate-answer  (v13 — Test Answer Evaluator)
+// Called by frontend when student answers a test question.
+// Returns: correct | incorrect | partial + one-line feedback.
+// Uses solveText() — same AI function used everywhere else.
+// ─────────────────────────────────────────────────────────────
+export async function evaluateAnswer(req: Request, res: Response) {
+  try {
+    const { question, answer, topic, subject } = req.body;
+
+    // If no answer provided, skip silently — never block the UI
+    if (!answer?.trim()) {
+      return res.json({ success: true, result: 'skipped', feedback: '' });
+    }
+
+    const qText = (question || '').slice(0, 400);
+    const aText = (answer   || '').slice(0, 400);
+    const prompt =
+      `You are evaluating a student answer. Be strict but fair.\n` +
+      `Question: "${qText}"\n` +
+      `Student answered: "${aText}"\n` +
+      `Topic: ${topic || 'general'}, Subject: ${subject || 'general'}\n` +
+      `Reply ONLY with valid JSON, no markdown:\n` +
+      `{"result":"correct","feedback":"one short line"}\n` +
+      `result must be: correct | incorrect | partial`;
+
+    const raw    = await solveText(prompt, [], 'general');
+    const clean  = raw.replace(/```json|```/g, '').trim();
+    const parsed = JSON.parse(clean);
+
+    return res.json({
+      success:  true,
+      result:   parsed.result   || 'skipped',
+      feedback: parsed.feedback || '',
+    });
+  } catch (err: any) {
+    // Always return success:true so frontend never breaks
+    logger.warn('evaluateAnswer error (non-critical): ' + err.message);
+    return res.json({ success: true, result: 'skipped', feedback: '' });
+  }
+}
+
 // POST /api/ai/reset-session
 // Called by frontend when user switches chat in sidebar.
 // Clears in-process RAM memory for this user so old context

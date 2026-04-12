@@ -1,9 +1,27 @@
 // ─────────────────────────────────────────────────────────────
-// AskAI.tsx  (v12 — Unforgettable AI: All 10 Improvements)
+// AskAI.tsx  (v14 — Adaptive Teaching Loop + Personalization Engine)
 //
 // ROUTE: src/pages/AskAI.tsx
 //
-// NEW IN v12 (Frontend):
+// NEW IN v13:
+//   GAP #1 FIX — Real Feedback Loop (Comprehension Tracking)
+//     • trackComprehension() called on every action button click
+//     • awaitingTestAnswer flag: next student msg after "Test me"
+//       is auto-evaluated → tracks correct/incorrect in real-time
+//     • getAdaptiveStrategyHint() injected into every API request
+//     • buildComprehensionContext() adds live session stats to prompt
+//     • ComprehensionBadge shows session comprehension % live
+//     • resetSessionComprehension() called on startNewChat()
+//
+//   GAP #2 FIX — Smart Semantic Memory (not context stuffing)
+//     • retrieveRelevantMemories() replaces full history dump
+//     • Only top 4 most-relevant past memories sent per request
+//     • autoExtractAndStoreMemory() auto-indexes each exchange
+//     • buildMemoryContext() creates ranked, compact context block
+//     • resetSessionMemory() called on startNewChat()
+//     • MemoryPulse badge shows live memory count
+//
+// PREVIOUSLY IN v12 (Frontend):
 //   Improvement 2 — StyleChoiceCard: "Beginner / Real-world / Future"
 //                   Student gets control over HOW they learn
 //   Improvement 7 — WowMomentBadge: every 5 turns AI observes
@@ -39,6 +57,28 @@ import { MarkdownRenderer }   from "../components/MarkdownRenderer";
 import { trackProgressEvent } from "../utils/progress-api";
 import { checkIsGeneral, fetchGeneralKnowledge, type GKData } from "../utils/general-api";
 import { checkIsImageRequest, generateImage as generateAIImage, type ImageGenResult } from "../utils/image-api";
+// v13: Gap #1 — Feedback Loop (Comprehension Tracking)
+import {
+  trackComprehension,
+  trackTestResult,
+  getSessionComprehensionStats,
+  buildComprehensionContext,
+  getAdaptiveStrategyHint,
+  detectIfAIAskedQuestion,
+  resetSessionComprehension,
+} from "../utils/comprehension-api";
+// v13: Gap #2 — Smart Semantic Memory
+import {
+  retrieveRelevantMemories,
+  buildMemoryContext,
+  autoExtractAndStoreMemory,
+  resetSessionMemory,
+  getSessionMemoryCount,
+} from "../utils/smart-memory-api";
+// v14: Gap #3 — Adaptive Teaching Loop
+import { useAdaptiveTeaching } from "../hooks/useAdaptiveTeaching";
+// v14: Gap #4 — Personalization Engine
+import { usePersonalization }  from "../hooks/usePersonalization";
 import {
   MentorIntelligenceBar,
   WeakTopicBanner,
@@ -549,6 +589,32 @@ function WowMomentBadge({ text, onDismiss }: { text: string; onDismiss: () => vo
   );
 }
 
+
+// ─── v13: Comprehension Badge ─────────────────────────────────
+// Live session comprehension % shown in header.
+function ComprehensionBadge({ rate, total }: { rate: number; total: number }) {
+  if (total === 0) return null;
+  const color =
+    rate >= 75 ? "text-emerald-400 border-emerald-500/25 bg-emerald-500/8" :
+    rate >= 50 ? "text-amber-400 border-amber-500/25 bg-amber-500/8" :
+                 "text-red-400 border-red-500/25 bg-red-500/8";
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border ${color}`}>
+      🧠 {rate}%
+    </span>
+  );
+}
+
+// ─── v13: Memory Pulse Badge ──────────────────────────────────
+function MemoryPulseBadge({ count }: { count: number }) {
+  if (count === 0) return null;
+  return (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border border-violet-500/25 bg-violet-500/8 text-violet-400">
+      💾 {count}
+    </span>
+  );
+}
+
 // ─── Growth Mirror Card (v12 — Improvement 5) ───────────────
 // Shows at start of first AI response in a session.
 // Visible proof of student's actual progress — NOT generic.
@@ -1029,6 +1095,16 @@ export function AskAI() {
   const [growthMirror,     setGrowthMirror]     = useState<AskAIEnrichment["growthMirror"]>(null);
   const [showGrowthMirror, setShowGrowthMirror] = useState(false);
 
+  // ── v13: Gap #1 — Comprehension Tracking state ──────────────
+  const [comprehensionRate,       setComprehensionRate]       = useState(100);
+  const [comprehensionTotal,      setComprehensionTotal]      = useState(0);
+  const [awaitingTestAnswer,      setAwaitingTestAnswer]      = useState(false);
+  const [pendingTestTopic,        setPendingTestTopic]        = useState<string | null>(null);
+  const [lastComprehensionAction, setLastComprehensionAction] = useState<string | null>(null);
+
+  // ── v13: Gap #2 — Smart Memory state ─────────────────────────
+  const [sessionMemoryCount, setSessionMemoryCount] = useState(0);
+
   // ── Comeback Nudge (v8 NEW) ──────────────────────────────
   const [showComebackNudge, setShowComebackNudge] = useState(false);
   const comebackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1051,6 +1127,35 @@ export function AskAI() {
       }
     },
   });
+
+  // ── v14: Gap #3 — Adaptive Teaching Loop ────────────────────
+  const {
+    cycle:                  teachingCycle,
+    startTeachingCycle,
+    markExplainDone,
+    recordCheckQuestion,
+    markStudentPassed,
+    markStudentFailed,
+    resetCycle:             resetTeachingCycle,
+    completeCycle:          completeTeachingCycle,
+    getTeachingInstructions,
+    shouldStartCycle,
+    isStudentAnsweringCheck,
+    getTeachingStats,
+  } = useAdaptiveTeaching();
+
+  // ── v14: Gap #4 — Personalization Engine ─────────────────────
+  const {
+    profile:                personaProfile,
+    recordStyleChoice,
+    recordComprehensionAction: recordPersonaAction,
+    recordTestResult:       recordPersonaTestResult,
+    recordTurn,
+    buildPersonalizationContext,
+    getSkillLevelForSubject,
+    resetPersonalization,
+    getPersonalizationSummary,
+  } = usePersonalization();
 
   // ── Quota ─────────────────────────────────────────────────
   const [nextRefillSecs, setNextRefillSecs] = useState(0);
@@ -1295,6 +1400,15 @@ export function AskAI() {
     setGrowthMirror(null); setShowGrowthMirror(false);
     setShowComebackNudge(false);
     setEnrichment(null); setShowHintBanner(false); setHintText(null);
+    // v13: Reset feedback loop + memory on new chat
+    setComprehensionRate(100); setComprehensionTotal(0);
+    setAwaitingTestAnswer(false); setPendingTestTopic(null); setLastComprehensionAction(null);
+    setSessionMemoryCount(0);
+    resetSessionComprehension();
+    resetSessionMemory();
+    // v14: Reset teaching cycle + personalization
+    resetTeachingCycle();
+    resetPersonalization();
     textareaRef.current?.focus();
   }
 
@@ -1383,6 +1497,53 @@ export function AskAI() {
   const handleQuickAction = useCallback((type: "understood" | "reexplain" | "testme") => {
     const lastAiMsg = [...messages].reverse().find(m => m.role === "assistant");
 
+    // v13: Gap #1 — Track comprehension action in feedback loop
+    const lastTopic = sessionTopics[sessionTopics.length - 1] || null;
+    trackComprehension({
+      action:    type,
+      topic:     lastTopic,
+      subject:   subjectMode,
+      convoId:   convoIdRef.current,
+      turnIndex: mentorState.turnCount,
+    }).then(() => {
+      const stats = getSessionComprehensionStats();
+      setComprehensionRate(stats.comprehensionRate);
+      setComprehensionTotal(stats.totalInteractions);
+    });
+
+    // v14: Gap #4 — Record action in personalization engine
+    recordPersonaAction(type);
+
+    // v14: Gap #3 — Teaching cycle phase transitions on action clicks
+    if (type === "understood") {
+      // If we were in checking phase, student understood without test
+      if (teachingCycle.phase === "checking") {
+        markStudentPassed();
+        setTimeout(() => completeTeachingCycle(), 3000);
+      }
+    } else if (type === "reexplain") {
+      // Student needs re-explanation — trigger teaching cycle re-explain
+      if (teachingCycle.phase === "checking" || teachingCycle.phase === "explaining") {
+        markStudentFailed();
+      } else if (teachingCycle.phase === "idle" && lastTopic) {
+        // Start a new re-explain cycle
+        startTeachingCycle(lastTopic, subjectMode);
+      }
+    }
+
+    // v13: If "testme", set flag so next student msg is treated as test answer
+    if (type === "testme") {
+      setAwaitingTestAnswer(true);
+      setPendingTestTopic(lastTopic);
+      // v14: Move teaching cycle to checking phase
+      if (teachingCycle.phase === "explaining" || teachingCycle.phase === "idle") {
+        markExplainDone(mentorState.turnCount);
+      }
+    } else {
+      setAwaitingTestAnswer(false);
+    }
+    setLastComprehensionAction(type);
+
     const prompts: Record<typeof type, string> = {
       understood: "Got it! Samajh aaya 👍 Aage batao.",
       reexplain:  "Please explain this again using a completely different example or analogy. Mujhe naya tarika se samjhao.",
@@ -1394,17 +1555,19 @@ export function AskAI() {
     setTimeout(() => {
       textareaRef.current?.focus();
     }, 50);
-  }, [messages]);
+  }, [messages, sessionTopics, subjectMode, mentorState.turnCount]);
 
   // ─────────────────────────────────────────────────────────
   // Style Choice Handler (v12 NEW — Improvement 2)
   // When student picks a learning style from StyleChoiceCard
   // ─────────────────────────────────────────────────────────
   const handleStyleChoice = useCallback((prompt: string) => {
+    // v14: Gap #4 — Record style choice in personalization engine
+    recordStyleChoice(prompt);
     setQuestion(prompt);
     setShowComebackNudge(false);
     setTimeout(() => { textareaRef.current?.focus(); }, 50);
-  }, []);
+  }, [recordStyleChoice]);
 
   // ─────────────────────────────────────────────────────────
   // SEND
@@ -1419,6 +1582,60 @@ export function AskAI() {
     setEnrichment(null);
     setShowHintBanner(false);
     setHintText(null);
+
+    // v13: Gap #1 — If awaitingTestAnswer, evaluate student's reply as test answer
+    // The AI previously asked a test question → this message is the student's answer.
+    // We send it to backend for evaluation, then track result in comprehension system.
+    if (awaitingTestAnswer && text && !uploadedFile) {
+      const evalTopic = pendingTestTopic;
+      setAwaitingTestAnswer(false);
+      setPendingTestTopic(null);
+      // Fire-and-forget: ask backend to evaluate if this answer is correct
+      // Backend receives the student's answer + the last AI message (which had the question)
+      const lastAiContent = [...messages].reverse().find(m => m.role === "assistant")?.content || "";
+      fetch(`${API_URL}/api/ai/evaluate-answer`, {
+        method:  "POST",
+        headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}`, "Content-Type": "application/json" },
+        body:    JSON.stringify({
+          question:    lastAiContent.slice(0, 500),
+          answer:      text,
+          topic:       evalTopic,
+          subject:     subjectMode,
+          convoId:     convoIdRef.current,
+        }),
+      })
+      .then(r => r.json())
+      .then(d => {
+        if (d.success && d.result) {
+          trackTestResult({
+            topic:        evalTopic,
+            subject:      subjectMode,
+            convoId:      convoIdRef.current,
+            result:       d.result,
+            questionText: lastAiContent.slice(0, 200),
+            answerText:   text.slice(0, 200),
+          }).then(() => {
+            const stats = getSessionComprehensionStats();
+            setComprehensionRate(stats.comprehensionRate);
+            setComprehensionTotal(stats.totalInteractions);
+          });
+
+          // v14: Gap #3 — Update teaching cycle based on test result
+          if (d.result === "correct") {
+            markStudentPassed();
+            setTimeout(() => completeTeachingCycle(), 3000);
+          } else if (d.result === "incorrect") {
+            markStudentFailed();
+          }
+
+          // v14: Gap #4 — Record test result in personalization engine
+          recordPersonaTestResult(d.result, subjectMode);
+        }
+      })
+      .catch(() => {
+        // Graceful fail — evaluation optional
+      });
+    }
 
     const userMsg: ChatMsg = {
       role: "user", content: text,
@@ -1612,19 +1829,42 @@ export function AskAI() {
     let firstToken   = true;
 
     try {
+      // v13: Gap #1 & #2 — Build enriched request body BEFORE fetching
+      // Retrieves top-4 semantic memories + live comprehension context
+      const v13LastTopic      = sessionTopics[sessionTopics.length - 1] || null;
+      const v13Memories       = await retrieveRelevantMemories({
+        query:     text,
+        topic:     v13LastTopic,
+        subject:   subjectMode,
+        topK:      4,
+        turnCount: mentorState.turnCount,
+        convoId:   convoIdRef.current,
+      });
+      const v13MemoryContext  = buildMemoryContext(v13Memories);
+      const v13CompStats      = getSessionComprehensionStats();
+      const v13CompContext    = buildComprehensionContext(v13CompStats);
+      const v13AdaptHint      = getAdaptiveStrategyHint(v13CompStats);
+
       const res = await fetch(`${API_URL}/api/ai/ask-stream`, {
         method: "POST",
         headers: { ...authHeaders(), "Content-Type": "application/json" },
         signal: ctrl.signal,
         body: JSON.stringify({
-          prompt:         text,
-          history:        buildHistory(),
+          prompt:               text,
+          history:              buildHistory(),
           userId,
           subjectMode,
           stepByStep,
-          personality:    "friendly",
-          recentActivity: subjectMode === "coding" ? "coding" : "ask",
-          convoId: convoIdRef.current,
+          personality:          "friendly",
+          recentActivity:       subjectMode === "coding" ? "coding" : "ask",
+          convoId:              convoIdRef.current,
+          // v13 NEW fields
+          smartMemoryContext:   v13MemoryContext,    // top relevant past memories
+          comprehensionContext: v13CompContext,      // live session stats
+          adaptiveHint:         v13AdaptHint,        // how AI should adjust
+          // v14 NEW fields
+          teachingContext:      getTeachingInstructions().contextSummary,  // teaching phase
+          personalizationContext: buildPersonalizationContext(),           // student persona
         }),
       });
 
@@ -1787,6 +2027,46 @@ export function AskAI() {
 
       if (convoId) {
         saveMessages(convoId, [userMsg, aiMsg]).then(() => fetchConvos()).catch(() => {});
+      }
+
+      // v13: Gap #2 — Auto-index this exchange into semantic memory
+      if (accumulated) {
+        const v13Topic = sessionTopics[sessionTopics.length - 1] || null;
+        autoExtractAndStoreMemory({
+          aiResponse:          finalContent,
+          userQuestion:        text,
+          topic:               v13Topic,
+          subject:             subjectMode,
+          turnIndex:           mentorState.turnCount,
+          convoId:             convoId,
+          comprehensionAction: lastComprehensionAction || undefined,
+        }).then(() => {
+          setSessionMemoryCount(getSessionMemoryCount());
+        }).catch(() => {});
+
+        // Check if AI asked a test question → flag next student msg as test answer
+        if (lastComprehensionAction === "testme" && detectIfAIAskedQuestion(finalContent)) {
+          setAwaitingTestAnswer(true);
+          setPendingTestTopic(v13Topic);
+        }
+        // Clear last action after processing
+        setLastComprehensionAction(null);
+
+        // v14: Gap #3 — Auto-detect if AI response is an explanation → start teaching cycle
+        if (shouldStartCycle(finalContent, v13Topic, subjectMode)) {
+          startTeachingCycle(v13Topic || "topic", subjectMode);
+        }
+
+        // v14: Gap #3 — If AI response contains a check question, record it
+        if (teachingCycle.phase === "explaining" || teachingCycle.phase === "re_explaining") {
+          if (detectIfAIAskedQuestion(finalContent)) {
+            recordCheckQuestion(finalContent.slice(-200));
+            markExplainDone(mentorState.turnCount + 1);
+          }
+        }
+
+        // v14: Gap #4 — Record turn in personalization engine
+        recordTurn();
       }
 
     } catch (err: any) {
@@ -2020,6 +2300,12 @@ export function AskAI() {
               <span className="hidden sm:inline">Steps</span>
             </button>
 
+            {/* v13: Comprehension badge — shows live session % */}
+            <ComprehensionBadge rate={comprehensionRate} total={comprehensionTotal} />
+
+            {/* v13: Memory pulse badge — shows indexed memory count */}
+            <MemoryPulseBadge count={sessionMemoryCount} />
+
             {/* Questions left */}
             <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-medium ${questionsLeft > 0 ? "border-blue-500/20 bg-blue-500/5 text-blue-300" : "border-red-500/20 bg-red-500/5 text-red-300"}`}>
               <Zap className="w-3 h-3" />
@@ -2051,6 +2337,11 @@ export function AskAI() {
           isVisible={showMentorBar}
           onToggle={() => setShowMentorBar(p => !p)}
           turnCount={mentorState.turnCount}
+          // v14: pass personalization summary for display
+          learningStyle={personaProfile.learningStyle}
+          cognitiveLoad={personaProfile.cognitiveLoad}
+          teachingPhase={teachingCycle.phase}
+          masteredTopics={teachingCycle.masteredTopics}
         />
 
         {/* Weak Topic Banner */}
@@ -2059,6 +2350,44 @@ export function AskAI() {
             topic={weakTopicBanner}
             onDismiss={() => setWeakTopicBanner(null)}
           />
+        )}
+
+        {/* v14: Gap #3 — Teaching Cycle Phase Banner */}
+        {teachingCycle.phase === "re_explaining" && (
+          <div className="mx-4 mt-2 flex items-center gap-2 px-3 py-2 rounded-xl bg-blue-500/8 border border-blue-500/15 animate-fade-in">
+            <span className="text-sm flex-shrink-0">🔄</span>
+            <p className="text-xs text-blue-300 flex-1">
+              <span className="font-semibold">Different angle — attempt {teachingCycle.retryCount}/{teachingCycle.maxRetries}</span>
+              {" "}AI is explaining this a new way using <span className="text-blue-200">{teachingCycle.nextStrategy}</span> approach.
+            </p>
+          </div>
+        )}
+        {teachingCycle.phase === "mastered" && (
+          <div className="mx-4 mt-2 flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-500/8 border border-emerald-500/15 animate-fade-in">
+            <span className="text-sm flex-shrink-0">✅</span>
+            <p className="text-xs text-emerald-300 flex-1">
+              <span className="font-semibold">{teachingCycle.topic} — mastered!</span>
+              {" "}You got it in {teachingCycle.retryCount === 0 ? "one go" : `${teachingCycle.retryCount + 1} attempts`}. 🎉
+            </p>
+          </div>
+        )}
+        {teachingCycle.phase === "giving_up" && (
+          <div className="mx-4 mt-2 flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-500/8 border border-amber-500/15 animate-fade-in">
+            <span className="text-sm flex-shrink-0">📌</span>
+            <p className="text-xs text-amber-300 flex-1">
+              <span className="font-semibold">{teachingCycle.topic}</span> — saved for later review. Moving forward!
+            </p>
+          </div>
+        )}
+
+        {/* v14: Gap #4 — Cognitive overload warning */}
+        {personaProfile.cognitiveLoad === "overloaded" && (
+          <div className="mx-4 mt-2 flex items-center gap-2 px-3 py-2 rounded-xl bg-red-500/8 border border-red-500/15 animate-fade-in">
+            <span className="text-sm flex-shrink-0">🧠</span>
+            <p className="text-xs text-red-300 flex-1">
+              Looks like a lot at once — AI is switching to simpler mode for you.
+            </p>
+          </div>
         )}
 
         {/* Messages */}
@@ -2189,6 +2518,23 @@ export function AskAI() {
           )}
 
           <div className="rounded-2xl border border-white/10 bg-white/[0.02] px-3 py-2">
+            {/* ── v13: Awaiting test answer banner ── */}
+            {awaitingTestAnswer && !isEditing && (
+              <div className="flex items-center justify-between px-1 py-1.5 mb-2 rounded-xl bg-purple-500/10 border border-purple-500/20">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[11px]">🧠</span>
+                  <span className="text-[11px] text-purple-300 font-medium">Test mode — type your answer</span>
+                  <span className="text-[10px] text-purple-500 hidden sm:inline">· AI will evaluate your response</span>
+                </div>
+                <button
+                  onClick={() => { setAwaitingTestAnswer(false); setPendingTestTopic(null); }}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/[0.06] border border-white/10 text-[11px] text-slate-300 hover:text-white hover:bg-white/[0.10] transition-all"
+                >
+                  <X className="w-3 h-3" /> Skip
+                </button>
+              </div>
+            )}
+
             {/* ── Edit mode cancel banner ── */}
             {isEditing && (
               <div className="flex items-center justify-between px-1 py-1.5 mb-2 rounded-xl bg-amber-500/10 border border-amber-500/20">
@@ -2246,15 +2592,16 @@ export function AskAI() {
                   if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
                 }}
                 placeholder={
-                  isListening            ? (interimText || "🎤 Listening… speak now")
-                  : questionsLeft <= 0   ? "Daily limit reached…"
-                  : fileType === "pdf"   ? "What to do with this PDF? (optional)"
-                  : fileType === "image" ? "Describe what to solve (optional)…"
-                  : stepByStep           ? "Ask anything — I'll solve it step by step…"
+                  isListening               ? (interimText || "🎤 Listening… speak now")
+                  : awaitingTestAnswer       ? "Type your answer here… AI will evaluate it 🧠"
+                  : questionsLeft <= 0      ? "Daily limit reached…"
+                  : fileType === "pdf"      ? "What to do with this PDF? (optional)"
+                  : fileType === "image"    ? "Describe what to solve (optional)…"
+                  : stepByStep              ? "Ask anything — I'll solve it step by step…"
                   : subjectMode === "math"    ? "Enter your math problem…"
                   : subjectMode === "coding"  ? "Ask your coding question…"
                   : subjectMode === "science" ? "Ask your science question…"
-                  : hasChat              ? "Ask a follow-up…"
+                  : hasChat                 ? "Ask a follow-up…"
                   : "Ask anything… Hinglish ya English, dono chalega 😊"
                 }
                 disabled={questionsLeft <= 0 || (loading && !isStreaming)}
