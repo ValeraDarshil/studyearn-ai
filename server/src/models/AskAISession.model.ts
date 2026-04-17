@@ -53,6 +53,14 @@ const AskAISessionSchema = new Schema({
   lastMessageAt:   { type: Date, default: Date.now },
   sessionStartAt:  { type: Date, default: Date.now },
   deletedAt:       { type: Date, default: null },
+  // Teaching loop state — persisted so it survives restarts / cold starts
+  loopState:       { type: Schema.Types.Mixed, default: null },
+
+  // Fix B: prevTurn persistence — survives cold starts / serverless restarts
+  lastAiResponse: { type: String,  default: null },
+  lastStrategy:   { type: String,  default: null },
+  lastTopic:      { type: String,  default: null },
+  lastSubject:    { type: String,  default: null },
 
 }, { timestamps: true });
 

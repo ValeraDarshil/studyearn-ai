@@ -62,6 +62,16 @@ TEACHING MODE: FULL SOLUTION
 TEACHING MODE: SHORT
 - Give a concise, direct answer.
 - 2-3 sentences maximum unless a brief example helps.`,
+
+  // ✅ NEW: Preserves "break to simplest level" behaviour from aiBrainCore
+  SIMPLIFY: `
+TEACHING MODE: SIMPLIFY
+- Break this down to the absolute simplest level. One idea per sentence. Use daily life analogies only. No technical terms.`,
+
+  // ✅ NEW: Preserves warm acknowledgement behaviour from aiBrainCore
+  ENCOURAGE: `
+TEACHING MODE: ENCOURAGE
+- Start by acknowledging the student's effort warmly. Then explain gently. Never make them feel bad for not understanding.`,
 };
 
 // ─────────────────────────────────────────────────────────────

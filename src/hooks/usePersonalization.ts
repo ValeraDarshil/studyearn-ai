@@ -1,90 +1,69 @@
 /**
  * usePersonalization.ts
  * ─────────────────────────────────────────────────────────────
- * ROUTE: src/hooks/usePersonalization.ts
- *
  * GAP #4 FIX — Real Personalization Engine
+ * GAP #5 FIX — Persists learningStyle to DB via /api/brain/learning-style
  *
- * What this does:
- *   OLD: skillLevel + weakTopics (static, never changes)
- *   NEW: Dynamic behavioral profiling based on actual actions
- *
- * Tracks & adapts:
- *   1. Learning style (beginner / real-world / future) — from StyleChoiceCard clicks
- *   2. Response speed (fast thinker vs slow processor)
- *   3. Cognitive load index — auto-detects overload from re-explain frequency
- *   4. Attention span modeling — session length + engagement drops
- *   5. Dynamic skill level — updates based on test results, not static
- *   6. Preferred explanation density (short vs detailed)
- *   7. Subject-specific skill maps (math vs coding vs science)
- *
- * Output: buildPersonalizationContext() → injected into every AI request
- * so the model automatically adjusts tone, depth, and style per student.
- * ─────────────────────────────────────────────────────────────
+ * On mount: fetches saved learningStyle from /api/brain/profile
+ * When confidence > 50: PATCHes new style to DB (debounced, once per session)
  */
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
+
+const API_URL = import.meta.env.VITE_API_URL;
 
 // ─── Types ────────────────────────────────────────────────────
 
 export type LearningStyle =
-  | "beginner"    // wants simple, step-by-step
-  | "real_world"  // wants practical examples
-  | "future"      // wants to know WHY it matters
+  | "visual"      // wants diagrams, charts, visual explanations
+  | "example"     // wants practical/real-world examples
+  | "theory"      // wants deep conceptual understanding
+  | "practice"    // wants to learn by doing
   | "unknown";    // not yet detected
 
 export type CognitiveLoad =
-  | "low"         // student breezing through, can take more depth
-  | "normal"      // comfortable pace
-  | "high"        // showing signs of overload, need to simplify
-  | "overloaded"; // multiple failures, needs a break or total reset
+  | "low"
+  | "normal"
+  | "high"
+  | "overloaded";
 
 export type ResponseDensity =
-  | "brief"       // student prefers short answers
-  | "normal"      // standard length
-  | "detailed";   // student asks follow-ups, wants depth
+  | "brief"
+  | "normal"
+  | "detailed";
 
 export interface SubjectSkill {
   subject:       string;
   level:         "beginner" | "intermediate" | "advanced";
   correctCount:  number;
   wrongCount:    number;
-  lastUpdated:   number;  // timestamp
+  lastUpdated:   number;
 }
 
 export interface PersonalizationProfile {
-  // Learning style
   learningStyle:      LearningStyle;
-  styleConfidence:    number;       // 0-100: how sure we are
+  styleConfidence:    number;
   styleCounts:        Record<LearningStyle, number>;
-
-  // Cognitive state
   cognitiveLoad:      CognitiveLoad;
-  reexplainStreak:    number;       // consecutive re-explains needed
-  consecutivePassed:  number;       // consecutive correct answers
-
-  // Speed & density
-  avgAnswerSpeedMs:   number;       // avg ms to answer a question
+  reexplainStreak:    number;
+  consecutivePassed:  number;
+  avgAnswerSpeedMs:   number;
   responseDensity:    ResponseDensity;
-  longResponseCount:  number;       // times student asked follow-up/detail
-  shortResponseCount: number;       // times student used "understood" quickly
-
-  // Skill by subject
+  longResponseCount:  number;
+  shortResponseCount: number;
   subjectSkills:      Record<string, SubjectSkill>;
-
-  // Session meta
   totalTurns:         number;
   sessionStartTime:   number;
   lastActiveTime:     number;
-  engagementDrops:    number;       // long gaps detected this session
+  engagementDrops:    number;
 }
 
 // ─── Default profile ──────────────────────────────────────────
-function defaultProfile(): PersonalizationProfile {
+function defaultProfile(initialStyle: LearningStyle = "unknown"): PersonalizationProfile {
   return {
-    learningStyle:     "unknown",
-    styleConfidence:   0,
-    styleCounts:       { beginner: 0, real_world: 0, future: 0, unknown: 0 },
+    learningStyle:     initialStyle,
+    styleConfidence:   initialStyle !== "unknown" ? 60 : 0,
+    styleCounts:       { visual: 0, example: 0, theory: 0, practice: 0, unknown: 0 },
     cognitiveLoad:     "normal",
     reexplainStreak:   0,
     consecutivePassed: 0,
@@ -105,21 +84,63 @@ function defaultProfile(): PersonalizationProfile {
 export function usePersonalization() {
   const [profile, setProfile] = useState<PersonalizationProfile>(defaultProfile());
   const lastTurnTimeRef = useRef<number>(Date.now());
+  // Track whether we've already synced to DB this session
+  const savedStyleRef = useRef<LearningStyle | null>(null);
+
+  // ── On mount: load saved learningStyle from DB ─────────────
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    fetch(`${API_URL}/api/brain/profile`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(r => r.json())
+      .then(data => {
+        const style: LearningStyle = data?.profile?.learningStyle ?? "unknown";
+        if (style && style !== "unknown") {
+          savedStyleRef.current = style;
+          setProfile(defaultProfile(style));
+        }
+      })
+      .catch(() => {/* silently ignore — non-critical */});
+  }, []);
+
+  // ── Persist to DB when confidence crosses 50 ──────────────
+  const persistLearningStyle = useCallback((style: LearningStyle, confidence: number) => {
+    if (confidence <= 50) return;
+    if (style === "unknown") return;
+    // Once per session — don't re-save the same style
+    if (savedStyleRef.current === style) return;
+
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    savedStyleRef.current = style;
+
+    fetch(`${API_URL}/api/brain/learning-style`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ learningStyle: style }),
+    }).catch(() => {/* silently ignore — non-critical */});
+  }, []);
 
   // ── Style detection ────────────────────────────────────────
 
-  /**
-   * recordStyleChoice — called when student picks from StyleChoiceCard
-   * "Beginner friendly" / "Real-world example" / "Future impact"
-   */
   const recordStyleChoice = useCallback((choice: string) => {
     let style: LearningStyle = "unknown";
-    if (choice.toLowerCase().includes("beginner") || choice.toLowerCase().includes("simple")) {
-      style = "beginner";
-    } else if (choice.toLowerCase().includes("real") || choice.toLowerCase().includes("example")) {
-      style = "real_world";
-    } else if (choice.toLowerCase().includes("future") || choice.toLowerCase().includes("impact")) {
-      style = "future";
+    const c = choice.toLowerCase();
+    if (c.includes("visual") || c.includes("diagram") || c.includes("chart")) {
+      style = "visual";
+    } else if (c.includes("example") || c.includes("real") || c.includes("practical")) {
+      style = "example";
+    } else if (c.includes("theory") || c.includes("concept") || c.includes("why") || c.includes("future") || c.includes("impact")) {
+      style = "theory";
+    } else if (c.includes("practice") || c.includes("exercise") || c.includes("do") || c.includes("beginner") || c.includes("simple")) {
+      style = "practice";
     }
     if (style === "unknown") return;
 
@@ -128,7 +149,6 @@ export function usePersonalization() {
         ...prev.styleCounts,
         [style]: (prev.styleCounts[style] || 0) + 1,
       };
-      // Dominant style = most chosen
       const dominant = (Object.entries(newCounts) as [LearningStyle, number][])
         .filter(([k]) => k !== "unknown")
         .sort((a, b) => b[1] - a[1])[0]?.[0] ?? "unknown";
@@ -138,6 +158,8 @@ export function usePersonalization() {
         ? Math.round((newCounts[dominant] / total) * 100)
         : 0;
 
+      persistLearningStyle(dominant, confidence);
+
       return {
         ...prev,
         learningStyle:   dominant,
@@ -145,14 +167,10 @@ export function usePersonalization() {
         styleCounts:     newCounts,
       };
     });
-  }, []);
+  }, [persistLearningStyle]);
 
   // ── Cognitive load tracking ────────────────────────────────
 
-  /**
-   * recordComprehensionAction — called on every action button press
-   * Updates cognitive load based on pattern.
-   */
   const recordComprehensionAction = useCallback((
     action: "understood" | "reexplain" | "testme",
     answerSpeedMs?: number,
@@ -172,25 +190,17 @@ export function usePersonalization() {
         longResponseCount += 1;
       }
 
-      // Update average answer speed
       if (answerSpeedMs && answerSpeedMs > 0) {
         avgAnswerSpeedMs = prev.avgAnswerSpeedMs === 0
           ? answerSpeedMs
           : Math.round((prev.avgAnswerSpeedMs * 0.7) + (answerSpeedMs * 0.3));
       }
 
-      // Determine cognitive load
-      if (reexplainStreak >= 4) {
-        cognitiveLoad = "overloaded";
-      } else if (reexplainStreak >= 2) {
-        cognitiveLoad = "high";
-      } else if (consecutivePassed >= 3) {
-        cognitiveLoad = "low";
-      } else {
-        cognitiveLoad = "normal";
-      }
+      if (reexplainStreak >= 4)        cognitiveLoad = "overloaded";
+      else if (reexplainStreak >= 2)   cognitiveLoad = "high";
+      else if (consecutivePassed >= 3) cognitiveLoad = "low";
+      else                             cognitiveLoad = "normal";
 
-      // Response density preference
       const densityRatio = longResponseCount / Math.max(1, shortResponseCount + longResponseCount);
       const responseDensity: ResponseDensity =
         densityRatio > 0.6 ? "detailed" :
@@ -209,15 +219,11 @@ export function usePersonalization() {
     });
   }, []);
 
-  /**
-   * recordTestResult — called when test answer is evaluated
-   */
   const recordTestResult = useCallback((
     result:  "correct" | "incorrect" | "partial",
     subject: string,
   ) => {
     setProfile(prev => {
-      // Update subject skill
       const existing = prev.subjectSkills[subject] || {
         subject, level: "intermediate" as const,
         correctCount: 0, wrongCount: 0, lastUpdated: Date.now(),
@@ -237,7 +243,6 @@ export function usePersonalization() {
         [subject]: { subject, level, correctCount: correct, wrongCount: wrong, lastUpdated: Date.now() },
       };
 
-      // Update cognitive load from test results
       let { reexplainStreak, consecutivePassed, cognitiveLoad } = prev;
       if (result === "correct") {
         consecutivePassed += 1;
@@ -263,9 +268,6 @@ export function usePersonalization() {
     });
   }, []);
 
-  /**
-   * recordTurn — called on every send — tracks engagement/attention
-   */
   const recordTurn = useCallback(() => {
     const now = Date.now();
     const gap = now - lastTurnTimeRef.current;
@@ -275,7 +277,6 @@ export function usePersonalization() {
       ...prev,
       totalTurns:     prev.totalTurns + 1,
       lastActiveTime: now,
-      // If gap > 3 minutes = engagement drop detected
       engagementDrops: gap > 3 * 60 * 1000
         ? prev.engagementDrops + 1
         : prev.engagementDrops,
@@ -284,32 +285,25 @@ export function usePersonalization() {
 
   // ── Prompt context builder ─────────────────────────────────
 
-  /**
-   * buildPersonalizationContext — THE main output function
-   * Returns a compact string to inject into every AI request.
-   *
-   * This tells the AI exactly HOW to respond to THIS specific student.
-   */
   const buildPersonalizationContext = useCallback((): string => {
     const p = profile;
     if (p.totalTurns === 0 && p.learningStyle === "unknown") return "";
 
     const parts: string[] = ["STUDENT PERSONALIZATION:"];
 
-    // 1. Learning style
     if (p.learningStyle !== "unknown" && p.styleConfidence > 30) {
       const styleInstructions: Record<LearningStyle, string> = {
-        beginner:   "Student prefers BEGINNER-FRIENDLY explanations. Use simple language, avoid jargon, build from basics.",
-        real_world: "Student prefers REAL-WORLD EXAMPLES. Always connect concepts to practical, relatable scenarios.",
-        future:     "Student is motivated by FUTURE IMPACT. Explain why this matters and where it's used in real life.",
-        unknown:    "",
+        visual:   "Student prefers VISUAL explanations. Use diagrams, charts, and structured layouts when possible.",
+        example:  "Student prefers REAL-WORLD EXAMPLES. Always connect concepts to practical, relatable scenarios.",
+        theory:   "Student prefers THEORY & CONCEPTS. Explain the 'why' deeply, include context and motivation.",
+        practice: "Student learns by DOING. Provide exercises, step-by-step walkthroughs, and hands-on examples.",
+        unknown:  "",
       };
       if (styleInstructions[p.learningStyle]) {
         parts.push(styleInstructions[p.learningStyle]);
       }
     }
 
-    // 2. Cognitive load
     const loadInstructions: Record<CognitiveLoad, string> = {
       low:        "Student is grasping concepts quickly. Can handle more depth, advanced nuance, and edge cases.",
       normal:     "",
@@ -320,7 +314,6 @@ export function usePersonalization() {
       parts.push(loadInstructions[p.cognitiveLoad]);
     }
 
-    // 3. Response density
     const densityInstructions: Record<ResponseDensity, string> = {
       brief:    "Student prefers CONCISE responses. Keep answers short and to the point.",
       normal:   "",
@@ -330,7 +323,6 @@ export function usePersonalization() {
       parts.push(densityInstructions[p.responseDensity]);
     }
 
-    // 4. Subject-specific skill level
     const skills = Object.values(p.subjectSkills);
     if (skills.length > 0) {
       const skillSummary = skills
@@ -339,12 +331,10 @@ export function usePersonalization() {
       parts.push(`Subject skill levels: ${skillSummary}`);
     }
 
-    // 5. Attention/engagement
     if (p.engagementDrops >= 2) {
       parts.push("Student has had attention gaps this session. Keep responses engaging and energetic.");
     }
 
-    // 6. Speed hint
     if (p.avgAnswerSpeedMs > 0) {
       if (p.avgAnswerSpeedMs < 5000) {
         parts.push("Student responds quickly — they are engaged and confident.");
@@ -356,24 +346,17 @@ export function usePersonalization() {
     return parts.length > 1 ? parts.join("\n") : "";
   }, [profile]);
 
-  /**
-   * getSkillLevelForSubject — returns skill for a specific subject
-   */
   const getSkillLevelForSubject = useCallback((subject: string) => {
     return profile.subjectSkills[subject]?.level ?? "intermediate";
   }, [profile.subjectSkills]);
 
-  /**
-   * resetPersonalization — call on startNewChat
-   */
   const resetPersonalization = useCallback(() => {
-    setProfile(defaultProfile());
+    // Keep saved DB style on reset — only reset session-specific state
+    const savedStyle = savedStyleRef.current ?? "unknown";
+    setProfile(defaultProfile(savedStyle));
     lastTurnTimeRef.current = Date.now();
   }, []);
 
-  /**
-   * getPersonalizationSummary — for MentorIntelligenceBar display
-   */
   const getPersonalizationSummary = useCallback(() => ({
     learningStyle:   profile.learningStyle,
     cognitiveLoad:   profile.cognitiveLoad,
@@ -386,15 +369,12 @@ export function usePersonalization() {
 
   return {
     profile,
-    // Recording actions
     recordStyleChoice,
     recordComprehensionAction,
     recordTestResult,
     recordTurn,
-    // Prompt building
     buildPersonalizationContext,
     getSkillLevelForSubject,
-    // Session management
     resetPersonalization,
     getPersonalizationSummary,
   };

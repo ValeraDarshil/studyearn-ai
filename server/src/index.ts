@@ -349,6 +349,8 @@ import brainRoutes       from './routes/brainRoutes.js';
 import learningRoutes    from './routes/learningEngineRoutes.js';
 import progressRoutes    from './routes/progressRoutes.js';
 import './models/AskAISession.model.js';
+import memoryRoutes       from './routes/memoryRoutes.js';
+import comprehensionRoutes from './routes/comprehensionRoutes.js';
  
 // ── Stage 6: AI Mentor ────────────────────────────────────────
 import mentorRoutes      from './routes/mentorRoutes.js';
@@ -358,11 +360,16 @@ import { mentorScheduler } from './services/aiMentor/mentorScheduler.js';
 import retentionRoutes   from './routes/retentionRoutes.js';
 import generalRoutes     from './routes/generalRoutes.js';
 import imageGenRoutes    from './routes/imageGenRoutes.js';
+import aiBrainRoutes     from './routes/aiBrainRoutes.js';
+import aiCoreRoutes      from './routes/aiCoreRoutes.js';
  
 // ── Stage 7 Advanced: Urgency Scheduler (precise 20h detection) ──
 import { UrgencyScheduler } from './services/retentionEngine/urgencyScheduler.js';
  
 import { fixStuckRedemptions, processPendingPremiums } from './controllers/rewardsController.js';
+
+import { decayAllTopics } from './services/adaptive/feedbackLoopEngine.js';
+import { User }            from './models/User.model.js';
  
 /* ─── 3. PROCESS ERROR HANDLERS ────────────────────────── */
 process.on('unhandledRejection', (reason: any) => {
@@ -442,6 +449,10 @@ app.use('/api/mentor',      mentorRoutes);
 app.use('/api/retention',   retentionRoutes);
 app.use('/api/general',     generalRoutes);
 app.use('/api/image',       imageGenRoutes);
+app.use('/api/aibrain',     aiBrainRoutes);
+app.use('/api/ai-core',     aiCoreRoutes);
+app.use('/api/memory',        memoryRoutes);
+app.use('/api/comprehension', comprehensionRoutes);
  
 /* ─── 9. GLOBAL ERROR HANDLER ───────────────────────────── */
 app.use(errorHandler);
@@ -479,4 +490,16 @@ connectDB().then(() => {
   // Precise 20h/36h/48h cron detection — not request-driven
   const urgencyScheduler = new UrgencyScheduler();
   urgencyScheduler.start();
+  // ── Nightly mastery decay — spaced repetition forgetting curve ──
+  setInterval(async () => {
+    try {
+      const users = await User.find({}).select('_id').lean();
+      for (const u of users) {
+        await decayAllTopics((u._id as any).toString());
+      }
+      logger.info('[Cron] Nightly mastery decay complete');
+    } catch (err: any) {
+      logger.warn('[Cron] Nightly mastery decay failed: ' + err.message);
+    }
+  }, 24 * 60 * 60 * 1000);
 });

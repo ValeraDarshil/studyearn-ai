@@ -1,49 +1,54 @@
 // ─────────────────────────────────────────────────────────────
-// AskAI — aiResponsePlanner.ts  (v13 — Intelligent Adaptive Planner)
+// AskAI — aiResponsePlanner.ts  (v14 — EXECUTION LAYER ONLY)
 //
-// ROUTE: server/src/services/askAI/aiResponsePlanner.ts
+// ARCHITECTURAL CHANGE (v13 → v14):
 //
-// GAP #5 FIX — Response Planner: from static rules → adaptive intelligence
+//   v13: This file detected intent, scored strategies, and made
+//        decisions about which strategy to use. It was effectively
+//        a second decision engine running in parallel with aiBrainCore.
 //
-// What changed vs old version:
-//   OLD: Rule-based intent detection → fixed strategy mapping
-//        Same strategy for same intent every time, never adapts
+//   v14: This file is now a PURE EXECUTION LAYER.
+//        - It reads FinalDecision from aiBrainCore (the authority).
+//        - It builds a ResponsePlan that downstream prompt-builders need.
+//        - It makes ZERO independent decisions about strategy, model, or tone.
 //
-//   NEW: 5 layers of intelligence added:
-//     1. Comprehension-aware strategy — reads frontend comprehension stats
-//        and adapts strategy based on how well student is doing RIGHT NOW
-//     2. Reexplain detection — detects "dubara samjhao" patterns and
-//        automatically switches to a different strategy, never repeats
-//     3. Teaching phase awareness — knows if we're in EXPLAIN/CHECK/REEXPLAIN
-//        cycle and picks strategy accordingly
-//     4. Personalization signals — reads learningStyle + cognitiveLoad
-//        from frontend and bakes them into strategy choice
-//     5. Dynamic follow-up logic — adapts whether to ask follow-up based
-//        on comprehension rate, not just intent
+//   ALL decision logic (intent routing, comprehension overrides,
+//   reexplain detection, cognitiveLoad switching) has been removed
+//   from this file. Those decisions live in aiBrainCore.ts only.
 //
-// All new fields are OPTIONAL — if frontend sends them, planner adapts.
-// If not sent (old frontend), falls back to same behavior as before.
+//   BACKWARD COMPATIBILITY:
+//   - ResponsePlan interface is preserved (same shape as v13)
+//   - buildResponsePlan() still exists (signature compatible)
+//   - detectIntent() still exported (used by orchestrator for logging)
+//   - New: buildResponsePlanFromDecision() — primary function when
+//     a FinalDecision is available (preferred path)
 // ─────────────────────────────────────────────────────────────
 
+import type { FinalDecision } from '../adaptive/aiBrainCore.js';
+
+// ── Types (preserved from v13 — backward compatible) ──────────
+
 export type Intent =
-  | 'EXPLAIN'       // "what is X", "explain X"
-  | 'SOLVE'         // "solve this", "find X"
-  | 'DEBUG'         // "why is my code wrong", "fix this"
-  | 'GUIDE'         // "how do I", "help me with"
-  | 'QUIZ'          // "quiz me", "test me"
-  | 'FOLLOWUP'      // short question continuing prior context
-  | 'CONCEPTUAL'    // "why does X work", "what's the difference"
-  | 'GENERAL';      // catch-all
+  | 'EXPLAIN'
+  | 'SOLVE'
+  | 'DEBUG'
+  | 'GUIDE'
+  | 'QUIZ'
+  | 'FOLLOWUP'
+  | 'CONCEPTUAL'
+  | 'GENERAL';
 
 export type ResponseStrategy =
-  | 'TEACH'         // full concept explanation with examples
-  | 'STEP_BY_STEP'  // numbered breakdown
-  | 'HINT'          // give hint first, not full answer
-  | 'SOLVE'         // complete solution
-  | 'GUIDE'         // ask questions back to guide student
-  | 'QUIZ'          // generate quiz question
-  | 'FULL_SOLUTION' // comprehensive answer for complex problems
-  | 'SHORT';        // brief, direct answer
+  | 'TEACH'
+  | 'STEP_BY_STEP'
+  | 'HINT'
+  | 'SOLVE'
+  | 'GUIDE'
+  | 'QUIZ'
+  | 'FULL_SOLUTION'
+  | 'SHORT'
+  | 'SIMPLIFY'    // ✅ NEW
+  | 'ENCOURAGE';  // ✅ NEW
 
 export interface ResponsePlan {
   intent:              Intent;
@@ -52,34 +57,28 @@ export interface ResponsePlan {
   correctGently:       boolean;
   boostConfidence:     boolean;
   turnCount?:          number;
-  // v13 additions
-  adaptationReason?:   string;   // why this strategy was chosen (for logging)
-  useAnalogy?:         boolean;  // should AI use a real-world analogy?
-  keepShort?:          boolean;  // override: keep response brief
-  emphasizeEncourage?: boolean;  // extra encouragement for struggling student
+  // v13 fields — preserved for downstream compatibility
+  adaptationReason?:   string;
+  useAnalogy?:         boolean;
+  keepShort?:          boolean;
+  emphasizeEncourage?: boolean;
 }
 
-// ─────────────────────────────────────────────────────────────
-// v13: Intelligence input — optional fields from frontend
-// ─────────────────────────────────────────────────────────────
+// v13 intelligence input — preserved for legacy compatibility
 export interface PlannerIntelligenceInput {
-  // Gap #1: from comprehension-api.ts
-  comprehensionRate?:  number;   // 0-100: session comprehension %
-  reexplainRate?:      number;   // 0-100: % of times re-explain was needed
-  sessionStreak?:      number;   // consecutive correct answers
-  topWeakTopics?:      string[]; // topics that needed re-explanation
-
-  // Gap #3: teaching phase from useAdaptiveTeaching
-  teachingPhase?:      string;   // 'idle'|'explaining'|'checking'|'re_explaining'|'mastered'
-
-  // Gap #4: personalization from usePersonalization
-  learningStyle?:      string;   // 'beginner'|'real_world'|'future'|'unknown'
-  cognitiveLoad?:      string;   // 'low'|'normal'|'high'|'overloaded'
-  responseDensity?:    string;   // 'brief'|'normal'|'detailed'
+  comprehensionRate?:  number;
+  reexplainRate?:      number;
+  sessionStreak?:      number;
+  topWeakTopics?:      string[];
+  teachingPhase?:      string;
+  learningStyle?:      string;
+  cognitiveLoad?:      string;
+  responseDensity?:    string;
 }
 
 // ─────────────────────────────────────────────────────────────
-// Intent Detection — unchanged from v8, keeps backward compat
+// Intent Detection — preserved from v13, used for logging only
+// Planner no longer uses intent to determine strategy.
 // ─────────────────────────────────────────────────────────────
 const INTENT_PATTERNS: { intent: Intent; patterns: RegExp[] }[] = [
   {
@@ -139,202 +138,121 @@ export function detectIntent(message: string): Intent {
 }
 
 // ─────────────────────────────────────────────────────────────
-// v13: Reexplain Detection
-// Detects when student is asking for re-explanation so we
-// automatically switch strategy (never repeat same approach)
+// mapBrainStrategy — maps adaptive TeachingStrategy to ResponseStrategy
 // ─────────────────────────────────────────────────────────────
-function detectReexplainRequest(message: string): boolean {
-  const lower = message.toLowerCase();
-  return /dubara|phir se|samajh nahi|nahi samajha|explain again|re.?explain|different (way|example|approach)|try again|once more|aur simple|aur easy|naya example|new example|different analogy|kuch aur|alag se/.test(lower);
+function mapBrainStrategy(brainStrategy: FinalDecision['strategy']): ResponseStrategy {
+  const mapping: Record<string, ResponseStrategy> = {
+    'TEACH':         'TEACH',
+    'SIMPLIFY':      'SIMPLIFY',      // ✅ FIXED: was 'TEACH' — preserves simplest-level behaviour
+    'STEP_BY_STEP':  'STEP_BY_STEP',
+    'HINT':          'HINT',
+    'CHALLENGE':     'FULL_SOLUTION', // CHALLENGE → FULL_SOLUTION (harder content)
+    'GUIDE':         'GUIDE',
+    'QUIZ':          'QUIZ',
+    'FULL_SOLUTION': 'FULL_SOLUTION',
+    'ENCOURAGE':     'ENCOURAGE',     // ✅ FIXED: was 'TEACH' — preserves warm-acknowledgement behaviour
+    'SHORT':         'SHORT',
+  };
+  return mapping[brainStrategy] ?? 'TEACH';
 }
 
 // ─────────────────────────────────────────────────────────────
-// Base Strategy Selector — same logic as v8
+// buildResponsePlanFromDecision — PRIMARY function (v14)
+//
+// Converts a FinalDecision into a ResponsePlan.
+// This is the ONLY place strategy enters the plan — from Brain Core.
+// No overrides. No independent decisions.
 // ─────────────────────────────────────────────────────────────
-function selectBaseStrategy(
-  intent:       Intent,
-  skillLevel:   'beginner' | 'intermediate' | 'advanced',
-  isStruggling: boolean,
-  turnCount:    number,
-): ResponseStrategy {
-  if (intent === 'QUIZ')                          return 'QUIZ';
-  if (intent === 'DEBUG')                         return 'STEP_BY_STEP';
-  if (intent === 'FOLLOWUP' && turnCount > 0)     return 'SHORT';
+export function buildResponsePlanFromDecision(
+  message:       string,
+  decision:      FinalDecision,
+  turnCount:     number,
+  stepByStep?:   boolean,
+): ResponsePlan {
+  const intent = detectIntent(message); // for logging/metadata only
 
-  if (isStruggling) {
-    if (intent === 'SOLVE')   return 'STEP_BY_STEP';
-    if (intent === 'EXPLAIN') return 'TEACH';
-    return 'GUIDE';
+  // Strategy comes from Brain Core — this file does NOT override it
+  let strategy = mapBrainStrategy(decision.strategy);
+
+  // stepByStep is a user-explicit override — the one legitimate override
+  // because it's a direct UI control, not a system decision
+  if (stepByStep && strategy !== 'QUIZ') {
+    strategy = 'STEP_BY_STEP';
   }
 
-  switch (intent) {
-    case 'EXPLAIN':    return skillLevel === 'advanced' ? 'FULL_SOLUTION' : 'TEACH';
-    case 'SOLVE':      return skillLevel === 'beginner'  ? 'STEP_BY_STEP'  : 'SOLVE';
-    case 'GUIDE':      return 'STEP_BY_STEP';
-    case 'CONCEPTUAL': return 'TEACH';
-    case 'GENERAL':    return 'TEACH';
-    default:           return 'TEACH';
-  }
+  const state = decision.inferredState;
+
+  return {
+    intent,
+    strategy,
+    followUpQuestion:    decision.followUpRequired,
+    correctGently:       state.needsReexplain || state.emotion === 'confused',
+    boostConfidence:     state.needsEncouragement || decision.tone === 'encouraging' || decision.tone === 'warm',
+    turnCount,
+    adaptationReason:    decision.strategyReason,
+    useAnalogy:          state.needsReexplain || decision.difficultyLevel === 'beginner',
+    keepShort:           strategy === 'SHORT',
+    emphasizeEncourage:  decision.tone === 'encouraging',
+  };
 }
 
 // ─────────────────────────────────────────────────────────────
-// v13: Comprehension-aware strategy override
-// The key upgrade: looks at HOW WELL student is doing and picks
-// the most effective strategy for THEM RIGHT NOW
-// ─────────────────────────────────────────────────────────────
-function applyComprehensionOverride(
-  baseStrategy:      ResponseStrategy,
-  intent:            Intent,
-  intel:             PlannerIntelligenceInput,
-  isReexplain:       boolean,
-): { strategy: ResponseStrategy; reason: string; useAnalogy: boolean; emphasizeEncourage: boolean } {
-  const rate    = intel.comprehensionRate   ?? 100;
-  const reRate  = intel.reexplainRate       ?? 0;
-  const streak  = intel.sessionStreak       ?? 0;
-  const load    = intel.cognitiveLoad       ?? 'normal';
-  const phase   = intel.teachingPhase       ?? 'idle';
-  const density = intel.responseDensity     ?? 'normal';
-  const style   = intel.learningStyle       ?? 'unknown';
-
-  let strategy          = baseStrategy;
-  let reason            = 'base selection';
-  let useAnalogy        = false;
-  let emphasizeEncourage = false;
-
-  // ── Teaching phase overrides ───────────────────────────────
-  if (phase === 're_explaining') {
-    // Student failed a check question — use completely different approach
-    strategy           = intent === 'SOLVE' ? 'STEP_BY_STEP' : 'TEACH';
-    useAnalogy         = true;
-    emphasizeEncourage = true;
-    reason             = 'teaching-phase:re_explaining → analogy+encourage';
-    return { strategy, reason, useAnalogy, emphasizeEncourage };
-  }
-
-  if (phase === 'checking') {
-    // AI asked a check question — keep response short, evaluate their answer
-    strategy = 'SHORT';
-    reason   = 'teaching-phase:checking → short evaluative response';
-    return { strategy, reason, useAnalogy, emphasizeEncourage };
-  }
-
-  // ── Cognitive overload — override everything to simplest mode ─
-  if (load === 'overloaded') {
-    strategy           = 'STEP_BY_STEP';
-    useAnalogy         = true;
-    emphasizeEncourage = true;
-    reason             = 'cognitive-overload → step-by-step + analogy + encourage';
-    return { strategy, reason, useAnalogy, emphasizeEncourage };
-  }
-
-  // ── Reexplain request — pick different strategy from last ──
-  if (isReexplain) {
-    const reexplainMap: Record<ResponseStrategy, ResponseStrategy> = {
-      'TEACH':         'STEP_BY_STEP',
-      'STEP_BY_STEP':  'GUIDE',
-      'GUIDE':         'TEACH',
-      'HINT':          'TEACH',
-      'SOLVE':         'STEP_BY_STEP',
-      'FULL_SOLUTION': 'TEACH',
-      'QUIZ':          'TEACH',
-      'SHORT':         'TEACH',
-    };
-    strategy   = reexplainMap[baseStrategy] ?? 'TEACH';
-    useAnalogy = true;
-    reason     = `reexplain-detected → switched ${baseStrategy} → ${strategy} + analogy`;
-    return { strategy, reason, useAnalogy, emphasizeEncourage };
-  }
-
-  // ── Comprehension rate adjustments ────────────────────────
-  if (rate < 40 || reRate > 60) {
-    // Student struggling a lot — simplify
-    strategy           = intent === 'SOLVE' ? 'STEP_BY_STEP' : 'TEACH';
-    useAnalogy         = true;
-    emphasizeEncourage = true;
-    reason             = `low-comprehension(${rate}%) → simplified + analogy`;
-  } else if (rate > 80 && streak >= 3) {
-    // Student on a streak — can go deeper
-    strategy = intent === 'EXPLAIN' ? 'FULL_SOLUTION' :
-               intent === 'SOLVE'   ? 'SOLVE'         : baseStrategy;
-    reason   = `high-comprehension(${rate}%) + streak(${streak}) → advanced mode`;
-  } else if (load === 'high') {
-    // High load but not overloaded — step by step
-    strategy   = 'STEP_BY_STEP';
-    useAnalogy = reRate > 30;
-    reason     = 'cognitive-load:high → step-by-step';
-  }
-
-  // ── Density overrides ─────────────────────────────────────
-  if (density === 'brief' && strategy !== 'QUIZ') {
-    strategy = 'SHORT';
-    reason   += ' + density:brief → SHORT';
-  } else if (density === 'detailed' && strategy === 'SHORT') {
-    strategy = 'TEACH';
-    reason   += ' + density:detailed → TEACH';
-  }
-
-  // ── Learning style adjustments ────────────────────────────
-  if (style === 'beginner' && strategy === 'FULL_SOLUTION') {
-    strategy = 'TEACH';   // beginners find full solutions overwhelming
-    reason  += ' + style:beginner → TEACH';
-  } else if (style === 'real_world') {
-    useAnalogy = true;    // always use analogy for real-world learners
-  } else if (style === 'future' && strategy === 'SHORT') {
-    strategy = 'TEACH';   // future-impact learners want context, not just answers
-    reason  += ' + style:future → TEACH';
-  }
-
-  return { strategy, reason, useAnalogy, emphasizeEncourage };
-}
-
-// ─────────────────────────────────────────────────────────────
-// buildResponsePlan — main export
-// v13: accepts optional intelligence input for adaptation
-// Fully backward compatible — works without intel input too
+// buildResponsePlan — LEGACY function (backward compatible)
+//
+// Preserved for callers that don't have a FinalDecision yet.
+// When aiBrainCore is available, always prefer buildResponsePlanFromDecision.
+//
+// IMPORTANT: This function still does intent-based planning as a
+// fallback. It is NOT authoritative. It should only run if Brain
+// Core fails or is unavailable.
 // ─────────────────────────────────────────────────────────────
 export function buildResponsePlan(
   message:       string,
   skillLevel:    'beginner' | 'intermediate' | 'advanced',
   mistakeTopics: string[],
   turnCount:     number,
-  intel?:        PlannerIntelligenceInput,   // v13: optional adaptive input
+  intel?:        PlannerIntelligenceInput,
 ): ResponsePlan {
-  const intent        = detectIntent(message);
-  const isStruggling  = mistakeTopics.length > 0;
-  const isReexplain   = detectReexplainRequest(message);
-  const baseStrategy  = selectBaseStrategy(intent, skillLevel, isStruggling, turnCount);
+  const intent       = detectIntent(message);
+  const isStruggling = mistakeTopics.length > 0;
+  const isReexplain  = /dubara|phir se|samajh nahi|explain again|different (way|example)|try again|once more|naya example/.test(message.toLowerCase());
 
-  // v13: Apply intelligence override if intel data provided
-  const override = intel
-    ? applyComprehensionOverride(baseStrategy, intent, intel, isReexplain)
-    : { strategy: baseStrategy, reason: 'no-intel', useAnalogy: false, emphasizeEncourage: false };
+  // Fallback strategy selection (only used when Brain Core is unavailable)
+  let strategy: ResponseStrategy = 'TEACH';
 
-  const finalStrategy = override.strategy;
+  if (intent === 'QUIZ')                       strategy = 'QUIZ';
+  else if (intent === 'DEBUG')                 strategy = 'STEP_BY_STEP';
+  else if (intent === 'FOLLOWUP' && turnCount > 0) strategy = 'SHORT';
+  else if (isStruggling || isReexplain)        strategy = 'STEP_BY_STEP';
+  else if (intent === 'SOLVE')                 strategy = skillLevel === 'beginner' ? 'STEP_BY_STEP' : 'SOLVE';
+  else if (intent === 'GUIDE')                 strategy = 'STEP_BY_STEP';
 
-  // Dynamic follow-up: only ask follow-up if comprehension rate is decent
-  // (no point asking follow-up if student is already struggling)
-  const compRate          = intel?.comprehensionRate ?? 100;
-  const shouldFollowUp    = finalStrategy !== 'QUIZ' &&
-                            finalStrategy !== 'SHORT' &&
-                            finalStrategy !== 'FULL_SOLUTION' &&
-                            compRate > 30;
+  // Apply intel overrides (also fallback-only)
+  if (intel) {
+    const { cognitiveLoad, teachingPhase, comprehensionRate, responseDensity } = intel;
+    if (cognitiveLoad === 'overloaded')       strategy = 'STEP_BY_STEP';
+    if (teachingPhase === 'checking')          strategy = 'SHORT';
+    if (teachingPhase === 're_explaining')     strategy = 'TEACH';
+    if ((comprehensionRate ?? 100) < 40)       strategy = intent === 'SOLVE' ? 'STEP_BY_STEP' : 'TEACH';
+    if (responseDensity === 'brief' && strategy !== 'QUIZ') strategy = 'SHORT';
+  }
 
-  // Boost confidence: struggling, or low comprehension, or early turns
-  const shouldBoost = isStruggling ||
-                      (intel?.cognitiveLoad === 'high' || intel?.cognitiveLoad === 'overloaded') ||
-                      (intel?.comprehensionRate !== undefined && intel.comprehensionRate < 50) ||
-                      turnCount > 3;
+  const compRate   = intel?.comprehensionRate ?? 100;
+  const shouldBoost = isStruggling
+    || intel?.cognitiveLoad === 'overloaded'
+    || (compRate !== undefined && compRate < 50)
+    || turnCount > 3;
 
   return {
     intent,
-    strategy:            finalStrategy,
-    followUpQuestion:    shouldFollowUp,
-    correctGently:       isStruggling || isReexplain,
-    boostConfidence:     shouldBoost,
+    strategy,
+    followUpQuestion: strategy !== 'QUIZ' && strategy !== 'SHORT' && compRate > 30,
+    correctGently:    isStruggling || isReexplain,
+    boostConfidence:  shouldBoost,
     turnCount,
-    adaptationReason:    override.reason,
-    useAnalogy:          override.useAnalogy,
-    keepShort:           finalStrategy === 'SHORT',
-    emphasizeEncourage:  override.emphasizeEncourage,
+    adaptationReason: '[FALLBACK] Brain Core unavailable — legacy planner used',
+    useAnalogy:       isReexplain || skillLevel === 'beginner',
+    keepShort:        strategy === 'SHORT',
+    emphasizeEncourage: isStruggling || compRate < 40,
   };
 }

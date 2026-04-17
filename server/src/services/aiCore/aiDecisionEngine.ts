@@ -1,18 +1,22 @@
 /**
- * AI Study OS — AI Decision Engine (Stage 5)
+ * AI Study OS — AI Decision Engine  (v2 — Adaptive Strategy Scoring)
  * ─────────────────────────────────────────────────────────────
- * Analyzes student state + trigger → generates ordered action list.
+ * GAP 1 FIX: Replaced static "if (confused) → SIMPLIFY" with
+ * strategyScoringEngine — scores each strategy and picks the best.
  *
- * Smart filtering rules:
- *   'ask_ai'          → only buildAIContext + prepareTutor
- *   'lesson_complete' → progress update + insights
- *   'login'           → full run (background)
- *   'daily_cron'      → full maintenance
+ * GAP 8 FIX: Reads optimizationEngine output to inform decisions.
+ *
+ * All original logic preserved. New adaptive layer sits ON TOP.
  */
 
 import { StudentStateData, StudentState } from './studentStateManager.js';
 import { OrchestrationTrigger }           from './aiOrchestrator.js';
 import { logger }                         from '../../utils/logger.js';
+
+// ── NEW: Adaptive imports ──────────────────────────────────────
+import { strategyScoringEngine }          from '../adaptive/strategyScoringEngine.js';
+import { optimizationEngine }             from '../adaptive/metricsEngine.js';
+import { memoryRetrievalEngine }          from '../adaptive/memoryRetrievalEngine.js';
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -77,13 +81,24 @@ export const aiDecisionEngine = {
     // Trigger-based decisions
     decisions.push(...getTriggerDecisions(trigger));
 
-    // State-based decisions (skip for lightweight triggers unless forceFullRun)
+    // ── GAP 1 FIX: Adaptive state decisions ──────────────────
+    // Instead of pure static rules, use strategy scoring for STUCK/IMPROVING/ADVANCED
     if (!isLightweightTrigger(trigger) || forceFullRun) {
-      decisions.push(...getStateDecisions(currentState, stateData));
+      if (['STUCK', 'IMPROVING', 'ADVANCED'].includes(currentState)) {
+        decisions.push(...await getAdaptiveStateDecisions(userId, currentState, stateData));
+      } else {
+        decisions.push(...getStateDecisions(currentState, stateData));
+      }
     }
 
     // Alert-driven decisions
     decisions.push(...getAlertDecisions(stateData));
+
+    // ── GAP 8 FIX: Optimization-driven decisions ─────────────
+    // Run optimization check in background — non-blocking
+    if (!isLightweightTrigger(trigger)) {
+      applyOptimizationDecisions(userId, decisions).catch(() => {});
+    }
 
     const ordered = sortByPriority(deduplicateDecisions(decisions));
 
@@ -97,7 +112,133 @@ export const aiDecisionEngine = {
 };
 
 // ─────────────────────────────────────────────────────────────
-// Trigger Rules
+// GAP 1: Adaptive state decisions using strategy scoring
+// ─────────────────────────────────────────────────────────────
+async function getAdaptiveStateDecisions(
+  userId:       string,
+  currentState: string,
+  stateData:    StudentStateData
+): Promise<OrchestratorDecision[]> {
+
+  try {
+    // Get top-ranked strategies for this student+state
+    const topStrategies = await strategyScoringEngine.getTopStrategies({
+      userId,
+      currentState,
+      masteryLevel:      stateData.overallMastery ?? 50,
+      confusionSignal:   currentState === 'STUCK',
+      frustrationSignal: false,
+      sessionStreak:     0,
+      lastStrategy:      null,
+    }, 2);
+
+    const primary   = topStrategies[0];
+    const secondary = topStrategies[1];
+
+    const decisions: OrchestratorDecision[] = [];
+
+    if (currentState === 'STUCK') {
+      decisions.push({
+        action:     'triggerTutor',
+        priority:   'critical',
+        reason:     `Stuck — adaptive strategy: ${primary?.strategy ?? 'SIMPLIFY'} (score: ${primary?.score.toFixed(2)})`,
+        background: false,
+        metadata:   {
+          weakTopics:       stateData.weakTopics,
+          adaptiveStrategy: primary?.strategy,
+          strategyScore:    primary?.score,
+        },
+      });
+      decisions.push({
+        action:     'adjustDifficulty',
+        priority:   'high',
+        reason:     `Reduce difficulty — confusion detected`,
+        background: false,
+        metadata:   { direction: 'decrease' },
+      });
+    }
+
+    if (currentState === 'IMPROVING') {
+      decisions.push({
+        action:     'generateInsights',
+        priority:   'high',
+        reason:     `Improving — motivational insights`,
+        background: false,
+      });
+      // Score-based: only boost difficulty if strategy scoring agrees
+      if (primary?.strategy === 'CHALLENGE' || secondary?.strategy === 'CHALLENGE') {
+        decisions.push({
+          action:     'boostDifficulty',
+          priority:   'normal',
+          reason:     `Strategy score recommends CHALLENGE (${primary?.score.toFixed(2)})`,
+          background: true,
+          metadata:   { direction: 'increase' },
+        });
+      }
+    }
+
+    if (currentState === 'ADVANCED') {
+      decisions.push({
+        action:     'challengeMode',
+        priority:   'high',
+        reason:     `Advanced — top strategy: ${primary?.strategy} (score: ${primary?.score.toFixed(2)})`,
+        background: false,
+        metadata:   { adaptiveStrategy: primary?.strategy },
+      });
+    }
+
+    return decisions;
+
+  } catch (err: any) {
+    // Fallback to static rules on error
+    logger.warn({ userId, err: err.message }, '[DecisionEngine] Adaptive scoring failed — using static rules');
+    return getStateDecisions(currentState as StudentState, stateData);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// GAP 8: Apply optimization engine signals
+// ─────────────────────────────────────────────────────────────
+async function applyOptimizationDecisions(
+  userId:    string,
+  decisions: OrchestratorDecision[]
+): Promise<void> {
+  try {
+    const optimization = await optimizationEngine.optimize(userId);
+
+    if (optimization.reengagementSuggested) {
+      // Only add if not already present
+      const hasReengagement = decisions.some(d => d.action === 'reengagementPlan');
+      if (!hasReengagement) {
+        decisions.push({
+          action:     'reengagementPlan',
+          priority:   'high',
+          reason:     `Optimization: churn risk=${optimization.churnRisk}`,
+          background: true,
+          metadata:   { churnRisk: optimization.churnRisk, recommendation: optimization.recommendation },
+        });
+      }
+    }
+
+    if (optimization.suggestedDifficultyDelta === 1) {
+      const hasBoost = decisions.some(d => d.action === 'boostDifficulty');
+      if (!hasBoost) {
+        decisions.push({
+          action:     'boostDifficulty',
+          priority:   'low',
+          reason:     `Optimization: accuracy improving, increase difficulty`,
+          background: true,
+          metadata:   { direction: 'increase' },
+        });
+      }
+    }
+  } catch {
+    // Non-fatal — optimization is always best-effort
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Original Trigger Rules (unchanged)
 // ─────────────────────────────────────────────────────────────
 function getTriggerDecisions(trigger: OrchestrationTrigger): OrchestratorDecision[] {
   switch (trigger) {
@@ -143,7 +284,7 @@ function getTriggerDecisions(trigger: OrchestrationTrigger): OrchestratorDecisio
 }
 
 // ─────────────────────────────────────────────────────────────
-// State Rules
+// Original Static State Rules (preserved as fallback)
 // ─────────────────────────────────────────────────────────────
 function getStateDecisions(
   state:     StudentState,
@@ -194,9 +335,6 @@ function getStateDecisions(
   }
 }
 
-// ─────────────────────────────────────────────────────────────
-// Alert Rules
-// ─────────────────────────────────────────────────────────────
 function getAlertDecisions(stateData: StudentStateData): OrchestratorDecision[] {
   const decisions: OrchestratorDecision[] = [];
   for (const alert of stateData.alerts) {
@@ -207,9 +345,6 @@ function getAlertDecisions(stateData: StudentStateData): OrchestratorDecision[] 
   return decisions;
 }
 
-// ─────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────
 function isLightweightTrigger(trigger: OrchestrationTrigger): boolean {
   return trigger === 'ask_ai' || trigger === 'lesson_complete' || trigger === 'quiz_complete';
 }

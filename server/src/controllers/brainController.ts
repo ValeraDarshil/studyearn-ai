@@ -3,6 +3,9 @@
  * ─────────────────────────────────────────────────────────────
  * FIX: brainSetupCompleted DB mein save hota hai —
  * baar baar login pe onboarding nahi aata.
+ *
+ * GAP 5 FIX: Added updateLearningStyle endpoint —
+ * PATCH /api/brain/learning-style persists detected style to DB.
  */
 
 import { Request, Response } from 'express';
@@ -27,10 +30,10 @@ import {
   getLatestReport,
   generateQuizAlert,
 } from '../services/progressIntelService.js';
-// ── Stage 4 connection ────────────────────────────────────────
 import { onActivityEvent } from '../services/progressSystem/progressAnalyzer.js';
 import { onQuizComplete }  from '../services/learningSystem/personalLearningEngine.js';
 import { User } from '../models/User.model.js';
+import { StudentProfile } from '../models/StudentProfile.model.js';
 import { logger } from '../utils/logger.js';
 
 // ─────────────────────────────────────────────────────────────
@@ -43,7 +46,7 @@ export async function setupProfile(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  const { learnerCategory, classLevel, primarySubjects, preferredLanguage } = req.body;
+  const { learnerCategory, classLevel, primarySubjects, preferredLanguage, level } = req.body;
 
   if (!['school', 'coding', 'college', 'self'].includes(learnerCategory)) {
     res.status(400).json({ success: false, message: 'Invalid learnerCategory' });
@@ -60,10 +63,45 @@ export async function setupProfile(req: Request, res: Response): Promise<void> {
       preferredLanguage,
     });
 
-    // ✅ KEY FIX: DB mein permanently save karo
-    // Yeh field /api/auth/me response mein aayegi
-    // Frontend isko check karta hai — localStorage pe depend nahi karte
-    // Isse chahe koi bhi device ya browser pe login kare, onboarding dobara nahi aayega
+    // FIX 5: Seed overallMasteryScore from the onboarding level field.
+    // Maps beginner/intermediate/advanced → a realistic starting mastery score
+    // so Brain Core gets the correct difficulty from session 1.
+    const masteryMap: Record<string, number> = {
+      'beginner':     15,
+      'intermediate': 45,
+      'advanced':     72,
+    };
+    const onboardingLevel  = (level || '').toLowerCase().trim();
+    const initialMastery   = masteryMap[onboardingLevel] ?? 50;
+
+    // Build initial topicMastery entries for each chosen subject
+    const topicMasteryEntries = (primarySubjects || []).map((subject: string) => ({
+      topic:           subject,
+      subject:         subject,
+      category:        learnerCategory,
+      masteryLevel:    initialMastery,
+      correctAttempts: 0,
+      totalAttempts:   0,
+      lastAttemptedAt: null,
+      isWeak:          initialMastery < 30,
+      isStrong:        initialMastery >= 70,
+      trend:           'stable' as const,
+    }));
+
+    await StudentProfile.findOneAndUpdate(
+      { userId },
+      {
+        $set: { overallMasteryScore: initialMastery },
+        // Only push topic entries that don't already exist
+        ...(topicMasteryEntries.length > 0
+          ? { $addToSet: { topicMastery: { $each: topicMasteryEntries } } }
+          : {}),
+      },
+      { upsert: true },
+    );
+
+    logger.info(`[BrainController] setup: onboardingLevel=${onboardingLevel || 'none'} initialMastery=${initialMastery} userId=${userId}`);
+
     await User.findByIdAndUpdate(userId, {
       brainSetupCompleted: true,
       onboardingCompleted: true,
@@ -286,7 +324,6 @@ export async function submitQuizResult(req: Request, res: Response): Promise<voi
   }
 
   try {
-    // Stage 1 — Update topic mastery in AI Brain
     await updateTopicMastery(userId, {
       subject,
       topic,
@@ -297,18 +334,47 @@ export async function submitQuizResult(req: Request, res: Response): Promise<voi
 
     await syncActivityToProfile(userId, 'quiz_completed', 20);
 
-    // Stage 1 — Original quiz alert
     const alert = await generateQuizAlert(userId, topic, subject, score);
 
-    // Stage 3 + 4 — Fire adaptive cycle in background (non-blocking)
     Promise.all([
-      onQuizComplete(userId, topic, subject, score),              // Stage 3
-      onActivityEvent(userId, 'quiz_done', { topic, subject, score }), // Stage 4
+      onQuizComplete(userId, topic, subject, score),
+      onActivityEvent(userId, 'quiz_done', { topic, subject, score }),
     ]).catch(() => {});
 
     res.json({ success: true, alert, masteryUpdated: true });
   } catch (err: any) {
     logger.error(`[BrainController] quizResult: ${err.message}`);
     res.status(500).json({ success: false });
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// PATCH /api/brain/learning-style
+// ─────────────────────────────────────────────────────────────
+export async function updateLearningStyle(req: Request, res: Response): Promise<void> {
+  const userId = getUserIdFromToken(req);
+  if (!userId) {
+    res.status(401).json({ success: false, message: 'Unauthorized' });
+    return;
+  }
+
+  const { learningStyle } = req.body;
+  const validStyles = ['visual', 'example', 'theory', 'practice', 'unknown'];
+
+  if (!learningStyle || !validStyles.includes(learningStyle)) {
+    res.status(400).json({ success: false, message: 'Invalid learningStyle. Must be one of: visual, example, theory, practice, unknown' });
+    return;
+  }
+
+  try {
+    await StudentProfile.findOneAndUpdate(
+      { userId },
+      { $set: { learningStyle } },
+      { upsert: false }
+    );
+    res.json({ success: true, learningStyle });
+  } catch (err: any) {
+    logger.error(`[BrainController] updateLearningStyle: ${err.message}`);
+    res.status(500).json({ success: false, message: 'Failed to update learning style' });
   }
 }

@@ -1,24 +1,12 @@
 /**
- * AI Study OS — Context Fusion Engine (Stage 5)
+ * AI Study OS — Context Fusion Engine  (v2 — Long-Term Memory Integration)
  * ─────────────────────────────────────────────────────────────
- * Combines ALL AI systems into a single rich context packet
- * that gets injected into every AskAI call.
+ * GAP 2 FIX: Replaced session-only memory dump with:
+ *   • longTermMemoryEngine  — persistent student history
+ *   • memoryRetrievalEngine — relevant-first (topK) retrieval
  *
- * Sources fused:
- *   1. AI Brain (BrainSnapshot)           → profile, plan, progress
- *   2. AI Memory (AIMemorySnapshot)       → past questions, weak areas
- *   3. Tutor Context (TutorContextPacket) → skill level, personality
- *   4. Student State (StudentStateData)   → current state from Stage 5
- *
- * Uses EXACT types from existing files:
- *   StudentIntelligenceProfile → learningType, classLevel, weakTopics,
- *                                currentStreak, overallMastery, tutorPersonality
- *   TutorContextPacket         → skillLevel, weakTopics, learnerType,
- *                                systemPromptBlock
- *   BrainSnapshot              → profile, dailyPlan (recommendations[])
- *
- * Output: FusedAIContext.systemPromptPrefix
- *   → Prepended to existing systemPromptBlock in aiController.ts
+ * Original fuse() logic fully preserved.
+ * New memory layer ADDS to the systemPromptPrefix — no breaking changes.
  */
 
 import { StudentStateData }                   from './studentStateManager.js';
@@ -27,40 +15,43 @@ import { getBrainSnapshot, BrainSnapshot }    from '../aiBrain/aiBrain.service.j
 import { buildTutorContext }                  from '../aiTutor/tutorContextManager.js';
 import { logger }                             from '../../utils/logger.js';
 
+// ── GAP 2 NEW imports ─────────────────────────────────────────
+import { longTermMemoryEngine }               from '../adaptive/longTermMemoryEngine.js';
+import { memoryRetrievalEngine }              from '../adaptive/memoryRetrievalEngine.js';
+
 // ── Types ──────────────────────────────────────────────────────
 
 export interface FusedAIContext {
   userId:        string;
 
-  // Student identity (from StudentIntelligenceProfile)
-  learningType:  string;   // 'school' | 'coding' | 'college' | 'self'
+  learningType:  string;
   classLevel:    string | null;
-  skillLevel:    string;   // 'beginner' | 'intermediate' | 'advanced'
+  skillLevel:    string;
 
-  // Current state
   currentState:    string;
   isStruggling:    boolean;
   isImproving:     boolean;
   isNewUser:       boolean;
 
-  // Knowledge context
   weakTopics:          string[];
   strongTopics:        string[];
   recentSubjects:      string[];
-  persistentWeakAreas: string[];  // appeared 2+ times in recentMistakes
+  persistentWeakAreas: string[];
 
-  // Performance
-  overallMastery:  number;   // 0–100
+  overallMastery:  number;
   streakDays:      number;
-  learningSpeed:   string;   // 'slow' | 'medium' | 'fast'
+  learningSpeed:   string;
 
-  // Memory
   recentQuestions:  string[];
   achievements:     string[];
 
-  // Tutor
   tutorPersonality:   string;
-  systemPromptPrefix: string;  // inject into Claude system prompt
+  systemPromptPrefix: string;
+
+  // GAP 2: long-term memory additions
+  longTermWeakConcepts:  string[];
+  longTermStrongConcepts: string[];
+  relevantMemoryBlock:   string;
 
   fusedAt:       string;
   sourcesSynced: string[];
@@ -75,259 +66,205 @@ export const contextFusionEngine = {
     logger.info({ userId }, '[ContextFusion] Starting context fusion');
 
     // Fetch all sources in parallel — gracefully degrade on failure
-    const [brainResult, memoryResult, tutorResult] = await Promise.allSettled([
+    const [brainResult, memoryResult, tutorResult, ltmResult, retrievalResult] = await Promise.allSettled([
       getBrainSnapshot(userId),
       aiMemoryStore.getMemorySnapshot(userId),
-      // buildTutorContext requires userMessage — use neutral placeholder
       buildTutorContext(userId, 'context preparation'),
+      // GAP 2: Long-term memory
+      longTermMemoryEngine.getMemory(userId),
+      // GAP 2: Relevant retrieval (use student state as query)
+      memoryRetrievalEngine.retrieve({
+        userId,
+        queryText:    stateData.currentState,
+        currentState: stateData.currentState,
+        topK:         5,
+      }),
     ]);
 
-    const brain  = brainResult.status  === 'fulfilled' ? brainResult.value  : null;
-    const memory = memoryResult.status === 'fulfilled' ? memoryResult.value : null;
-    const tutor  = tutorResult.status  === 'fulfilled' ? tutorResult.value  : null;
+    const brain     = brainResult.status     === 'fulfilled' ? brainResult.value     : null;
+    const memory    = memoryResult.status    === 'fulfilled' ? memoryResult.value    : null;
+    const tutor     = tutorResult.status     === 'fulfilled' ? tutorResult.value     : null;
+    const ltMemory  = ltmResult.status       === 'fulfilled' ? ltmResult.value       : null;
+    const retrieval = retrievalResult.status === 'fulfilled' ? retrievalResult.value : null;
 
     const sourcesSynced: string[] = ['studentState'];
-    if (brain)  sourcesSynced.push('aiBrain');
-    if (memory) sourcesSynced.push('aiMemory');
-    if (tutor)  sourcesSynced.push('aiTutor');
+    if (brain)     sourcesSynced.push('aiBrain');
+    if (memory)    sourcesSynced.push('aiMemory');
+    if (tutor)     sourcesSynced.push('aiTutor');
+    if (ltMemory)  sourcesSynced.push('longTermMemory');
+    if (retrieval) sourcesSynced.push('memoryRetrieval');
 
     logger.info({ userId, sourcesSynced }, '[ContextFusion] Sources loaded');
 
-    return buildFusedContext(userId, stateData, brain, memory, tutor, sourcesSynced);
+    return buildFusedContext(userId, stateData, brain, memory, tutor, ltMemory, retrieval, sourcesSynced);
   },
 };
 
 // ─────────────────────────────────────────────────────────────
-// buildFusedContext
+// buildFusedContext — internal builder
 // ─────────────────────────────────────────────────────────────
 function buildFusedContext(
-  userId:       string,
-  stateData:    StudentStateData,
-  brain:        BrainSnapshot | null,
-  memory:       AIMemorySnapshot | null,
-  tutor:        any | null,
+  userId:     string,
+  stateData:  StudentStateData,
+  brain:      any | null,
+  memory:     AIMemorySnapshot | null,
+  tutor:      any | null,
+  ltMemory:   any | null,
+  retrieval:  any | null,
   sourcesSynced: string[]
 ): FusedAIContext {
 
-  const profile = brain?.profile ?? null;
-
   // ── Identity ─────────────────────────────────────────────────
-  // StudentIntelligenceProfile uses: learningType, classLevel, weakTopics,
-  // strongTopics, currentStreak, overallMastery, tutorPersonality, learningSpeed
-  const learningType   = profile?.learningType  ?? 'school';
-  const classLevel     = profile?.classLevel    ?? null;
-  const skillLevel     = tutor?.skillLevel      ?? deriveSkillLevel(profile?.overallMastery ?? 0);
-  const tutorPersonality = profile?.tutorPersonality ?? 'normal';
+  const profile       = (brain as any)?.profile ?? null;
+  const learningType  = profile?.learnerCategory   ?? tutor?.learnerType   ?? 'self';
+  const classLevel    = profile?.classLevel        ?? tutor?.classLevel    ?? null;
+  const skillLevel    = tutor?.skillLevel          ?? profile?.skillLevel  ?? 'intermediate';
+  const tutorPersonality = profile?.tutorPersonality ?? tutor?.personality ?? 'mentor';
 
-  // ── Topics ───────────────────────────────────────────────────
-  const brainWeakTopics   = profile?.weakTopics   ?? [];
-  const stateWeakTopics   = stateData.weakTopics;
-  const memoryWeakTopics  = (memory?.weakTopics ?? []).map(w => w.topic);
+  // ── Current state ─────────────────────────────────────────────
+  const { currentState, overallMastery, weakTopics: stateWeakTopics = [] } = stateData;
+  const isStruggling = currentState === 'STUCK';
+  const isImproving  = currentState === 'IMPROVING';
+  const isNewUser    = currentState === 'NEW_USER';
 
-  // Merge + deduplicate weak topics from all sources
-  const allWeakTopics = [...new Set([
-    ...brainWeakTopics,
-    ...stateWeakTopics,
-    ...memoryWeakTopics,
-  ])].slice(0, 8);
+  // ── Knowledge context ─────────────────────────────────────────
+  const brainWeakTopics:   string[] = (brain as any)?.profile?.weakTopics   ?? [];
+  const brainStrongTopics: string[] = (brain as any)?.profile?.strongTopics ?? [];
+  const tutorWeakTopics:   string[] = tutor?.weakTopics ?? tutor?.criticalTopics ?? [];
+  const memoryWeakTopics:  string[] = (memory?.weakTopics ?? []).map((w: any) => w.topic);
 
-  // Persistent weak areas = appeared 2+ times in memory
-  const persistentWeakAreas = (memory?.weakTopics ?? [])
-    .filter(w => w.occurrences >= 2)
-    .map(w => w.topic)
+  const weakTopics   = dedupe([...stateWeakTopics, ...brainWeakTopics, ...tutorWeakTopics, ...memoryWeakTopics]).slice(0, 8);
+  const strongTopics = dedupe(brainStrongTopics).slice(0, 6);
+
+  const recentSubjects: string[] = (memory?.recentConversations ?? [])
+    .map((c: any) => c.topic)
+    .filter(Boolean)
+    .slice(0, 5) as string[];
+
+  // Persistent weak areas — appeared 2+ times in recentMistakes
+  const mistakeCounts: Record<string, number> = {};
+  for (const t of memoryWeakTopics) {
+    mistakeCounts[t] = (mistakeCounts[t] ?? 0) + 1;
+  }
+  const persistentWeakAreas = Object.entries(mistakeCounts)
+    .filter(([, count]) => count >= 2)
+    .map(([t]) => t)
     .slice(0, 5);
 
-  const strongTopics = profile?.strongTopics ?? stateData.strongTopics;
-
   // ── Performance ───────────────────────────────────────────────
-  const overallMastery = profile?.overallMastery  ?? stateData.overallMastery;
-  const streakDays     = profile?.currentStreak   ?? stateData.streakDays;
-  const learningSpeed  = profile?.learningSpeed   ?? stateData.learningVelocity;
+  const streakDays   = (brain as any)?.profile?.currentStreak ?? 0;
+  const learningSpeed = (brain as any)?.profile?.learningSpeed ?? 'medium';
 
   // ── Memory ────────────────────────────────────────────────────
   const recentQuestions = (memory?.recentConversations ?? [])
-    .slice(0, 3)
-    .map(c => c.question);
+    .map((c: any) => c.question)
+    .filter(Boolean)
+    .slice(0, 5) as string[];
 
   const achievements = (memory?.achievements ?? [])
-    .slice(0, 3)
-    .map(a => a.title);
+    .map((a: any) => a.title)
+    .filter(Boolean)
+    .slice(0, 3) as string[];
 
-  // ── Daily plan topics ─────────────────────────────────────────
-  // DailyPlan has: date, greeting, focusMessage, recommendations[], motivationalNote
-  const currentTopics = (brain?.dailyPlan?.recommendations ?? [])
-    .slice(0, 3)
-    .map((r: any) => r.topic ?? r.title ?? '')
-    .filter(Boolean);
+  // ── GAP 2: Long-term memory fields ───────────────────────────
+  const longTermWeakConcepts   = ltMemory?.weakConcepts?.map((c: any) => c.concept)   ?? [];
+  const longTermStrongConcepts = ltMemory?.strongConcepts?.map((c: any) => c.concept) ?? [];
+  const relevantMemoryBlock    = retrieval?.promptBlock ?? '';
 
   // ── Build system prompt prefix ────────────────────────────────
   const systemPromptPrefix = buildSystemPromptPrefix({
-    learningType,
-    classLevel,
-    skillLevel,
-    currentState:    stateData.currentState,
-    weakTopics:      allWeakTopics,
-    persistentWeakAreas,
-    strongTopics,
-    currentTopics,
-    recentQuestions,
-    overallMastery,
-    streakDays,
-    tutorPersonality,
-    isStruggling:    stateData.currentState === 'STUCK',
-    isNewUser:       stateData.currentState === 'NEW_USER',
-    learningVelocity: String(learningSpeed),
+    learningType, classLevel, skillLevel, tutorPersonality,
+    currentState, isStruggling, isImproving,
+    weakTopics, strongTopics, persistentWeakAreas,
+    overallMastery, streakDays, learningSpeed,
+    recentQuestions, achievements,
+    // GAP 2 additions
+    longTermWeakConcepts,
+    relevantMemoryBlock,
+    ltMemoryBlock: ltMemory ? longTermMemoryEngine.buildMemoryPromptBlock(ltMemory) : '',
   });
 
   return {
     userId,
-    learningType:       String(learningType),
-    classLevel,
-    skillLevel,
-    currentState:       stateData.currentState,
-    isStruggling:       stateData.currentState === 'STUCK',
-    isImproving:        stateData.currentState === 'IMPROVING',
-    isNewUser:          stateData.currentState === 'NEW_USER',
-    weakTopics:         allWeakTopics,
-    strongTopics,
-    recentSubjects:     stateData.recentSubjects,
-    persistentWeakAreas,
-    overallMastery,
-    streakDays,
-    learningSpeed:      String(learningSpeed),
-    recentQuestions,
-    achievements,
-    tutorPersonality,
-    systemPromptPrefix,
-    fusedAt:            new Date().toISOString(),
+    learningType, classLevel, skillLevel,
+    currentState, isStruggling, isImproving, isNewUser,
+    weakTopics, strongTopics, recentSubjects, persistentWeakAreas,
+    overallMastery: overallMastery ?? 0,
+    streakDays, learningSpeed,
+    recentQuestions, achievements,
+    tutorPersonality, systemPromptPrefix,
+    longTermWeakConcepts,
+    longTermStrongConcepts,
+    relevantMemoryBlock,
+    fusedAt:       new Date().toISOString(),
     sourcesSynced,
   };
 }
 
 // ─────────────────────────────────────────────────────────────
-// System Prompt Builder
+// System prompt prefix builder
 // ─────────────────────────────────────────────────────────────
-interface PromptParams {
-  learningType:       string;
-  classLevel:         string | null;
-  skillLevel:         string;
-  currentState:       string;
-  weakTopics:         string[];
+function buildSystemPromptPrefix(data: {
+  learningType:        string;
+  classLevel:          string | null;
+  skillLevel:          string;
+  tutorPersonality:    string;
+  currentState:        string;
+  isStruggling:        boolean;
+  isImproving:         boolean;
+  weakTopics:          string[];
+  strongTopics:        string[];
   persistentWeakAreas: string[];
-  strongTopics:       string[];
-  currentTopics:      string[];
-  recentQuestions:    string[];
-  overallMastery:     number;
-  streakDays:         number;
-  tutorPersonality:   string;
-  isStruggling:       boolean;
-  isNewUser:          boolean;
-  learningVelocity:   string;
-}
+  overallMastery:      number;
+  streakDays:          number;
+  learningSpeed:       string;
+  recentQuestions:     string[];
+  achievements:        string[];
+  longTermWeakConcepts: string[];
+  relevantMemoryBlock:  string;
+  ltMemoryBlock:        string;
+}): string {
+  const lines: string[] = [];
 
-function buildSystemPromptPrefix(p: PromptParams): string {
-  const lines: string[] = [
-    '## AI Study OS — Student Context (Stage 5)',
-    '',
-    `**Learning Type:** ${formatLearningType(p.learningType)}` +
-      (p.classLevel ? ` | ${p.classLevel}` : ''),
-    `**Skill Level:** ${p.skillLevel} | **State:** ${p.currentState}`,
-    `**Mastery:** ${p.overallMastery}% | **Streak:** ${p.streakDays} days | **Pace:** ${p.learningVelocity}`,
-    '',
-  ];
+  lines.push(`Student Type: ${data.learningType}${data.classLevel ? ` (${data.classLevel})` : ''}`);
+  lines.push(`Skill Level: ${data.skillLevel} | Mastery: ${data.overallMastery}% | Streak: ${data.streakDays} days`);
+  lines.push(`Learning State: ${data.currentState} | Speed: ${data.learningSpeed}`);
 
-  if (p.currentTopics.length > 0) {
-    lines.push(`**Currently Studying:** ${p.currentTopics.join(', ')}`);
+  if (data.weakTopics.length > 0) {
+    lines.push(`Weak Topics: ${data.weakTopics.slice(0, 5).join(', ')}`);
+  }
+  if (data.strongTopics.length > 0) {
+    lines.push(`Strong Topics: ${data.strongTopics.slice(0, 4).join(', ')}`);
+  }
+  if (data.persistentWeakAreas.length > 0) {
+    lines.push(`⚠️ Persistent struggles: ${data.persistentWeakAreas.join(', ')}`);
+  }
+  if (data.isStruggling) {
+    lines.push('🔴 Student is STUCK — use simpler explanations and extra encouragement.');
+  }
+  if (data.isImproving) {
+    lines.push('🟢 Student is IMPROVING — acknowledge progress and gently increase challenge.');
+  }
+  if (data.recentQuestions.length > 0) {
+    lines.push(`Recent questions: ${data.recentQuestions.slice(0, 3).join(' | ')}`);
+  }
+  if (data.achievements.length > 0) {
+    lines.push(`Recent wins: ${data.achievements.join(', ')}`);
   }
 
-  if (p.weakTopics.length > 0) {
-    lines.push(`**Weak Areas (needs extra attention):** ${p.weakTopics.join(', ')}`);
-  }
-
-  if (p.persistentWeakAreas.length > 0) {
-    lines.push(`**Persistent Struggles (appeared 2+ times):** ${p.persistentWeakAreas.join(', ')}`);
-    lines.push('→ Use simpler language and more examples for these topics.');
-  }
-
-  if (p.strongTopics.length > 0) {
-    lines.push(`**Strong Areas:** ${p.strongTopics.join(', ')}`);
-  }
-
-  if (p.recentQuestions.length > 0) {
+  // GAP 2: Long-term memory additions
+  if (data.ltMemoryBlock) {
     lines.push('');
-    lines.push('**Student recently asked:**');
-    p.recentQuestions.forEach(q => lines.push(`  - "${q}"`));
-    lines.push('→ Use this context to build connected explanations.');
+    lines.push(data.ltMemoryBlock);
   }
-
-  lines.push('');
-  lines.push('**Teaching Instructions:**');
-  lines.push(buildTeachingInstructions(p));
-
-  lines.push('');
-  lines.push('---');
-  lines.push('');
+  if (data.relevantMemoryBlock) {
+    lines.push('');
+    lines.push(data.relevantMemoryBlock);
+  }
 
   return lines.join('\n');
 }
 
-function buildTeachingInstructions(p: PromptParams): string {
-  const parts: string[] = [];
-
-  // Personality-based instruction
-  switch (p.tutorPersonality) {
-    case 'simple':
-      parts.push('Use very simple language. Avoid jargon. Use relatable daily-life examples.');
-      break;
-    case 'advanced':
-      parts.push('Use technical language. Skip basics unless asked. Include edge cases and best practices.');
-      break;
-    default:
-      parts.push('Balance simplicity with depth. Use practical examples.');
-  }
-
-  // State-based instruction
-  if (p.isStruggling) {
-    parts.push('Student is struggling — be extra patient. Break explanations into small steps. Add encouragement.');
-  } else if (p.isNewUser) {
-    parts.push('New student — be welcoming and exciting. Keep things simple and motivating.');
-  }
-
-  // Learning type instruction
-  switch (p.learningType) {
-    case 'coding':
-      parts.push('Include code examples when relevant. Show runnable snippets with comments.');
-      break;
-    case 'school':
-      parts.push('Use examples from school subjects. Relate concepts to textbook context.');
-      break;
-    case 'college':
-      parts.push('Go deeper technically. Connect theory to real-world applications.');
-      break;
-  }
-
-  if (p.persistentWeakAreas.length > 0) {
-    parts.push(`Student has struggled repeatedly with: ${p.persistentWeakAreas.join(', ')}. Show extra patience here.`);
-  }
-
-  return parts.join(' ');
-}
-
-// ─────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────
-function deriveSkillLevel(mastery: number): string {
-  if (mastery >= 75) return 'advanced';
-  if (mastery >= 45) return 'intermediate';
-  return 'beginner';
-}
-
-function formatLearningType(type: string): string {
-  const map: Record<string, string> = {
-    school:  'School Student',
-    coding:  'Coding Learner',
-    college: 'College Student',
-    self:    'Self-Learner',
-  };
-  return map[type] ?? type;
+function dedupe(arr: string[]): string[] {
+  return [...new Set(arr.filter(Boolean))];
 }

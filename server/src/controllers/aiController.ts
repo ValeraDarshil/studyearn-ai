@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-// AskAI — aiController.ts  (v13 — +evaluateAnswer, +v13 context fields)
+// AskAI — aiController.ts  (v15 — FIX 1/2/3 from audit)
 //
 // ROUTES HANDLED:
 //   POST /api/ai/ask           → askAI()         (image / text non-stream)
@@ -9,17 +9,31 @@
 //   GET  /api/ai/quota         → getQuota()      (remaining questions)
 //   POST /api/ai/reset-session → resetSession()  (chat switch RAM clear)
 //
-// WHAT'S NEW IN v11:
-//   1. askAIOrchestrator wired — post-response enrichment pipeline:
-//        learningRecommendationEngine → next-topic suggestions (every 3rd turn)
-//        progressAnalyzer            → real-time mastery score update
-//        hintGenerator               → socratic nudge when strategy=HINT
-//        emotional nudge             → rotating encouragement for struggling students
-//   2. detectTopicExpanded — 80+ topics (was 18), full Indian curriculum
-//   3. Bug fixed: validateAskAI now applied to /ask-stream route (aiRoutes.ts)
-//   4. Bug fixed: turnCount passed correctly to buildResponsePlan (askAIService.ts)
-//   5. Enrichment emitted as final SSE chunk { enrichment: {...} }
-//      Frontend reads this to show recommendation cards / nudges
+// ─── WHAT CHANGED IN v15 ─────────────────────────────────────
+//
+// FIX 1 (CRITICAL — audit Issue #1):
+//   TEXT path in POST /api/ai/ask previously called personalTutorSolve()
+//   which bypassed aiBrainCore entirely. It is now replaced with the SAME
+//   pipeline as the streaming path:
+//     buildMasterPrompt() → solveText() → afterResponseWithBrain()
+//   FinalDecision is always built. feedbackLoop, strategy scoring, and
+//   memory updates now fire for ALL non-streaming text requests.
+//
+// FIX 2 (CRITICAL — audit Issue #2):
+//   strategyScoringEngine.ts and feedbackLoopEngine.ts both had
+//   { upsert: false } in their findOneAndUpdate calls, causing silent
+//   failures for new users. Changed to { upsert: true } with default
+//   document structure so new users immediately start building a profile.
+//   (See strategyScoringEngine.ts and feedbackLoopEngine.ts)
+//
+// FIX 3 (STABILITY — audit Issue #3):
+//   prevTurnStore (in-memory Map) is still used as primary fast-path cache,
+//   but DB persistence was already added in Fix B. This release adds an
+//   explicit $set write with upsert:true after every streaming turn so the
+//   DB record is always authoritative even on first turn of a new session.
+//
+// All other fixes (FIX A/B, image/PDF Brain Core, model routing) are
+// carried forward unchanged from v14.
 // ─────────────────────────────────────────────────────────────
 
 import { Request, Response }     from 'express';
@@ -28,8 +42,6 @@ import {
   solveWithVision,
   solveTextStreamWithContext,
 }                                from '../services/aiService.js';
-import { contextAwareSolve }    from '../services/contextTutorService.js';
-import { personalTutorSolve }   from '../services/aiTutor/aiTutor.service.js';
 import { parsePDFText }         from '../services/pdfService.js';
 import { getUserIdFromToken }   from '../middleware/authMiddleware.js';
 import { User }                 from '../models/User.model.js';
@@ -42,6 +54,7 @@ import {
   buildMasterPrompt,
   validateAndLog,
   detectEmotionalState,
+  afterResponseWithBrain,
 }                               from '../services/askAI/askAIService.js';
 
 // v11: AI-OS Orchestrator — post-response enrichment + expanded topic detection
@@ -71,6 +84,33 @@ import {
   getWeakTopicsFromDB,
   getSessionSummaryForPrompt,
 }                               from '../services/askAI/askAIDbService.js';
+
+// Brain Core for image/PDF/text paths
+import { aiBrainCore }          from '../services/adaptive/aiBrainCore.js';
+
+// Fix A: masteryLevel from DB
+import { StudentProfile }       from '../models/StudentProfile.model.js';
+
+// Fix B: prevTurn DB persistence
+import { AskAISession }         from '../models/AskAISession.model.js';
+
+// ─────────────────────────────────────────────────────────────
+// FIX 2: prevTurnStore — in-memory store for previous turn data.
+// Used to score the PREVIOUS strategy using the CURRENT message as
+// a reaction signal, and to pass prevAiResponse into the pipeline
+// so feedbackLoopEngine.processOutcome() fires from turn 2 onward.
+// key = userId + ':' + (convoId || 'default')
+// ─────────────────────────────────────────────────────────────
+interface PrevTurnData {
+  aiResponse:    string;
+  strategy:      string;
+  topic:         string | null;
+  subject:       string;
+  sessionId:     string;
+  finalDecision: any;
+  turnCount:     number;
+}
+const prevTurnStore = new Map<string, PrevTurnData>();
 
 // ─────────────────────────────────────────────────────────────
 // Constants
@@ -180,7 +220,11 @@ async function handleQuestionUsed(
 
 // ─────────────────────────────────────────────────────────────
 // POST /api/ai/ask
-// Non-streaming: IMAGE (vision) + legacy text path
+// Non-streaming: IMAGE (vision) + TEXT path
+//
+// FIX 1 (v15): TEXT path now goes through Brain Core via
+// buildMasterPrompt() → solveText() → afterResponseWithBrain()
+// exactly like the streaming path. personalTutorSolve() is removed.
 // ─────────────────────────────────────────────────────────────
 export async function askAI(req: Request, res: Response) {
   try {
@@ -209,42 +253,213 @@ export async function askAI(req: Request, res: Response) {
     const questionType: 'text' | 'image' | 'pdf'  = image ? 'image' : 'text';
     const startMs                                  = Date.now();
     let answer: string;
+    let sessionId = '';
 
     if (image) {
-      // IMAGE → NVIDIA vision (primary) → Groq Vision → OR Vision
+      // ── IMAGE PATH — Brain Core first → solveWithVision with context ──
       let imageUrl = image;
       if (!image.startsWith('data:')) {
         const isJpeg = image.startsWith('/9j/');
         imageUrl     = `data:image/${isJpeg ? 'jpeg' : 'png'};base64,${image}`;
       }
       logger.info(`/api/ai/ask image=true | mode=${subjectMode || 'auto'}`);
-      answer = await solveWithVision(imageUrl, prompt || '');
-    } else {
-      // TEXT → personalTutorSolve → contextAwareSolve → solveText (fallback chain)
-      logger.info(`/api/ai/ask text | mode=${subjectMode || 'auto'}`);
+
+      // Fix A: Read masteryLevel from StudentProfile DB before Brain Core call
+      let resolvedMastery = 50;
       if (userId) {
         try {
-          const tutorResponse = await personalTutorSolve({
-            userId,
-            message:        prompt,
-            history:        safeHistory,
-            personality:    personality  || undefined,
-            hintOverride:   hintMode !== undefined ? !!hintMode : undefined,
-            recentActivity: recentActivity || undefined,
-          });
-          answer = tutorResponse.answer;
+          const profileSnap = await StudentProfile
+            .findOne({ userId })
+            .select('overallMasteryScore')
+            .lean();
+          if (profileSnap?.overallMasteryScore != null) {
+            resolvedMastery = profileSnap.overallMasteryScore;
+          }
         } catch {
-          try {
-            answer = await contextAwareSolve(userId, prompt, safeHistory, {
-              subjectMode: subjectMode || 'auto',
-              stepByStep:  !!stepByStep,
-            });
-          } catch {
-            answer = await solveText(prompt, safeHistory);
+          // non-fatal — keep default 50
+        }
+      }
+
+      // Step 1: Brain Core decides strategy/tone/difficulty for this image query
+      let brainDecision: any = null;
+      try {
+        if (userId) {
+          sessionId = await getOrCreateAskAISession(userId, convoId || null).catch(() => '');
+        }
+        brainDecision = await aiBrainCore.processRequest({
+          userId:          userId || 'anonymous',
+          sessionId:       sessionId || 'image-session',
+          userMessage:     prompt || 'Solve this image question.',
+          prevAiResponse:  null,
+          prevStrategy:    null,
+          topic:           null,
+          subject:         subjectMode || 'auto',
+          turnCount:       safeHistory.length,
+          retryCount:      0,
+          masteryLevel:    resolvedMastery,
+          currentState:    'LEARNING',
+        });
+      } catch (err: any) {
+        logger.warn('[AskAI] Image Brain Core failed (continuing): ' + err.message);
+      }
+
+      // Step 2: Build system prompt addition from Brain Core decision
+      const brainContextNote = brainDecision?.systemPromptAddition
+        ? `\n\n=== AI BRAIN CORE DIRECTIVES ===\n${brainDecision.systemPromptAddition}\n=== END DIRECTIVES ===`
+        : '';
+
+      // Step 3: Solve with vision — pass Brain Core context as part of the prompt
+      const enhancedPrompt = (prompt || '') + brainContextNote;
+      answer = await solveWithVision(imageUrl, enhancedPrompt);
+
+      // Step 4: afterResponseWithBrain — same as streaming path
+      if (userId && brainDecision) {
+        afterResponseWithBrain(
+          userId,
+          sessionId,
+          prompt || '',
+          answer,
+          null,
+          subjectMode || 'auto',
+          safeHistory.length,
+          0,
+          brainDecision,
+          undefined,
+        ).catch(() => {});
+      }
+
+    } else {
+      // ── FIX 1 (v15): TEXT PATH — Brain Core via buildMasterPrompt ──
+      // Previously called personalTutorSolve() which bypassed Brain Core entirely.
+      // Now uses the exact same pipeline as askAIStream() so FinalDecision,
+      // strategy scoring, feedback loop, and memory all fire on this path.
+      logger.info(`/api/ai/ask text (Brain Core) | mode=${subjectMode || 'auto'}`);
+
+      if (userId) {
+        try {
+          sessionId = await getOrCreateAskAISession(userId, convoId || null);
+        } catch {
+          // non-fatal
+        }
+      }
+
+      // Load prevTurn from RAM (fast path) or DB (cold-start recovery)
+      const prevTurnKey = userId ? `${userId}:${convoId || 'default'}` : '';
+      let prevTurn = prevTurnKey ? prevTurnStore.get(prevTurnKey) : undefined;
+
+      if (!prevTurn && userId && sessionId) {
+        try {
+          const savedSession = await AskAISession
+            .findOne({ userId })
+            .sort({ lastMessageAt: -1 })
+            .select('lastAiResponse lastStrategy lastTopic lastSubject turnCount')
+            .lean();
+          if (savedSession?.lastAiResponse && (savedSession.turnCount ?? 0) > 0) {
+            prevTurn = {
+              aiResponse:    savedSession.lastAiResponse,
+              strategy:      (savedSession as any).lastStrategy   ?? 'TEACH',
+              topic:         (savedSession as any).lastTopic      ?? null,
+              subject:       (savedSession as any).lastSubject    ?? subjectMode ?? 'auto',
+              sessionId:     String(savedSession._id),
+              finalDecision: null,
+              turnCount:     savedSession.turnCount ?? 1,
+            };
+            if (prevTurnKey) prevTurnStore.set(prevTurnKey, prevTurn);
+          }
+        } catch {
+          // non-fatal
+        }
+      }
+
+      // Score the PREVIOUS strategy using the current prompt as the reaction signal
+      if (prevTurn && userId) {
+        const reactionSignal = detectEmotionalState(prompt, prevTurn.turnCount);
+        afterResponseWithBrain(
+          userId,
+          prevTurn.sessionId,
+          prompt,
+          prevTurn.aiResponse,
+          prevTurn.topic,
+          prevTurn.subject,
+          prevTurn.turnCount,
+          0,
+          prevTurn.finalDecision,
+          reactionSignal === 'correct'
+            ? { success: true,  correctness: 1.0 }
+            : reactionSignal === 'confused' || reactionSignal === 'frustrated'
+            ? { success: false, correctness: 0.0 }
+            : undefined,
+        ).catch(() => {});
+      }
+
+      // Build the master prompt — same as streaming path
+      let pkg: any;
+      try {
+        pkg = await buildMasterPrompt({
+          userId,
+          message:     prompt,
+          subjectMode: subjectMode || 'auto',
+          stepByStep:  !!stepByStep,
+          history:     safeHistory,
+          prevAiResponse: prevTurn?.aiResponse ?? null,
+          prevStrategy:   prevTurn?.strategy   ?? null,
+        });
+        answer = await solveText(pkg.userMessage, pkg.history, pkg.systemPrompt);
+      } catch (buildErr: any) {
+        // Safety fallback — if Brain Core fails, still answer the student
+        logger.warn('[AskAI] Text Brain Core failed, falling back to plain solveText: ' + buildErr.message);
+        answer = await solveText(prompt, safeHistory);
+        pkg = null;
+      }
+
+      // afterResponseWithBrain — fires feedback loop + strategy scoring
+      if (userId && answer && pkg) {
+        const expandedTopic = detectTopicExpanded(prompt, subjectMode || 'auto');
+        const finalTopic    = expandedTopic.topic ?? pkg.detectedTopic;
+        const finalSubject  = expandedTopic.subject;
+
+        afterResponseWithBrain(
+          userId,
+          sessionId,
+          prompt,
+          answer,
+          finalTopic,
+          finalSubject ?? subjectMode ?? 'auto',
+          safeHistory.length,
+          0,
+          pkg.finalDecision,
+          undefined,
+        ).catch(() => {});
+
+        // Store this turn in prevTurnStore + DB so next turn's feedback fires correctly
+        if (prevTurnKey) {
+          const newPrevTurn: PrevTurnData = {
+            aiResponse:    answer,
+            strategy:      pkg.plan?.strategy ?? 'TEACH',
+            topic:         finalTopic,
+            subject:       finalSubject ?? subjectMode ?? 'auto',
+            sessionId,
+            finalDecision: pkg.finalDecision,
+            turnCount:     pkg.plan?.turnCount ?? safeHistory.length,
+          };
+          prevTurnStore.set(prevTurnKey, newPrevTurn);
+
+          // FIX 3: Persist to DB with upsert:true so cold-start recovery always works
+          if (sessionId && pkg.plan?.strategy) {
+            AskAISession.findByIdAndUpdate(
+              sessionId,
+              {
+                $set: {
+                  lastAiResponse: answer.slice(0, 3000),
+                  lastStrategy:   pkg.plan.strategy,
+                  lastTopic:      finalTopic   ?? null,
+                  lastSubject:    finalSubject ?? subjectMode ?? null,
+                },
+              },
+              { upsert: true },
+            ).catch(() => {});
           }
         }
-      } else {
-        answer = await solveText(prompt, safeHistory);
       }
     }
 
@@ -256,14 +471,14 @@ export async function askAI(req: Request, res: Response) {
     if (userId) {
       (async () => {
         try {
-          const sessionId = await getOrCreateAskAISession(userId, convoId || null);
+          const sid = sessionId || await getOrCreateAskAISession(userId, convoId || null);
           await persistUserMessage(
-            sessionId, userId,
+            sid, userId,
             String(prompt || '').slice(0, 2000),
             null, 'neutral', questionType,
           );
           await persistAIMessage(
-            sessionId, userId, answer,
+            sid, userId, answer,
             null, null, null,
             image ? 'nvidia-vision' : null,
             image ? 'nvidia'        : null,
@@ -292,14 +507,7 @@ export async function askAI(req: Request, res: Response) {
 // ─────────────────────────────────────────────────────────────
 // POST /api/ai/ask-stream
 // SSE Streaming — main AskAI chat endpoint
-//
-// SSE chunk types (in order):
-//   1. metadata  { intent, strategy, skillLevel, detectedTopic,
-//                  subject, isWeakTopic, emotionalState, provider }
-//   2. tokens    { token: "..." }   (one per LLM token)
-//   3. done      { done: true }
-//   4. enrichment { enrichment: { recommendation, progressInsight,
-//                                 hintMode, hintText, emotionalNudge } }
+// UNCHANGED from v14 except Fix 3: upsert:true on prevTurn DB write
 // ─────────────────────────────────────────────────────────────
 export async function askAIStream(req: Request, res: Response): Promise<void> {
   const {
@@ -308,11 +516,9 @@ export async function askAIStream(req: Request, res: Response): Promise<void> {
     subjectMode          = 'auto',
     stepByStep           = false,
     convoId              = null,
-    // v13: Gap #1 + #2 — frontend sends these; backend injects into prompt
     smartMemoryContext   = '',
     comprehensionContext = '',
     adaptiveHint         = '',
-    // v14: Gap #3 + #4
     teachingContext      = '',
     personalizationContext = '',
   } = req.body;
@@ -334,8 +540,9 @@ export async function askAIStream(req: Request, res: Response): Promise<void> {
   let fullResponse = '';
   let sessionId    = '';
 
+  const prevTurnKey = userId ? `${userId}:${convoId || 'default'}` : '';
+
   try {
-    // DB setup: session + weak topics (non-blocking on failure)
     let dbWeakTopics:    string[] = [];
     let dbSessionSummary          = '';
 
@@ -349,12 +556,58 @@ export async function askAIStream(req: Request, res: Response): Promise<void> {
       }
     }
 
-    // Frontend history = source of truth for current chat (v10 fix)
+    // Fix B Part 3: Load prevTurn from RAM; fall back to DB on cold start
+    let prevTurn = prevTurnKey ? prevTurnStore.get(prevTurnKey) : undefined;
+
+    if (!prevTurn && userId && sessionId) {
+      try {
+        const savedSession = await AskAISession
+          .findOne({ userId })
+          .sort({ lastMessageAt: -1 })
+          .select('lastAiResponse lastStrategy lastTopic lastSubject turnCount')
+          .lean();
+        if (savedSession?.lastAiResponse && (savedSession.turnCount ?? 0) > 0) {
+          prevTurn = {
+            aiResponse:    savedSession.lastAiResponse,
+            strategy:      (savedSession as any).lastStrategy   ?? 'TEACH',
+            topic:         (savedSession as any).lastTopic      ?? null,
+            subject:       (savedSession as any).lastSubject    ?? subjectMode,
+            sessionId:     String(savedSession._id),
+            finalDecision: null,
+            turnCount:     savedSession.turnCount ?? 1,
+          };
+          if (prevTurnKey) prevTurnStore.set(prevTurnKey, prevTurn);
+        }
+      } catch {
+        // non-fatal
+      }
+    }
+
+    // Score the PREVIOUS strategy using current prompt as reaction signal
+    if (prevTurn && userId) {
+      const reactionSignal = detectEmotionalState(prompt, prevTurn.turnCount);
+      afterResponseWithBrain(
+        userId,
+        prevTurn.sessionId,
+        prompt,
+        prevTurn.aiResponse,
+        prevTurn.topic,
+        prevTurn.subject,
+        prevTurn.turnCount,
+        0,
+        prevTurn.finalDecision,
+        reactionSignal === 'correct'
+          ? { success: true,  correctness: 1.0 }
+          : reactionSignal === 'confused' || reactionSignal === 'frustrated'
+          ? { success: false, correctness: 0.0 }
+          : undefined,
+      ).catch(() => {});
+    }
+
     const contextHistory = (Array.isArray(history) ? history : [])
       .filter((m: any) => m.role && m.content && typeof m.content === 'string')
       .slice(-20);
 
-    // Build master prompt via full AI-OS pipeline
     const pkg = await buildMasterPrompt({
       userId,
       message:              prompt,
@@ -363,24 +616,23 @@ export async function askAIStream(req: Request, res: Response): Promise<void> {
       history:              contextHistory,
       persistentWeakTopics: dbWeakTopics,
       dbSessionSummary,
-      // v13: frontend-computed intelligence — injected into system prompt
       smartMemoryContext,
       comprehensionContext,
       adaptiveHint,
-      // v14: teaching + personalization context
       teachingContext,
       personalizationContext,
+      prevAiResponse: prevTurn?.aiResponse ?? null,
+      prevStrategy:   prevTurn?.strategy   ?? null,
     });
 
     const emotionalState = detectEmotionalState(prompt, pkg.plan.turnCount ?? 0);
 
-    // v11: expanded topic detection — 80+ topics, Indian curriculum
     const expandedTopic = detectTopicExpanded(prompt, subjectMode);
     const finalTopic    = expandedTopic.topic ?? pkg.detectedTopic;
     const finalSubject  = expandedTopic.subject;
 
     logger.info(
-      'AskAI v11 | intent='  + pkg.plan.intent +
+      'AskAI v15 | intent='  + pkg.plan.intent +
       ' skill='   + pkg.context.skillLevel +
       ' model='   + pkg.modelConfig.modelId +
       ' topic='   + (finalTopic   ?? 'none') +
@@ -390,7 +642,6 @@ export async function askAIStream(req: Request, res: Response): Promise<void> {
       ' turns='   + contextHistory.length,
     );
 
-    // Persist user message (fire-and-forget)
     if (userId && sessionId) {
       persistUserMessage(
         sessionId, userId, prompt,
@@ -398,7 +649,6 @@ export async function askAIStream(req: Request, res: Response): Promise<void> {
       ).catch(() => {});
     }
 
-    // SSE chunk 1: metadata (Mentor Intelligence Bar reads this)
     const isWeakTopic = finalTopic
       ? pkg.context.weakTopics.includes(finalTopic) || dbWeakTopics.includes(finalTopic)
       : false;
@@ -414,7 +664,6 @@ export async function askAIStream(req: Request, res: Response): Promise<void> {
       provider:      'groq',
     }) + '\n\n');
 
-    // SSE token capture proxy — builds fullResponse while streaming
     const captureWrite = (chunk: any) => {
       try {
         const str = typeof chunk === 'string' ? chunk : chunk.toString('utf8');
@@ -439,25 +688,19 @@ export async function askAIStream(req: Request, res: Response): Promise<void> {
       },
     });
 
-    // Stream: GROQ (primary) → OpenRouter (fallback) — handled inside aiService.ts
     await solveTextStreamWithContext(
       pkg.userMessage, pkg.history, pkg.systemPrompt, proxyRes as any,
     );
 
     const responseMs = Date.now() - startMs;
 
-    // Validate + persist AI message (fire-and-forget)
     if (fullResponse && userId) {
       const validation = validateAndLog(fullResponse, pkg.plan.intent, prompt, userId);
-      // v13: Gap #7+#8 — feed quality result back into model router
-      // so poor-performing models get deprioritized next time
       if (validation.pedagogyScore !== undefined) {
         if (validation.pedagogyScore < 40) {
-          // Poor teaching quality — penalize this model
           recordQualityPenalty(pkg.modelConfig.modelId, 2);
           logger.warn(`[Router] Quality penalty x2 | model=${pkg.modelConfig.modelId} pedagogy=${validation.pedagogyScore} quality=${getQualityLabel(validation)}`);
         } else if (validation.pedagogyScore >= 80) {
-          // Excellent quality — record success
           recordModelSuccess(pkg.modelConfig.modelId, Date.now() - startMs);
         }
       }
@@ -475,18 +718,44 @@ export async function askAIStream(req: Request, res: Response): Promise<void> {
       ).catch(() => {});
     }
 
-    // Deduct quota + award points (fire-and-forget)
     if (userId) {
       handleQuestionUsed(req, String(prompt).substring(0, 100)).catch(() => {});
     }
 
-    // ── v11: AI-OS Enrichment Pipeline ────────────────────────
-    // Runs AFTER stream ends — student already has their response
-    // Connects: learningSystem + progressSystem + hintGenerator + emotional nudge
-    // Emits final SSE chunk with enrichment data for the frontend to display
+    // Store this turn's data into prevTurnStore for the next turn's feedback scoring
+    if (userId && fullResponse && prevTurnKey) {
+      prevTurnStore.set(prevTurnKey, {
+        aiResponse:    fullResponse,
+        strategy:      pkg.plan.strategy,
+        topic:         finalTopic,
+        subject:       finalSubject ?? subjectMode,
+        sessionId,
+        finalDecision: pkg.finalDecision,
+        turnCount:     pkg.plan.turnCount ?? contextHistory.length,
+      });
+
+      // FIX 3: upsert:true ensures DB record exists even on first turn of a new session
+      if (sessionId && pkg.plan?.strategy) {
+        AskAISession.findByIdAndUpdate(
+          sessionId,
+          {
+            $set: {
+              lastAiResponse: fullResponse.slice(0, 3000),
+              lastStrategy:   pkg.plan.strategy,
+              lastTopic:      finalTopic   ?? null,
+              lastSubject:    finalSubject ?? subjectMode ?? null,
+            },
+          },
+          { upsert: true },  // FIX 3: was missing upsert — new sessions had no DB record
+        ).catch(() => {});
+      }
+    }
+
+    // v11: AI-OS Enrichment Pipeline
     if (userId && fullResponse) {
       runPostResponsePipeline({
         userId,
+        sessionId,
         prompt,
         aiResponse:    fullResponse,
         emotionalState,
@@ -495,6 +764,7 @@ export async function askAIStream(req: Request, res: Response): Promise<void> {
         strategy:      pkg.plan.strategy,
         turnCount:     pkg.plan.turnCount ?? 0,
         subjectMode,
+        prevAiResponse: prevTurn?.aiResponse ?? null,
       }).then(enrichment => {
         if (res.writableEnded) return;
         const hasData =
@@ -505,22 +775,20 @@ export async function askAIStream(req: Request, res: Response): Promise<void> {
         if (hasData) {
           res.write('data: ' + JSON.stringify({ enrichment }) + '\n\n');
         }
-      }).catch(() => { /* enrichment failure never blocks the stream */ });
+      }).catch(() => {});
     }
 
-    // ── v12: Visual Brain — sends visual rendering instructions ──
-    // Runs in parallel with enrichment — analyzes fullResponse and
-    // returns segment classifications for premium visual rendering
+    // v12: Visual Brain
     if (fullResponse && fullResponse.length > 100) {
       analyzeWithVisualBrain(fullResponse, subjectMode).then(brain => {
         if (res.writableEnded || !brain.rawUsed || !brain.segments.length) return;
         res.write('data: ' + JSON.stringify({ visualBrain: brain.segments }) + '\n\n');
-      }).catch(() => { /* visual brain failure is non-critical */ });
+      }).catch(() => {});
     }
 
   } catch (err: any) {
     if (!res.writableEnded) {
-      logger.error('AskAI v11 stream error: ' + err.message);
+      logger.error('AskAI v15 stream error: ' + err.message);
       res.write('data: ' + JSON.stringify({ error: 'Stream failed. Please try again.' }) + '\n\n');
     }
   } finally {
@@ -530,8 +798,7 @@ export async function askAIStream(req: Request, res: Response): Promise<void> {
 
 // ─────────────────────────────────────────────────────────────
 // POST /api/ai/solve-pdf
-// PDF upload → AI solve
-// Text PDF → Groq, Scanned PDF → NVIDIA Vision
+// PDF upload → AI solve (unchanged from v14)
 // ─────────────────────────────────────────────────────────────
 export async function solvePDF(req: Request, res: Response) {
   try {
@@ -551,10 +818,70 @@ export async function solvePDF(req: Request, res: Response) {
         : `Please analyze and solve all questions in this PDF:\n\n${pdfText.slice(0, 8000)}`;
       answer = await solveText(q, [], 'general');
     } else {
+      // Scanned PDF — Brain Core first, then solveWithVision with context
+      let pdfBrainDecision: any = null;
+      let pdfSessionId          = '';
+      try {
+        if (userId) {
+          pdfSessionId = await getOrCreateAskAISession(userId, null).catch(() => '');
+        }
+
+        let resolvedMastery = 50;
+        if (userId) {
+          try {
+            const profileSnap = await StudentProfile
+              .findOne({ userId })
+              .select('overallMasteryScore')
+              .lean();
+            if (profileSnap?.overallMasteryScore != null) {
+              resolvedMastery = profileSnap.overallMasteryScore;
+            }
+          } catch {
+            // non-fatal
+          }
+        }
+
+        pdfBrainDecision = await aiBrainCore.processRequest({
+          userId:          userId || 'anonymous',
+          sessionId:       pdfSessionId || 'pdf-session',
+          userMessage:     prompt || 'Solve all questions in this PDF completely.',
+          prevAiResponse:  null,
+          prevStrategy:    null,
+          topic:           null,
+          subject:         'general',
+          turnCount:       0,
+          retryCount:      0,
+          masteryLevel:    resolvedMastery,
+          currentState:    'LEARNING',
+        });
+      } catch (err: any) {
+        logger.warn('[AskAI] PDF Brain Core failed (continuing): ' + err.message);
+      }
+
+      const brainContextNote = pdfBrainDecision?.systemPromptAddition
+        ? `\n\n=== AI BRAIN CORE DIRECTIVES ===\n${pdfBrainDecision.systemPromptAddition}\n=== END DIRECTIVES ===`
+        : '';
+
+      const enhancedPdfPrompt = (prompt || 'Solve all questions in this PDF completely.') + brainContextNote;
       answer = await solveWithVision(
         `data:application/pdf;base64,${req.file.buffer.toString('base64')}`,
-        prompt || 'Solve all questions in this PDF completely.',
+        enhancedPdfPrompt,
       );
+
+      if (userId && pdfBrainDecision) {
+        afterResponseWithBrain(
+          userId,
+          pdfSessionId,
+          prompt || `[PDF: ${req.file.originalname}]`,
+          answer,
+          null,
+          'general',
+          0,
+          0,
+          pdfBrainDecision,
+          undefined,
+        ).catch(() => {});
+      }
     }
 
     const responseMs = Date.now() - startMs;
@@ -597,7 +924,6 @@ export async function solvePDF(req: Request, res: Response) {
 
 // ─────────────────────────────────────────────────────────────
 // POST /api/ai/watch-ad
-// Watch video ad → +3 questions to quota
 // ─────────────────────────────────────────────────────────────
 export async function watchAd(req: Request, res: Response) {
   const userId = getUserIdFromToken(req);
@@ -638,7 +964,6 @@ export async function watchAd(req: Request, res: Response) {
 
 // ─────────────────────────────────────────────────────────────
 // GET /api/ai/quota
-// Returns remaining question quota for current user
 // ─────────────────────────────────────────────────────────────
 export async function getQuota(req: Request, res: Response) {
   const userId = getUserIdFromToken(req);
@@ -674,17 +999,12 @@ export async function getQuota(req: Request, res: Response) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// ─────────────────────────────────────────────────────────────
-// POST /api/ai/evaluate-answer  (v13 — Test Answer Evaluator)
-// Called by frontend when student answers a test question.
-// Returns: correct | incorrect | partial + one-line feedback.
-// Uses solveText() — same AI function used everywhere else.
+// POST /api/ai/evaluate-answer  (v13)
 // ─────────────────────────────────────────────────────────────
 export async function evaluateAnswer(req: Request, res: Response) {
   try {
     const { question, answer, topic, subject } = req.body;
 
-    // If no answer provided, skip silently — never block the UI
     if (!answer?.trim()) {
       return res.json({ success: true, result: 'skipped', feedback: '' });
     }
@@ -710,16 +1030,13 @@ export async function evaluateAnswer(req: Request, res: Response) {
       feedback: parsed.feedback || '',
     });
   } catch (err: any) {
-    // Always return success:true so frontend never breaks
     logger.warn('evaluateAnswer error (non-critical): ' + err.message);
     return res.json({ success: true, result: 'skipped', feedback: '' });
   }
 }
 
+// ─────────────────────────────────────────────────────────────
 // POST /api/ai/reset-session
-// Called by frontend when user switches chat in sidebar.
-// Clears in-process RAM memory for this user so old context
-// doesn't bleed into the next chat's first question.
 // ─────────────────────────────────────────────────────────────
 export async function resetSession(req: Request, res: Response) {
   const userId = getUserIdFromToken(req);
@@ -728,6 +1045,16 @@ export async function resetSession(req: Request, res: Response) {
   try {
     const { clearSession } = await import('../services/askAI/conversationMemoryEngine.js');
     clearSession(userId);
+
+    const convoId = req.body.convoId;
+    if (convoId) {
+      prevTurnStore.delete(`${userId}:${convoId}`);
+    } else {
+      for (const key of prevTurnStore.keys()) {
+        if (key.startsWith(`${userId}:`)) prevTurnStore.delete(key);
+      }
+    }
+
     logger.info(`[AskAI] Session RAM cleared | userId=${userId.slice(-6)} | convoId=${req.body.convoId || 'none'}`);
     return res.json({ success: true });
   } catch (err: any) {

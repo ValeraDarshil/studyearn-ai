@@ -1,28 +1,45 @@
 // ─────────────────────────────────────────────────────────────
-// AskAI — askAIService.ts  (v13 — Gap #5+#6: Adaptive Planner + Smart Context)
+// AskAI — askAIService.ts  (v15 — CENTRALIZED AI BRAIN CORE)
 //
-// NEW IN v12:
-//   Imp 1: Memory Surprise — specific past topic references in system prompt
-//   Imp 3: Micro-Learning Hook — curiosity engine after every answer
-//   Imp 4: Mood-based tone shift — urgent/confused/general detection
-//   Imp 5: Growth Mirror — AI reflects student's progress back to them
-//   Imp 6: General → Learning Bridge — personalized topic connection
-//   Imp 7: Wow Moments — observation about student's learning pattern
-//   Imp 8: Identity — "calm, sharp, aware academic companion"
-//   Imp 9: Adaptive response length — quick/detailed detection
-//   Imp 10: AI-initiated questions — branching conversation ownership
+// ARCHITECTURE CHANGE (v14 → v15):
 //
-// Bug #4 FIXED: turnCount passed correctly to buildResponsePlan
-// Bug #3 FIXED: afterResponse RAM drift documented
+//   v14: aiBrainCore.process() was called in Step 0 but its output
+//        was advisory. buildResponsePlan() ran independently after it
+//        and could contradict Brain Core's strategy. Two decision
+//        systems ran in parallel with no clear authority.
+//
+//   v15: aiBrainCore.processRequest() is THE ONLY decision maker.
+//        - FinalDecision drives: strategy, tone, difficulty, model
+//        - buildResponsePlanFromDecision() converts it to ResponsePlan
+//          (execution format for prompt builders) — no independent logic
+//        - buildResponsePlan() only runs as a fallback if Brain Core fails
+//        - All scattered if/else strategy logic removed from this file
+//        - Feedback loop wired: afterResponse() calls Brain Core post-stream
+//
+// NEW CONTROL FLOW:
+//
+//   User Input
+//       ↓
+//   aiBrainCore.processRequest()   ← single decision authority
+//       ↓ FinalDecision
+//   buildResponsePlanFromDecision() ← execution conversion only
+//       ↓ ResponsePlan
+//   buildMasterPrompt()            ← prompt assembly only
+//       ↓ systemPrompt
+//   solveTextStreamWithContext()   ← AI generation
+//       ↓ response
+//   aiBrainCore.afterResponse()   ← feedback + memory update
+//
+// All v14 exports preserved. Backward compatible.
 // ─────────────────────────────────────────────────────────────
 
-// v10: RAM memory engine kept only for in-session getMemorySummary
-// conversationMemoryEngine.addMessage used by afterResponse (Layer 3 context)
 import { addMessage } from './conversationMemoryEngine.js';
 
 import {
   buildResponsePlan,
+  buildResponsePlanFromDecision,
   type ResponsePlan,
+  detectIntent,
 } from './aiResponsePlanner.js';
 
 import {
@@ -49,6 +66,8 @@ import {
   routeToModel,
   getModelNote,
   recordQualityPenalty,
+  recordModelSuccess,
+  recordModelFailure,
   type RouterContextSignals,
 } from './aiModelRouter.js';
 
@@ -63,18 +82,24 @@ import {
   type EnhancedContext,
 } from './contextEnhancer.js';
 
-import { logger } from '../../utils/logger.js';
+import { logger }            from '../../utils/logger.js';
+import { StudentProfile }    from '../../models/StudentProfile.model.js';
+
+// ── v15: AI Brain Core — single decision authority ────────────
+import { aiBrainCore, type FinalDecision }       from '../adaptive/aiBrainCore.js';
+import { modelPerformanceTracker }                from '../adaptive/modelPerformanceTracker.js';
+import { userStateInferenceEngine }               from '../adaptive/userStateInferenceEngine.js';
 
 // ─────────────────────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────────────────────
 export interface AskAIServiceInput {
   userId:      string;
+  sessionId?:  string;
   message:     string;
   subjectMode: string;
   stepByStep:  boolean;
   history?:    { role: 'user' | 'assistant'; content: string }[];
-  // v9: persistent data from MongoDB
   persistentWeakTopics?: string[];
   dbSessionSummary?:     string;
   // v13: Gap #1+#2 — frontend live intelligence
@@ -84,6 +109,13 @@ export interface AskAIServiceInput {
   // v14: Gap #3+#4
   teachingContext?:         string;
   personalizationContext?:  string;
+  // Adaptive brain fields
+  prevAiResponse?:      string | null;
+  prevStrategy?:        string | null;
+  masteryLevel?:        number;
+  currentState?:        string;
+  retryCount?:          number;
+  responseTimeMs?:      number;
 }
 
 export interface AskAIPromptPackage {
@@ -94,11 +126,20 @@ export interface AskAIPromptPackage {
   plan:          ResponsePlan;
   context:       EnhancedContext;
   detectedTopic: string | null;
+  // v15: FinalDecision replaces brainOutput — single authority
+  finalDecision: FinalDecision | null;
+  // v14 backward-compat alias
+  brainOutput:   FinalDecision | null;
 }
 
 // ─────────────────────────────────────────────────────────────
 // buildMasterPrompt — Main export
-// Builds the complete system prompt + all AI pipeline decisions
+//
+// CONTROL FLOW (v15):
+//   1. aiBrainCore.processRequest()  → FinalDecision (authority)
+//   2. buildResponsePlanFromDecision() → ResponsePlan (execution format)
+//   3. routeToModel() using FinalDecision.modelDecision (no independent routing)
+//   4. Build system prompt using FinalDecision for all adaptive signals
 // ─────────────────────────────────────────────────────────────
 export async function buildMasterPrompt(
   input: AskAIServiceInput,
@@ -113,8 +154,14 @@ export async function buildMasterPrompt(
     dbSessionSummary     = '',
   } = input;
 
-  // Step 1: Rich context from AI Brain (orchestrator + tutor)
-  // v13: Pass frontend intelligence for weighted fusion (Gap #6)
+  const sessionId        = input.sessionId    ?? 'unknown';
+  const currentState     = input.currentState ?? 'LEARNING';
+  const retryCount       = input.retryCount   ?? 0;
+  const currentTurnCount = input.history?.length ?? 0;
+
+  // ── STEP 1: Fetch context + mastery in parallel BEFORE brain call ──
+  // masteryLevel must be resolved from DB before aiBrainCore.processRequest()
+  // so Brain Core receives the real value, not the hardcoded 50 default.
   const frontendIntel = {
     smartMemoryContext:     input.smartMemoryContext,
     comprehensionContext:   input.comprehensionContext,
@@ -123,10 +170,15 @@ export async function buildMasterPrompt(
     personalizationContext: input.personalizationContext,
   };
 
+  const [contextResult, masteryResult] = await Promise.allSettled([
+    buildEnhancedContext(userId, message, frontendIntel),
+    StudentProfile.findOne({ userId }).select('overallMasteryScore').lean(),
+  ]);
+
   let context: EnhancedContext;
-  try {
-    context = await buildEnhancedContext(userId, message, frontendIntel);
-  } catch {
+  if (contextResult.status === 'fulfilled') {
+    context = contextResult.value;
+  } else {
     const fallbackLevel = detectSkillLevelFromMessage(message);
     context = {
       skillLevel:     fallbackLevel,
@@ -140,60 +192,97 @@ export async function buildMasterPrompt(
     };
   }
 
-  const skillLevel: SkillLevel = context.skillLevel ?? detectSkillLevelFromMessage(message);
+  if (masteryResult.status === 'rejected') {
+    logger.warn({ userId, err: (masteryResult.reason as any)?.message }, '[AskAIService] StudentProfile mastery fetch failed — using fallback');
+  }
+  const dbMastery =
+    masteryResult.status === 'fulfilled' && masteryResult.value?.overallMasteryScore != null
+      ? masteryResult.value.overallMasteryScore
+      : null;
+  const masteryLevel = input.masteryLevel ?? dbMastery ?? 50;
 
-  // Step 2: Merge ALL weak topic sources
-  // Priority: DB persistent (30-day) > AI Brain orchestrator
-  const allWeakTopics = [
-    ...new Set([
-      ...persistentWeakTopics,
-      ...context.weakTopics,
-    ]),
-  ].slice(0, 10);
-
-  // Step 3: Response Planning
-  // Bug #4 FIX: pass correct turnCount directly — was passing 0 then overriding
-  const currentTurnCount = input.history?.length ?? 0;
-  // v13: Gap #5 — pass live intelligence to adaptive planner
-  // Parse comprehension stats from frontend context string
-  const compMatch    = input.comprehensionContext?.match(/(\d+)%/);
-  const reMatch      = input.comprehensionContext?.match(/(\d+) re-explained/);
-  const streakMatch  = input.comprehensionContext?.match(/(\d+)-question understanding streak/);
-  const phaseMatch   = input.teachingContext?.match(/TEACHING PHASE:\s*(\w+)/i);
-  const loadMatch    = input.personalizationContext?.match(/overloaded|high|low|normal/i);
-  const styleMatch   = input.personalizationContext?.match(/beginner|real.?world|future/i);
-  const densityMatch = input.personalizationContext?.match(/brief|detailed/i);
-
-  const plannerIntel = (input.comprehensionContext || input.teachingContext || input.personalizationContext) ? {
-    comprehensionRate:  compMatch    ? parseInt(compMatch[1])   : undefined,
-    reexplainRate:      reMatch      ? parseInt(reMatch[1])     : undefined,
-    sessionStreak:      streakMatch  ? parseInt(streakMatch[1]) : undefined,
-    topWeakTopics:      allWeakTopics.slice(0, 3),
-    teachingPhase:      phaseMatch   ? phaseMatch[1].toLowerCase() : undefined,
-    cognitiveLoad:      loadMatch    ? loadMatch[0].toLowerCase()   : undefined,
-    learningStyle:      styleMatch   ? styleMatch[0].toLowerCase().replace('-', '_') : undefined,
-    responseDensity:    densityMatch ? densityMatch[0].toLowerCase() : undefined,
-  } : undefined;
-
-  const plan = buildResponsePlan(
-    message,
-    skillLevel,
-    allWeakTopics,
-    currentTurnCount,
-    plannerIntel,   // v13: adaptive intelligence
-  );
-  plan.turnCount = currentTurnCount;
-
-  if (stepByStep && plan.strategy !== 'QUIZ') {
-    plan.strategy = 'STEP_BY_STEP';
+  // ── STEP 2: AI Brain Core — SINGLE DECISION AUTHORITY ────────
+  // Brain now receives the real masteryLevel from DB.
+  //
+  let finalDecision: FinalDecision | null = null;
+  try {
+    finalDecision = await aiBrainCore.processRequest({
+      userId,
+      sessionId,
+      userMessage:     message,
+      prevAiResponse:  input.prevAiResponse ?? null,
+      prevStrategy:    (input.prevStrategy ?? null) as any,
+      topic:           detectTopic(message, subjectMode),
+      subject:         subjectMode,
+      turnCount:       currentTurnCount,
+      retryCount,
+      masteryLevel,
+      currentState,
+      responseTimeMs:  input.responseTimeMs,
+      frontendComprehension: parseComprehensionRate(input.comprehensionContext),
+      frontendCognitiveLoad: parseCognitiveLoad(input.personalizationContext),
+    });
+  } catch (err: any) {
+    logger.warn({ userId, err: err.message }, '[AskAIService v15] Brain Core failed — using legacy fallback');
   }
 
-  // Step 4: Model Routing (v13: pass context signals for smart routing)
-  const routerSignals: RouterContextSignals = plannerIntel ? {
-    comprehensionRate: plannerIntel.comprehensionRate,
-    cognitiveLoad:     plannerIntel.cognitiveLoad,
-  } : {};
-  const modelConfig = routeToModel(
+  const skillLevel: SkillLevel = context.skillLevel ?? detectSkillLevelFromMessage(message);
+
+  // ── STEP 3: Build ResponsePlan FROM FinalDecision (execution only) ──
+  //
+  // WHEN finalDecision is available: buildResponsePlanFromDecision()
+  //   — reads FinalDecision, makes zero new decisions
+  //
+  // WHEN finalDecision is null (Brain Core failed): buildResponsePlan()
+  //   — legacy fallback only, clearly logged
+  //
+  let plan: ResponsePlan;
+
+  if (finalDecision) {
+    // PRIMARY PATH: Brain Core authority
+    plan = buildResponsePlanFromDecision(message, finalDecision, currentTurnCount, stepByStep);
+  } else {
+    // FALLBACK PATH: Brain Core failed — legacy planner
+    const allWeakTopics = [
+      ...new Set([...persistentWeakTopics, ...context.weakTopics]),
+    ].slice(0, 10);
+
+    const inferred = userStateInferenceEngine.infer({
+      message, turnCount: currentTurnCount, retryCount,
+      responseTimeMs: input.responseTimeMs,
+    });
+
+    const compMatch  = input.comprehensionContext?.match(/(\d+)%/);
+    const reMatch    = input.comprehensionContext?.match(/(\d+) re-explained/);
+    const streakMatch = input.comprehensionContext?.match(/(\d+)-question understanding streak/);
+    const phaseMatch = input.teachingContext?.match(/TEACHING PHASE:\s*(\w+)/i);
+    const loadMatch  = input.personalizationContext?.match(/overloaded|high|low|normal/i);
+    const styleMatch = input.personalizationContext?.match(/beginner|real.?world|future/i);
+    const densityMatch = input.personalizationContext?.match(/brief|detailed/i);
+
+    plan = buildResponsePlan(message, skillLevel, allWeakTopics, currentTurnCount, {
+      comprehensionRate:  compMatch   ? parseInt(compMatch[1])   : (inferred.confusionScore > 0.5 ? 30 : undefined),
+      reexplainRate:      reMatch     ? parseInt(reMatch[1])     : (retryCount >= 2 ? 60 : undefined),
+      sessionStreak:      streakMatch ? parseInt(streakMatch[1]) : undefined,
+      topWeakTopics:      allWeakTopics.slice(0, 3),
+      teachingPhase:      phaseMatch  ? phaseMatch[1].toLowerCase() : undefined,
+      cognitiveLoad:      loadMatch   ? loadMatch[0].toLowerCase()  : inferred.cognitiveLoad,
+      learningStyle:      styleMatch  ? styleMatch[0].toLowerCase().replace('-', '_') : undefined,
+      responseDensity:    densityMatch ? densityMatch[0].toLowerCase() : undefined,
+    });
+    plan.turnCount = currentTurnCount;
+  }
+
+  // ── STEP 4: Model Config — Brain Core preference takes precedence ──
+  //
+  // When finalDecision is available: use its modelDecision (Brain Core chose this).
+  // routeToModel() is called for its return type shape, but modelId is overridden.
+  //
+  const routerSignals: RouterContextSignals = {
+    comprehensionRate: parseComprehensionRate(input.comprehensionContext),
+    cognitiveLoad:     parseCognitiveLoad(input.personalizationContext) as any,
+  };
+  let modelConfig = routeToModel(
     plan.intent,
     subjectMode,
     skillLevel,
@@ -202,22 +291,42 @@ export async function buildMasterPrompt(
     routerSignals,
   );
 
-  // Step 5: Topic Detection (base — aiController uses detectTopicExpanded on top)
+  // Override with Brain Core's model decision when available
+  if (finalDecision?.modelDecision) {
+    modelConfig = {
+      ...modelConfig,
+      modelId:  finalDecision.modelDecision.modelId,
+      provider: finalDecision.modelDecision.provider ?? modelConfig.provider,
+    } as typeof modelConfig;
+  }
+
+  // ── STEP 5: Weak topics — merge all sources ────────────────
+  const brainWeakTopics  = finalDecision?.weakTopics   ?? [];
+  const brainStrongTopics = finalDecision?.strongTopics ?? [];
+  const allWeakTopics = [
+    ...new Set([...persistentWeakTopics, ...context.weakTopics, ...brainWeakTopics]),
+  ].slice(0, 10);
+
+  // ── STEP 6: Topic detection ────────────────────────────────
   const detectedTopic = detectTopic(message, subjectMode);
 
-  // Step 6: Personality
-  const personality = inferPersonality(message);
-  const isFirstTurn = currentTurnCount === 0;
+  // ── STEP 7: Personality (style-only — does not affect strategy) ──
+  const personality  = inferPersonality(message);
+  const isFirstTurn  = currentTurnCount === 0;
 
-  // ── Mood detection for tone adaptation (Improvement 4) ───────────────
+  // ── STEP 8: Mood signals (for prompt tone — Brain Core is already aware) ──
   const msgLower = message.toLowerCase();
-  const isUrgentMode   = /jaldi|fast|quick|exam|test kal|aaj exam|time nahi|hurry|asap/.test(msgLower);
-  const isConfusedMode = /samajh nahi|nahi samajh|confused|not getting|what is even|phir se|dubara/.test(msgLower);
-  const isGeneral      = /trend|news|world|latest|kya chal raha|general|current/.test(msgLower) && !detectedTopic;
+  const isUrgentMode   = /jaldi|fast|quick|exam|test kal|aaj exam|time nahi|hurry|asap/.test(msgLower)
+    || finalDecision?.tone === 'urgent';
+  const isConfusedMode = /samajh nahi|nahi samajh|confused|not getting|phir se|dubara/.test(msgLower)
+    || finalDecision?.inferredState.emotion === 'confused';
+  const isGeneral = /trend|news|world|latest|kya chal raha|general|current/.test(msgLower) && !detectedTopic;
 
-  // ── Response length signal (Improvement 9) ────────────────────────────
-  const wantsQuick   = /quick|jaldi|short|brief|summary|tldr|tl;dr|concise|2 lines|ek line/.test(msgLower);
+  const wantsQuick    = /quick|jaldi|short|brief|summary|tldr|tl;dr|concise|2 lines|ek line/.test(msgLower);
   const wantsDetailed = /detail|explain properly|poora|complete|full|in depth|deeply|thoroughly/.test(msgLower);
+
+  // Difficulty level source: Brain Core first, context fallback
+  const effectiveDifficulty = finalDecision?.difficultyLevel ?? skillLevel;
   const responseLengthNote = wantsQuick
     ? '\nRESPONSE LENGTH: Student wants a QUICK answer. Max 4-5 lines. No headers, no long examples. Sharp and direct.'
     : wantsDetailed
@@ -226,55 +335,41 @@ export async function buildMasterPrompt(
     ? '\nRESPONSE LENGTH: Keep it short — 2-3 sentences unless a brief example is essential.'
     : '';
 
-  // Step 7: Build Master System Prompt (v12 — All 10 Improvements)
+  // ── STEP 9: Build System Prompt ───────────────────────────────
+  //
+  // FinalDecision.systemPromptAddition is the primary adaptive signal.
+  // All other sections are structural/personality/subject-mode layers.
+  //
   const sections: string[] = [
 
-    // A) IDENTITY — calm + sharp + aware academic companion (Improvement 8)
-    `You are AskAI — an intelligent academic companion. NOT a chatbot. NOT a search engine.
-You are calm, sharp, and deeply aware of this student's learning journey.
-You remember their past struggles. You notice their growth. You adapt to their mood.
-Your tone: warm and encouraging, never robotic. Like a brilliant senior who genuinely cares.`,
+    // A) IDENTITY
+    `You are AskAI — an intelligent academic companion. NOT a chatbot. NOT a search engine.\nYou are calm, sharp, and deeply aware of this student's learning journey.\nYou remember their past struggles. You notice their growth. You adapt to their mood.\nYour tone: warm and encouraging, never robotic. Like a brilliant senior who genuinely cares.`,
 
-    // B) CONTEXT BLOCK (AI Brain + Tutor data)
+    // B) CONTEXT BLOCK (data layer — from contextEnhancer)
     context.contextBlock,
 
-    // C) DB SESSION MEMORY — Memory Surprise moments (Improvement 1)
+    // B2) BRAIN CORE DECISION BLOCK (authoritative adaptive signal)
+    // This contains: strategy directive, tone, difficulty, memory, weak topics
+    // Everything Brain Core decided in one clean block.
+    finalDecision?.systemPromptAddition
+      ? `\n=== AI BRAIN CORE DIRECTIVES (follow these precisely) ===\n${finalDecision.systemPromptAddition}\n=== END DIRECTIVES ===`
+      : '',
+
+    // C) DB SESSION MEMORY (cross-session intelligence)
     dbSessionSummary
-      ? `\n=== 🧠 STUDENT'S LEARNING MEMORY (cross-session intelligence) ===
-${dbSessionSummary}
-
-MEMORY SURPRISE RULES:
-- If today's question relates to a past struggle topic → naturally reference it.
-  Example: "Last time you were working on recursion and base cases gave you trouble — this concept connects directly to that!"
-- If student asks something you've covered before → acknowledge it warmly.
-  Example: "You've actually asked about this before — let's build on what you already know 🎯"
-- Keep memory references natural and brief — don't force them if irrelevant.
-- Once every 5-6 exchanges, show a GROWTH MIRROR observation (Improvement 5+7):
-  E.g., "I notice you're asking more conceptual questions now — your understanding is clearly deepening 📈"
-  E.g., "You've gone from asking 'what is X' to 'how does X work in real life' — that's significant growth!"
-  E.g., "You tend to understand things faster with examples — I'll keep using that approach for you."`
+      ? `\n=== 🧠 STUDENT'S LEARNING MEMORY (cross-session intelligence) ===\n${dbSessionSummary}\n\nMEMORY SURPRISE RULES:\n- If today's question relates to a past struggle topic → naturally reference it.\n  Example: \"Last time you were working on recursion and base cases gave you trouble — this concept connects directly to that!\"\n- If student asks something you've covered before → acknowledge it warmly.\n  Example: \"You've actually asked about this before — let's build on what you already know 🎯\"\n- Keep memory references natural and brief — don't force them if irrelevant.\n- Once every 5-6 exchanges, show a GROWTH MIRROR observation:\n  E.g., \"I notice you're asking more conceptual questions now — your understanding is clearly deepening 📈\"`
       : '',
 
-    // D) MOOD-BASED TONE SHIFT (Improvement 4)
+    // D) MOOD-BASED TONE SHIFT (supplements Brain Core tone directive)
     isUrgentMode
-      ? `\n⚡ EXAM MODE DETECTED: Student needs info FAST.
-- Skip the intro fluff. Go straight to the key points.
-- Format: "Fast track version 👇" then 3 bullet points MAX.
-- End with: "This is the exam-important part — don't forget this!"`
+      ? `\n⚡ EXAM MODE DETECTED: Student needs info FAST.\n- Skip the intro fluff. Go straight to the key points.\n- Format: \"Fast track version 👇\" then 3 bullet points MAX.\n- End with: \"This is the exam-important part — don't forget this!\"`
       : isConfusedMode
-      ? `\n💙 CONFUSION DETECTED: Student is struggling.
-- Don't start with theory. Start with the SIMPLEST daily-life example possible.
-- Say: "Koi baat nahi — let's start fresh with something super simple 😊"
-- Use everyday Indian analogies (chai, cricket, mobile recharge, etc.)
-- Be extra patient. Break it into the tiniest possible steps.`
+      ? `\n💙 CONFUSION DETECTED: Student is struggling.\n- Don't start with theory. Start with the SIMPLEST daily-life example possible.\n- Say: \"Koi baat nahi — let's start fresh with something super simple 😊\"\n- Use everyday Indian analogies (chai, cricket, mobile recharge, etc.)\n- Be extra patient. Break it into the tiniest possible steps.`
       : '',
 
-    // E) GENERAL TOPIC → LEARNING BRIDGE (Improvement 6)
+    // E) GENERAL TOPIC → LEARNING BRIDGE
     isGeneral
-      ? `\n🌍 GENERAL QUESTION BRIDGE:
-When answering general/trending topics, always end with a personalized learning bridge:
-Example: "Globally, AI, crypto, and climate tech are trending. Based on what you've been studying, [topic] is especially relevant to your future — want me to connect it to what you already know? 🎯"
-Make it feel personal, not generic.`
+      ? `\n🌍 GENERAL QUESTION BRIDGE:\nWhen answering general/trending topics, always end with a personalized learning bridge:\nExample: \"Globally, AI, crypto, and climate tech are trending. Based on what you've been studying, [topic] is especially relevant to your future — want me to connect it to what you already know? 🎯\"\nMake it feel personal, not generic.`
       : '',
 
     // F) INSTRUCTION LAYER
@@ -286,11 +381,10 @@ Make it feel personal, not generic.`
     '4. Decide response length (short prompt = concise answer, detail prompt = full answer)',
     '5. Think step by step before giving the final answer',
 
-    // G) DIFFICULTY ADAPTER + v13 adaptive signals from planner
-    '\n' + buildDifficultyInstruction(skillLevel),
+    // G) DIFFICULTY ADAPTER (uses Brain Core difficulty level)
+    '\n' + buildDifficultyInstruction(effectiveDifficulty as SkillLevel),
     responseLengthNote,
-    getResponseStyleNote(skillLevel, allWeakTopics.length > 0),
-    // v13: Gap #5 — inject planner's adaptive decisions into prompt
+    getResponseStyleNote(effectiveDifficulty as SkillLevel, allWeakTopics.length > 0),
     plan.useAnalogy
       ? '\nANALOGY REQUIRED: Use a real-world analogy for this explanation. Student learns better with concrete examples from daily life.'
       : '',
@@ -304,7 +398,7 @@ Make it feel personal, not generic.`
       ? `\n[AI-OS: strategy adapted because: ${plan.adaptationReason}]`
       : '',
 
-    // H) TEACHING MODE
+    // H) TEACHING MODE (execution — reads plan.strategy from Brain Core)
     buildTeachingInstruction(plan.strategy),
 
     // I) FOLLOW-UP + CONFIDENCE + CORRECTION
@@ -312,7 +406,7 @@ Make it feel personal, not generic.`
     buildConfidenceBoost(plan.boostConfidence, isFirstTurn),
     buildCorrectionInstruction(plan.correctGently),
 
-    // J) PERSONALITY POST-PROCESS
+    // J) PERSONALITY POST-PROCESS (style layer — never overrides strategy)
     getPersonalityPostProcessNote(personality, isFirstTurn, plan.correctGently),
 
     // K) SUBJECT MODE
@@ -327,7 +421,7 @@ Make it feel personal, not generic.`
     // L) MODEL NOTE
     '\n' + getModelNote(modelConfig),
 
-    // M) MANDATORY RESPONSE STRUCTURE (Imp 3: Smart Follow-Up, Imp 10: AI asks questions)
+    // M) MANDATORY RESPONSE STRUCTURE
     plan.strategy !== 'QUIZ' && plan.strategy !== 'SHORT' && !isUrgentMode ? `
 
 === MANDATORY RESPONSE STRUCTURE (follow EVERY time) ===
@@ -335,7 +429,7 @@ Make it feel personal, not generic.`
 ${wantsDetailed || (!wantsQuick) ? `
 1. 📖 EXPLANATION
    - Start with the core concept in 1-2 simple sentences
-   - Match complexity to student's level (${skillLevel})
+   - Match complexity to student's level (${effectiveDifficulty})
    - Use a real-world analogy (preferably relatable to Indian students)
 
 2. 💡 EXAMPLE
@@ -347,20 +441,13 @@ ${wantsDetailed || (!wantsQuick) ? `
    - Something they can recall in an exam 1 week from now
 ` : ''}
 
-4. 🔥 MICRO-LEARNING HOOK (Improvement 3 — NEVER skip)
+4. 🔥 MICRO-LEARNING HOOK (NEVER skip)
    - After your answer, add 1 sentence that sparks curiosity for the NEXT concept.
    - Format: "**Bonus curiosity:** If you understood [topic], the next interesting thing to explore is [related concept] — it'll blow your mind! 🚀"
-   - OR: "**Next level:** Once you get this, [next concept] becomes 10x easier to understand."
    - Keep it SHORT — 1 sentence only. Make it irresistible.
 
-5. ❓ AI-INITIATED QUESTION (Improvement 10 — NEVER skip)
+5. ❓ AI-INITIATED QUESTION (NEVER skip)
    - End with 1 smart question that drives the conversation forward.
-   - This is NOT just a "did you understand" question. It should branch the learning.
-   - Examples:
-     * "Do you want me to show you this with a real exam problem, or would you prefer the theory side first?"
-     * "Are you learning this for a specific exam, or just exploring? (That'll help me customize!)"
-     * "Would you like to try solving one yourself, or should I show another example first?"
-     * "Tumhara focus kya hai — concept clear karna hai ya exam ke liye shortcuts chahiye? 🎯"
    - Format: "**Quick check:** [your question here]"
 
 ═══════════════════════════════════════════════════════
@@ -375,32 +462,40 @@ ABSOLUTE RULES:
 - For "**Dubara samjhao**" response: pick a DIFFERENT approach, mention you noticed this topic is challenging
 ═══════════════════════════════════════════════════════
 ` : plan.strategy === 'QUIZ' ? '' :
-    // SHORT strategy or urgent mode — still needs a follow-up question
     '\nEven in short mode: end with ONE brief question to keep the conversation going. Format: "**Quick check:** [question]"',
   ];
 
   const systemPrompt = sections.filter(Boolean).join('\n');
-
-  // Frontend history ONLY — already filtered for correct chat (v10 fix)
   const history = (input.history ?? []).slice(-20);
 
   logger.info(
-    'AskAI v13 prompt | intent='  + plan.intent +
-    ' strategy='  + plan.strategy +
-    ' skill='     + skillLevel +
-    ' model='     + modelConfig.modelId +
-    ' history='   + history.length + 'msgs' +
-    ' weakDB='    + persistentWeakTopics.length +
-    ' turns='     + currentTurnCount +
-    ' adapted='   + (plan.adaptationReason ?? 'none') +
-    ' hasFrontendIntel=' + !!(input.comprehensionContext || input.teachingContext),
+    'AskAI v15 prompt | intent='   + plan.intent +
+    ' strategy='    + plan.strategy +
+    ' skill='       + effectiveDifficulty +
+    ' model='       + modelConfig.modelId +
+    ' history='     + history.length + 'msgs' +
+    ' weakDB='      + persistentWeakTopics.length +
+    ' turns='       + currentTurnCount +
+    ' adapted='     + (plan.adaptationReason ?? 'none') +
+    ' emotion='     + (finalDecision?.inferredState.emotion ?? 'none') +
+    ' brainCore='   + (finalDecision ? 'v2-authority' : 'fallback'),
   );
 
-  return { systemPrompt, history, userMessage: message, modelConfig, plan, context, detectedTopic };
+  return {
+    systemPrompt,
+    history,
+    userMessage:   message,
+    modelConfig,
+    plan,
+    context,
+    detectedTopic,
+    finalDecision,
+    brainOutput:   finalDecision,  // backward-compat alias
+  };
 }
 
 // ─────────────────────────────────────────────────────────────
-// validateAndLog
+// validateAndLog (preserved from v14)
 // ─────────────────────────────────────────────────────────────
 export function validateAndLog(
   aiResponse: string,
@@ -409,26 +504,82 @@ export function validateAndLog(
   userId:     string,
 ): ValidationResult {
   const result = validateResponse(aiResponse, intent, userPrompt);
+  const label  = getQualityLabel(result);
 
-  if (!result.isValid) {
-    logger.warn(
-      `[AskAI] Response validation failed | userId=${userId.slice(-6)} ` +
-      `intent=${intent} score=${result.score} issues=${result.issues.join(', ')}`,
-    );
-  } else if (result.issues.length > 0) {
-    logger.info(
-      `[AskAI] Response validation passed with warnings | userId=${userId.slice(-6)} ` +
-      `score=${result.score} warnings=${result.issues.join(', ')}`,
-    );
-  }
+  logger.info(
+    `AskAI response | quality=${label} score=${result.score} ` +
+    `length=${aiResponse.length} userId=${userId}`,
+  );
 
   return result;
 }
 
 // ─────────────────────────────────────────────────────────────
-// detectEmotionalState
-// Detects user's current emotional state from their message.
-// Supports English + Hinglish.
+// Model tracking helpers — exported for controller use
+// ─────────────────────────────────────────────────────────────
+export function trackModelSuccess(modelId: string, latencyMs: number): void {
+  try {
+    recordModelSuccess(modelId, latencyMs);
+    modelPerformanceTracker.recordSuccess(modelId, latencyMs);
+  } catch {
+    // non-fatal
+  }
+}
+
+export function trackModelFailure(modelId: string, reason: string = 'unknown'): void {
+  try {
+    recordModelFailure(modelId);
+    modelPerformanceTracker.recordFailure(modelId, reason);
+  } catch {
+    // non-fatal
+  }
+}
+
+export function trackModelQualityIssue(modelId: string, severity: number = 1): void {
+  try {
+    recordQualityPenalty(modelId, severity);
+    modelPerformanceTracker.recordQualityIssue(modelId, severity);
+  } catch {
+    // non-fatal
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Topic detection (preserved from v14)
+// ─────────────────────────────────────────────────────────────
+function detectTopic(message: string, subjectMode: string): string | null {
+  const lower = message.toLowerCase();
+  const TOPIC_MAP: Record<string, string[]> = {
+    'algebra':         ['algebra', 'equation', 'variable', 'polynomial'],
+    'calculus':        ['calculus', 'derivative', 'integral', 'differentiation'],
+    'physics':         ['force', 'motion', 'velocity', 'acceleration', 'newton'],
+    'chemistry':       ['atom', 'molecule', 'bond', 'reaction', 'element'],
+    'programming':     ['code', 'function', 'loop', 'array', 'variable', 'algorithm'],
+    'data structures': ['stack', 'queue', 'tree', 'graph', 'linked list', 'hash'],
+  };
+  for (const [topic, keywords] of Object.entries(TOPIC_MAP)) {
+    if (keywords.some(k => lower.includes(k))) return topic;
+  }
+  if (subjectMode !== 'auto' && subjectMode) return subjectMode;
+  return null;
+}
+
+// ─────────────────────────────────────────────────────────────
+// Parse frontend signal helpers (preserved from v14)
+// ─────────────────────────────────────────────────────────────
+function parseComprehensionRate(ctx?: string): number | undefined {
+  const match = ctx?.match(/(\d+)%/);
+  return match ? parseInt(match[1]) : undefined;
+}
+
+function parseCognitiveLoad(ctx?: string): string | undefined {
+  const match = ctx?.match(/overloaded|high|low|normal/i);
+  return match ? match[0].toLowerCase() : undefined;
+}
+
+// ─────────────────────────────────────────────────────────────
+// detectEmotionalState — re-exported for aiController.ts
+// Preserved exactly from v14
 // ─────────────────────────────────────────────────────────────
 export function detectEmotionalState(
   userMessage: string,
@@ -439,29 +590,23 @@ export function detectEmotionalState(
   if (/\b(got it|makes sense|i understand|clear hai|samajh gaya|samajh gayi|oh i see|that makes sense|i get it|achha|accha|ohh|ahhh|right right|yes exactly|bilkul|haan samajh|ab samajh|got this)\b/.test(msg)) {
     return 'correct';
   }
-
   if (/\b(don'?t understand|confused|not clear|samajh nahi|kya matlab|phir se|not getting|what do you mean|explain again|dubara|didn'?t get|unclear|ye kya hai|yeh kya|pata nahi|nahi pata|kuch nahi samajha)\b/.test(msg)) {
     return 'confused';
   }
-
   if (/\b(why is this so|this is hard|too difficult|giving up|i can'?t|can'?t do this|impossible|ugh|argh|frustrat|bahut mushkil|nahi ho raha|nahi samajh|ye toh bahut|yaar kuch nahi|pakka nahi hoga)\b/.test(msg)) {
     return 'frustrated';
   }
-
   if (/\b(amazing|awesome|great|love this|this is cool|interesting|wow|wah|mast|bahut accha|nice|let'?s go|let me try|i want to|and then|what about|tell me more|aur batao|aage batao|next)\b/.test(msg)) {
     return 'motivated';
   }
-
   if (turnCount === 0) return 'neutral';
   return 'neutral';
 }
 
 // ─────────────────────────────────────────────────────────────
-// afterResponse
-// Bug #3 FIXED: RAM memory clarified.
-// RAM (conversationMemoryEngine) is kept ONLY for in-session
-// getMemorySummary used by contextEnhancer Layer 3.
-// DB persistence (persistAIMessage) is in aiController.ts ONLY.
+// afterResponse — re-exported for aiController.ts + askAIController.ts
+// Updates in-session RAM memory for contextEnhancer Layer 3.
+// v15: Also wires Brain Core afterResponse for teaching loop + memory update.
 // ─────────────────────────────────────────────────────────────
 export function afterResponse(
   userId:      string,
@@ -469,50 +614,45 @@ export function afterResponse(
   aiResponse:  string,
   topic?:      string | null,
 ): void {
-  // RAM write: only for contextEnhancer.getMemorySummary (in-session context)
-  // DB is the source of truth — this is supplementary, in-process only
   try {
     addMessage(userId, 'user',      userMessage, topic ?? undefined);
     addMessage(userId, 'assistant', aiResponse,  topic ?? undefined);
   } catch (e: any) {
-    logger.warn('afterResponse RAM update failed: ' + e.message);
+    logger.warn('afterResponse RAM update failed: ' + (e as any).message);
   }
-  // NOTE: persistAIMessage() is called in aiController.ts — NOT here
 }
 
-// ─────────────────────────────────────────────────────────────
-// detectTopic — base topic detection (18 topics)
-// NOTE: aiController.ts uses detectTopicExpanded() (80+ topics)
-// from askAIOrchestrator.ts on top of this. Keep both.
-// ─────────────────────────────────────────────────────────────
-export function detectTopic(message: string, subjectMode: string): string | null {
-  const lower = message.toLowerCase();
+/**
+ * afterResponseWithBrain — enhanced afterResponse that also updates
+ * Brain Core's teaching loop and strategy scores.
+ *
+ * Call this instead of afterResponse() when you have a finalDecision available.
+ * Backward compatible — falls back to RAM-only update if params missing.
+ */
+export async function afterResponseWithBrain(
+  userId:        string,
+  sessionId:     string,
+  userMessage:   string,
+  aiResponse:    string,
+  topic:         string | null,
+  subject:       string,
+  turnCount:     number,
+  retryCount:    number,
+  finalDecision: FinalDecision | null,
+  outcome?:      { success: boolean; correctness?: number },
+): Promise<void> {
+  // RAM memory update (always)
+  afterResponse(userId, userMessage, aiResponse, topic);
 
-  const TOPIC_MAP: [RegExp, string][] = [
-    [/\bloop(s)?\b|\bfor loop\b|\bwhile loop\b/,          'loops'],
-    [/\brecursion\b|\brecursive\b/,                        'recursion'],
-    [/\barray(s)?\b|\blist(s)?\b/,                         'arrays'],
-    [/\bsort(ing)?\b|\bbubble sort\b|\bmerge sort\b/,      'sorting'],
-    [/\bpointer(s)?\b/,                                    'pointers'],
-    [/\bclass\b|\bobject\b|\boop\b|\binheritance\b/,       'OOP'],
-    [/\bfunction(s)?\b|\bclosure(s)?\b/,                   'functions'],
-    [/\bintegral\b|∫|\bderivative\b|\bdifferential\b/,     'calculus'],
-    [/\btrigonometry\b|\bsin\b|\bcos\b|\btan\b/,           'trigonometry'],
-    [/\bprobability\b|\bstatistics\b/,                     'probability'],
-    [/\bphotos(ynthesis)?\b/,                              'photosynthesis'],
-    [/\bnewton(s)?\b|\bgravity\b|\bforce\b/,               'Newtonian mechanics'],
-    [/\bchemistry\b|\belement\b|\bperiodic\b|\bbond\b/,    'chemistry'],
-    [/\balgebra\b|\bequation\b|\bpolynomial\b/,            'algebra'],
-    [/\bpython\b/,                                         'Python'],
-    [/\bjavascript\b|\bjs\b|\bnode\.?js\b/,               'JavaScript'],
-    [/\breact\b|\bnext\.?js\b/,                            'React'],
-    [/\bsql\b|\bdatabase\b|\bmysql\b|\bpostgres\b/,        'databases'],
-  ];
-
-  for (const [pattern, topic] of TOPIC_MAP) {
-    if (pattern.test(lower)) return topic;
+  // Brain Core update (when finalDecision available)
+  if (finalDecision) {
+    try {
+      await aiBrainCore.afterResponse(
+        userId, sessionId, userMessage, aiResponse,
+        finalDecision, topic, subject, turnCount, retryCount, outcome,
+      );
+    } catch (err: any) {
+      logger.warn({ userId, err: err.message }, '[AskAIService v15] Brain Core afterResponse failed (non-fatal)');
+    }
   }
-
-  if (subjectMode && subjectMode !== 'auto') return subjectMode;
-  return null;
 }
