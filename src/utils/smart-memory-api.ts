@@ -270,7 +270,28 @@ export async function retrieveRelevantMemories(params: {
     if (res.ok) {
       const data = await res.json();
       if (data.success && Array.isArray(data.results)) {
-        backendResults = data.results;
+        backendResults = data.results
+          .filter((r: any) => r != null)
+          .map((r: any) => {
+            const mem = r.memory || r;
+            const normalizedMemory: MemoryUnit = {
+              id:         String(mem.id || mem._id || Math.random()),
+              type:       mem.type       || "concept_explained",
+              topic:      mem.topic      || "",
+              subject:    mem.subject    || "general",
+              summary:    mem.summary    || "",
+              keywords:   Array.isArray(mem.keywords) ? mem.keywords : [],
+              importance: typeof mem.importance === "number" ? mem.importance : 3,
+              createdAt:  mem.createdAt  || Date.now(),
+              turnIndex:  typeof mem.turnIndex === "number" ? mem.turnIndex : 0,
+              convoId:    mem.convoId    || null,
+            };
+            return {
+              memory:         normalizedMemory,
+              relevanceScore: typeof r.relevanceScore === "number" ? r.relevanceScore : 0.3,
+              reason:         r.reason || "cross-session memory",
+            } as MemorySearchResult;
+          });
       }
     }
   } catch {
