@@ -282,8 +282,9 @@ export async function retrieveRelevantMemories(params: {
   const seen  = new Set<string>();
   const final = all
     .filter(r => {
-      if (seen.has(r.memory.id)) return false;
-      seen.add(r.memory.id);
+      const memId = r.memory?.id || r.memory?._id || r.memory?.summary || Math.random().toString();
+      if (seen.has(memId)) return false;
+      seen.add(memId);
       return true;
     })
     .sort((a, b) => b.relevanceScore - a.relevanceScore)
