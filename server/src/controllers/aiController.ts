@@ -947,7 +947,22 @@ export async function watchAd(req: Request, res: Response) {
     }
 
     (user as any).videoAdsToday = ((user as any).videoAdsToday || 0) + 1;
-    (user as any).questionsLeft = Math.min(((user as any).questionsLeft || 0) + 3, dailyLim);
+
+    // Fix: applyHourlyRefill overrides questionsLeft using questionUsedAt array.
+    // So to give +3 questions, we remove 3 oldest entries from questionUsedAt.
+    // This way applyHourlyRefill will correctly compute the higher questionsLeft.
+    const usedAt: Date[] = (user as any).questionUsedAt || [];
+    const toRemove = Math.min(3, usedAt.length);
+    if (toRemove > 0) {
+      // Remove the 3 oldest timestamps (sorted ascending)
+      const sorted = [...usedAt].sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+      const removed = new Set(sorted.slice(0, toRemove).map(d => new Date(d).getTime()));
+      (user as any).questionUsedAt = usedAt.filter(
+        (d: Date) => !removed.has(new Date(d).getTime())
+      );
+    }
+    // Recompute questionsLeft based on updated questionUsedAt
+    applyHourlyRefill(user, dailyLim);
 
     await user.save();
 
