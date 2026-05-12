@@ -136,7 +136,12 @@ function applyHourlyRefill(user: any, dailyLimit: number): void {
     (t: Date) => new Date(t).getTime() > cutoff,
   );
   user.questionUsedAt = recent;
-  user.questionsLeft  = Math.max(0, Math.min(dailyLimit, dailyLimit - recent.length));
+  // Compute what questionsLeft should be from usage history
+  const computedLeft = Math.max(0, Math.min(dailyLimit, dailyLimit - recent.length));
+  // Only override if computed is HIGHER (natural refill) or current is undefined
+  // This preserves bonus questions granted by watchAd
+  const current = user.questionsLeft ?? 0;
+  user.questionsLeft = Math.max(current, computedLeft);
 }
 
 function isPremiumValid(user: any): boolean {
@@ -948,26 +953,16 @@ export async function watchAd(req: Request, res: Response) {
 
     (user as any).videoAdsToday = ((user as any).videoAdsToday || 0) + 1;
 
-    // Fix: applyHourlyRefill overrides questionsLeft using questionUsedAt array.
-    // So to give +3 questions, we remove 3 oldest entries from questionUsedAt.
-    // This way applyHourlyRefill will correctly compute the higher questionsLeft.
-    const usedAt: Date[] = (user as any).questionUsedAt || [];
-    const toRemove = Math.min(3, usedAt.length);
-    if (toRemove > 0) {
-      // Remove the 3 oldest timestamps (sorted ascending)
-      const sorted = [...usedAt].sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
-      const removed = new Set(sorted.slice(0, toRemove).map(d => new Date(d).getTime()));
-      (user as any).questionUsedAt = usedAt.filter(
-        (d: Date) => !removed.has(new Date(d).getTime())
-      );
-    }
-    // Recompute questionsLeft based on updated questionUsedAt
-    applyHourlyRefill(user, dailyLim);
+    // Give exactly +1 question (capped at dailyLimit)
+    // We directly increment questionsLeft without touching questionUsedAt
+    // so applyHourlyRefill does not interfere with the bonus question
+    const currentLeft = (user as any).questionsLeft || 0;
+    (user as any).questionsLeft = Math.min(currentLeft + 1, dailyLim);
 
     await user.save();
 
     return res.json({
-      success:      true,
+      success:       true,
       questionsLeft: (user as any).questionsLeft,
       videoAdsLeft:  MAX_VIDEO_ADS_DAY - (user as any).videoAdsToday,
     });
@@ -995,6 +990,11 @@ export async function getQuota(req: Request, res: Response) {
     if ((user as any).questionsDate !== today) {
       (user as any).questionsDate  = today;
       (user as any).questionUsedAt = [];
+    }
+    // Reset video ads daily
+    if ((user as any).videoAdsDate !== today) {
+      (user as any).videoAdsDate  = today;
+      (user as any).videoAdsToday = 0;
     }
     applyHourlyRefill(user, dailyLimit);
     await user.save();
