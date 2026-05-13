@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-// AskAI — aiController.ts  (v15 — FIX 1/2/3 from audit)
+// AskAI — aiController.ts  (v16 — FIX 1/2/3 + image cross-turn learning)
 //
 // ROUTES HANDLED:
 //   POST /api/ai/ask           → askAI()         (image / text non-stream)
@@ -31,6 +31,12 @@
 //   but DB persistence was already added in Fix B. This release adds an
 //   explicit $set write with upsert:true after every streaming turn so the
 //   DB record is always authoritative even on first turn of a new session.
+//
+// FIX 4 (v16 — image cross-turn learning):
+//   Image path had prevAiResponse hardcoded null. Brain Core had no prior
+//   context for image sessions — strategy scoring never fired between turns.
+//   Fixed: prevTurn loaded from RAM store + DB cold-start fallback (same
+//   as text path). Turn saved to prevTurnStore + DB after each response.
 //
 // All other fixes (FIX A/B, image/PDF Brain Core, model routing) are
 // carried forward unchanged from v14.
@@ -87,6 +93,7 @@ import {
 
 // Brain Core for image/PDF/text paths
 import { aiBrainCore }          from '../services/adaptive/aiBrainCore.js';
+import type { TeachingStrategy } from '../services/adaptive/strategyScoringEngine.js';
 
 // Fix A: masteryLevel from DB
 import { StudentProfile }       from '../models/StudentProfile.model.js';
@@ -286,17 +293,73 @@ export async function askAI(req: Request, res: Response) {
       }
 
       // Step 1: Brain Core decides strategy/tone/difficulty for this image query
+      //
+      // FIX #3 (v16): Load prevTurn from RAM store — same pattern as text/stream paths.
+      // Previously prevAiResponse was hardcoded null so Brain Core had no prior context,
+      // strategy scoring never fired between image turns, and adaptive learning was broken.
+      const imgPrevTurnKey = userId ? `${userId}:${convoId || 'default'}` : '';
+      let imgPrevTurn = imgPrevTurnKey ? prevTurnStore.get(imgPrevTurnKey) : undefined;
+
+      // Cold-start DB fallback — recovers prevTurn after server restart
+      if (!imgPrevTurn && userId) {
+        try {
+          if (!sessionId) {
+            sessionId = await getOrCreateAskAISession(userId, convoId || null).catch(() => '');
+          }
+          const savedSession = await AskAISession
+            .findOne({ userId })
+            .sort({ lastMessageAt: -1 })
+            .select('lastAiResponse lastStrategy lastTopic lastSubject turnCount')
+            .lean();
+          if (savedSession?.lastAiResponse && (savedSession.turnCount ?? 0) > 0) {
+            imgPrevTurn = {
+              aiResponse:    savedSession.lastAiResponse,
+              strategy:      (savedSession as any).lastStrategy ?? 'TEACH',
+              topic:         (savedSession as any).lastTopic    ?? null,
+              subject:       (savedSession as any).lastSubject  ?? subjectMode ?? 'auto',
+              sessionId:     String(savedSession._id),
+              finalDecision: null,
+              turnCount:     savedSession.turnCount ?? 1,
+            };
+            if (imgPrevTurnKey) prevTurnStore.set(imgPrevTurnKey, imgPrevTurn);
+          }
+        } catch {
+          // non-fatal
+        }
+      }
+
+      // Score PREVIOUS strategy using current image prompt as reaction signal
+      if (imgPrevTurn && userId) {
+        const imgReaction = detectEmotionalState(prompt || '', imgPrevTurn.turnCount);
+        afterResponseWithBrain(
+          userId,
+          imgPrevTurn.sessionId,
+          prompt || '',
+          imgPrevTurn.aiResponse,
+          imgPrevTurn.topic,
+          imgPrevTurn.subject,
+          imgPrevTurn.turnCount,
+          0,
+          imgPrevTurn.finalDecision,
+          imgReaction === 'correct'
+            ? { success: true,  correctness: 1.0 }
+            : imgReaction === 'confused' || imgReaction === 'frustrated'
+            ? { success: false, correctness: 0.0 }
+            : undefined,
+        ).catch(() => {});
+      }
+
       let brainDecision: any = null;
       try {
-        if (userId) {
+        if (!sessionId && userId) {
           sessionId = await getOrCreateAskAISession(userId, convoId || null).catch(() => '');
         }
         brainDecision = await aiBrainCore.processRequest({
           userId:          userId || 'anonymous',
           sessionId:       sessionId || 'image-session',
           userMessage:     prompt || 'Solve this image question.',
-          prevAiResponse:  null,
-          prevStrategy:    null,
+          prevAiResponse:  imgPrevTurn?.aiResponse ?? null,   // FIX #3: was always null
+          prevStrategy:    (imgPrevTurn?.strategy as TeachingStrategy) ?? null,   // FIX #3: was always null
           topic:           null,
           subject:         subjectMode || 'auto',
           turnCount:       safeHistory.length,
@@ -317,7 +380,7 @@ export async function askAI(req: Request, res: Response) {
       const enhancedPrompt = (prompt || '') + brainContextNote;
       answer = await solveWithVision(imageUrl, enhancedPrompt);
 
-      // Step 4: afterResponseWithBrain — same as streaming path
+      // Step 4: afterResponseWithBrain — fires feedback loop for THIS image turn
       if (userId && brainDecision) {
         afterResponseWithBrain(
           userId,
@@ -331,6 +394,36 @@ export async function askAI(req: Request, res: Response) {
           brainDecision,
           undefined,
         ).catch(() => {});
+      }
+
+      // FIX #3: Save this image turn to prevTurnStore + DB
+      // so the NEXT turn (image or text) can score this strategy correctly.
+      if (userId && answer && imgPrevTurnKey) {
+        const imgNewPrevTurn: PrevTurnData = {
+          aiResponse:    answer,
+          strategy:      brainDecision?.strategy ?? 'TEACH',
+          topic:         null,
+          subject:       subjectMode || 'auto',
+          sessionId,
+          finalDecision: brainDecision,
+          turnCount:     safeHistory.length,
+        };
+        prevTurnStore.set(imgPrevTurnKey, imgNewPrevTurn);
+
+        if (sessionId && brainDecision?.strategy) {
+          AskAISession.findByIdAndUpdate(
+            sessionId,
+            {
+              $set: {
+                lastAiResponse: answer.slice(0, 3000),
+                lastStrategy:   brainDecision.strategy,
+                lastTopic:      null,
+                lastSubject:    subjectMode ?? null,
+              },
+            },
+            { upsert: true },
+          ).catch(() => {});
+        }
       }
 
     } else {

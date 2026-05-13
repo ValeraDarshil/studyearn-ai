@@ -1,19 +1,33 @@
 /**
- * AI Study OS — Feedback Loop Engine  (v2 — FIX 2: upsert:true for new users)
+ * AI Study OS — Feedback Loop Engine  (v3 — FIX A: isWeak/isStrong  |  FIX B: overallMasteryScore)
  * ─────────────────────────────────────────────────────────────
- * WHAT CHANGED IN v2:
- *   updateTopicMastery() had a conditional write that silently skipped
- *   topic creation for new users. The existing entry query used an
- *   array-match approach that only updated if the topic already existed.
- *   For new users, no topic entry existed → nothing was written.
+ * WHAT CHANGED IN v3 (on top of v2):
  *
- *   Fixed by splitting the write into two paths:
- *     1. If topic entry exists → update it (same as before, with decay)
- *     2. If topic entry does NOT exist → push a new entry ($push)
- *        with sensible starting values so the profile is built from
- *        the very first question.
+ *   FIX A — isWeak / isStrong flags were NEVER written by this path.
+ *     longTermMemoryEngine.getMemory() filters on t.isWeak / t.isStrong
+ *     to build weakConcepts[] and strongConcepts[]. Those booleans were
+ *     only set by studentProfileService.updateTopicMastery(), which is
+ *     NOT in the AskAI feedback path.
+ *     Result: every student's weakConcepts[] and strongConcepts[] were
+ *     always empty — the AI had no memory of what anyone struggled with.
  *
- * Everything else is unchanged from the original.
+ *     Fixed in updateTopicMastery() (both EXISTING and NEW topic branches)
+ *     by computing and writing isWeak / isStrong alongside masteryLevel.
+ *
+ *     Thresholds match studentProfileService.ts:
+ *       isWeak   → masteryLevel < 30
+ *       isStrong → masteryLevel >= 75
+ *
+ *   FIX B — overallMasteryScore frozen at onboarding value forever.
+ *     Brain Core reads overallMasteryScore to decide difficulty level.
+ *     It was seeded once at signup and never updated.
+ *     Fixed by adding recomputeOverallMastery() which averages all
+ *     topicMastery levels and writes the result back after every
+ *     updateTopicMastery() call (fire-and-forget, non-blocking).
+ *     Also runs at the end of decayAllTopics().
+ *
+ * Everything from v2 (upsert:true for new users, exponential decay,
+ * $push for new topics) is carried forward unchanged.
  * ─────────────────────────────────────────────────────────────
  */
 
@@ -24,6 +38,10 @@ import { AskAISession }                             from '../../models/AskAISess
 import { StudentProfile }                           from '../../models/StudentProfile.model.js';
 import { logger }                                   from '../../utils/logger.js';
 
+// ── Mastery thresholds — keep in sync with studentProfileService.ts ──
+const WEAK_THRESHOLD   = 30;   // masteryLevel < 30  → isWeak   = true
+const STRONG_THRESHOLD = 75;   // masteryLevel >= 75 → isStrong  = true
+
 // ── Types ──────────────────────────────────────────────────────
 
 export type OutcomeType =
@@ -33,27 +51,27 @@ export type OutcomeType =
   | 'clarity'       // expressed clear understanding
   | 'frustrated'    // expressed frustration
   | 'engaged'       // continued naturally (neutral positive)
-  | 'dropped';      // session ended abruptly (short session)
+  | 'dropped';      // session ended abruptly
 
 export interface FeedbackInput {
-  userId:        string;
-  sessionId:     string;
-  userMessage:   string;        // the student's follow-up reply
-  aiResponse:    string;        // the previous AI response (triggers this feedback)
-  strategy:      TeachingStrategy; // strategy that was used for the AI response
-  topic:         string | null;
-  subject:       string;
-  turnCount:     number;
-  retryCount:    number;
+  userId:         string;
+  sessionId:      string;
+  userMessage:    string;           // student's follow-up reply
+  aiResponse:     string;           // previous AI response (triggers this feedback)
+  strategy:       TeachingStrategy; // strategy used for the AI response
+  topic:          string | null;
+  subject:        string;
+  turnCount:      number;
+  retryCount:     number;
   responseTimeMs?: number;
 }
 
 export interface FeedbackResult {
-  outcomeType:    OutcomeType;
+  outcomeType:     OutcomeType;
   strategySuccess: boolean;
-  inferredState:  InferredUserState;
-  recorded:       boolean;
-  actions:        string[];  // what the engine did
+  inferredState:   InferredUserState;
+  recorded:        boolean;
+  actions:         string[];
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -83,7 +101,7 @@ export const feedbackLoopEngine = {
       currentTopic: topic,
     });
 
-    const outcomeType   = detectOutcome(inferredState, retryCount);
+    const outcomeType    = detectOutcome(inferredState, retryCount);
     const strategySuccess = isStrategySuccess(outcomeType);
 
     logger.info(
@@ -120,7 +138,7 @@ export const feedbackLoopEngine = {
       logger.warn({ err: err.message }, '[FeedbackLoop] Outcome tracking failed');
     }
 
-    // Step 5: Milestone detection — 5 correct in a row → record milestone
+    // Step 5: Milestone detection — every 5 correct turns
     if (strategySuccess && turnCount > 0 && turnCount % 5 === 0) {
       try {
         await longTermMemoryEngine.recordMilestone(
@@ -134,13 +152,7 @@ export const feedbackLoopEngine = {
       }
     }
 
-    return {
-      outcomeType,
-      strategySuccess,
-      inferredState,
-      recorded: true,
-      actions,
-    };
+    return { outcomeType, strategySuccess, inferredState, recorded: true, actions };
   },
 };
 
@@ -148,50 +160,38 @@ export const feedbackLoopEngine = {
 // Learning Outcome Tracker
 // ─────────────────────────────────────────────────────────────
 export interface OutcomeRecord {
-  userId:         string;
-  sessionId:      string;
-  topic:          string | null;
-  subject:        string;
-  strategy:       TeachingStrategy;
-  outcomeType:    OutcomeType;
+  userId:          string;
+  sessionId:       string;
+  topic:           string | null;
+  subject:         string;
+  strategy:        TeachingStrategy;
+  outcomeType:     OutcomeType;
   strategySuccess: boolean;
 }
 
 export const learningOutcomeTracker = {
 
-  /**
-   * record — persists outcome to AskAISession for analysis.
-   */
   async record(rec: OutcomeRecord): Promise<void> {
     const { userId, sessionId, outcomeType } = rec;
 
     try {
       const inc: Record<string, number> = {};
-
-      if (outcomeType === 'confused' || outcomeType === 'incorrect') {
-        inc.confusionCount = 1;
-      }
-      if (outcomeType === 'correct' || outcomeType === 'clarity') {
-        inc.masteryCount = 1;
-      }
+      if (outcomeType === 'confused' || outcomeType === 'incorrect') inc.confusionCount = 1;
+      if (outcomeType === 'correct'  || outcomeType === 'clarity')   inc.masteryCount   = 1;
 
       if (Object.keys(inc).length > 0) {
         await AskAISession.findByIdAndUpdate(sessionId, { $inc: inc });
       }
 
-      // Also update StudentProfile topic mastery incrementally
+      // Update StudentProfile topic mastery (writes isWeak/isStrong + overallMastery)
       if (rec.topic) {
         await updateTopicMastery(userId, rec.topic, rec.subject, rec.strategySuccess);
       }
-
     } catch (err: any) {
       logger.warn({ userId, err: err.message }, '[OutcomeTracker] Record failed');
     }
   },
 
-  /**
-   * getSessionStats — returns outcomes for a session.
-   */
   async getSessionStats(sessionId: string): Promise<{
     confusionCount: number;
     masteryCount:   number;
@@ -243,28 +243,22 @@ function inferErrorType(
   subject: string
 ): 'conceptual' | 'calculation' | 'memory' | 'application' | 'unknown' {
   const lower = message.toLowerCase();
-  if (/formula|equation|calculate|compute|solve/.test(lower))  return 'calculation';
-  if (/remember|recall|forgot|memorize/.test(lower))           return 'memory';
-  if (/apply|use|when to|example/.test(lower))                 return 'application';
-  if (/concept|theory|understand|why|how/.test(lower))         return 'conceptual';
-  if (['math', 'physics', 'chemistry'].includes(subject.toLowerCase())) return 'calculation';
+  if (/formula|equation|calculate|compute|solve/.test(lower))           return 'calculation';
+  if (/remember|recall|forgot|memorize/.test(lower))                    return 'memory';
+  if (/apply|use|when to|example/.test(lower))                          return 'application';
+  if (/concept|theory|understand|why|how/.test(lower))                  return 'conceptual';
+  if (['math', 'physics', 'chemistry'].includes(subject?.toLowerCase())) return 'calculation';
   return 'unknown';
 }
 
 /**
- * updateTopicMastery — FIX 2 (v2)
+ * updateTopicMastery — v3
  *
- * Original code used a two-step approach:
- *   1. Query for existing topic entry
- *   2. If found: update it; if not found: SKIP
- *
- * The skip for missing topics meant new users never built a topic mastery
- * profile. Fixed by:
- *   - If topic entry EXISTS → update in-place with decay (same logic)
- *   - If topic entry DOES NOT EXIST → push a new entry with starting values
- *
- * This also handles new users who have no StudentProfile at all, via
- * upsert:true on the outer document write.
+ * v2: upsert:true for new users / new topics, exponential decay.
+ * v3 adds:
+ *   FIX A — writes isWeak and isStrong after every masteryLevel change.
+ *   FIX B — calls recomputeOverallMastery() (fire-and-forget) so Brain
+ *            Core always has an accurate difficulty baseline.
  */
 async function updateTopicMastery(
   userId:  string,
@@ -274,29 +268,30 @@ async function updateTopicMastery(
 ): Promise<void> {
   try {
     const adjustment = success ? 3 : -2;
+    const now        = new Date();
 
-    // Check if this topic entry already exists in the user's profile
+    // Check if topic entry already exists
     const existingProfile = await StudentProfile.findOne(
       { userId, 'topicMastery.topic': topic },
       { 'topicMastery.$': 1 }
     ).lean();
 
     if (existingProfile && (existingProfile as any).topicMastery?.length > 0) {
-      // ── EXISTING TOPIC: apply decay then adjustment ──────────
-      const currentEntry = (existingProfile as any).topicMastery[0];
-      const currentScore: number = currentEntry.masteryLevel ?? 50;
-      const lastAttempted: Date  = currentEntry.lastAttemptedAt
+      // ── EXISTING TOPIC: decay → adjustment → flags ────────────
+      const currentEntry    = (existingProfile as any).topicMastery[0];
+      const currentScore    = currentEntry.masteryLevel ?? 50;
+      const lastAttempted   = currentEntry.lastAttemptedAt
         ? new Date(currentEntry.lastAttemptedAt)
-        : new Date();
-
-      const now = new Date();
-      const daysSinceLastAttempt = Math.floor(
+        : now;
+      const daysSince       = Math.floor(
         (now.getTime() - lastAttempted.getTime()) / (1000 * 60 * 60 * 24)
       );
-
-      // Apply exponential decay (3% per day) then add adjustment
-      const decayedScore    = currentScore * Math.pow(0.97, daysSinceLastAttempt);
+      const decayedScore    = currentScore * Math.pow(0.97, daysSince);
       const newMasteryLevel = Math.min(100, Math.max(0, decayedScore + adjustment));
+
+      // FIX A: compute flags from the new mastery level
+      const isWeak   = newMasteryLevel < WEAK_THRESHOLD;
+      const isStrong = newMasteryLevel >= STRONG_THRESHOLD;
 
       await StudentProfile.findOneAndUpdate(
         { userId, 'topicMastery.topic': topic },
@@ -308,15 +303,22 @@ async function updateTopicMastery(
           $set: {
             'topicMastery.$.masteryLevel':    newMasteryLevel,
             'topicMastery.$.lastAttemptedAt': now,
+            'topicMastery.$.isWeak':          isWeak,   // FIX A
+            'topicMastery.$.isStrong':        isStrong, // FIX A
           },
         }
       );
+
+      logger.info(
+        { userId, topic, newMasteryLevel: Math.round(newMasteryLevel), isWeak, isStrong },
+        '[FeedbackLoop] Existing topic mastery updated'
+      );
+
     } else {
-      // ── FIX 2: NEW TOPIC (or new user) — create the entry ────
-      // Use $push to add the topic entry. upsert:true on the outer
-      // document ensures a new StudentProfile is created if one
-      // doesn't exist yet (covers brand-new signups).
+      // ── NEW TOPIC (or new user): create entry with flags ──────
       const startingMastery = Math.min(100, Math.max(0, 50 + adjustment));
+      const isWeak          = startingMastery < WEAK_THRESHOLD;
+      const isStrong        = startingMastery >= STRONG_THRESHOLD;
 
       await StudentProfile.findOneAndUpdate(
         { userId },
@@ -326,28 +328,39 @@ async function updateTopicMastery(
               topic,
               subject,
               masteryLevel:    startingMastery,
+              isWeak,          // FIX A
+              isStrong,        // FIX A
               totalAttempts:   1,
               correctAttempts: success ? 1 : 0,
-              lastAttemptedAt: new Date(),
-              createdAt:       new Date(),
+              lastAttemptedAt: now,
+              createdAt:       now,
             },
           },
-          // Initialize top-level profile fields for new documents
           $setOnInsert: {
             userId,
             aiStrategyStats:     {},
             overallMasteryScore: 50,
-            createdAt:           new Date(),
+            createdAt:           now,
           },
         },
-        {
-          upsert: true,  // FIX 2: was missing — new users had no profile created
-          new:    false,
-        }
+        { upsert: true, new: false }
       );
 
-      logger.info({ userId, topic, subject }, '[FeedbackLoop] New topic mastery entry created');
+      logger.info(
+        { userId, topic, subject, startingMastery, isWeak, isStrong },
+        '[FeedbackLoop] New topic mastery entry created'
+      );
     }
+
+    // FIX B: recompute overallMasteryScore after every mastery change.
+    // Fire-and-forget — failure here must not block the main flow.
+    recomputeOverallMastery(userId).catch((err: any) =>
+      logger.warn(
+        { userId, err: err.message },
+        '[FeedbackLoop] overallMasteryScore recompute failed (non-fatal)'
+      )
+    );
+
   } catch (err: any) {
     logger.warn({ userId, topic, err: err.message }, '[FeedbackLoop] updateTopicMastery failed');
     // non-fatal — adaptive system degrades gracefully
@@ -355,14 +368,46 @@ async function updateTopicMastery(
 }
 
 /**
+ * recomputeOverallMastery — FIX B
+ *
+ * Reads all topicMastery entries and writes back the arithmetic mean
+ * as overallMasteryScore. Brain Core reads this for difficulty decisions,
+ * so it must stay current as the student improves or forgets topics.
+ *
+ * Called fire-and-forget from updateTopicMastery() and at the end of
+ * decayAllTopics().
+ */
+async function recomputeOverallMastery(userId: string): Promise<void> {
+  const profile = await StudentProfile.findOne({ userId })
+    .select('topicMastery')
+    .lean();
+
+  const topics: any[] = (profile as any)?.topicMastery ?? [];
+  if (!topics.length) return;
+
+  const levels  = topics.map((t: any) => t.masteryLevel ?? 50);
+  const avg     = levels.reduce((a: number, b: number) => a + b, 0) / levels.length;
+  const rounded = Math.round(Math.min(100, Math.max(0, avg)));
+
+  await StudentProfile.findOneAndUpdate(
+    { userId },
+    { $set: { overallMasteryScore: rounded } }
+  );
+
+  logger.info({ userId, overallMasteryScore: rounded }, '[FeedbackLoop] overallMasteryScore updated');
+}
+
+/**
  * decayAllTopics — Nightly decay function.
- * Applies forgetting curve to all stale topics for a user.
- * Called by the nightly cron in index.js for every user.
- * Only decays topics not attempted in 7+ days.
+ * Applies forgetting curve to all stale topics (7+ days untouched).
+ * Called by the nightly cron in index.ts for every user.
+ *
+ * v3: also writes isWeak/isStrong flags after decay, and triggers
+ * overallMasteryScore recompute at the end of the full decay run.
  */
 export async function decayAllTopics(userId: string): Promise<void> {
   try {
-    const now = new Date();
+    const now          = new Date();
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
     const profile = await StudentProfile.findOne({ userId })
@@ -377,16 +422,31 @@ export async function decayAllTopics(userId: string): Promise<void> {
 
     for (const t of staleTopics) {
       const lastAttempted = t.lastAttemptedAt ? new Date(t.lastAttemptedAt) : sevenDaysAgo;
-      const daysSince = Math.floor(
+      const daysSince     = Math.floor(
         (now.getTime() - lastAttempted.getTime()) / (1000 * 60 * 60 * 24)
       );
-      const currentScore: number = t.masteryLevel ?? 50;
-      const decayedScore = Math.min(100, Math.max(0, currentScore * Math.pow(0.97, daysSince)));
+      const currentScore  = t.masteryLevel ?? 50;
+      const decayedScore  = Math.min(100, Math.max(0, currentScore * Math.pow(0.97, daysSince)));
+
+      // FIX A: update flags during nightly decay too
+      const isWeak   = decayedScore < WEAK_THRESHOLD;
+      const isStrong = decayedScore >= STRONG_THRESHOLD;
 
       await StudentProfile.findOneAndUpdate(
         { userId, 'topicMastery.topic': t.topic },
-        { $set: { 'topicMastery.$.masteryLevel': decayedScore } }
+        {
+          $set: {
+            'topicMastery.$.masteryLevel': decayedScore,
+            'topicMastery.$.isWeak':       isWeak,   // FIX A
+            'topicMastery.$.isStrong':     isStrong, // FIX A
+          },
+        }
       );
+    }
+
+    // FIX B: recompute overall after full decay run
+    if (staleTopics.length > 0) {
+      await recomputeOverallMastery(userId);
     }
 
     logger.info({ userId, decayedCount: staleTopics.length }, '[FeedbackLoop] decayAllTopics complete');

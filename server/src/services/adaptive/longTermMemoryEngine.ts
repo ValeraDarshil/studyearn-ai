@@ -1,21 +1,22 @@
 /**
- * AI Study OS — Long-Term Memory Engine  (GAP 2 FIX)
+ * AI Study OS — Long-Term Memory Engine  (v2 — FIX: upsert:true for recordMistake + recordMilestone)
  * ─────────────────────────────────────────────────────────────
- * Replaces the session-only Map cache in aiMemoryStore.ts with
- * true persistent memory that survives server restarts and builds
- * a rich model of each student over time.
+ * WHAT CHANGED (v1 → v2):
  *
- * Stores (per user, in MongoDB StudentProfile):
- *   • weakConcepts[]        — concepts with repeated mistakes
- *   • strongConcepts[]      — mastered topics
- *   • pastMistakes[]        — detailed mistake log (last 50)
- *   • learningTimeline[]    — key milestones
- *   • behaviorPatterns      — learning speed, peak hours, style
+ *   FIX A — recordMistake() used { upsert: false }.
+ *     If a StudentProfile didn't exist yet (brand-new user), the
+ *     findOneAndUpdate found no document and silently did nothing.
+ *     Every mistake for new users was permanently dropped.
+ *     Fixed: { upsert: true } + $setOnInsert seeds safe defaults so the
+ *     profile is created on the first mistake write if needed.
  *
- * Integration:
- *   • contextFusionEngine.ts  — inject into AI system prompt
- *   • aiDecisionEngine.ts     — inform strategy selection
- *   • feedbackLoopEngine.ts   — write outcomes here
+ *   FIX B — recordMilestone() used { upsert: false }.
+ *     Same root cause — new users had no profile → $push silently dropped.
+ *     Fixed: { upsert: true } + $setOnInsert defaults.
+ *
+ * Everything else (getMemory, buildMemoryPromptBlock, deriveBehaviorPattern,
+ * all types) is unchanged from v1.
+ * ─────────────────────────────────────────────────────────────
  */
 
 import { StudentProfile } from '../../models/StudentProfile.model.js';
@@ -27,9 +28,9 @@ import { logger }         from '../../utils/logger.js';
 export interface MistakeRecord {
   topic:       string;
   subject:     string;
-  question:    string;   // truncated to 200 chars
+  question:    string;
   errorType:   'conceptual' | 'calculation' | 'memory' | 'application' | 'unknown';
-  count:       number;   // how many times this same mistake pattern appeared
+  count:       number;
   firstSeenAt: string;
   lastSeenAt:  string;
 }
@@ -38,7 +39,7 @@ export interface ConceptStrength {
   concept:      string;
   subject:      string;
   strength:     'weak' | 'developing' | 'strong' | 'mastered';
-  masteryScore: number;  // 0–100
+  masteryScore: number;
   reviewCount:  number;
   lastSeenAt:   string;
 }
@@ -53,23 +54,23 @@ export interface LearningMilestone {
 export interface BehaviorPattern {
   avgSessionDurationMin:  number;
   preferredSubjects:      string[];
-  peakHour:               number | null;  // 0–23
+  peakHour:               number | null;
   avgQuestionsPerSession: number;
-  confusionRate:          number;  // 0–1
-  retryRate:              number;  // 0–1 (how often they ask again after confusion)
+  confusionRate:          number;
+  retryRate:              number;
   updatedAt:              string;
 }
 
 export interface LongTermMemory {
-  userId:           string;
-  weakConcepts:     ConceptStrength[];
-  strongConcepts:   ConceptStrength[];
-  pastMistakes:     MistakeRecord[];
-  milestones:       LearningMilestone[];
-  behaviorPattern:  BehaviorPattern | null;
-  totalQuestions:   number;
-  totalSessions:    number;
-  loadedAt:         string;
+  userId:          string;
+  weakConcepts:    ConceptStrength[];
+  strongConcepts:  ConceptStrength[];
+  pastMistakes:    MistakeRecord[];
+  milestones:      LearningMilestone[];
+  behaviorPattern: BehaviorPattern | null;
+  totalQuestions:  number;
+  totalSessions:   number;
+  loadedAt:        string;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -96,7 +97,7 @@ export const longTermMemoryEngine = {
           .lean(),
       ]);
 
-      // ── Derive concept strengths from topicMastery ───────────
+      // ── Derive concept strengths from topicMastery ────────────
       const topicMastery: any[] = (profile as any)?.topicMastery ?? [];
 
       const weakConcepts: ConceptStrength[] = topicMastery
@@ -123,12 +124,10 @@ export const longTermMemoryEngine = {
         }))
         .slice(0, 10);
 
-      // ── Mistake records from recentMistakes + stored memory ──
-      const storedMemory = (profile as any)?.aiLongTermMemory ?? {};
-      const pastMistakes: MistakeRecord[] = storedMemory.pastMistakes ?? [];
-
-      // ── Milestones ─────────────────────────────────────────────
-      const milestones: LearningMilestone[] = storedMemory.milestones ?? [];
+      // ── Mistake records ────────────────────────────────────────
+      const storedMemory           = (profile as any)?.aiLongTermMemory ?? {};
+      const pastMistakes: MistakeRecord[]        = storedMemory.pastMistakes ?? [];
+      const milestones:   LearningMilestone[]    = storedMemory.milestones   ?? [];
 
       // ── Behavior pattern from session stats ────────────────────
       const behaviorPattern = deriveBehaviorPattern(sessions, storedMemory);
@@ -165,6 +164,10 @@ export const longTermMemoryEngine = {
   /**
    * recordMistake — persists a new mistake to the user's long-term record.
    * Called by feedbackLoopEngine when a wrong answer is detected.
+   *
+   * FIX A (v2): upsert:false → upsert:true so brand-new users who have no
+   * StudentProfile yet get one created on their first mistake write,
+   * instead of the data being silently dropped.
    */
   async recordMistake(
     userId:    string,
@@ -174,16 +177,17 @@ export const longTermMemoryEngine = {
     errorType: MistakeRecord['errorType'] = 'unknown'
   ): Promise<void> {
     try {
+      // Load existing mistakes first (read-then-merge)
       const profile = await StudentProfile.findOne({ userId })
         .select('aiLongTermMemory')
         .lean();
 
-      const stored   = (profile as any)?.aiLongTermMemory ?? {};
+      const stored             = (profile as any)?.aiLongTermMemory ?? {};
       const mistakes: MistakeRecord[] = stored.pastMistakes ?? [];
 
-      // Upsert — if same topic+errorType already exists, increment count
+      // Upsert in-memory: same topic+errorType → increment count
       const existing = mistakes.find(m => m.topic === topic && m.errorType === errorType);
-      const now = new Date().toISOString();
+      const now      = new Date().toISOString();
 
       if (existing) {
         existing.count++;
@@ -192,21 +196,30 @@ export const longTermMemoryEngine = {
         mistakes.unshift({
           topic,
           subject,
-          question: question.slice(0, 200),
+          question:    (question || '').slice(0, 200),
           errorType,
-          count:        1,
-          firstSeenAt:  now,
-          lastSeenAt:   now,
+          count:       1,
+          firstSeenAt: now,
+          lastSeenAt:  now,
         });
       }
 
-      // Keep last 50
       const trimmed = mistakes.slice(0, 50);
 
+      // FIX A: upsert:true + $setOnInsert so new users get a profile document created
       await StudentProfile.findOneAndUpdate(
         { userId },
-        { $set: { 'aiLongTermMemory.pastMistakes': trimmed } },
-        { upsert: false }
+        {
+          $set: { 'aiLongTermMemory.pastMistakes': trimmed },
+          $setOnInsert: {
+            userId,
+            aiStrategyStats:     {},
+            topicMastery:        [],
+            overallMasteryScore: 50,
+            createdAt:           new Date(),
+          },
+        },
+        { upsert: true }  // FIX A: was { upsert: false } — new users lost all mistake history
       );
 
       logger.info({ userId, topic, errorType }, '[LTMemory] Mistake recorded');
@@ -217,6 +230,10 @@ export const longTermMemoryEngine = {
 
   /**
    * recordMilestone — persists a learning achievement.
+   *
+   * FIX B (v2): upsert:false → upsert:true so brand-new users get a
+   * StudentProfile created on their first milestone, instead of the
+   * $push being silently dropped on a missing document.
    */
   async recordMilestone(
     userId:      string,
@@ -230,10 +247,26 @@ export const longTermMemoryEngine = {
         achievedAt: new Date().toISOString(),
       };
 
+      // FIX B: upsert:true + $setOnInsert so new users get a profile created
       await StudentProfile.findOneAndUpdate(
         { userId },
-        { $push: { 'aiLongTermMemory.milestones': { $each: [milestone], $position: 0, $slice: 30 } } },
-        { upsert: false }
+        {
+          $push: {
+            'aiLongTermMemory.milestones': {
+              $each:     [milestone],
+              $position: 0,
+              $slice:    30,
+            },
+          },
+          $setOnInsert: {
+            userId,
+            aiStrategyStats:     {},
+            topicMastery:        [],
+            overallMasteryScore: 50,
+            createdAt:           new Date(),
+          },
+        },
+        { upsert: true }  // FIX B: was { upsert: false } — new users lost all milestones
       );
 
       logger.info({ userId, type }, '[LTMemory] Milestone recorded');
@@ -272,18 +305,18 @@ export const longTermMemoryEngine = {
 // ─────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────
+
 function deriveBehaviorPattern(sessions: any[], storedMemory: any): BehaviorPattern | null {
   if (!sessions || sessions.length === 0) return storedMemory.behaviorPattern ?? null;
 
-  const totalTurns      = sessions.reduce((s, sess) => s + (sess.turnCount ?? 0), 0);
-  const totalConfusion  = sessions.reduce((s, sess) => s + (sess.confusionCount ?? 0), 0);
-  const totalMastery    = sessions.reduce((s, sess) => s + (sess.masteryCount ?? 0), 0);
+  const totalTurns     = sessions.reduce((s, sess) => s + (sess.turnCount     ?? 0), 0);
+  const totalConfusion = sessions.reduce((s, sess) => s + (sess.confusionCount ?? 0), 0);
+  const totalMastery   = sessions.reduce((s, sess) => s + (sess.masteryCount   ?? 0), 0);
 
-  const avgQuestions    = sessions.length > 0 ? totalTurns / sessions.length : 0;
-  const confusionRate   = totalTurns > 0 ? totalConfusion / totalTurns : 0;
-  const retryRate       = totalMastery > 0 ? totalMastery / (totalTurns || 1) : 0;
+  const avgQuestions  = sessions.length > 0 ? totalTurns / sessions.length : 0;
+  const confusionRate = totalTurns  > 0 ? totalConfusion / totalTurns : 0;
+  const retryRate     = totalMastery > 0 ? totalMastery  / (totalTurns || 1) : 0;
 
-  // Preferred subjects from session topics
   const subjectCount: Record<string, number> = {};
   for (const sess of sessions) {
     for (const topic of (sess.detectedTopics ?? [])) {
@@ -296,7 +329,7 @@ function deriveBehaviorPattern(sessions: any[], storedMemory: any): BehaviorPatt
     .map(([s]) => s);
 
   return {
-    avgSessionDurationMin:  0,  // would require actual timestamps per session
+    avgSessionDurationMin:  0,
     preferredSubjects,
     peakHour:               null,
     avgQuestionsPerSession: Math.round(avgQuestions),
