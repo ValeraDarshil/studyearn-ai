@@ -30,45 +30,83 @@ export interface GeneralKnowledgeResult {
 // Returns true for questions about famous people, places, events
 // that Wikipedia can answer better than an AI API call.
 
+// ── Study / CS / Programming exclusion list ─────────────────────────────────
+// If ANY of these words appear in the prompt → never trigger Wikipedia search.
+// Using new RegExp() because TypeScript does not allow multiline regex literals.
+const STUDY_EXCLUSIONS = new RegExp(
+  '\\b(' +
+    // OOP & CS concepts
+    'oops|oop|object.oriented|polymorphism|inheritance|encapsulation|abstraction|' +
+    'recursion|algorithm|data.structure|linked.list|stack|queue|heap|hash|' +
+    'sorting|searching|binary.search|bubble.sort|merge.sort|quick.sort|' +
+    // Programming keywords
+    'programming|coding|code|program|script|' +
+    // Languages
+    'python|javascript|typescript|rust|golang|php|ruby|swift|kotlin|' +
+    'react|nodejs|express|mongodb|sql|database|' +
+    // Math / Science terms
+    'derivative|integral|calculus|differentiate|integrate|' +
+    'trigonometry|algebra|geometry|theorem|proof|' +
+    // Physics laws
+    'newton|kepler|faraday|ohm|boyle|hooke|coulomb|' +
+    // Bio
+    'photosynthesis|mitosis|meiosis|' +
+    // Exact phrases that always mean study questions
+    'what is called|what are called|called in programming|in computer science' +
+  ')\\b',
+  'i'
+);
+
 const GK_PATTERNS = [
-  // Who is / What is X
+  // Who is / Who was — safe, almost always a person query
   /^who\s+is\s+/i,
   /^who\s+was\s+/i,
-  /^what\s+is\s+(?!the\s+formula|the\s+equation|the\s+derivative|the\s+integral)/i,
-  /^what\s+was\s+/i,
-  // Capital / Country questions
+  // Capital of country — safe geography
   /^what\s+is\s+the\s+capital\s+of/i,
   /^capital\s+of\s+/i,
-  // Tell me about X
+  // Tell me about / Information about
   /^tell\s+me\s+about\s+/i,
   /^information\s+(about|on)\s+/i,
-  // Define / explain — general terms
-  /^define\s+/i,
-  // Famous people patterns
-  /\b(who\s+is|who\s+was|biography|founder|inventor|discover)\b.*\b(elon|tesla|gandhi|einstein|newton|darwin|napoleon|shakespeare|modi|trump|obama|bezos|gates|zuckerberg|musk|einstein|hawking|darwin)\b/i,
+  // Famous people — explicit name list only (no open-ended match)
+  /(biography|founder|inventor).*(elon|tesla|gandhi|einstein|darwin|napoleon|shakespeare|modi|trump|obama|bezos|gates|zuckerberg|musk|hawking)/i,
+  // Historical "what was the X"
+  /^what\s+was\s+the\s+/i,
 ];
 
 const GK_TOPIC_WORDS = [
-  'president', 'prime minister', 'founder', 'ceo', 'director', 'chairman',
+  'president', 'prime minister', 'ceo', 'director', 'chairman',
   'country', 'continent', 'ocean', 'river', 'mountain', 'city', 'capital',
   'history', 'war', 'revolution', 'independence', 'treaty',
   'planet', 'galaxy', 'solar system', 'universe',
-  'company', 'organization', 'institution', 'university',
 ];
 
 export function isGeneralKnowledgeQuestion(prompt: string): boolean {
   const lower = prompt.toLowerCase().trim();
 
-  // Skip if it's a study/homework question
-  if (/\b(solve|calculate|prove|derive|differentiate|integrate|code|program|algorithm|formula|equation|how\s+does.*work|explain.*science|explain.*physics|explain.*math|explain.*chemistry)\b/i.test(lower)) {
-    return false;
+  // ── STEP 1: Hard exclusion — any study/CS/programming term → never GK ──
+  if (STUDY_EXCLUSIONS.test(lower)) return false;
+
+  // ── STEP 2: Additional homework/study phrase check ────────────────────
+  if (/(solve|calculate|prove|derive|differentiate|integrate|formula|equation)/i.test(lower)) return false;
+  if (/(explain|how does|how do|how to|what does).*(work|function|happen)/i.test(lower)) return false;
+  if (/in\s+(programming|coding|computer science|cs|java|python|javascript)/i.test(lower)) return false;
+
+  // ── STEP 3: "What is X" — only allow for proper nouns or capital/country ─
+  // Blocks: "what is OOP", "what is recursion", "what is photosynthesis"
+  // Allows: "what is the capital of France", "what is NASA", "what is ISRO"
+  if (/^what\s+is\s+/i.test(prompt)) {
+    if (/^what\s+is\s+the\s+capital\s+of/i.test(prompt)) return true; // always allow capital questions
+    const afterWhatIs = prompt.replace(/^what\s+is\s+(the\s+|a\s+|an\s+)?/i, '').trim();
+    // Only allow if starts with capital letter AND is 1-3 words (proper noun like NASA, ISRO, WHO)
+    const isProperNoun = /^[A-Z]{2,}/.test(afterWhatIs) && afterWhatIs.split(' ').length <= 3;
+    if (!isProperNoun) return false;
   }
 
-  // Check patterns
+  // ── STEP 4: Check safe GK patterns ───────────────────────────────────
   if (GK_PATTERNS.some(p => p.test(prompt))) return true;
 
-  // Check if it's a short factual question with topic words
-  if (lower.length < 100 && GK_TOPIC_WORDS.some(w => lower.includes(w))) return true;
+  // ── STEP 5: Short factual question with a GK topic word ──────────────
+  if (lower.length < 60 && GK_TOPIC_WORDS.some(w => lower.includes(w))) return true;
 
   return false;
 }
