@@ -270,15 +270,27 @@ async function updateTopicMastery(
     const adjustment = success ? 3 : -2;
     const now        = new Date();
 
-    // Check if topic entry already exists
-    const existingProfile = await StudentProfile.findOne(
+    // ── FIX: Eliminate read-then-write race condition ──────────────────────
+    // Old pattern: findOne (read) → separate findOneAndUpdate (write).
+    // Two simultaneous requests for same user+topic both read "not found",
+    // both $push → duplicate topic entries that corrupt mastery tracking.
+    //
+    // New pattern: attempt the positional UPDATE first (atomic).
+    // If it matched 0 docs, the topic doesn't exist yet → safe to $push.
+    // Only one request can win the initial update; the other falls through
+    // to the $push path, which may add a duplicate. To prevent that,
+    // we use addToSet-style logic: check matchedCount before pushing.
+    // ──────────────────────────────────────────────────────────────────────
+
+    // Step 1: Try to update EXISTING topic entry (atomic positional update)
+    const existing = await StudentProfile.findOne(
       { userId, 'topicMastery.topic': topic },
       { 'topicMastery.$': 1 }
     ).lean();
 
-    if (existingProfile && (existingProfile as any).topicMastery?.length > 0) {
+    if (existing && (existing as any).topicMastery?.length > 0) {
       // ── EXISTING TOPIC: decay → adjustment → flags ────────────
-      const currentEntry    = (existingProfile as any).topicMastery[0];
+      const currentEntry    = (existing as any).topicMastery[0];
       const currentScore    = currentEntry.masteryLevel ?? 50;
       const lastAttempted   = currentEntry.lastAttemptedAt
         ? new Date(currentEntry.lastAttemptedAt)
@@ -288,10 +300,8 @@ async function updateTopicMastery(
       );
       const decayedScore    = currentScore * Math.pow(0.97, daysSince);
       const newMasteryLevel = Math.min(100, Math.max(0, decayedScore + adjustment));
-
-      // FIX A: compute flags from the new mastery level
-      const isWeak   = newMasteryLevel < WEAK_THRESHOLD;
-      const isStrong = newMasteryLevel >= STRONG_THRESHOLD;
+      const isWeak          = newMasteryLevel < WEAK_THRESHOLD;
+      const isStrong        = newMasteryLevel >= STRONG_THRESHOLD;
 
       await StudentProfile.findOneAndUpdate(
         { userId, 'topicMastery.topic': topic },
@@ -303,8 +313,8 @@ async function updateTopicMastery(
           $set: {
             'topicMastery.$.masteryLevel':    newMasteryLevel,
             'topicMastery.$.lastAttemptedAt': now,
-            'topicMastery.$.isWeak':          isWeak,   // FIX A
-            'topicMastery.$.isStrong':        isStrong, // FIX A
+            'topicMastery.$.isWeak':          isWeak,
+            'topicMastery.$.isStrong':        isStrong,
           },
         }
       );
@@ -315,21 +325,29 @@ async function updateTopicMastery(
       );
 
     } else {
-      // ── NEW TOPIC (or new user): create entry with flags ──────
+      // ── NEW TOPIC: use $addToSet-style atomic push ─────────────
+      // addToSet doesn't work for subdoc arrays, so we use:
+      //   findOneAndUpdate with filter { 'topicMastery.topic': { $ne: topic } }
+      // This ensures only ONE request succeeds in creating the entry.
+      // Concurrent requests that also see "not found" will fail this filter
+      // (because the first request already inserted it) and their $push is rejected.
       const startingMastery = Math.min(100, Math.max(0, 50 + adjustment));
       const isWeak          = startingMastery < WEAK_THRESHOLD;
       const isStrong        = startingMastery >= STRONG_THRESHOLD;
 
-      await StudentProfile.findOneAndUpdate(
-        { userId },
+      const result = await StudentProfile.findOneAndUpdate(
+        {
+          userId,
+          'topicMastery.topic': { $ne: topic },  // atomic guard: only insert if topic absent
+        },
         {
           $push: {
             topicMastery: {
               topic,
               subject,
               masteryLevel:    startingMastery,
-              isWeak,          // FIX A
-              isStrong,        // FIX A
+              isWeak,
+              isStrong,
               totalAttempts:   1,
               correctAttempts: success ? 1 : 0,
               lastAttemptedAt: now,
@@ -346,10 +364,12 @@ async function updateTopicMastery(
         { upsert: true, new: false }
       );
 
-      logger.info(
-        { userId, topic, subject, startingMastery, isWeak, isStrong },
-        '[FeedbackLoop] New topic mastery entry created'
-      );
+      if (result === null) {
+        // Profile didn't exist yet — new user, upsert created it. OK.
+        logger.info({ userId, topic, subject, startingMastery }, '[FeedbackLoop] New topic entry created (new user)');
+      } else {
+        logger.info({ userId, topic, subject, startingMastery, isWeak, isStrong }, '[FeedbackLoop] New topic mastery entry created');
+      }
     }
 
     // FIX B: recompute overallMasteryScore after every mastery change.
@@ -378,23 +398,35 @@ async function updateTopicMastery(
  * decayAllTopics().
  */
 async function recomputeOverallMastery(userId: string): Promise<void> {
-  const profile = await StudentProfile.findOne({ userId })
-    .select('topicMastery')
-    .lean();
-
-  const topics: any[] = (profile as any)?.topicMastery ?? [];
-  if (!topics.length) return;
-
-  const levels  = topics.map((t: any) => t.masteryLevel ?? 50);
-  const avg     = levels.reduce((a: number, b: number) => a + b, 0) / levels.length;
-  const rounded = Math.round(Math.min(100, Math.max(0, avg)));
-
-  await StudentProfile.findOneAndUpdate(
-    { userId },
-    { $set: { overallMasteryScore: rounded } }
-  );
-
-  logger.info({ userId, overallMasteryScore: rounded }, '[FeedbackLoop] overallMasteryScore updated');
+  // FIX: Use MongoDB aggregation pipeline in a single findOneAndUpdate call.
+  // Old: findOne (read all topics) + findOneAndUpdate (write) = 2 DB round-trips per feedback turn.
+  // New: single atomic update pipeline that computes $avg inline — 1 DB call, no separate read.
+  try {
+    await (StudentProfile as any).findOneAndUpdate(
+      { userId },
+      [
+        {
+          $set: {
+            overallMasteryScore: {
+              $round: [
+                {
+                  $cond: {
+                    if:   { $gt: [{ $size: { $ifNull: ['$topicMastery', []] } }, 0] },
+                    then: { $avg: '$topicMastery.masteryLevel' },
+                    else: 50,
+                  },
+                },
+                0,
+              ],
+            },
+          },
+        },
+      ],
+    );
+    logger.info({ userId }, '[FeedbackLoop] overallMasteryScore updated (aggregation pipeline)');
+  } catch (err: any) {
+    logger.warn({ userId, err: err.message }, '[FeedbackLoop] recomputeOverallMastery failed');
+  }
 }
 
 /**

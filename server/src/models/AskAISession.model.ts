@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-// AskAI — AskAISession.model.ts  (v10)
+// AskAI — AskAISession.model.ts  (v11 — TTL 90d + modelCooldowns field)
 // linkedConvoId added — Conversation model se link
 // ─────────────────────────────────────────────────────────────
 
@@ -62,12 +62,24 @@ const AskAISessionSchema = new Schema({
   lastTopic:      { type: String,  default: null },
   lastSubject:    { type: String,  default: null },
 
+  // FIX: Model cooldown sharing across instances (no Redis needed).
+  // modelPerformanceTracker cooldowns are in-process RAM — in multi-instance
+  // deploys each instance has its own cooldown state. This field lets instances
+  // share which models are currently cooling down via a simple DB document.
+  // Structure: { 'llama-3.3-70b-versatile': { until: 1234567890 } }
+  // Stored on a special singleton doc with userId = 'system:model-cooldowns'.
+  modelCooldowns: { type: Schema.Types.Mixed, default: null },
+
 }, { timestamps: true });
 
 AskAISessionSchema.index({ userId: 1, lastMessageAt: -1 });
 AskAISessionSchema.index({ linkedConvoId: 1 });
-// 30-day auto-delete
-AskAISessionSchema.index({ lastMessageAt: 1 }, { expireAfterSeconds: 30 * 24 * 60 * 60 });
+// FIX: Extended TTL from 30 days to 90 days.
+// 30-day TTL was deleting returning students' session context —
+// prevTurnStore DB fallback, strategy scoring, and teachingLoop
+// all query AskAISession. Deleted session = lost adaptive context
+// even though StudentProfile is intact.
+AskAISessionSchema.index({ lastMessageAt: 1 }, { expireAfterSeconds: 90 * 24 * 60 * 60 });
 
 export interface IAskAIMessage {
   role:           'user' | 'assistant';

@@ -493,13 +493,29 @@ connectDB().then(() => {
   // ── Nightly mastery decay — spaced repetition forgetting curve ──
   setInterval(async () => {
     try {
-      const users = await User.find({}).select('_id').lean();
+      // FIX: Only decay users active in last 30 days (not ALL users).
+      // Without this filter, at 100k users this becomes a 100k-document
+      // sequential scan that can take 10-30 mins and overlap the next cron.
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      const users = await User.find({ updatedAt: { $gt: thirtyDaysAgo } })
+        .select('_id')
+        .lean();
+
+      let success = 0, failed = 0;
       for (const u of users) {
-        await decayAllTopics((u._id as any).toString());
+        // FIX: Per-user try/catch — one corrupt profile no longer kills all remaining users.
+        // Previously: single outer try/catch meant user #500 failure → users #501-N never decayed.
+        try {
+          await decayAllTopics((u._id as any).toString());
+          success++;
+        } catch (err: any) {
+          failed++;
+          logger.warn(`[Cron] decayAllTopics failed for user ${(u._id as any).toString()}: ${err.message}`);
+        }
       }
-      logger.info('[Cron] Nightly mastery decay complete');
+      logger.info(`[Cron] Nightly mastery decay complete | success=${success} failed=${failed} total=${users.length}`);
     } catch (err: any) {
-      logger.warn('[Cron] Nightly mastery decay failed: ' + err.message);
+      logger.warn('[Cron] Nightly mastery decay — failed to fetch users: ' + err.message);
     }
   }, 24 * 60 * 60 * 1000);
 });

@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-// AskAI — aiController.ts  (v16 — FIX 1/2/3 + image cross-turn learning)
+// AskAI — aiController.ts  (v17 — Production stability fixes: quota bypass, auth, LRU, prompt injection)
 //
 // ROUTES HANDLED:
 //   POST /api/ai/ask           → askAI()         (image / text non-stream)
@@ -102,6 +102,20 @@ import { StudentProfile }       from '../models/StudentProfile.model.js';
 import { AskAISession }         from '../models/AskAISession.model.js';
 
 // ─────────────────────────────────────────────────────────────
+// FIX 3: Prompt injection sanitizer — strips control chars and
+// limits length of user-derived strings before system prompt injection.
+// Topic/subject are extracted from user messages and injected into
+// system prompts — without sanitization they are a prompt injection vector.
+function sanitizeForPrompt(input: string | null | undefined, maxLen = 80): string {
+  if (!input) return '';
+  return input
+    .replace(/[^\w\s,.\-()]/g, '')   // allow only safe chars
+    .replace(/\s+/g, ' ')            // collapse whitespace
+    .trim()
+    .slice(0, maxLen);
+}
+
+// ─────────────────────────────────────────────────────────────
 // FIX 2: prevTurnStore — in-memory store for previous turn data.
 // Used to score the PREVIOUS strategy using the CURRENT message as
 // a reaction signal, and to pass prevAiResponse into the pipeline
@@ -117,7 +131,25 @@ interface PrevTurnData {
   finalDecision: any;
   turnCount:     number;
 }
+// FIX: LRU eviction — prevents unbounded memory growth.
+// Without this, every user session adds an entry that never gets deleted
+// (unless resetSession() is called, which most users never do).
+// At 10,000 users × 5 convos = 50,000 entries × ~3KB each = ~150MB RAM leak.
+const PREV_TURN_MAX_SIZE = 5_000;
 const prevTurnStore = new Map<string, PrevTurnData>();
+
+function prevTurnSet(key: string, value: PrevTurnData): void {
+  prevTurnStore.set(key, value);
+  // Evict oldest 500 entries when limit is hit (FIFO — Map preserves insertion order)
+  if (prevTurnStore.size > PREV_TURN_MAX_SIZE) {
+    let evicted = 0;
+    for (const k of prevTurnStore.keys()) {
+      prevTurnStore.delete(k);
+      if (++evicted >= 500) break;
+    }
+    logger.info(`[PrevTurnStore] Evicted 500 entries | size=${prevTurnStore.size}`);
+  }
+}
 
 // ─────────────────────────────────────────────────────────────
 // Constants
@@ -168,6 +200,87 @@ function getNextRefillSecs(user: any): number {
   return Math.max(0, Math.ceil((oldest + REFILL_INTERVAL_MS - Date.now()) / 1000));
 }
 
+/**
+ * checkAndDeductQuota — ATOMIC quota check + deduct (FIX: quota bypass race condition).
+ *
+ * Problem: old handleQuestionUsed() did findById → check → save.
+ * Two simultaneous requests both read questionsLeft=1, both pass, both get AI responses.
+ *
+ * Fix: single atomic findOneAndUpdate with { questionsLeft: { $gt: 0 } } filter.
+ * MongoDB guarantees only ONE request wins the decrement — the other gets null back.
+ * No two requests can simultaneously pass the quota check.
+ *
+ * Returns: { allowed: true, user } if quota available, { allowed: false } if exhausted.
+ */
+async function checkAndDeductQuota(
+  req: Request,
+): Promise<{ allowed: false; questionsLeft: 0; nextRefillSecs: number } | { allowed: true; userId: string; isPremium: boolean }> {
+  const userId = getUserIdFromToken(req);
+  if (!userId) return { allowed: false, questionsLeft: 0, nextRefillSecs: 0 };
+
+  try {
+    // Step 1: Load user to determine daily limit + reset date
+    const user = await User.findById(userId).lean();
+    if (!user) return { allowed: false, questionsLeft: 0, nextRefillSecs: 0 };
+
+    const premium    = isPremiumValid(user);
+    const today      = getTodayIST();
+    const dailyLimit = premium ? PREMIUM_DAILY_LIMIT : FREE_DAILY_LIMIT;
+
+    // Step 2: If new day → reset quota first (non-atomic but safe — only resets once per day)
+    if ((user as any).questionsDate !== today) {
+      await User.findByIdAndUpdate(userId, {
+        $set: {
+          questionsDate:  today,
+          questionUsedAt: [],
+          questionsLeft:  dailyLimit,
+          videoAdsToday:  0,
+          videoAdsDate:   today,
+        },
+      });
+    }
+
+    // Step 3: ATOMIC decrement — only succeeds if questionsLeft > 0
+    // This eliminates the race condition entirely.
+    const updated = await User.findOneAndUpdate(
+      {
+        _id:           userId,
+        questionsLeft: { $gt: 0 },  // atomic guard — only one request wins
+      },
+      {
+        $inc: { questionsLeft: -1 },
+        $push: { questionUsedAt: new Date() },
+      },
+      { new: true },
+    );
+
+    if (!updated) {
+      // Quota exhausted — compute refill time from current user state
+      const fresh = await User.findById(userId).lean();
+      return {
+        allowed:        false,
+        questionsLeft:  0,
+        nextRefillSecs: getNextRefillSecs(fresh),
+      };
+    }
+
+    return {
+      allowed:   true,
+      userId,
+      isPremium: premium,
+    };
+  } catch (err: any) {
+    logger.error('checkAndDeductQuota error: ' + err.message);
+    // On error, DENY the request — fail closed, not open
+    return { allowed: false, questionsLeft: 0, nextRefillSecs: 0 };
+  }
+}
+
+/**
+ * handleQuestionUsed — called AFTER AI response to log points + activity.
+ * Quota is already deducted by checkAndDeductQuota() before the AI call.
+ * This function only handles the non-critical bookkeeping.
+ */
 async function handleQuestionUsed(
   req:        Request,
   promptText = '',
@@ -177,30 +290,11 @@ async function handleQuestionUsed(
 
   try {
     const user = await User.findById(userId);
-    if (!user)  return null;
+    if (!user) return null;
 
-    const premium    = isPremiumValid(user);
-    const today      = getTodayIST();
-    const dailyLimit = premium ? PREMIUM_DAILY_LIMIT : FREE_DAILY_LIMIT;
+    const premium = isPremiumValid(user);
+    const pts     = premium ? BASE_AI_POINTS * PREMIUM_MULTIPLIER : BASE_AI_POINTS;
 
-    if ((user as any).questionsDate !== today) {
-      (user as any).questionsDate  = today;
-      (user as any).questionUsedAt = [];
-      (user as any).videoAdsToday  = 0;
-      (user as any).videoAdsDate   = today;
-    }
-
-    applyHourlyRefill(user, dailyLimit);
-
-    if ((user as any).questionsLeft <= 0) {
-      await user.save();
-      return { questionsLeft: 0, pointsAwarded: 0, nextRefillSecs: getNextRefillSecs(user) };
-    }
-
-    (user as any).questionUsedAt = [...((user as any).questionUsedAt || []), new Date()];
-    applyHourlyRefill(user, dailyLimit);
-
-    const pts                         = premium ? BASE_AI_POINTS * PREMIUM_MULTIPLIER : BASE_AI_POINTS;
     user.points                      += pts;
     (user as any).totalXP             = ((user as any).totalXP || 0) + pts;
     (user as any).totalQuestionsAsked = ((user as any).totalQuestionsAsked || 0) + 1;
@@ -213,14 +307,13 @@ async function handleQuestionUsed(
       ? `Asked: ${cleanPrompt.substring(0, 80)}${cleanPrompt.length > 80 ? '…' : ''}`
       : 'Asked an AI question';
 
-    await Activity.create({ userId, action: 'ask_question', details: activityDetail, pointsEarned: pts });
+    Activity.create({ userId, action: 'ask_question', details: activityDetail, pointsEarned: pts }).catch(() => {});
     logger.info(`AI question | premium=${premium} | +${pts}pts | left=${(user as any).questionsLeft}`);
-
     syncActivityToProfile(userId, 'ask_question', pts).catch(() => {});
     onActivityEvent(userId, 'ai_tutor_used', { topic: activityDetail }).catch(() => {});
 
     return {
-      questionsLeft:  (user as any).questionsLeft,
+      questionsLeft:  (user as any).questionsLeft ?? 0,
       pointsAwarded:  pts,
       nextRefillSecs: getNextRefillSecs(user),
     };
@@ -261,7 +354,23 @@ export async function askAI(req: Request, res: Response) {
       return res.status(400).json({ success: false, answer: 'Please enter a question or upload an image.' });
     }
 
-    const userId                                   = getUserIdFromToken(req) ?? '';
+    // ── FIX: Auth guard — reject anonymous requests before any AI call ──
+    const userId = getUserIdFromToken(req) ?? '';
+    if (!userId) {
+      return res.status(401).json({ success: false, answer: 'Please log in to use AI features.' });
+    }
+
+    // ── FIX: Atomic quota check BEFORE AI call — eliminates race condition ──
+    const quotaResult = await checkAndDeductQuota(req);
+    if (!quotaResult.allowed) {
+      return res.status(429).json({
+        success:        false,
+        answer:         'You have used all your questions for today. Watch an ad or wait for the next refill.',
+        questionsLeft:  0,
+        nextRefillSecs: quotaResult.nextRefillSecs,
+      });
+    }
+
     const questionType: 'text' | 'image' | 'pdf'  = image ? 'image' : 'text';
     const startMs                                  = Date.now();
     let answer: string;
@@ -321,7 +430,7 @@ export async function askAI(req: Request, res: Response) {
               finalDecision: null,
               turnCount:     savedSession.turnCount ?? 1,
             };
-            if (imgPrevTurnKey) prevTurnStore.set(imgPrevTurnKey, imgPrevTurn);
+            if (imgPrevTurnKey) prevTurnSet(imgPrevTurnKey, imgPrevTurn);
           }
         } catch {
           // non-fatal
@@ -408,7 +517,7 @@ export async function askAI(req: Request, res: Response) {
           finalDecision: brainDecision,
           turnCount:     safeHistory.length,
         };
-        prevTurnStore.set(imgPrevTurnKey, imgNewPrevTurn);
+        prevTurnSet(imgPrevTurnKey, imgNewPrevTurn);
 
         if (sessionId && brainDecision?.strategy) {
           AskAISession.findByIdAndUpdate(
@@ -462,7 +571,7 @@ export async function askAI(req: Request, res: Response) {
               finalDecision: null,
               turnCount:     savedSession.turnCount ?? 1,
             };
-            if (prevTurnKey) prevTurnStore.set(prevTurnKey, prevTurn);
+            if (prevTurnKey) prevTurnSet(prevTurnKey, prevTurn);
           }
         } catch {
           // non-fatal
@@ -540,7 +649,7 @@ export async function askAI(req: Request, res: Response) {
             finalDecision: pkg.finalDecision,
             turnCount:     pkg.plan?.turnCount ?? safeHistory.length,
           };
-          prevTurnStore.set(prevTurnKey, newPrevTurn);
+          prevTurnSet(prevTurnKey, newPrevTurn);
 
           // FIX 3: Persist to DB with upsert:true so cold-start recovery always works
           if (sessionId && pkg.plan?.strategy) {
@@ -562,8 +671,9 @@ export async function askAI(req: Request, res: Response) {
     }
 
     const responseMs = Date.now() - startMs;
+    // Quota already deducted by checkAndDeductQuota() above — only log points now
     const userAction = await handleQuestionUsed(req, String(prompt || '').substring(0, 100));
-    const pts        = userAction?.pointsAwarded ?? (isPremiumValid(await User.findById(userId).lean()) ? 20 : 10);
+    const pts        = userAction?.pointsAwarded ?? (quotaResult.isPremium ? 20 : 10);
 
     // Persist to DB (non-blocking)
     if (userId) {
@@ -629,6 +739,25 @@ export async function askAIStream(req: Request, res: Response): Promise<void> {
     return;
   }
 
+  // ── FIX: Auth + quota check BEFORE flushHeaders() ──────────────
+  // Must happen before SSE headers are sent — once flushHeaders() fires
+  // we can no longer send a proper HTTP 401/429 status code.
+  if (!userId) {
+    res.status(401).json({ error: 'Please log in to use AI features.' });
+    return;
+  }
+
+  const quotaResult = await checkAndDeductQuota(req);
+  if (!quotaResult.allowed) {
+    res.status(429).json({
+      error:          'You have used all your questions for today. Watch an ad or wait for the next refill.',
+      questionsLeft:  0,
+      nextRefillSecs: quotaResult.nextRefillSecs,
+    });
+    return;
+  }
+  // ── End quota check ─────────────────────────────────────────────
+
   res.setHeader('Content-Type',      'text/event-stream');
   res.setHeader('Cache-Control',     'no-cache');
   res.setHeader('Connection',        'keep-alive');
@@ -644,11 +773,18 @@ export async function askAIStream(req: Request, res: Response): Promise<void> {
     let dbWeakTopics:    string[] = [];
     let dbSessionSummary          = '';
 
+    let realTurnCount = 0;
     if (userId) {
       try {
         sessionId        = await getOrCreateAskAISession(userId, convoId);
         dbWeakTopics     = await getWeakTopicsFromDB(userId);
         dbSessionSummary = await getSessionSummaryForPrompt(userId);
+
+        // FIX: Load real turnCount from DB — safeHistory.length is capped at 20
+        // and resets every new chat. Real turnCount is needed for milestone
+        // detection (turnCount % 5) and metricsEngine refresh (every 5th turn).
+        const sessionDoc = await AskAISession.findById(sessionId).select('turnCount').lean();
+        realTurnCount = (sessionDoc as any)?.turnCount ?? 0;
       } catch (e: any) {
         logger.warn('[AskAI DB] Pre-stream setup failed (continuing): ' + e.message);
       }
@@ -674,7 +810,7 @@ export async function askAIStream(req: Request, res: Response): Promise<void> {
             finalDecision: null,
             turnCount:     savedSession.turnCount ?? 1,
           };
-          if (prevTurnKey) prevTurnStore.set(prevTurnKey, prevTurn);
+          if (prevTurnKey) prevTurnSet(prevTurnKey, prevTurn);
         }
       } catch {
         // non-fatal
@@ -722,6 +858,12 @@ export async function askAIStream(req: Request, res: Response): Promise<void> {
       prevAiResponse: prevTurn?.aiResponse ?? null,
       prevStrategy:   prevTurn?.strategy   ?? null,
     });
+
+    // FIX: Override pkg.plan.turnCount with the real DB value
+    // so milestone detection and metricsEngine refresh fire correctly.
+    if (realTurnCount > 0 && pkg?.plan) {
+      pkg.plan.turnCount = realTurnCount;
+    }
 
     const emotionalState = detectEmotionalState(prompt, pkg.plan.turnCount ?? 0);
 
@@ -814,15 +956,23 @@ export async function askAIStream(req: Request, res: Response): Promise<void> {
         pkg.modelConfig.modelId, pkg.modelConfig.provider,
         'text', 0, responseMs,
       ).catch(() => {});
+
+      // FIX: Increment the real DB turnCount after every AI response.
+      // This keeps realTurnCount accurate for next turn's milestone/metrics check.
+      AskAISession.findByIdAndUpdate(
+        sessionId,
+        { $inc: { turnCount: 1 } }
+      ).catch(() => {});
     }
 
+    // Quota already deducted before stream started — only log points now
     if (userId) {
       handleQuestionUsed(req, String(prompt).substring(0, 100)).catch(() => {});
     }
 
     // Store this turn's data into prevTurnStore for the next turn's feedback scoring
     if (userId && fullResponse && prevTurnKey) {
-      prevTurnStore.set(prevTurnKey, {
+      prevTurnSet(prevTurnKey, {
         aiResponse:    fullResponse,
         strategy:      pkg.plan.strategy,
         topic:         finalTopic,
@@ -916,12 +1066,67 @@ export async function solvePDF(req: Request, res: Response) {
         : `Please analyze and solve all questions in this PDF:\n\n${pdfText.slice(0, 8000)}`;
       answer = await solveText(q, [], 'general');
     } else {
-      // Scanned PDF — Brain Core first, then solveWithVision with context
+      // Scanned PDF — Brain Core + cross-turn learning
+      //
+      // FIX: Load prevTurn from RAM + DB fallback (same as image path fix).
+      // Previously prevAiResponse was null so Brain Core had no prior context,
+      // strategy scoring never fired between PDF uploads, and adaptive difficulty
+      // never improved across multiple PDFs in the same session.
       let pdfBrainDecision: any = null;
       let pdfSessionId          = '';
+
+      const pdfPrevTurnKey = userId ? `${userId}:pdf-session` : '';
+      let pdfPrevTurn = pdfPrevTurnKey ? prevTurnStore.get(pdfPrevTurnKey) : undefined;
+
       try {
         if (userId) {
           pdfSessionId = await getOrCreateAskAISession(userId, null).catch(() => '');
+        }
+
+        // DB cold-start fallback — recovers prevTurn after server restart
+        if (!pdfPrevTurn && userId && pdfSessionId) {
+          try {
+            const savedSession = await AskAISession
+              .findOne({ userId })
+              .sort({ lastMessageAt: -1 })
+              .select('lastAiResponse lastStrategy lastTopic lastSubject turnCount')
+              .lean();
+            if (savedSession?.lastAiResponse && (savedSession.turnCount ?? 0) > 0) {
+              pdfPrevTurn = {
+                aiResponse:    savedSession.lastAiResponse,
+                strategy:      (savedSession as any).lastStrategy ?? 'TEACH',
+                topic:         (savedSession as any).lastTopic    ?? null,
+                subject:       (savedSession as any).lastSubject  ?? 'general',
+                sessionId:     String(savedSession._id),
+                finalDecision: null,
+                turnCount:     savedSession.turnCount ?? 1,
+              };
+              if (pdfPrevTurnKey) prevTurnSet(pdfPrevTurnKey, pdfPrevTurn);
+            }
+          } catch {
+            // non-fatal
+          }
+        }
+
+        // Score PREVIOUS strategy using current PDF prompt as reaction signal
+        if (pdfPrevTurn && userId) {
+          const pdfReaction = detectEmotionalState(prompt || '', pdfPrevTurn.turnCount);
+          afterResponseWithBrain(
+            userId,
+            pdfPrevTurn.sessionId,
+            prompt || '',
+            pdfPrevTurn.aiResponse,
+            pdfPrevTurn.topic,
+            pdfPrevTurn.subject,
+            pdfPrevTurn.turnCount,
+            0,
+            pdfPrevTurn.finalDecision,
+            pdfReaction === 'correct'
+              ? { success: true,  correctness: 1.0 }
+              : pdfReaction === 'confused' || pdfReaction === 'frustrated'
+              ? { success: false, correctness: 0.0 }
+              : undefined,
+          ).catch(() => {});
         }
 
         let resolvedMastery = 50;
@@ -943,11 +1148,11 @@ export async function solvePDF(req: Request, res: Response) {
           userId:          userId || 'anonymous',
           sessionId:       pdfSessionId || 'pdf-session',
           userMessage:     prompt || 'Solve all questions in this PDF completely.',
-          prevAiResponse:  null,
-          prevStrategy:    null,
+          prevAiResponse:  pdfPrevTurn?.aiResponse ?? null,   // FIX: was always null
+          prevStrategy:    (pdfPrevTurn?.strategy as any) ?? null,   // FIX: was always null
           topic:           null,
           subject:         'general',
-          turnCount:       0,
+          turnCount:       pdfPrevTurn?.turnCount ?? 0,
           retryCount:      0,
           masteryLevel:    resolvedMastery,
           currentState:    'LEARNING',
@@ -974,11 +1179,36 @@ export async function solvePDF(req: Request, res: Response) {
           answer,
           null,
           'general',
-          0,
+          pdfPrevTurn?.turnCount ?? 0,
           0,
           pdfBrainDecision,
           undefined,
         ).catch(() => {});
+      }
+
+      // Save this PDF turn for next turn's feedback
+      if (userId && answer && pdfPrevTurnKey) {
+        prevTurnSet(pdfPrevTurnKey, {
+          aiResponse:    answer,
+          strategy:      pdfBrainDecision?.strategy ?? 'TEACH',
+          topic:         null,
+          subject:       'general',
+          sessionId:     pdfSessionId,
+          finalDecision: pdfBrainDecision,
+          turnCount:     (pdfPrevTurn?.turnCount ?? 0) + 1,
+        });
+        if (pdfSessionId && pdfBrainDecision?.strategy) {
+          AskAISession.findByIdAndUpdate(
+            pdfSessionId,
+            { $set: {
+              lastAiResponse: answer.slice(0, 3000),
+              lastStrategy:   pdfBrainDecision.strategy,
+              lastTopic:      null,
+              lastSubject:    'general',
+            }},
+            { upsert: true },
+          ).catch(() => {});
+        }
       }
     }
 

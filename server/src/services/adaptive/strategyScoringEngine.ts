@@ -160,12 +160,10 @@ export const strategyScoringEngine = {
         }
       );
 
-      // Update global fallback too
-      const gs = globalStats.get(strategy);
-      if (gs) {
-        gs.usageCount++;
-        success ? gs.successCount++ : gs.failureCount++;
-      }
+      // FIX: Do NOT mutate globalStats — it is a read-only prior for new users.
+      // Mutating it causes: (a) incorrect priors after many requests, and
+      // (b) async interleaving bugs when two recordOutcome() calls run in parallel.
+      // Per-user DB stats (aiStrategyStats) are already the live source of truth.
 
       logger.info({ userId, strategy, success }, '[StrategyScoringEngine] Outcome recorded');
     } catch (err: any) {

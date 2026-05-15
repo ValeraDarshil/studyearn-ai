@@ -1,5 +1,5 @@
 /**
- * AI Study OS — Teaching Loop Engine  (GAP 6 FIX + AI Evaluator)
+ * AI Study OS — Teaching Loop Engine  (v2 — FIX: resetTopic DB persist + loopStates LRU cap)  (GAP 6 FIX + AI Evaluator)
  * ─────────────────────────────────────────────────────────────
  * The AI currently explains once or twice with no mastery check.
  * This engine implements a full iterative teaching loop:
@@ -74,7 +74,22 @@ export interface LoopAdvanceResult {
 }
 
 // ── Session state store ───────────────────────────────────────
+// FIX: Cap loopStates Map size to prevent memory leak.
+// Like prevTurnStore, this Map grows unbounded without eviction.
+// DB is the durable store — RAM is just a fast cache.
+const LOOP_STATE_MAX = 3_000;
 const loopStates = new Map<string, TeachingLoopState>();
+
+function loopStateSet(userId: string, state: TeachingLoopState): void {
+  loopStates.set(userId, state);
+  if (loopStates.size > LOOP_STATE_MAX) {
+    let evicted = 0;
+    for (const k of loopStates.keys()) {
+      loopStates.delete(k);
+      if (++evicted >= 300) break;
+    }
+  }
+}
 const LOOP_IDLE_TIMEOUT_MS = 10 * 60 * 1000;  // 10 min inactivity → reset
 
 // ─────────────────────────────────────────────────────────────
@@ -159,7 +174,7 @@ export const teachingLoopEngine = {
         .lean();
       if (session?.loopState) {
         const restored = { ...(session.loopState as TeachingLoopState), updatedAt: Date.now() };
-        loopStates.set(userId, restored);
+        loopStateSet(userId, restored);
         logger.info({ userId }, '[TeachingLoop] State restored from DB');
         return restored;
       }
@@ -286,7 +301,7 @@ export const teachingLoopEngine = {
       updatedAt:       Date.now(),
     };
 
-    loopStates.set(userId, newState);
+    loopStateSet(userId, newState);
     // FIX 4C+D: Await the DB write so state persists durably.
     // FIX 4D: RAM map is always updated above — current session keeps working
     // even if the DB write fails.
@@ -323,16 +338,28 @@ export const teachingLoopEngine = {
   /**
    * resetTopic — call when student switches to a new topic.
    */
-  resetTopic(userId: string, newTopic: string): void {
+  resetTopic(userId: string, newTopic: string, sessionId?: string): void {
     const state = this.getState(userId);
-    loopStates.set(userId, {
+    const newState: TeachingLoopState = {
       ...state,
-      phase:           'idle',
-      topic:           newTopic,
-      attemptCount:    0,
-      checkQuestion:   null,
-      updatedAt:       Date.now(),
-    });
+      phase:         'idle',
+      topic:         newTopic,
+      attemptCount:  0,
+      checkQuestion: null,
+      updatedAt:     Date.now(),
+    };
+    loopStateSet(userId, newState);
+
+    // FIX: resetTopic was RAM-only — state lost on restart/redeploy.
+    // Now persists to DB same as advance() does.
+    if (sessionId) {
+      AskAISession.findByIdAndUpdate(
+        sessionId,
+        { $set: { loopState: newState } },
+      ).catch((err: any) =>
+        logger.warn({ userId, err: err.message }, '[TeachingLoop] resetTopic DB persist failed (non-fatal)')
+      );
+    }
   },
 
   /**

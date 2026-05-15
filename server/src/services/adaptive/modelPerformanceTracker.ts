@@ -1,5 +1,5 @@
 /**
- * AI Study OS — Model Performance Tracker  (GAP 5 FIX)
+ * AI Study OS — Model Performance Tracker  (v2 — FIX: cooldown DB persistence for multi-instance)
  * ─────────────────────────────────────────────────────────────
  * Extends the existing aiModelRouter.ts with persistent performance
  * tracking and cost optimization.
@@ -24,7 +24,8 @@
  *   const best = modelPerformanceTracker.getBestModel(complexityTier, budget);
  */
 
-import { logger } from '../../utils/logger.js';
+import { logger }       from '../../utils/logger.js';
+import { AskAISession } from '../../models/AskAISession.model.js';
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -76,10 +77,52 @@ export const MODEL_COST_CONFIG: Record<string, ModelCostConfig> = {
 };
 
 // ── In-process persistent stats (survives across requests) ───
+// Fine-grained metrics (latency, token counts) stay in RAM — appropriate.
+// COOLDOWNS are now also written to MongoDB so multi-instance deploys share them.
 const performanceStore = new Map<string, ModelPerformanceRecord>();
 
-// Cooling-off window after failure — don't use model for 2 min
-const FAILURE_COOLDOWN_MS = 2 * 60 * 1000;
+const FAILURE_COOLDOWN_MS   = 2 * 60 * 1000;   // 2 min cooldown after failure
+const COOLDOWN_SYNC_KEY     = 'system:model-cooldowns'; // singleton DB doc userId
+
+// ── Cooldown DB sync ──────────────────────────────────────────
+// Write cooldown state to DB (fire-and-forget, non-blocking).
+// Other instances read this on every routing decision.
+async function persistCooldown(modelId: string, until: number): Promise<void> {
+  try {
+    await AskAISession.findOneAndUpdate(
+      { userId: COOLDOWN_SYNC_KEY as any },
+      { $set: { [`modelCooldowns.${modelId}`]: { until } } },
+      { upsert: true },
+    );
+  } catch {
+    // non-fatal — RAM cooldown still works for this instance
+  }
+}
+
+async function loadSharedCooldowns(): Promise<Record<string, { until: number }>> {
+  try {
+    const doc = await AskAISession
+      .findOne({ userId: COOLDOWN_SYNC_KEY as any })
+      .select('modelCooldowns')
+      .lean();
+    return (doc as any)?.modelCooldowns ?? {};
+  } catch {
+    return {};
+  }
+}
+
+// Cache shared cooldowns — refresh every 30s to avoid DB hit on every request
+let _sharedCooldowns: Record<string, { until: number }> = {};
+let _cooldownLoadedAt = 0;
+const COOLDOWN_CACHE_MS = 30_000;
+
+async function getSharedCooldowns(): Promise<Record<string, { until: number }>> {
+  if (Date.now() - _cooldownLoadedAt > COOLDOWN_CACHE_MS) {
+    _sharedCooldowns  = await loadSharedCooldowns();
+    _cooldownLoadedAt = Date.now();
+  }
+  return _sharedCooldowns;
+}
 
 // ─────────────────────────────────────────────────────────────
 // modelPerformanceTracker
@@ -114,9 +157,16 @@ export const modelPerformanceTracker = {
     const rec = getOrCreate(modelId);
     rec.failureCount++;
     rec.lastFailureAt = Date.now();
-    rec.qualityPenalty += 3;  // heavy penalty for hard failure
+    rec.qualityPenalty += 3;
 
-    logger.warn({ modelId, reason }, '[ModelTracker] Failure recorded');
+    // FIX: Persist cooldown to MongoDB so other instances respect it too.
+    // Without this, instance A puts model on cooldown but instance B keeps routing to it.
+    const until = Date.now() + FAILURE_COOLDOWN_MS;
+    persistCooldown(modelId, until).catch(() => {});
+    // Invalidate shared cooldown cache immediately
+    _cooldownLoadedAt = 0;
+
+    logger.warn({ modelId, reason }, '[ModelTracker] Failure recorded — cooldown persisted to DB');
   },
 
   /**
@@ -139,6 +189,8 @@ export const modelPerformanceTracker = {
     excludeModels: string[] = []
   ): RoutingDecision {
 
+    // Note: shared cooldowns are refreshed async every 30s via getSharedCooldowns().
+    // isInCooldown() reads _sharedCooldowns (the cached version) — no await needed here.
     const candidates = Object.entries(MODEL_COST_CONFIG)
       .filter(([id, cfg]) =>
         cfg.tier === tier &&
@@ -207,6 +259,9 @@ export const modelPerformanceTracker = {
       ? 'powerful'
       : complexity;
 
+    // Refresh shared cooldowns async (non-blocking, cached 30s)
+    getSharedCooldowns().catch(() => {});
+
     const decision = this.getBestModel(effectiveTier, Infinity, excludeModels);
 
     if (isStruggling) {
@@ -272,7 +327,16 @@ function getOrCreate(modelId: string): ModelPerformanceRecord {
 }
 
 function isInCooldown(modelId: string): boolean {
+  // Check local RAM cooldown first (always fresh for this instance)
   const rec = performanceStore.get(modelId);
-  if (!rec || rec.lastFailureAt === null) return false;
-  return (Date.now() - rec.lastFailureAt) < FAILURE_COOLDOWN_MS;
+  if (rec?.lastFailureAt !== null && rec?.lastFailureAt !== undefined) {
+    if ((Date.now() - rec.lastFailureAt) < FAILURE_COOLDOWN_MS) return true;
+  }
+  // Check shared DB cooldown (cached 30s) — covers other instances' failures
+  const shared = _sharedCooldowns[modelId];
+  if (shared && Date.now() < shared.until) return true;
+  return false;
 }
+
+// Pre-warm shared cooldowns on module load (non-blocking)
+getSharedCooldowns().catch(() => {});

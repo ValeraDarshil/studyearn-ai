@@ -47,6 +47,17 @@ import { strategyScoringEngine, TeachingStrategy }            from './strategySc
 import { modelPerformanceTracker, RoutingDecision }           from './modelPerformanceTracker.js';
 import { feedbackLoopEngine }                                 from './feedbackLoopEngine.js';
 import { logger }                                             from '../../utils/logger.js';
+
+// sanitizeForPrompt — strips injection chars from user-derived strings
+// topic/subject come from user messages and go into the system prompt.
+function sanitizeForPrompt(input: string | null | undefined, maxLen = 80): string {
+  if (!input) return '';
+  return input
+    .replace(/[^a-zA-Z0-9\s,.\-()]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, maxLen);
+}
 import { metricsEngine, optimizationEngine }                  from './metricsEngine.js';
 
 // ── Optimization cache: 5-min TTL per userId ─────────────────
@@ -391,9 +402,9 @@ export const aiBrainCore = {
     if (outcome && !outcome.success && topic) {
       longTermMemoryEngine.recordMistake(
         userId,
-        topic,
-        subject,
-        `Struggled with: ${topic} (strategy: ${decision.strategy})`,
+        sanitizeForPrompt(topic, 60) || topic,
+        sanitizeForPrompt(subject, 60) || subject,
+        `Struggled with: ${sanitizeForPrompt(topic, 60) || topic} (strategy: ${decision.strategy})`,
         'conceptual',
       ).catch((err: any) => {
         logger.warn({ userId, err: err.message }, '[BrainCore v2] Memory record failed (non-fatal)');
@@ -521,14 +532,20 @@ function buildSystemPromptAddition(input: PromptBuildInput): string {
   // Relevant memory (only what's useful for THIS turn)
   if (memoryBlock) lines.push(memoryBlock);
 
-  // Weak topics (max 3 — no context flood)
+  // Weak topics (max 3 — sanitized before injection to prevent prompt injection)
   if (weakTopics.length > 0) {
-    lines.push(`[ATTENTION] Student struggles with: ${weakTopics.slice(0, 3).join(', ')}. Be extra clear.`);
+    const safeWeak = weakTopics.slice(0, 3).map(t => sanitizeForPrompt(t, 60)).filter(Boolean);
+    if (safeWeak.length > 0) {
+      lines.push(`[ATTENTION] Student struggles with: ${safeWeak.join(', ')}. Be extra clear.`);
+    }
   }
 
-  // Strong topics — avoid over-explaining
+  // Strong topics — sanitized before injection
   if (strongTopics.length > 0) {
-    lines.push(`[NOTE] Student knows: ${strongTopics.slice(0, 3).join(', ')}. Don't over-explain.`);
+    const safeStrong = strongTopics.slice(0, 3).map(t => sanitizeForPrompt(t, 60)).filter(Boolean);
+    if (safeStrong.length > 0) {
+      lines.push(`[NOTE] Student knows: ${safeStrong.join(', ')}. Don't over-explain.`);
+    }
   }
 
   // Re-explain flag
