@@ -9,6 +9,121 @@ import { calculateLevel, getLevelTier, getLevelColor } from '../utils/level-util
 import Lottie from 'lottie-react';
 import streakAnimation from '../assets/animations/streak-fire.json';
 
+// ─── GlitchNumber — cyberpunk digit scramble on value change ─────────────────
+// Plays 8 frames of random digit scramble (40ms each = ~320ms total),
+// with cyan/pink ghost layers offset on X-axis, plus a scan-line sweep.
+// Only triggers when `value` prop changes — zero effect on static renders.
+function GlitchNumber({ value, className = '' }: { value: number; className?: string }) {
+  const [display, setDisplay] = useState(value);
+  const [glitching, setGlitching] = useState(false);
+  const [scanActive, setScanActive] = useState(false);
+  const prevRef = useRef(value);
+  const frameRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (value === prevRef.current) return;
+    prevRef.current = value;
+
+    // Clear any running scramble
+    if (frameRef.current) clearInterval(frameRef.current);
+
+    setGlitching(true);
+    setScanActive(true);
+
+    let frame = 0;
+    const TOTAL = 8;
+    frameRef.current = setInterval(() => {
+      frame++;
+      if (frame < TOTAL) {
+        // Random 1–2 digit number in the same visual range
+        setDisplay(Math.floor(Math.random() * 9) + Math.max(1, value - 3));
+      } else {
+        clearInterval(frameRef.current!);
+        setDisplay(value);
+        setGlitching(false);
+        // Scan line finishes naturally via CSS animation
+        setTimeout(() => setScanActive(false), 420);
+      }
+    }, 40);
+
+    return () => { if (frameRef.current) clearInterval(frameRef.current); };
+  }, [value]);
+
+  return (
+    <span className={`glitch-num-wrapper ${className}`} style={{ position: 'relative', display: 'inline-block' }}>
+      {/* Scan line sweep */}
+      {scanActive && (
+        <span style={{
+          position: 'absolute', left: 0, right: 0, height: '2px',
+          background: 'linear-gradient(90deg,transparent,rgba(56,189,248,0.7),transparent)',
+          animation: 'glitch-scan 0.42s ease-out forwards',
+          pointerEvents: 'none', zIndex: 10,
+        }} />
+      )}
+
+      {/* Cyan ghost — top half */}
+      {glitching && (
+        <span aria-hidden style={{
+          position: 'absolute', left: 0, top: 0,
+          color: '#38bdf8',
+          clipPath: 'polygon(0 0,100% 0,100% 40%,0 40%)',
+          animation: 'glitch-top 0.32s steps(1) forwards',
+          fontWeight: 'inherit', fontSize: 'inherit',
+          pointerEvents: 'none',
+        }}>{display}</span>
+      )}
+
+      {/* Pink ghost — bottom half */}
+      {glitching && (
+        <span aria-hidden style={{
+          position: 'absolute', left: 0, top: 0,
+          color: '#f472b6',
+          clipPath: 'polygon(0 62%,100% 62%,100% 100%,0 100%)',
+          animation: 'glitch-bot 0.32s steps(1) forwards',
+          fontWeight: 'inherit', fontSize: 'inherit',
+          pointerEvents: 'none',
+        }}>{display}</span>
+      )}
+
+      {/* Real number */}
+      <span style={{
+        display: 'inline-block',
+        animation: glitching ? 'glitch-shake 0.32s steps(1) forwards' : 'none',
+        fontFamily: glitching ? "'Courier New', monospace" : 'inherit',
+      }}>{display}</span>
+
+      <style>{`
+        @keyframes glitch-shake {
+          0%   { transform: translate(0,0); }
+          15%  { transform: translate(-3px,1px); }
+          30%  { transform: translate(2px,-1px); }
+          45%  { transform: translate(-2px,2px); }
+          60%  { transform: translate(3px,-1px); }
+          75%  { transform: translate(-1px,1px); }
+          100% { transform: translate(0,0); }
+        }
+        @keyframes glitch-top {
+          0%   { transform:translate(-4px,0); opacity:1; }
+          33%  { transform:translate(4px,0);  opacity:0.8; }
+          66%  { transform:translate(-2px,0); opacity:0.6; }
+          100% { transform:translate(0,0);    opacity:0; }
+        }
+        @keyframes glitch-bot {
+          0%   { transform:translate(4px,0);  opacity:1; }
+          33%  { transform:translate(-4px,0); opacity:0.8; }
+          66%  { transform:translate(2px,0);  opacity:0.6; }
+          100% { transform:translate(0,0);    opacity:0; }
+        }
+        @keyframes glitch-scan {
+          0%   { top:0;    opacity:0.9; }
+          100% { top:100%; opacity:0; }
+        }
+      `}</style>
+    </span>
+  );
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 export function Dashboard() {
   const { points, totalXP, streak, questionsLeft, setQuestionsLeft, refreshQuota, recentActivity, userName, unlockedAchievements, userStats, isPremium, premiumExpiresAt } = useApp();
   const firstName = userName ? userName.trim().split(" ")[0] : "Student";
@@ -36,7 +151,6 @@ export function Dashboard() {
       .then(r => r.json())
       .then(d => {
         if (d.success) {
-          // Update context so ALL pages see fresh count
           if (d.questionsLeft !== undefined) setQuestionsLeft(d.questionsLeft);
           setNextRefillSecs(d.nextRefillSecs || 0);
           setVideoAdsLeft(d.videoAdsLeft ?? 5);
@@ -53,7 +167,6 @@ export function Dashboard() {
       setNextRefillSecs(p => {
         if (p <= 1) {
           clearInterval(refillTimerRef.current!);
-          // Auto-refresh quota from server when refill time is up
           const token = localStorage.getItem('token');
           if (token) {
             fetch(`${API_URL}/api/ai/quota`, { headers: { Authorization: `Bearer ${token}` } })
@@ -94,7 +207,6 @@ export function Dashboard() {
       if (data.success) {
         setVideoAdsLeft(data.videoAdsLeft ?? 0);
         setNextRefillSecs(data.nextRefillSecs || 0);
-        // Update questionsLeft via context won't work directly, re-fetch quota
         const q = await fetch(`${API_URL}/api/ai/quota`, { headers: { Authorization: `Bearer ${token}` } });
         const qd = await q.json();
         if (qd.success) {
@@ -145,7 +257,6 @@ export function Dashboard() {
           </h1>
           <p className="text-slate-400 text-sm mt-1">Ready to learn something new today?</p>
         </div>
-        {/* ✅ ANIMATED STREAK BADGE */}
         <div data-tour="streak-badge" className="flex items-center gap-2 px-4 py-2 rounded-xl glass border border-orange-500/20">
           <Lottie 
             animationData={streakAnimation}
@@ -192,7 +303,7 @@ export function Dashboard() {
           <div className="w-full h-0.5 mt-3 rounded-full bg-gradient-to-r from-purple-500/40 to-transparent" />
         </div>
 
-        {/* Questions Today — full featured card */}
+        {/* Questions Today — Glitch counter card */}
         <div className="glass glass-hover card-shine rounded-2xl p-4 animate-slide-up border border-blue-500/10 hover:border-blue-500/25 transition-all duration-300 group">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs text-slate-500 font-medium">Questions Today</span>
@@ -201,9 +312,11 @@ export function Dashboard() {
             </div>
           </div>
 
-          {/* Count + limit */}
+          {/* ── GlitchNumber replaces plain {questionsLeft} ── */}
           <div className="flex items-end gap-1 mb-2">
-            <span className="text-2xl font-bold text-white">{questionsLeft}</span>
+            <span className="text-2xl font-bold text-white">
+              <GlitchNumber value={questionsLeft} />
+            </span>
             <span className="text-sm text-slate-500 font-normal mb-0.5">/{dailyLimit} left</span>
             {nextRefillSecs > 0 && questionsLeft < dailyLimit && (
               <span className="ml-auto text-[10px] text-blue-300 font-medium flex items-center gap-1 mb-0.5">
@@ -226,7 +339,7 @@ export function Dashboard() {
             />
           </div>
 
-          {/* Bottom row: status + watch video button */}
+          {/* Bottom row */}
           <div className="flex items-center gap-2">
             {questionsLeft >= dailyLimit ? (
               <span className="text-[10px] text-green-400 flex items-center gap-1">✓ Full quota</span>
@@ -345,7 +458,6 @@ export function Dashboard() {
 
         {/* Achievements — compact preview card */}
         <div className="glass rounded-2xl p-4 sm:p-5 overflow-hidden">
-          {/* Header */}
           <div className="flex items-center justify-between mb-3 sm:mb-4">
             <div className="flex items-center gap-2">
               <Trophy className="w-4 h-4 text-yellow-400" />
@@ -359,7 +471,6 @@ export function Dashboard() {
             </button>
           </div>
 
-          {/* Progress bar */}
           <div className="mb-4">
             <div className="flex justify-between text-xs mb-1.5">
               <span className="text-slate-500">{unlockedAchievements.length} unlocked</span>
@@ -373,7 +484,6 @@ export function Dashboard() {
             </div>
           </div>
 
-          {/* Preview: show 4 most recent unlocked + next to unlock */}
           <div className="space-y-2">
             {(() => {
               const statMap: Record<string, number> = {
@@ -432,7 +542,6 @@ export function Dashboard() {
             })()}
           </div>
 
-          {/* View All CTA */}
           <button
             onClick={() => setShowAchievementsModal(true)}
             className="mt-3 w-full py-2 rounded-xl border border-white/5 text-xs text-slate-400 hover:text-white hover:border-purple-500/30 hover:bg-purple-500/5 transition-all flex items-center justify-center gap-2"
@@ -443,9 +552,7 @@ export function Dashboard() {
         </div>
       </div>
 
-      {/* ═══════════════════════════════════════════════════════════════════
-          ACHIEVEMENTS FULL MODAL — Premium animated overlay
-      ═══════════════════════════════════════════════════════════════════ */}
+      {/* ACHIEVEMENTS FULL MODAL */}
       {showAchievementsModal && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -468,7 +575,6 @@ export function Dashboard() {
           <div className="modal-enter glass rounded-3xl border border-white/10 w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden"
             style={{ boxShadow: '0 40px 120px rgba(0,0,0,0.8), 0 0 60px rgba(139,92,246,0.1)' }}>
 
-            {/* Modal Header */}
             <div className="flex items-center justify-between px-6 py-5 border-b border-white/8 flex-shrink-0">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-yellow-500/20 to-orange-500/20 border border-yellow-500/30 flex items-center justify-center">
@@ -489,7 +595,6 @@ export function Dashboard() {
               </button>
             </div>
 
-            {/* Progress overview */}
             <div className="px-6 py-4 border-b border-white/5 flex-shrink-0">
               <div className="flex items-center justify-between text-xs text-slate-500 mb-2">
                 <span>{Math.round((unlockedAchievements.length / ACHIEVEMENTS.length) * 100)}% complete</span>
@@ -503,7 +608,6 @@ export function Dashboard() {
               </div>
             </div>
 
-            {/* Scrollable content */}
             <div className="flex-1 overflow-y-auto px-6 py-5 space-y-8">
               {(['questions','ppt','pdf','streak','points'] as const).map(category => {
                 const categoryAchs = ACHIEVEMENTS.filter(a => a.category === category);
@@ -539,13 +643,11 @@ export function Dashboard() {
                               }`}
                             style={{ animationDelay: `${idx * 50}ms` }}
                           >
-                            {/* Shimmer sweep on unlocked */}
                             {isUnlocked && (
                               <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.04] to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700 pointer-events-none" />
                             )}
 
                             <div className="flex items-start gap-3">
-                              {/* Icon with glow ring on unlocked */}
                               <div className={`relative flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center text-2xl
                                 ${isUnlocked
                                   ? `bg-gradient-to-br ${styles.bg} border ${styles.border}`
@@ -600,7 +702,6 @@ export function Dashboard() {
               })}
             </div>
 
-            {/* Modal footer */}
             <div className="px-6 py-4 border-t border-white/5 flex-shrink-0 flex items-center justify-between">
               <span className="text-xs text-slate-500">Keep earning to unlock more achievements!</span>
               <button
@@ -643,7 +744,7 @@ export function Dashboard() {
         </p>
       </div>
 
-      {/* ✅ STREAK CELEBRATION POPUP */}
+      {/* STREAK CELEBRATION POPUP */}
       {showStreakCelebration && (
         <div 
           className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 animate-in fade-in duration-300"
