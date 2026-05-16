@@ -60,8 +60,43 @@ export interface OrchestrationResult {
 }
 
 // ── In-memory cache (5 min TTL) ────────────────────────────────
+//
+// BUG FIX 5 (v18): Added size cap + TTL eviction.
+// Previously: orchestrationCache had no size limit and no automatic eviction.
+// Only invalidateOrchestrationCache(userId) deleted entries — almost never
+// called. At 10k active users this grew to ~50MB and never shrank.
+//
+// Fixed:
+//   (1) Cache reads now check TTL and delete stale entries immediately.
+//   (2) ORCH_CACHE_MAX_SIZE (2000) cap with FIFO eviction when exceeded.
+//       Size chosen so 2k users × ~5KB each = ~10MB max RAM.
 const orchestrationCache = new Map<string, { ts: number; result: OrchestrationResult }>();
-const CACHE_TTL_MS = 5 * 60 * 1000;
+const CACHE_TTL_MS       = 5 * 60 * 1000;
+const ORCH_CACHE_MAX_SIZE = 2_000;
+
+function orchCacheGet(userId: string): OrchestrationResult | null {
+  const entry = orchestrationCache.get(userId);
+  if (!entry) return null;
+  // TTL eviction on read
+  if (Date.now() - entry.ts >= CACHE_TTL_MS) {
+    orchestrationCache.delete(userId);
+    return null;
+  }
+  return entry.result;
+}
+
+function orchCacheSet(userId: string, result: OrchestrationResult): void {
+  orchestrationCache.set(userId, { ts: Date.now(), result });
+  // Size cap — evict oldest 200 entries when limit hit (FIFO)
+  if (orchestrationCache.size > ORCH_CACHE_MAX_SIZE) {
+    let evicted = 0;
+    for (const k of orchestrationCache.keys()) {
+      orchestrationCache.delete(k);
+      if (++evicted >= 200) break;
+    }
+    logger.info(`[Orchestrator] Cache evicted 200 entries | size=${orchestrationCache.size}`);
+  }
+}
 
 // ─────────────────────────────────────────────────────────────
 // runAIOrchestration — Main Entry Point
@@ -78,10 +113,10 @@ export async function runAIOrchestration(
 
   // Cache check (skip for login + forceFullRun)
   if (!options.forceFullRun && !options.backgroundMode && options.trigger !== 'login') {
-    const cached = orchestrationCache.get(userId);
-    if (cached && (Date.now() - cached.ts) < CACHE_TTL_MS) {
+    const cached = orchCacheGet(userId);
+    if (cached) {
       logger.info({ userId }, '[Orchestrator] Cache hit — returning cached result');
-      return cached.result;
+      return cached;
     }
   }
 
@@ -162,7 +197,7 @@ export async function runAIOrchestration(
     triggeredAt:   new Date().toISOString(),
   };
 
-  orchestrationCache.set(userId, { ts: Date.now(), result });
+  orchCacheSet(userId, result);
 
   logger.info(
     { userId, ms: result.executionMs, tasks: tasksExecuted.length, success: result.success },
@@ -177,9 +212,9 @@ export async function runAIOrchestration(
 // ─────────────────────────────────────────────────────────────
 export async function getFusedContextForAI(userId: string): Promise<FusedAIContext | null> {
   try {
-    const cached = orchestrationCache.get(userId);
-    if (cached && (Date.now() - cached.ts) < CACHE_TTL_MS && cached.result.fusedContext) {
-      return cached.result.fusedContext;
+    const cached = orchCacheGet(userId);
+    if (cached && cached.fusedContext) {
+      return cached.fusedContext;
     }
     const result = await runAIOrchestration(userId, { trigger: 'ask_ai', contextOnly: true });
     return result.fusedContext;

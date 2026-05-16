@@ -370,6 +370,7 @@ import { fixStuckRedemptions, processPendingPremiums } from './controllers/rewar
 
 import { decayAllTopics } from './services/adaptive/feedbackLoopEngine.js';
 import { User }            from './models/User.model.js';
+import cluster             from 'cluster';
  
 /* ─── 3. PROCESS ERROR HANDLERS ────────────────────────── */
 process.on('unhandledRejection', (reason: any) => {
@@ -491,31 +492,37 @@ connectDB().then(() => {
   const urgencyScheduler = new UrgencyScheduler();
   urgencyScheduler.start();
   // ── Nightly mastery decay — spaced repetition forgetting curve ──
-  setInterval(async () => {
-    try {
-      // FIX: Only decay users active in last 30 days (not ALL users).
-      // Without this filter, at 100k users this becomes a 100k-document
-      // sequential scan that can take 10-30 mins and overlap the next cron.
-      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-      const users = await User.find({ updatedAt: { $gt: thirtyDaysAgo } })
-        .select('_id')
-        .lean();
+  //
+  // BUG FIX 4 (v18): Wrapped in !cluster.isWorker guard.
+  // cluster.ts forks up to 4 worker processes. Without this guard, every
+  // worker ran the cron independently — each user was decayed 4× per night
+  // instead of 1×, making mastery scores drop 4× faster than intended and
+  // incorrectly flagging topics as isWeak. Now only the primary process (or
+  // a single-instance deploy) runs the decay cron.
+  if (!cluster.isWorker) {
+    setInterval(async () => {
+      try {
+        // Only decay users active in last 30 days (not ALL users).
+        const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+        const users = await User.find({ updatedAt: { $gt: thirtyDaysAgo } })
+          .select('_id')
+          .lean();
 
-      let success = 0, failed = 0;
-      for (const u of users) {
-        // FIX: Per-user try/catch — one corrupt profile no longer kills all remaining users.
-        // Previously: single outer try/catch meant user #500 failure → users #501-N never decayed.
-        try {
-          await decayAllTopics((u._id as any).toString());
-          success++;
-        } catch (err: any) {
-          failed++;
-          logger.warn(`[Cron] decayAllTopics failed for user ${(u._id as any).toString()}: ${err.message}`);
+        let success = 0, failed = 0;
+        for (const u of users) {
+          // Per-user try/catch — one corrupt profile no longer kills all remaining users.
+          try {
+            await decayAllTopics((u._id as any).toString());
+            success++;
+          } catch (err: any) {
+            failed++;
+            logger.warn(`[Cron] decayAllTopics failed for user ${(u._id as any).toString()}: ${err.message}`);
+          }
         }
+        logger.info(`[Cron] Nightly mastery decay complete | success=${success} failed=${failed} total=${users.length}`);
+      } catch (err: any) {
+        logger.warn('[Cron] Nightly mastery decay — failed to fetch users: ' + err.message);
       }
-      logger.info(`[Cron] Nightly mastery decay complete | success=${success} failed=${failed} total=${users.length}`);
-    } catch (err: any) {
-      logger.warn('[Cron] Nightly mastery decay — failed to fetch users: ' + err.message);
-    }
-  }, 24 * 60 * 60 * 1000);
+    }, 24 * 60 * 60 * 1000);
+  }
 });

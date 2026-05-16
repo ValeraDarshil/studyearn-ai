@@ -1,14 +1,18 @@
 /**
- * AI Study OS — AI Brain Core  (v2 — CENTRALIZED CONTROL LAYER)
+ * AI Study OS — AI Brain Core  (v3 — BUG FIX: single feedback fire per turn)
  * ─────────────────────────────────────────────────────────────
  * THE single decision authority of AI Study OS.
  *
- * ARCHITECTURE CHANGE (v1 → v2):
- *   v1: aiBrainCore returned "recommendations" — other modules could
- *       override them. Strategy still decided in aiResponsePlanner.ts.
- *       Model still decided in aiModelRouter.ts independently.
- *       Result: distributed, inconsistent behavior.
+ * WHAT CHANGED (v2 → v3):
+ *   BUG FIX 2 (double feedback loop):
+ *   Step 2.4 condition changed from turnCount > 1 → turnCount >= 1.
+ *   The controller-side pre-call to afterResponseWithBrain(prevTurn)
+ *   before buildMasterPrompt() has been removed in aiController v18.
+ *   This block is now the SINGLE place that fires feedbackLoopEngine
+ *   .processOutcome() for the previous turn — eliminating the 2×
+ *   inflation of strategy stats that biased adaptive learning.
  *
+ * ARCHITECTURE (v2 — unchanged):
  *   v2: aiBrainCore returns a FinalDecision object that IS the law.
  *       aiResponsePlanner.ts → prompt builder only (reads FinalDecision)
  *       aiModelRouter.ts     → called BY brain core, not independently
@@ -199,8 +203,16 @@ export const aiBrainCore = {
     const loopState = await teachingLoopEngine.getStateAsync(userId);
 
     // ── STEP 2.4: Fetch Feedback History (prev turn feedback) ─
-    // Close the loop: process what happened last turn BEFORE deciding this turn
-    if (prevAiResponse && prevStrategy && turnCount > 1) {
+    // Close the loop: process what happened last turn BEFORE deciding this turn.
+    //
+    // BUG FIX 2 (v18): Changed turnCount > 1 → turnCount >= 1.
+    // Previously the controller ALSO called afterResponseWithBrain(prevTurn)
+    // BEFORE buildMasterPrompt() which fired feedbackLoopEngine.processOutcome()
+    // a second time — inflating strategy stats 2× per turn.
+    // That controller pre-call has been removed. This block is now the SINGLE
+    // place that processes previous-turn feedback. Condition relaxed to >= 1
+    // so turn 2 (turnCount=1 from history) also gets feedback processed.
+    if (prevAiResponse && prevStrategy && turnCount >= 1) {
       feedbackLoopEngine.processOutcome({
         userId, sessionId, userMessage,
         aiResponse:  prevAiResponse,
