@@ -65,78 +65,122 @@ function generateReferralCode(name: string, userId: string): string {
 
 // ─────────────────────────────────────────────────────────────
 // ACHIEVEMENT DEFINITIONS — keep in sync with src/data/achievements.ts
+// v3: All new achievement IDs added. Server validates every unlock.
 // ─────────────────────────────────────────────────────────────
 const ACHIEVEMENT_MAP: Record<string, { stat: string; threshold: number; reward: number }> = {
-  // ── Ask AI — Questions ──
-  first_question:    { stat: 'totalQuestionsAsked',      threshold: 1,    reward: 20   },
-  curious_mind:      { stat: 'totalQuestionsAsked',      threshold: 10,   reward: 30   },
-  knowledge_seeker:  { stat: 'totalQuestionsAsked',      threshold: 50,   reward: 75   },
-  question_master:   { stat: 'totalQuestionsAsked',      threshold: 100,  reward: 150  },
-  question_legend:   { stat: 'totalQuestionsAsked',      threshold: 500,  reward: 750  },
 
-  // ── PPT Generator ──
-  first_ppt:         { stat: 'totalPPTsGenerated',       threshold: 1,    reward: 25   },
-  ppt_pro:           { stat: 'totalPPTsGenerated',       threshold: 5,    reward: 60   },
-  ppt_master:        { stat: 'totalPPTsGenerated',       threshold: 20,   reward: 200  },
-  ppt_legend:        { stat: 'totalPPTsGenerated',       threshold: 50,   reward: 500  },
+  // ── Questions ──────────────────────────────────────────────
+  first_question:    { stat: 'totalQuestionsAsked', threshold: 1,    reward: 20   },
+  curious_mind:      { stat: 'totalQuestionsAsked', threshold: 10,   reward: 30   },
+  q_25:              { stat: 'totalQuestionsAsked', threshold: 25,   reward: 50   },
+  knowledge_seeker:  { stat: 'totalQuestionsAsked', threshold: 50,   reward: 75   },
+  q_75:              { stat: 'totalQuestionsAsked', threshold: 75,   reward: 100  },
+  question_master:   { stat: 'totalQuestionsAsked', threshold: 100,  reward: 150  },
+  q_200:             { stat: 'totalQuestionsAsked', threshold: 200,  reward: 250  },
+  q_300:             { stat: 'totalQuestionsAsked', threshold: 300,  reward: 350  },
+  q_400:             { stat: 'totalQuestionsAsked', threshold: 400,  reward: 500  },
+  question_legend:   { stat: 'totalQuestionsAsked', threshold: 500,  reward: 750  },
+  q_750:             { stat: 'totalQuestionsAsked', threshold: 750,  reward: 1000 },
+  q_1000:            { stat: 'totalQuestionsAsked', threshold: 1000, reward: 2000 },
 
-  // ── PDF Tools ──
-  first_pdf:         { stat: 'totalPDFsConverted',       threshold: 1,    reward: 15   },
-  pdf_pro:           { stat: 'totalPDFsConverted',       threshold: 10,   reward: 50   },
-  pdf_master:        { stat: 'totalPDFsConverted',       threshold: 50,   reward: 200  },
+  // ── PPT Generator ──────────────────────────────────────────
+  first_ppt:         { stat: 'totalPPTsGenerated',  threshold: 1,    reward: 25   },
+  ppt_3:             { stat: 'totalPPTsGenerated',  threshold: 3,    reward: 40   },
+  ppt_pro:           { stat: 'totalPPTsGenerated',  threshold: 5,    reward: 60   },
+  ppt_10:            { stat: 'totalPPTsGenerated',  threshold: 10,   reward: 120  },
+  ppt_master:        { stat: 'totalPPTsGenerated',  threshold: 20,   reward: 200  },
+  ppt_35:            { stat: 'totalPPTsGenerated',  threshold: 35,   reward: 350  },
+  ppt_legend:        { stat: 'totalPPTsGenerated',  threshold: 50,   reward: 500  },
 
-  // ── Streak ──
-  streak_3:          { stat: 'streak',                   threshold: 3,    reward: 30   },
-  streak_7:          { stat: 'streak',                   threshold: 7,    reward: 70   },
-  streak_14:         { stat: 'streak',                   threshold: 14,   reward: 150  },
-  streak_30:         { stat: 'streak',                   threshold: 30,   reward: 500  },
-  streak_100:        { stat: 'streak',                   threshold: 100,  reward: 2000 },
+  // ── PDF Tools ──────────────────────────────────────────────
+  first_pdf:         { stat: 'totalPDFsConverted',  threshold: 1,    reward: 15   },
+  pdf_5:             { stat: 'totalPDFsConverted',  threshold: 5,    reward: 30   },
+  pdf_pro:           { stat: 'totalPDFsConverted',  threshold: 10,   reward: 60   },
+  pdf_25:            { stat: 'totalPDFsConverted',  threshold: 25,   reward: 120  },
+  pdf_master:        { stat: 'totalPDFsConverted',  threshold: 50,   reward: 200  },
+  pdf_100:           { stat: 'totalPDFsConverted',  threshold: 100,  reward: 500  },
 
-  // ── Points / XP — use 'points' (lifetime XP stored in user.points / user.totalXP)
-  points_100:        { stat: 'points',                   threshold: 100,  reward: 0    },
-  points_500:        { stat: 'points',                   threshold: 500,  reward: 0    },
-  points_1000:       { stat: 'points',                   threshold: 1000, reward: 100  },
-  points_5000:       { stat: 'points',                   threshold: 5000, reward: 500  },
-  points_10000:      { stat: 'points',                   threshold: 10000,reward: 1000 },
-  points_50000:      { stat: 'points',                   threshold: 50000,reward: 5000 },
+  // ── Streak ─────────────────────────────────────────────────
+  streak_3:          { stat: 'streak',              threshold: 3,    reward: 30   },
+  streak_7:          { stat: 'streak',              threshold: 7,    reward: 70   },
+  streak_14:         { stat: 'streak',              threshold: 14,   reward: 150  },
+  streak_21:         { stat: 'streak',              threshold: 21,   reward: 250  },
+  streak_30:         { stat: 'streak',              threshold: 30,   reward: 500  },
+  streak_60:         { stat: 'streak',              threshold: 60,   reward: 1000 },
+  streak_100:        { stat: 'streak',              threshold: 100,  reward: 2000 },
+  streak_365:        { stat: 'streak',              threshold: 365,  reward: 10000},
 
-  // ── Quiz Generator ──
-  first_quiz:        { stat: 'totalQuizCompleted',       threshold: 1,    reward: 20   },
-  quiz_10:           { stat: 'totalQuizCompleted',       threshold: 10,   reward: 50   },
-  quiz_50:           { stat: 'totalQuizCompleted',       threshold: 50,   reward: 150  },
-  quiz_100:          { stat: 'totalQuizCompleted',       threshold: 100,  reward: 400  },
+  // ── Points ─────────────────────────────────────────────────
+  points_100:        { stat: 'points',              threshold: 100,   reward: 0    },
+  pts_250:           { stat: 'points',              threshold: 250,   reward: 0    },
+  points_500:        { stat: 'points',              threshold: 500,   reward: 0    },
+  points_1000:       { stat: 'points',              threshold: 1000,  reward: 100  },
+  pts_2500:          { stat: 'points',              threshold: 2500,  reward: 200  },
+  points_5000:       { stat: 'points',              threshold: 5000,  reward: 500  },
+  points_10000:      { stat: 'points',              threshold: 10000, reward: 1000 },
+  pts_25000:         { stat: 'points',              threshold: 25000, reward: 2500 },
+  points_50000:      { stat: 'points',              threshold: 50000, reward: 5000 },
 
-  // ── Daily Challenge ──
-  first_challenge:      { stat: 'totalChallengesCompleted', threshold: 1,  reward: 25  },
-  challenge_7:          { stat: 'totalChallengesCompleted', threshold: 7,  reward: 75  },
-  challenge_30:         { stat: 'totalChallengesCompleted', threshold: 30, reward: 300 },
-  challenge_correct_10: { stat: 'totalChallengesCorrect',   threshold: 10, reward: 100 },
-  challenge_correct_50: { stat: 'totalChallengesCorrect',   threshold: 50, reward: 500 },
+  // ── Quiz Generator ─────────────────────────────────────────
+  first_quiz:        { stat: 'totalQuizCompleted',  threshold: 1,    reward: 20   },
+  quiz_5:            { stat: 'totalQuizCompleted',  threshold: 5,    reward: 35   },
+  quiz_10:           { stat: 'totalQuizCompleted',  threshold: 10,   reward: 50   },
+  quiz_25:           { stat: 'totalQuizCompleted',  threshold: 25,   reward: 100  },
+  quiz_50:           { stat: 'totalQuizCompleted',  threshold: 50,   reward: 150  },
+  quiz_100:          { stat: 'totalQuizCompleted',  threshold: 100,  reward: 400  },
+  quiz_200:          { stat: 'totalQuizCompleted',  threshold: 200,  reward: 1000 },
 
-  // ── Collab Notes ──
-  first_note:        { stat: 'totalNotesCreated',        threshold: 1,    reward: 20   },
-  notes_10:          { stat: 'totalNotesCreated',        threshold: 10,   reward: 75   },
+  // ── Daily Challenge ────────────────────────────────────────
+  first_challenge:       { stat: 'totalChallengesCompleted', threshold: 1,   reward: 25   },
+  challenge_7:           { stat: 'totalChallengesCompleted', threshold: 7,   reward: 75   },
+  challenge_15:          { stat: 'totalChallengesCompleted', threshold: 15,  reward: 120  },
+  challenge_30:          { stat: 'totalChallengesCompleted', threshold: 30,  reward: 300  },
+  challenge_50:          { stat: 'totalChallengesCompleted', threshold: 50,  reward: 500  },
+  challenge_100:         { stat: 'totalChallengesCompleted', threshold: 100, reward: 1500 },
+  challenge_correct_5:   { stat: 'totalChallengesCorrect',   threshold: 5,   reward: 40   },
+  challenge_correct_10:  { stat: 'totalChallengesCorrect',   threshold: 10,  reward: 100  },
+  challenge_correct_25:  { stat: 'totalChallengesCorrect',   threshold: 25,  reward: 200  },
+  challenge_correct_50:  { stat: 'totalChallengesCorrect',   threshold: 50,  reward: 500  },
+  challenge_correct_100: { stat: 'totalChallengesCorrect',   threshold: 100, reward: 1500 },
 
-  // ── Study Tools ──
-  first_study_tool:  { stat: 'totalStudyToolsUsed',      threshold: 1,    reward: 20   },
-  study_tools_10:    { stat: 'totalStudyToolsUsed',      threshold: 10,   reward: 80   },
+  // ── Collab Notes ───────────────────────────────────────────
+  first_note:        { stat: 'totalNotesCreated',   threshold: 1,    reward: 20   },
+  notes_5:           { stat: 'totalNotesCreated',   threshold: 5,    reward: 40   },
+  notes_10:          { stat: 'totalNotesCreated',   threshold: 10,   reward: 75   },
+  notes_25:          { stat: 'totalNotesCreated',   threshold: 25,   reward: 200  },
+  notes_50:          { stat: 'totalNotesCreated',   threshold: 50,   reward: 500  },
 
-  // ── Formula Sheet ──
-  first_bookmark:    { stat: 'totalFormulaBookmarks',    threshold: 1,    reward: 15   },
-  bookmarks_10:      { stat: 'totalFormulaBookmarks',    threshold: 10,   reward: 50   },
-  bookmarks_25:      { stat: 'totalFormulaBookmarks',    threshold: 25,   reward: 150  },
+  // ── Study Tools ────────────────────────────────────────────
+  first_study_tool:  { stat: 'totalStudyToolsUsed', threshold: 1,   reward: 20   },
+  study_tools_5:     { stat: 'totalStudyToolsUsed', threshold: 5,   reward: 40   },
+  study_tools_10:    { stat: 'totalStudyToolsUsed', threshold: 10,  reward: 80   },
+  study_tools_25:    { stat: 'totalStudyToolsUsed', threshold: 25,  reward: 200  },
+  study_tools_50:    { stat: 'totalStudyToolsUsed', threshold: 50,  reward: 500  },
 
-  // ── Social / Referral ──
-  first_referral:    { stat: 'totalReferrals',           threshold: 1,    reward: 50   },
-  referrals_5:       { stat: 'totalReferrals',           threshold: 5,    reward: 200  },
-  referrals_10:      { stat: 'totalReferrals',           threshold: 10,   reward: 500  },
-  referrals_25:      { stat: 'totalReferrals',           threshold: 25,   reward: 2000 },
+  // ── Formula Sheet ──────────────────────────────────────────
+  first_bookmark:    { stat: 'totalFormulaBookmarks', threshold: 1,  reward: 15   },
+  bookmarks_5:       { stat: 'totalFormulaBookmarks', threshold: 5,  reward: 30   },
+  bookmarks_10:      { stat: 'totalFormulaBookmarks', threshold: 10, reward: 50   },
+  bookmarks_25:      { stat: 'totalFormulaBookmarks', threshold: 25, reward: 150  },
+  bookmarks_50:      { stat: 'totalFormulaBookmarks', threshold: 50, reward: 400  },
 
-  // ── Special / Days Active ──
-  days_active_7:     { stat: 'totalDaysActive',          threshold: 7,    reward: 50   },
-  days_active_30:    { stat: 'totalDaysActive',          threshold: 30,   reward: 200  },
-  days_active_100:   { stat: 'totalDaysActive',          threshold: 100,  reward: 1000 },
-  days_active_365:   { stat: 'totalDaysActive',          threshold: 365,  reward: 5000 },
+  // ── Social / Referral ──────────────────────────────────────
+  first_referral:    { stat: 'totalReferrals',       threshold: 1,   reward: 50   },
+  referrals_3:       { stat: 'totalReferrals',       threshold: 3,   reward: 100  },
+  referrals_5:       { stat: 'totalReferrals',       threshold: 5,   reward: 200  },
+  referrals_10:      { stat: 'totalReferrals',       threshold: 10,  reward: 500  },
+  referrals_25:      { stat: 'totalReferrals',       threshold: 25,  reward: 2000 },
+  referrals_50:      { stat: 'totalReferrals',       threshold: 50,  reward: 5000 },
+
+  // ── Days Active ────────────────────────────────────────────
+  days_active_1:     { stat: 'totalDaysActive',      threshold: 1,   reward: 10   },
+  days_active_7:     { stat: 'totalDaysActive',      threshold: 7,   reward: 50   },
+  days_active_14:    { stat: 'totalDaysActive',      threshold: 14,  reward: 100  },
+  days_active_30:    { stat: 'totalDaysActive',      threshold: 30,  reward: 200  },
+  days_active_60:    { stat: 'totalDaysActive',      threshold: 60,  reward: 500  },
+  days_active_100:   { stat: 'totalDaysActive',      threshold: 100, reward: 1000 },
+  days_active_180:   { stat: 'totalDaysActive',      threshold: 180, reward: 2500 },
+  days_active_365:   { stat: 'totalDaysActive',      threshold: 365, reward: 5000 },
 };
 
 // ─────────────────────────────────────────────────────────────
