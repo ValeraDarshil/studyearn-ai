@@ -1,5 +1,21 @@
 /**
- * OnboardingTour — Premium New User Welcome Tour
+ * OnboardingTour — Premium New User Welcome Tour  (v2)
+ *
+ * FIXES (v2):
+ *   1. Step 5 (finish) was rendering off-center on desktop because
+ *      the previous step's targetRect was still stored in state.
+ *      Fix: pos() now checks step.position === 'center' FIRST,
+ *      before touching targetRect. Also setTarget(null) is called
+ *      immediately when target is '' (finish step).
+ *
+ *   2. Step transitions were abrupt — card disappeared and reappeared
+ *      with no animation. Fix: added a dedicated `transitioning` state.
+ *      On Next click:
+ *        a) card slides out (translateY + fade, 220ms)
+ *        b) content swaps (idx updates)
+ *        c) card slides in from opposite direction (translateY + fade, 280ms)
+ *      The slide direction alternates: even→odd slides left, odd→even slides right,
+ *      giving a clean page-flip feel between steps.
  *
  * Mobile  → Bottom sheet card with large illustration, premium glassmorphism
  * Desktop → Spotlight cutout + anchored tooltip card
@@ -10,7 +26,7 @@
  *   1. DB   user.onboardingCompleted  (cross-device, permanent)
  *   2. localStorage se_tour_done      (instant, no flicker on refresh)
  */
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { completeOnboarding } from '../utils/user-api';
 
@@ -19,7 +35,6 @@ interface TourStep {
   target: string;
   title: string;
   description: string;
-  // Mobile illustration
   icon: string;
   accentColor: string;
   accentDim: string;
@@ -91,7 +106,7 @@ const TOUR_STEPS: TourStep[] = [
   },
 ];
 
-// ─── Persistence ──────────────────────────────────────────────────────────────
+// ─── Persistence ───────────────────────────────────────────────────────────────
 const LS_DONE = 'se_tour_done';
 const LS_USER = 'se_tour_user';
 
@@ -104,7 +119,7 @@ function saveLocalCompletion(userId: string) {
   catch { /* ignore */ }
 }
 
-// ─── Mobile detect ────────────────────────────────────────────────────────────
+// ─── Mobile detect ─────────────────────────────────────────────────────────────
 function useIsMobile() {
   const [m, setM] = useState(() => window.innerWidth < 768);
   useEffect(() => {
@@ -115,7 +130,7 @@ function useIsMobile() {
   return m;
 }
 
-// ─── Desktop overlay with spotlight cutout ────────────────────────────────────
+// ─── Desktop overlay with spotlight cutout ─────────────────────────────────────
 function DesktopOverlay({ targetRect, accentColor, onClose }: {
   targetRect: DOMRect | null; accentColor: string; onClose: () => void;
 }) {
@@ -137,12 +152,15 @@ function DesktopOverlay({ targetRect, accentColor, onClose }: {
   );
 }
 
-// ─── MOBILE TOUR CARD ─────────────────────────────────────────────────────────
-function MobileCard({ step, stepIndex, total, onNext, onSkip, isLast, visible }: {
+// ─── MOBILE TOUR CARD ──────────────────────────────────────────────────────────
+function MobileCard({ step, stepIndex, total, onNext, onSkip, isLast, phase }: {
   step: TourStep; stepIndex: number; total: number;
-  onNext: () => void; onSkip: () => void; isLast: boolean; visible: boolean;
+  onNext: () => void; onSkip: () => void; isLast: boolean;
+  // phase: 'in' | 'out' controls the slide animation
+  phase: 'in' | 'idle' | 'out';
 }) {
-  const progress = ((stepIndex + 1) / total) * 100;
+  const slideY = phase === 'out' ? '110%' : phase === 'in' ? '0%' : '0%';
+  const opacity = phase === 'out' ? 0 : 1;
 
   return (
     <>
@@ -151,48 +169,43 @@ function MobileCard({ step, stepIndex, total, onNext, onSkip, isLast, visible }:
         position: 'fixed', inset: 0, zIndex: 9990,
         background: 'rgba(2,5,15,0.80)',
         backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)',
-        opacity: visible ? 1 : 0,
-        transition: 'opacity 0.35s ease',
+        opacity: phase === 'out' ? 0 : 1,
+        transition: 'opacity 0.3s ease',
       }} />
 
-      {/* Ambient glow behind card */}
+      {/* Ambient glow */}
       <div style={{
         position: 'fixed', bottom: 0, left: 0, right: 0, height: '55%',
         zIndex: 9991, pointerEvents: 'none',
         background: `radial-gradient(ellipse at 50% 100%, ${step.bgGlow} 0%, transparent 70%)`,
-        opacity: visible ? 1 : 0,
+        opacity: phase === 'out' ? 0 : 1,
         transition: 'opacity 0.5s ease, background 0.4s ease',
       }} />
 
-      {/* Card wrapper — slides up */}
+      {/* Card wrapper */}
       <div style={{
         position: 'fixed', left: 0, right: 0, bottom: 0,
         zIndex: 9999,
-        transform: visible ? 'translateY(0)' : 'translateY(110%)',
-        transition: 'transform 0.48s cubic-bezier(0.32, 1.18, 0.64, 1)',
+        transform: `translateY(${slideY})`,
+        opacity,
+        transition: phase === 'in'
+          ? 'transform 0.48s cubic-bezier(0.32,1.18,0.64,1), opacity 0.3s ease'
+          : 'transform 0.28s cubic-bezier(0.4,0,1,1), opacity 0.22s ease',
       }}>
-        {/* Outer glow ring */}
         <div style={{
           margin: '0 8px',
           marginBottom: 'max(10px, env(safe-area-inset-bottom, 10px))',
-          borderRadius: 32,
-          padding: 2,
+          borderRadius: 32, padding: 2,
           background: `linear-gradient(170deg, ${step.accentColor}60, transparent 60%)`,
         }}>
-          {/* Card */}
           <div style={{
-            borderRadius: 30,
-            overflow: 'hidden',
+            borderRadius: 30, overflow: 'hidden',
             background: 'linear-gradient(175deg, rgba(16,12,40,0.98) 0%, rgba(8,6,22,0.99) 100%)',
             border: `1px solid ${step.accentColor}30`,
             boxShadow: `0 -8px 60px ${step.bgGlow}, 0 40px 80px rgba(0,0,0,0.9)`,
             position: 'relative',
           }}>
-
-            {/* Coloured top bar */}
             <div style={{ height: 3, background: step.gradient, width: '100%' }} />
-
-            {/* Subtle inner glow */}
             <div style={{
               position: 'absolute', top: 0, left: 0, right: 0, height: 120,
               background: `radial-gradient(ellipse at 50% 0%, ${step.bgGlow} 0%, transparent 100%)`,
@@ -200,126 +213,73 @@ function MobileCard({ step, stepIndex, total, onNext, onSkip, isLast, visible }:
             }} />
 
             <div style={{ padding: '18px 20px 22px', position: 'relative' }}>
-
-              {/* ── TOP ROW: icon + step info + skip ── */}
+              {/* TOP ROW */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20 }}>
-
-                {/* Large icon badge */}
                 <div style={{
                   width: 58, height: 58, borderRadius: 18, flexShrink: 0,
-                  background: step.accentDim,
-                  border: `1.5px solid ${step.accentColor}45`,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 28,
+                  background: step.accentDim, border: `1.5px solid ${step.accentColor}45`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28,
                   boxShadow: `0 0 24px ${step.bgGlow}, inset 0 1px 0 rgba(255,255,255,0.10)`,
                 }}>
                   {step.icon}
                 </div>
-
-                {/* Step counter + progress bar */}
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{
-                    fontSize: 11, fontWeight: 800, letterSpacing: '0.10em',
-                    textTransform: 'uppercase', color: step.accentColor,
-                    marginBottom: 7,
-                  }}>
+                  <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.10em', textTransform: 'uppercase', color: step.accentColor, marginBottom: 7 }}>
                     Step {stepIndex + 1} of {total}
                   </div>
-                  {/* Segmented progress */}
                   <div style={{ display: 'flex', gap: 4 }}>
                     {Array.from({ length: total }).map((_, i) => (
                       <div key={i} style={{
                         flex: 1, height: 4, borderRadius: 9999,
-                        background: i <= stepIndex
-                          ? step.accentColor
-                          : 'rgba(255,255,255,0.10)',
+                        background: i <= stepIndex ? step.accentColor : 'rgba(255,255,255,0.10)',
                         boxShadow: i === stepIndex ? `0 0 8px ${step.accentColor}` : 'none',
                         transition: 'background 0.4s ease',
                       }} />
                     ))}
                   </div>
                 </div>
-
-                {/* Skip */}
                 <button onClick={onSkip} style={{
-                  background: 'rgba(255,255,255,0.07)',
-                  border: '1px solid rgba(255,255,255,0.12)',
-                  borderRadius: 50, cursor: 'pointer',
-                  fontSize: 12, fontWeight: 600,
-                  color: 'rgba(148,163,184,0.80)',
-                  padding: '7px 15px', flexShrink: 0,
+                  background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)',
+                  borderRadius: 50, cursor: 'pointer', fontSize: 12, fontWeight: 600,
+                  color: 'rgba(148,163,184,0.80)', padding: '7px 15px', flexShrink: 0,
                   WebkitTapHighlightColor: 'transparent',
-                }}
-                onTouchStart={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.13)'; }}
-                onTouchEnd={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.07)'; }}>
-                  Skip
-                </button>
+                }}>Skip</button>
               </div>
 
-              {/* ── TITLE ── */}
               <h2 style={{
-                margin: '0 0 10px',
-                fontSize: 24, fontWeight: 900,
+                margin: '0 0 10px', fontSize: 24, fontWeight: 900,
                 color: '#f8fafc', lineHeight: 1.18,
-                fontFamily: "'Syne', system-ui, sans-serif",
-                letterSpacing: '-0.025em',
-              }}>
-                {step.title}
-              </h2>
+                fontFamily: "'Syne', system-ui, sans-serif", letterSpacing: '-0.025em',
+              }}>{step.title}</h2>
 
-              {/* ── DESCRIPTION ── */}
-              <p style={{
-                margin: '0 0 22px',
-                fontSize: 14.5, color: 'rgba(148,163,184,0.90)',
-                lineHeight: 1.65,
-              }}>
+              <p style={{ margin: '0 0 22px', fontSize: 14.5, color: 'rgba(148,163,184,0.90)', lineHeight: 1.65 }}>
                 {step.description}
               </p>
 
-              {/* ── FOOTER: dots + CTA ── */}
+              {/* FOOTER */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-
-                {/* Dot indicators */}
                 <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                   {Array.from({ length: total }).map((_, i) => (
                     <div key={i} style={{
                       borderRadius: 9999, height: 7,
                       width: i === stepIndex ? 22 : 7,
-                      background: i === stepIndex
-                        ? step.accentColor
-                        : i < stepIndex
-                        ? `${step.accentColor}55`
-                        : 'rgba(255,255,255,0.12)',
+                      background: i === stepIndex ? step.accentColor : i < stepIndex ? `${step.accentColor}55` : 'rgba(255,255,255,0.12)',
                       transition: 'all 0.4s cubic-bezier(0.34,1.56,0.64,1)',
                       boxShadow: i === stepIndex ? `0 0 8px ${step.accentColor}90` : 'none',
                     }} />
                   ))}
                 </div>
-
-                {/* CTA Button */}
                 <button onClick={onNext} style={{
-                  flex: 1,
-                  background: step.gradient,
-                  color: '#fff', border: 'none',
-                  borderRadius: 18, padding: '16px 0',
-                  fontSize: 15.5, fontWeight: 800,
+                  flex: 1, background: step.gradient, color: '#fff', border: 'none',
+                  borderRadius: 18, padding: '16px 0', fontSize: 15.5, fontWeight: 800,
                   cursor: 'pointer', letterSpacing: '0.01em',
                   boxShadow: `0 6px 28px ${step.bgGlow}, inset 0 1px 0 rgba(255,255,255,0.20)`,
                   WebkitTapHighlightColor: 'transparent',
                   transition: 'transform 0.15s ease, box-shadow 0.15s ease',
-                }}
-                onTouchStart={e => {
-                  e.currentTarget.style.transform = 'scale(0.97)';
-                  e.currentTarget.style.boxShadow = `0 2px 12px ${step.bgGlow}`;
-                }}
-                onTouchEnd={e => {
-                  e.currentTarget.style.transform = 'scale(1)';
-                  e.currentTarget.style.boxShadow = `0 6px 28px ${step.bgGlow}, inset 0 1px 0 rgba(255,255,255,0.20)`;
                 }}>
                   {isLast ? '🚀 Start Learning' : 'Next →'}
                 </button>
               </div>
-
             </div>
           </div>
         </div>
@@ -328,35 +288,62 @@ function MobileCard({ step, stepIndex, total, onNext, onSkip, isLast, visible }:
   );
 }
 
-// ─── DESKTOP TOOLTIP CARD ─────────────────────────────────────────────────────
-function DesktopCard({ step, stepIndex, total, targetRect, onNext, onSkip, isLast }: {
+// ─── DESKTOP TOOLTIP CARD ──────────────────────────────────────────────────────
+function DesktopCard({ step, stepIndex, total, targetRect, onNext, onSkip, isLast, slideDir }: {
   step: TourStep; stepIndex: number; total: number;
   targetRect: DOMRect | null; onNext: () => void; onSkip: () => void; isLast: boolean;
+  // slideDir: 'left' | 'right' — which direction this card enters from
+  slideDir: 'left' | 'right';
 }) {
   const W = 370, H = 250, GAP = 18, EDGE = 14;
 
   function pos(): React.CSSProperties {
+    // ── FIX 1: Check position === 'center' BEFORE using targetRect ──
+    // Previously targetRect from previous step was still in state when
+    // finish step rendered, causing it to anchor near the last spotlight.
     if (step.position === 'center' || !targetRect) {
-      return { position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: W, zIndex: 9999 };
+      return {
+        position: 'fixed',
+        top: '50%', left: '50%',
+        transform: 'translate(-50%, -50%)',
+        width: W, zIndex: 9999,
+      };
     }
     const vw = window.innerWidth, vh = window.innerHeight;
-    let top = step.position === 'bottom' ? targetRect.bottom + GAP : targetRect.top - H - GAP;
+    let top  = step.position === 'bottom' ? targetRect.bottom + GAP : targetRect.top - H - GAP;
     let left = targetRect.left + targetRect.width / 2 - W / 2;
     left = Math.max(EDGE, Math.min(left, vw - W - EDGE));
     top  = Math.max(EDGE, Math.min(top,  vh - H - EDGE));
     return { position: 'fixed', top, left, width: W, zIndex: 9999 };
   }
 
+  const posStyle = pos();
+  // For center, the transform is already set. For anchored cards, add entrance animation.
+  const isCentered = step.position === 'center' || !targetRect;
+
   return (
-    <div style={{ ...pos(), animation: 'tourCardIn 0.44s cubic-bezier(0.34,1.56,0.64,1) both' }}>
-      {targetRect && step.position !== 'center' && (
+    <div style={{
+      ...posStyle,
+      // Override transform for centered card — entrance handled by keyframe
+      transform: isCentered ? undefined : posStyle.transform,
+      animation: isCentered
+        ? 'tourCenterIn 0.42s cubic-bezier(0.34,1.2,0.64,1) both'
+        : slideDir === 'left'
+          ? 'tourSlideLeft 0.38s cubic-bezier(0.34,1.2,0.64,1) both'
+          : 'tourSlideRight 0.38s cubic-bezier(0.34,1.2,0.64,1) both',
+    }}>
+      {/* Arrow — hidden for center */}
+      {!isCentered && targetRect && (
         <div style={{
           position: 'absolute', left: '50%', marginLeft: -7, width: 14, height: 14,
           background: 'rgba(10,8,28,0.99)', border: `1.5px solid ${step.accentColor}35`,
           transform: 'rotate(45deg)', zIndex: 1,
-          ...(step.position === 'bottom' ? { top: -7, borderRight: 'none', borderBottom: 'none' } : { bottom: -7, borderLeft: 'none', borderTop: 'none' }),
+          ...(step.position === 'bottom'
+            ? { top: -7, borderRight: 'none', borderBottom: 'none' }
+            : { bottom: -7, borderLeft: 'none', borderTop: 'none' }),
         }} />
       )}
+
       <div style={{
         background: 'linear-gradient(145deg, rgba(10,8,28,0.99), rgba(15,10,36,0.99))',
         border: `1.5px solid ${step.accentColor}35`, borderRadius: 22,
@@ -364,10 +351,15 @@ function DesktopCard({ step, stepIndex, total, targetRect, onNext, onSkip, isLas
         boxShadow: `0 32px 64px rgba(0,0,0,0.8), 0 0 60px ${step.bgGlow}`,
         backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)',
       }}>
+        {/* Top accent line */}
         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, transparent, ${step.accentColor}, transparent)` }} />
+        {/* Inner glow */}
         <div style={{ position: 'absolute', inset: 0, background: `radial-gradient(ellipse at 50% 0%, ${step.bgGlow} 0%, transparent 65%)`, pointerEvents: 'none' }} />
+        {/* Shine sweep */}
         <div style={{ position: 'absolute', top: 0, bottom: 0, width: 80, pointerEvents: 'none', background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.04), transparent)', transform: 'skewX(-12deg)', animation: 'tourShine 3.5s ease-in-out 0.6s infinite' }} />
+
         <div style={{ position: 'relative' }}>
+          {/* Header row */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <div style={{ width: 44, height: 44, borderRadius: 14, fontSize: 22, background: step.accentDim, border: `1.5px solid ${step.accentColor}35`, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 0 18px ${step.bgGlow}` }}>
@@ -384,18 +376,22 @@ function DesktopCard({ step, stepIndex, total, targetRect, onNext, onSkip, isLas
                 </div>
               </div>
             </div>
-            <button onClick={onSkip} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: 50, cursor: 'pointer', fontSize: 11, color: 'rgba(148,163,184,0.65)', padding: '5px 13px', fontWeight: 500 }}
+            <button onClick={onSkip}
+              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: 50, cursor: 'pointer', fontSize: 11, color: 'rgba(148,163,184,0.65)', padding: '5px 13px', fontWeight: 500 }}
               onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.10)'; e.currentTarget.style.color = '#94a3b8'; }}
               onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; e.currentTarget.style.color = 'rgba(148,163,184,0.65)'; }}>
               Skip tour
             </button>
           </div>
+
           <h3 style={{ margin: '0 0 9px', fontSize: 18.5, fontWeight: 800, color: '#f1f5f9', lineHeight: 1.2, fontFamily: "'Syne', system-ui, sans-serif", letterSpacing: '-0.02em' }}>
             {step.title}
           </h3>
           <p style={{ margin: '0 0 20px', fontSize: 13.5, color: 'rgba(148,163,184,0.88)', lineHeight: 1.65 }}>
             {step.description}
           </p>
+
+          {/* Footer */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', gap: 6 }}>
               {Array.from({ length: total }).map((_, i) => (
@@ -415,13 +411,21 @@ function DesktopCard({ step, stepIndex, total, targetRect, onNext, onSkip, isLas
   );
 }
 
-// ─── Main ─────────────────────────────────────────────────────────────────────
+// ─── Main ──────────────────────────────────────────────────────────────────────
 export function OnboardingTour({ onComplete }: { onComplete: () => void }) {
   const { userName, userId } = useApp();
   const isMobile = useIsMobile();
-  const [idx, setIdx]             = useState(0);
-  const [targetRect, setTarget]   = useState<DOMRect | null>(null);
-  const [visible, setVisible]     = useState(false);
+
+  const [idx, setIdx]           = useState(0);
+  const [targetRect, setTarget] = useState<DOMRect | null>(null);
+
+  // ── FIX 2: Transition state machine ──
+  // 'in'   = card is entering (animate in)
+  // 'idle' = card fully visible
+  // 'out'  = card is exiting (animate out)
+  const [phase, setPhase]       = useState<'in' | 'idle' | 'out'>('in');
+  const [slideDir, setSlideDir] = useState<'left' | 'right'>('left');
+  const transitioning           = useRef(false);
 
   const step   = TOUR_STEPS[idx];
   const isLast = idx === TOUR_STEPS.length - 1;
@@ -434,6 +438,7 @@ export function OnboardingTour({ onComplete }: { onComplete: () => void }) {
   };
 
   const measureTarget = useCallback(() => {
+    // ── FIX 1: Clear targetRect immediately for center steps ──
     if (!step.target || isMobile) { setTarget(null); return; }
     const el = document.querySelector(`[data-tour="${step.target}"]`);
     if (!el) { setTarget(null); return; }
@@ -441,42 +446,101 @@ export function OnboardingTour({ onComplete }: { onComplete: () => void }) {
     setTimeout(() => setTarget(el.getBoundingClientRect()), 350);
   }, [step.target, isMobile]);
 
-  useEffect(() => { const t = setTimeout(() => setVisible(true), 220); return () => clearTimeout(t); }, []);
-  useEffect(() => { measureTarget(); window.addEventListener('resize', measureTarget); return () => window.removeEventListener('resize', measureTarget); }, [measureTarget]);
+  // Initial entrance
+  useEffect(() => {
+    const t = setTimeout(() => setPhase('idle'), 220);
+    return () => clearTimeout(t);
+  }, []);
+
+  useEffect(() => {
+    measureTarget();
+    window.addEventListener('resize', measureTarget);
+    return () => window.removeEventListener('resize', measureTarget);
+  }, [measureTarget]);
 
   const finish = useCallback(() => {
+    if (transitioning.current) return;
+    transitioning.current = true;
+    setPhase('out');
     saveLocalCompletion(userId);
     completeOnboarding().catch(() => {});
-    setVisible(false);
-    setTimeout(() => onComplete(), 420);
+    setTimeout(() => { transitioning.current = false; onComplete(); }, 320);
   }, [userId, onComplete]);
 
   const next = useCallback(() => {
-    if (isLast) { finish(); return; }
-    setVisible(false);
-    setTimeout(() => { setIdx(i => i + 1); setTimeout(() => setVisible(true), 60); }, 220);
-  }, [isLast, finish]);
+    if (isLast)               { finish(); return; }
+    if (transitioning.current) return;
+    transitioning.current = true;
+
+    // Alternate slide direction for page-flip feel
+    const dir = idx % 2 === 0 ? 'left' : 'right';
+
+    // 1. Slide out
+    setPhase('out');
+
+    setTimeout(() => {
+      // 2. Swap content
+      setIdx(i => i + 1);
+      setSlideDir(dir);
+      // Clear targetRect immediately so center step doesn't flash in wrong pos
+      setTarget(null);
+
+      // 3. Slide in
+      requestAnimationFrame(() => {
+        setPhase('in');
+        setTimeout(() => {
+          setPhase('idle');
+          transitioning.current = false;
+        }, 380);
+      });
+    }, 240);
+  }, [isLast, finish, idx]);
 
   return (
     <>
       <style>{`
-        @keyframes tourCardIn    { from{opacity:0;transform:scale(0.88) translateY(16px);}to{opacity:1;transform:scale(1) translateY(0);} }
-        @keyframes tourRingPulse { 0%,100%{box-shadow:0 0 0 4px ${step.accentColor}22,0 0 24px ${step.accentColor}55;}50%{box-shadow:0 0 0 8px ${step.accentColor}33,0 0 48px ${step.accentColor}70;} }
-        @keyframes tourShine     { 0%{left:-100px;opacity:0;}15%{opacity:1;}85%{opacity:1;}100%{left:calc(100%+100px);opacity:0;} }
+        @keyframes tourCenterIn {
+          from { opacity:0; transform:translate(-50%,-50%) scale(0.88); }
+          to   { opacity:1; transform:translate(-50%,-50%) scale(1); }
+        }
+        @keyframes tourSlideLeft {
+          from { opacity:0; transform:translateX(32px) scale(0.96); }
+          to   { opacity:1; transform:translateX(0)    scale(1); }
+        }
+        @keyframes tourSlideRight {
+          from { opacity:0; transform:translateX(-32px) scale(0.96); }
+          to   { opacity:1; transform:translateX(0)     scale(1); }
+        }
+        @keyframes tourRingPulse {
+          0%,100%{ box-shadow:0 0 0 4px ${step.accentColor}22,0 0 24px ${step.accentColor}55; }
+          50%    { box-shadow:0 0 0 8px ${step.accentColor}33,0 0 48px ${step.accentColor}70; }
+        }
+        @keyframes tourShine {
+          0%   { left:-100px; opacity:0; }
+          15%  { opacity:1; }
+          85%  { opacity:1; }
+          100% { left:calc(100%+100px); opacity:0; }
+        }
       `}</style>
 
       {isMobile ? (
         <MobileCard
           step={display} stepIndex={idx} total={TOUR_STEPS.length}
-          onNext={next} onSkip={finish} isLast={isLast} visible={visible}
+          onNext={next} onSkip={finish} isLast={isLast} phase={phase}
         />
       ) : (
         <>
-          <DesktopOverlay targetRect={targetRect} accentColor={step.accentColor} onClose={finish} />
-          {visible && (
+          <DesktopOverlay
+            targetRect={step.position === 'center' ? null : targetRect}
+            accentColor={step.accentColor}
+            onClose={finish}
+          />
+          {phase !== 'out' && (
             <DesktopCard
               step={display} stepIndex={idx} total={TOUR_STEPS.length}
-              targetRect={targetRect} onNext={next} onSkip={finish} isLast={isLast}
+              targetRect={step.position === 'center' ? null : targetRect}
+              onNext={next} onSkip={finish} isLast={isLast}
+              slideDir={slideDir}
             />
           )}
         </>
