@@ -1781,6 +1781,11 @@ export function AskAI() {
           incrementAction("question");
           checkAndUnlockAchievements({ totalQuestionsAsked: newTotal });
           trackProgressEvent("ai_tutor_used", { mode: subjectMode }).catch(() => {});
+          // Real-time Recent Activity update (image/non-stream path)
+          const actLabelImg = text.trim().length > 60
+            ? `Asked: ${text.trim().slice(0, 60)}...`
+            : `Asked: ${text.trim()}`;
+          logActivity('ask_question', actLabelImg, pts).catch(() => {});
         }
         const finalMsgs = [...withUserRef.current, aiMsg];
         setMessages(finalMsgs);
@@ -2018,6 +2023,14 @@ export function AskAI() {
         checkAndUnlockAchievements({ totalQuestionsAsked: newTotal });
         trackProgressEvent("ai_tutor_used", { mode: subjectMode }).catch(() => {});
         setMentorState(prev => ({ ...prev, turnCount: prev.turnCount + 1 }));
+
+        // Real-time Recent Activity update
+        // logActivity() optimistically prepends to recentActivity in context
+        // so Dashboard shows the new entry instantly without page refresh.
+        const actLabel = text.trim().length > 60
+          ? `Asked: ${text.trim().slice(0, 60)}\u2026`
+          : `Asked: ${text.trim()}`;
+        logActivity('ask_question', actLabel, finalPoints).catch(() => {});
 
         // ── v12: Wow Moment (Improvement 7) ─────────────────
         // Now DYNAMIC — driven by SSE enrichment.wowObservation
