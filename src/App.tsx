@@ -1651,6 +1651,8 @@ function AppContent() {
 
   const [toastQueue, setToastQueue]             = useState<any[]>([]);
   const [toastAchievement, setToastAchievement] = useState<any>(null);
+  const [pendingAchievements, setPendingAchievements] = useState<any[]>([]);
+  const [claimedAchievement,  setClaimedAchievement]  = useState<any>(null);
 
   const pointsRef    = useRef(points);
   const streakRef    = useRef(streak);
@@ -1822,7 +1824,10 @@ function AppContent() {
         }
       } catch (e) { console.error("unlock error", ach.id, e); }
     }
-    if (newlyUnlocked.length > 0) setToastQueue(prev => [...prev, ...newlyUnlocked]);
+    if (newlyUnlocked.length > 0) {
+      setToastQueue(prev => [...prev, ...newlyUnlocked]);
+      setPendingAchievements(prev => [...prev, ...newlyUnlocked]);
+    }
   }, []);
 
   const checkStreak = async () => {
@@ -1909,10 +1914,14 @@ function AppContent() {
 
       <PWAInstallPrompt />
 
+      {/* Corner pill — subtle, non-intrusive, fires on any page */}
       {toastAchievement && location.pathname.startsWith("/app") && (
-        (location.pathname === "/app" || location.pathname === "/app/")
-          ? <AchievementToast achievement={toastAchievement} onClose={() => setToastAchievement(null)} />
-          : <AchievementCornerPill achievement={toastAchievement} onClose={() => setToastAchievement(null)} />
+        <AchievementCornerPill achievement={toastAchievement} onClose={() => setToastAchievement(null)} />
+      )}
+
+      {/* Full dramatic toast — only fires when user CLAIMS from notification bell */}
+      {claimedAchievement && location.pathname.startsWith("/app") && (
+        <AchievementToast achievement={claimedAchievement} onClose={() => setClaimedAchievement(null)} />
       )}
 
       <AppContext.Provider
@@ -1922,6 +1931,8 @@ function AppContent() {
           useQuestion, userId, userName, resetProgress, recentActivity, logActivity,
           loading, unlockedAchievements, userStats, checkAndUnlockAchievements,
           setUnlockedAchievements, setUserStats,
+          pendingAchievements,
+          setPendingAchievements: (achs: any[]) => setPendingAchievements(achs),
         }}
       >
         <Routes>
@@ -1939,7 +1950,7 @@ function AppContent() {
           <Route path="/codelearn/:language" element={<CoursePage />} />
           <Route path="/codelearn/:language/certificate" element={<CertificatePage />} />
 
-          <Route path="/app" element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
+          <Route path="/app" element={<ProtectedRoute><DashboardLayout onClaimAchievement={(ach: any) => setClaimedAchievement(ach)} /></ProtectedRoute>}>
             <Route index element={<Dashboard />} />
             <Route path="ask"         element={<AskAI />} />
             <Route path="ppt"         element={<PPTGenerator />} />

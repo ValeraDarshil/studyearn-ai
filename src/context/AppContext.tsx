@@ -39,6 +39,9 @@ export interface AppContextType {
   setUserStats: (stats: UserStats) => void;
   setQuestionsLeft: (n: number) => void;
   refreshQuota: () => Promise<void>;
+  // 🏆 Pending unclaimed achievements — drives notification bell badge
+  pendingAchievements: any[];
+  setPendingAchievements: (achievements: any[]) => void;
 }
 
 export const AppContext = createContext<AppContextType>({
@@ -65,6 +68,8 @@ export const AppContext = createContext<AppContextType>({
   setUserStats: () => {},
   setQuestionsLeft: () => {},
   refreshQuota: async () => {},
+  pendingAchievements: [],
+  setPendingAchievements: () => {},
 });
 
 export const useApp = () => useContext(AppContext);
