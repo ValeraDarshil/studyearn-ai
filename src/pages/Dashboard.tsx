@@ -9,10 +9,69 @@ import { calculateLevel, getLevelTier, getLevelColor } from '../utils/level-util
 import Lottie from 'lottie-react';
 import streakAnimation from '../assets/animations/streak-fire.json';
 
-// ─── GlitchNumber — cyberpunk digit scramble on value change ─────────────────
+// ─── GlitchNumber — cyberpunk digit scramble + SFX on value change ──────────
 // Plays 8 frames of random digit scramble (40ms each = ~320ms total),
 // with cyan/pink ghost layers offset on X-axis, plus a scan-line sweep.
+// SFX: glitch stutter noise burst + rising digital beep, timed to match visuals.
 // Only triggers when `value` prop changes — zero effect on static renders.
+
+function playGlitchSFX() {
+  try {
+    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const master = ctx.createGain();
+    master.gain.setValueAtTime(0.35, ctx.currentTime);
+    master.connect(ctx.destination);
+    const now = ctx.currentTime;
+
+    // Layer 1: Glitch stutter — short noise bursts timed to scramble frames
+    [0, 0.04, 0.08, 0.12, 0.18, 0.22, 0.26].forEach((delay) => {
+      const bufSize = Math.floor(ctx.sampleRate * 0.018);
+      const buf     = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+      const data    = buf.getChannelData(0);
+      for (let i = 0; i < bufSize; i++) data[i] = (Math.random() * 2 - 1) * 0.6;
+      const src  = ctx.createBufferSource();
+      const filt = ctx.createBiquadFilter();
+      const g    = ctx.createGain();
+      filt.type            = 'bandpass';
+      filt.frequency.value = 3200 + Math.random() * 800;
+      filt.Q.value         = 1.2;
+      g.gain.setValueAtTime(0.55, now + delay);
+      g.gain.exponentialRampToValueAtTime(0.001, now + delay + 0.016);
+      src.buffer = buf;
+      src.connect(filt); filt.connect(g); g.connect(master);
+      src.start(now + delay); src.stop(now + delay + 0.018);
+    });
+
+    // Layer 2: Digital scan beep — rising pitch sweep (scan line sound)
+    const beep = ctx.createOscillator();
+    const bg   = ctx.createGain();
+    beep.type = 'square';
+    beep.frequency.setValueAtTime(320, now);
+    beep.frequency.exponentialRampToValueAtTime(1800, now + 0.28);
+    bg.gain.setValueAtTime(0, now);
+    bg.gain.linearRampToValueAtTime(0.18, now + 0.03);
+    bg.gain.setValueAtTime(0.18, now + 0.22);
+    bg.gain.exponentialRampToValueAtTime(0.001, now + 0.34);
+    beep.connect(bg); bg.connect(master);
+    beep.start(now); beep.stop(now + 0.34);
+
+    // Layer 3: Final lock-in ping — confirms new number landed
+    const ping = ctx.createOscillator();
+    const pg   = ctx.createGain();
+    ping.type = 'sine';
+    ping.frequency.setValueAtTime(1400, now + 0.30);
+    ping.frequency.exponentialRampToValueAtTime(1800, now + 0.36);
+    pg.gain.setValueAtTime(0.28, now + 0.30);
+    pg.gain.exponentialRampToValueAtTime(0.001, now + 0.52);
+    ping.connect(pg); pg.connect(master);
+    ping.start(now + 0.30); ping.stop(now + 0.52);
+
+    setTimeout(() => ctx.close(), 700);
+  } catch {
+    // AudioContext blocked — silently skip
+  }
+}
+
 function GlitchNumber({ value, className = '' }: { value: number; className?: string }) {
   const [display, setDisplay] = useState(value);
   const [glitching, setGlitching] = useState(false);
@@ -29,6 +88,9 @@ function GlitchNumber({ value, className = '' }: { value: number; className?: st
 
     setGlitching(true);
     setScanActive(true);
+
+    // Fire SFX in sync with visual glitch start
+    playGlitchSFX();
 
     let frame = 0;
     const TOTAL = 8;
