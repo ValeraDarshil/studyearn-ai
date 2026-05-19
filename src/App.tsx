@@ -1495,18 +1495,33 @@ function playCornerPillSFX(rarity: string) {
 function AchievementToast({ achievement, onClose }: { achievement: any; onClose: () => void }) {
   const [visible, setVisible] = useState(true);
 
-  const handleClose = useCallback(() => {
-    // NOTE: Full_Achivements_SFX already contains its own ending sound.
-    // playAchievementCloseSFX() intentionally NOT called here to avoid double-ending.
+  // Track the open audio so we can stop it on manual close
+  const openAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  const handleClose = useCallback((manual = false) => {
+    // If user clicked "Awesome" — stop the open SFX and play ending SFX
+    if (manual && openAudioRef.current) {
+      openAudioRef.current.pause();
+      openAudioRef.current.currentTime = 0;
+      playAchievementCloseSFX();
+    }
     setVisible(false);
     setTimeout(onClose, 350);
   }, [onClose]);
 
   useEffect(() => {
-    // Fire open SFX immediately when toast mounts
-    playAchievementSFX();
-    // Auto-close after 6s — no separate close SFX needed (open SFX has its own ending)
-    const t = setTimeout(handleClose, 6000);
+    // Play open SFX and keep reference so we can stop it on manual close
+    try {
+      if (!achOpenAudio) {
+        achOpenAudio = new Audio(ACH_OPEN_SFX);
+        achOpenAudio.volume = 0.7;
+      }
+      achOpenAudio.currentTime = 0;
+      achOpenAudio.play().catch(() => {});
+      openAudioRef.current = achOpenAudio;
+    } catch { /* skip */ }
+    // Auto-close — full SFX plays out naturally, no ending SFX
+    const t = setTimeout(() => handleClose(false), 6000);
     return () => clearTimeout(t);
   }, [handleClose]);
 
@@ -1533,7 +1548,7 @@ function AchievementToast({ achievement, onClose }: { achievement: any; onClose:
       <div
         className="fixed inset-0 z-[200]"
         style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)", animation: visible ? "achBgIn 0.3s ease forwards" : "achBgOut 0.35s ease forwards" }}
-        onClick={handleClose}
+        onClick={() => handleClose(false)}
       />
 
       <div
@@ -1566,7 +1581,7 @@ function AchievementToast({ achievement, onClose }: { achievement: any; onClose:
               <span className="text-sm font-bold text-green-400">+{achievement.reward} Bonus Points Earned!</span>
             </div>
           )}
-          <button onClick={handleClose} className="w-full py-3 rounded-xl font-semibold text-sm text-white transition-all hover:opacity-80"
+          <button onClick={() => handleClose(true)} className="w-full py-3 rounded-xl font-semibold text-sm text-white transition-all hover:opacity-80"
             style={{ background: `linear-gradient(135deg, ${r.ring}80, ${r.ring}40)`, border: `1px solid ${r.ring}50` }}>
             Awesome! 🎉
           </button>
