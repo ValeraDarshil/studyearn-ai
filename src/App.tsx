@@ -1280,7 +1280,8 @@ function AchievementCornerPill({ achievement, onClose }: { achievement: any; onC
   };
   const r = rarityAccent[achievement.rarity || 'common'];
 
-  const handleClose = useCallback(() => {
+  const handleClose = useCallback((manual = false) => {
+    if (manual) playAchievementCloseSFX(); // X button → ending SFX
     setLeaving(true);
     setTimeout(onClose, 320);
   }, [onClose]);
@@ -1288,7 +1289,7 @@ function AchievementCornerPill({ achievement, onClose }: { achievement: any; onC
   useEffect(() => {
     // Corner pill uses Web Audio generated SFX (rarity-based, non-intrusive)
     playCornerPillSFX(achievement.rarity || 'common');
-    const auto = setTimeout(handleClose, 5000);
+    const auto = setTimeout(() => handleClose(false), 5000);
     return () => clearTimeout(auto);
   }, [handleClose]);
 
@@ -1340,7 +1341,7 @@ function AchievementCornerPill({ achievement, onClose }: { achievement: any; onC
               )}
             </div>
           </div>
-          <button onClick={handleClose} style={{
+          <button onClick={() => handleClose(true)} style={{
             flexShrink:0, width:'24px', height:'24px', borderRadius:'50%',
             background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.10)',
             color:'rgba(148,163,184,0.6)', cursor:'pointer', fontSize:'13px',
