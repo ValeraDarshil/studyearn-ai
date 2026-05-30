@@ -1,15 +1,34 @@
 # StudyEarn AI — robots.txt
 User-agent: *
-Allow: /
 
-# Block internal app pages from indexing (login required)
-Disallow: /app/
-Disallow: /google-welcome
-
-# Allow landing, login, signup for indexing
+# Allow all public pages
 Allow: /
 Allow: /login
 Allow: /signup
 
-# Sitemap location
+# Block internal app pages (login required — no SEO value)
+Disallow: /app/
+Disallow: /dashboard
+Disallow: /ask-ai
+Disallow: /ppt-generator
+Disallow: /quiz-generator
+Disallow: /pdf-tools
+Disallow: /study-planner
+Disallow: /leaderboard
+Disallow: /rewards
+Disallow: /profile
+Disallow: /onboarding
+Disallow: /google-welcome
+Disallow: /daily-challenge
+Disallow: /collab-notes
+Disallow: /analytics
+Disallow: /ai-mentor
+Disallow: /brain-dashboard
+Disallow: /refer-friends
+Disallow: /points-history
+Disallow: /formula-sheet
+Disallow: /study-tools
+Disallow: /codelearn
+
+# Sitemap
 Sitemap: https://studyearnai.tech/sitemap.xml
