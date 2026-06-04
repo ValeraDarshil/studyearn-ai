@@ -23,7 +23,12 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           // Core React — loads first
-          if (id.includes("node_modules/react/") || id.includes("node_modules/react-dom/")) {
+          if (
+            id.includes("node_modules/react/") ||
+            id.includes("node_modules/react-dom/") ||
+            id.includes("node_modules/react-helmet-async") ||
+            id.includes("node_modules/helmet")
+          ) {
             return "react-core";
           }
           // Router — separate chunk
