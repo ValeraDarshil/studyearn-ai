@@ -156,11 +156,11 @@ export function LandingPage() {
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </button>
             <button
-              onClick={handleGetStarted}
+              onClick={() => navigate("/pdf-tools")}
               className="px-8 py-4 rounded-2xl glass border border-white/10 text-white font-semibold text-lg hover:bg-white/5 transition-all duration-300 flex items-center justify-center gap-2"
             >
-              <Presentation className="w-5 h-5 text-purple-400" />
-              Generate PPT
+              <FileText className="w-5 h-5 text-cyan-400" />
+              Free PDF Tools
             </button>
           </div>
 
