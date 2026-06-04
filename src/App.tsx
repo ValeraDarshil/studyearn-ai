@@ -1248,6 +1248,7 @@ import { PointsHistory } from "./pages/PointsHistory";
 import CodeLearnHome from "./pages/codelearn/CodeLearnHome";
 import CoursePage from "./pages/codelearn/CoursePage";
 import CertificatePage from "./pages/codelearn/CertificatePage";
+import { PDFToolsPublic } from "./pages/PDFToolsPublic";
 import { OnboardingTour, hasCompletedOnboardingLocally } from "./components/OnboardingTour";
 
 // ── AI Study OS — New Pages ───────────────────────────────────
@@ -1934,6 +1935,7 @@ function AppContent() {
           <Route path="/codelearn" element={<CodeLearnHome />} />
           <Route path="/codelearn/:language" element={<CoursePage />} />
           <Route path="/codelearn/:language/certificate" element={<CertificatePage />} />
+          <Route path="/pdf-tools" element={<PDFToolsPublic />} />
 
           <Route path="/app" element={<ProtectedRoute><DashboardLayout onClaimAchievement={(ach: any) => setClaimedAchievement(ach)} /></ProtectedRoute>}>
             <Route index element={<Dashboard />} />
