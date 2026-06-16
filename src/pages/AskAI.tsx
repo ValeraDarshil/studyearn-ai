@@ -3714,13 +3714,142 @@ function ModeSelector({
 }
 
 // ─── Suggestions per mode ─────────────────────────────────────
-const MODE_SUGGESTIONS: Record<SubjectMode, string[]> = {
-  auto:    ["Explain photosynthesis with diagram", "Solve: ∫x²dx from 0 to 1", "Write a Python function to reverse a string", "What is Newton's 3rd Law? Give examples"],
-  math:    ["Solve: 2x² + 5x - 3 = 0", "Integrate ∫sin(x)cos(x)dx", "Find the derivative of x³ln(x)", "Prove that √2 is irrational"],
-  coding:  ["Write a binary search in Python", "Explain Big O notation with examples", "Debug: why does my loop run infinitely?", "Difference between stack and queue with code"],
-  science: ["Explain photosynthesis step by step", "What is Newton's 2nd law with examples?", "How does DNA replication work?", "Explain Ohm's law with a circuit example"],
-  general: ["Explain the French Revolution briefly", "What causes inflation?", "How does the internet work?", "Difference between communism and socialism"],
+const ALL_MODE_SUGGESTIONS: Record<SubjectMode, string[]> = {
+  auto: [
+    "Explain photosynthesis with diagram",
+    "Solve: ∫x²dx from 0 to 1",
+    "Write a Python function to reverse a string",
+    "What is Newton's 3rd Law? Give examples",
+    "How does the human brain store memory?",
+    "Explain recursion with a real-world example",
+    "What is the difference between speed and velocity?",
+    "Write a function to check if a number is prime",
+    "How does DNA replication work?",
+    "What causes a solar eclipse?",
+    "Explain Big O notation simply",
+    "What is the Pythagorean theorem?",
+    "How does WiFi work?",
+    "Explain the water cycle with diagram",
+    "What is machine learning in simple terms?",
+    "How do vaccines work?",
+    "Explain Newton's laws of motion",
+    "What is a sorting algorithm? Give examples",
+    "How does the stock market work?",
+    "Explain blockchain in simple terms",
+  ],
+  math: [
+    "Solve: 2x² + 5x - 3 = 0",
+    "Integrate ∫sin(x)cos(x)dx",
+    "Find the derivative of x³ln(x)",
+    "Prove that √2 is irrational",
+    "What is the difference between permutation and combination?",
+    "Explain the binomial theorem with an example",
+    "Find the area under the curve y = x² from 0 to 3",
+    "Solve the system: 3x + 2y = 12, x - y = 1",
+    "What is a limit in calculus? Explain with example",
+    "Prove: sum of angles in a triangle = 180°",
+    "Solve: log₂(x) + log₂(x-2) = 3",
+    "Find eigenvalues of a 2x2 matrix",
+    "What is the difference between mean, median, mode?",
+    "Explain Bayes theorem with an example",
+    "Solve: d²y/dx² + 4y = 0",
+    "What is a complex number? Give examples",
+    "Explain the chain rule in differentiation",
+    "Find the HCF of 84 and 120",
+    "What is a geometric series? Find its sum",
+    "Explain the concept of vectors in 3D",
+  ],
+  coding: [
+    "Write a binary search in Python",
+    "Explain Big O notation with examples",
+    "Debug: why does my loop run infinitely?",
+    "Difference between stack and queue with code",
+    "Write a function to check if a string is a palindrome",
+    "Explain how promises work in JavaScript",
+    "What is the difference between SQL and NoSQL?",
+    "Write a function to find duplicates in an array",
+    "Explain OOP concepts with Python examples",
+    "What is a REST API? How do I build one?",
+    "How does async/await work in JavaScript?",
+    "Write a function to flatten a nested array",
+    "Explain the difference between == and === in JS",
+    "What is a linked list? Write one in Python",
+    "How does garbage collection work?",
+    "Write a regex to validate an email address",
+    "Explain Docker in simple terms with examples",
+    "What is memoization and when to use it?",
+    "Write a function to merge two sorted arrays",
+    "Explain the MVC design pattern",
+  ],
+  science: [
+    "Explain photosynthesis step by step",
+    "What is Newton's 2nd law with examples?",
+    "How does DNA replication work?",
+    "Explain Ohm's law with a circuit example",
+    "What is the difference between mitosis and meiosis?",
+    "How does a nuclear reactor work?",
+    "Explain the greenhouse effect and global warming",
+    "What is electromagnetic induction?",
+    "How do black holes form?",
+    "Explain the periodic table trends",
+    "What is CRISPR and how does it work?",
+    "How does the human immune system fight viruses?",
+    "Explain the Doppler effect with examples",
+    "What is entropy in thermodynamics?",
+    "How does a transistor work?",
+    "Explain the carbon cycle with diagram",
+    "What is the difference between fusion and fission?",
+    "How do antibiotics work?",
+    "Explain Bernoulli's principle with examples",
+    "What causes earthquakes and how are they measured?",
+  ],
+  general: [
+    "Explain the French Revolution briefly",
+    "What causes inflation?",
+    "How does the internet work?",
+    "Difference between communism and socialism",
+    "What is the United Nations and what does it do?",
+    "How does a country's GDP get calculated?",
+    "Explain the Cold War in simple terms",
+    "What is the difference between a democracy and a republic?",
+    "How do central banks control inflation?",
+    "What caused World War I?",
+    "Explain how elections work in India",
+    "What is globalisation and its effects?",
+    "How does the Supreme Court of India work?",
+    "What is the difference between a myth and a legend?",
+    "Explain the Industrial Revolution and its impact",
+    "What is climate change and who causes it?",
+    "How does foreign exchange rate work?",
+    "What is the difference between ethics and morality?",
+    "Explain the Renaissance period briefly",
+    "What is the difference between a recession and a depression?",
+  ],
 };
+
+// Daily rotation — picks 4 different suggestions each day per mode
+function getDailySuggestions(mode: SubjectMode): string[] {
+  const pool = ALL_MODE_SUGGESTIONS[mode];
+  const today = new Date();
+  // seed = mode + date so each mode rotates independently
+  const seed  = `${mode}-${today.getFullYear()}-${today.getMonth()}-${today.getDate()}`;
+  let hash    = 0;
+  for (let i = 0; i < seed.length; i++) {
+    hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
+  }
+  const picked: string[] = [];
+  const used   = new Set<number>();
+  let   cursor = hash;
+  while (picked.length < 4) {
+    cursor      = (cursor * 1664525 + 1013904223) >>> 0;
+    const idx   = cursor % pool.length;
+    if (!used.has(idx)) { used.add(idx); picked.push(pool[idx]); }
+  }
+  return picked;
+}
+
+// Keep backward compat — used only as fallback type reference now
+const MODE_SUGGESTIONS: Record<SubjectMode, string[]> = ALL_MODE_SUGGESTIONS;
 
 // ─────────────────────────────────────────────────────────────
 // MAIN COMPONENT
@@ -5095,8 +5224,8 @@ export function AskAI() {
 
           {!hasChat && (
             <div className="flex flex-col items-center justify-center h-full gap-5 text-center px-4">
-              <div className="w-14 h-14 rounded-2xl flex items-center justify-center border bg-violet-500/10 border-violet-500/30">
-                <Sparkles className="w-6 h-6 text-violet-400" />
+              <div className={`w-14 h-14 rounded-2xl flex items-center justify-center border ${currentMode.bg} ${currentMode.border}`}>
+                <currentMode.icon className={`w-6 h-6 ${currentMode.color}`} />
               </div>
               <div>
                 <h2 className="text-base font-semibold text-white mb-1">Ask anything</h2>
@@ -5106,10 +5235,10 @@ export function AskAI() {
                 </p>
               </div>
               <div className="w-full max-w-md grid sm:grid-cols-2 gap-2">
-                {MODE_SUGGESTIONS["auto"].map(q => (
+                {getDailySuggestions(subjectMode).map(q => (
                   <button key={q} onClick={() => { setQuestion(q); textareaRef.current?.focus(); }}
                     className="text-left p-3 rounded-xl border border-white/5 bg-white/[0.02] text-xs text-slate-400 hover:text-white hover:border-white/10 hover:bg-white/[0.04] transition-all group">
-                    <span className="text-violet-400 mr-1.5 group-hover:mr-2 transition-all">→</span>{q}
+                    <span className={`${currentMode.color} mr-1.5 group-hover:mr-2 transition-all`}>→</span>{q}
                   </button>
                 ))}
               </div>
