@@ -3356,35 +3356,34 @@ function GrowthMirrorCard({
 }
 
 // ─── Action Buttons ───────────────────────────────────────────
-// Shown below EVERY completed AI response (not while streaming).
-// "Samajh aaya 👍" / "Dubara samjhao 🔁" / "Test me 🧠"
+// Shown on HOVER alongside copy button — NOT below the response.
 function ActionButtons({
   onAction,
 }: { onAction: (type: "understood" | "reexplain" | "testme") => void }) {
   return (
-    <div className="flex flex-wrap gap-2 mt-3 pt-2 border-t border-white/5">
+    <>
       <button
         onClick={() => onAction("understood")}
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-green-500/10 text-green-400 border border-green-500/20 hover:bg-green-500/20 hover:border-green-500/35 transition-all active:scale-95"
+        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-green-500/10 border border-green-500/20 text-[10px] font-medium text-green-400 hover:bg-green-500/20 hover:border-green-500/35 active:scale-95 transition-all shadow-lg"
       >
         <ThumbsUp className="w-3 h-3" />
-        Samajh aaya 👍
+        Samajh aaya
       </button>
       <button
         onClick={() => onAction("reexplain")}
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20 hover:border-blue-500/35 transition-all active:scale-95"
+        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-blue-500/10 border border-blue-500/20 text-[10px] font-medium text-blue-400 hover:bg-blue-500/20 hover:border-blue-500/35 active:scale-95 transition-all shadow-lg"
       >
         <RotateCcw className="w-3 h-3" />
-        Dubara samjhao 🔁
+        Dubara samjhao
       </button>
       <button
         onClick={() => onAction("testme")}
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-purple-500/10 text-purple-400 border border-purple-500/20 hover:bg-purple-500/20 hover:border-purple-500/35 transition-all active:scale-95"
+        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-purple-500/10 border border-purple-500/20 text-[10px] font-medium text-purple-400 hover:bg-purple-500/20 hover:border-purple-500/35 active:scale-95 transition-all shadow-lg"
       >
         <Dumbbell className="w-3 h-3" />
-        Test me 🧠
+        Test me
       </button>
-    </div>
+    </>
   );
 }
 
@@ -3536,9 +3535,34 @@ function AIBubble({
         <div className="mb-1.5"><ModeBadge mode={msg.subjectMode} /></div>
       )}
 
-      {/* AI response — clean, no box, no border */}
+      {/* Smooth streaming reveal style */}
+      <style>{`
+        @keyframes streamReveal {
+          from { opacity: 0; transform: translateY(3px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        .ai-stream-content > * {
+          animation: streamReveal 0.18s ease-out both;
+        }
+        .streaming-cursor {
+          display: inline-block;
+          width: 2px;
+          height: 1em;
+          background: #818cf8;
+          border-radius: 2px;
+          margin-left: 2px;
+          vertical-align: middle;
+          animation: cursorBlink 0.8s ease-in-out infinite;
+        }
+        @keyframes cursorBlink {
+          0%, 100% { opacity: 1; }
+          50%       { opacity: 0; }
+        }
+      `}</style>
+
+      {/* AI response content */}
       <div
-        className={`w-full ${msg.isError ? "text-red-300" : "text-white"}`}
+        className={`w-full ${msg.isError ? "text-red-300" : "text-white"} ${isStreaming ? "ai-stream-content" : ""}`}
         onClick={() => { if (!isStreaming && !msg.isError && msg.content) setShowCopy(p => !p); }}
       >
         {msg.isError
@@ -3553,9 +3577,7 @@ function AIBubble({
             : msg.gkData
               ? <GKCard data={msg.gkData} />
               : <MarkdownRenderer content={msg.content} visualBrain={msg.visualBrain} />}
-        {isStreaming && (
-          <span className="inline-block w-0.5 h-4 bg-blue-400 ml-0.5 animate-pulse align-middle" />
-        )}
+        {isStreaming && <span className="streaming-cursor" />}
       </div>
 
       {!!msg.pointsAwarded && (
@@ -3566,33 +3588,30 @@ function AIBubble({
         </div>
       )}
 
-      {/* Copy button */}
+      {/* Unified hover toolbar — copy + action buttons together */}
       {!isStreaming && !msg.isError && msg.content && (
-        <div className={`transition-all duration-150 pt-0.5 ${
+        <div className={`transition-all duration-150 pt-1.5 ${
           showCopy ? "opacity-100" : "opacity-0 group-hover/ai:opacity-100"
         }`}>
-          <button
-            onClick={e => { e.stopPropagation(); handleCopy(); }}
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white/[0.04] border border-white/8 text-[10px] font-medium text-slate-500 hover:text-slate-200 hover:bg-white/[0.08] hover:border-white/15 active:scale-95 transition-all"
-          >
-            {copied
-              ? <><Check className="w-3 h-3 text-green-400" /> Copied!</>
-              : <><Copy className="w-3 h-3" /> Copy</>
-            }
-          </button>
-        </div>
-      )}
+          <div className="flex flex-wrap items-center gap-1.5">
+            {/* Copy */}
+            <button
+              onClick={e => { e.stopPropagation(); handleCopy(); }}
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white/[0.04] border border-white/8 text-[10px] font-medium text-slate-500 hover:text-slate-200 hover:bg-white/[0.08] hover:border-white/15 active:scale-95 transition-all shadow-lg"
+            >
+              {copied
+                ? <><Check className="w-3 h-3 text-green-400" /> Copied!</>
+                : <><Copy className="w-3 h-3" /> Copy</>
+              }
+            </button>
 
-      {/* Action Buttons — last completed AI message only */}
-      {isLast && !isStreaming && !msg.isError && msg.content && (
-        <>
-          <ActionButtons onAction={onQuickAction} />
-          {(msg.content.includes("📖") || msg.content.includes("EXPLANATION") ||
-            msg.content.toLowerCase().includes("let me explain") ||
-            msg.content.length > 300) && (
-            <StyleChoiceCard onChoice={onStyleChoice} />
-          )}
-        </>
+            {/* Divider */}
+            {isLast && <span className="w-px h-4 bg-white/10 mx-0.5" />}
+
+            {/* Action buttons — only on last message */}
+            {isLast && <ActionButtons onAction={onQuickAction} />}
+          </div>
+        </div>
       )}
     </div>
   );
