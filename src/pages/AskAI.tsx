@@ -3493,6 +3493,41 @@ function UserBubble({
   );
 }
 
+// ─── Smart concept detector ───────────────────────────────────
+// Returns true only when AI response is likely a concept/theory explanation
+// where "Beginner friendly / Real-world / Future impact" makes sense.
+function isConceptQuestion(content: string): boolean {
+  const c = content.toLowerCase();
+
+  // EXCLUDE: coding responses (has code blocks or coding keywords)
+  if (c.includes("```") || c.includes("def ") || c.includes("function ") ||
+      c.includes("return ") || c.includes("class ") || c.includes("import ") ||
+      c.includes("console.log") || c.includes("print(") || c.includes("var ") ||
+      c.includes("const ") || c.includes("let ")) return false;
+
+  // EXCLUDE: math/calculation responses
+  if (c.includes("= ") && (c.includes("dx") || c.includes("∫") || c.includes("√") ||
+      c.includes("²") || c.includes("equation") || c.includes("solve") ||
+      c.includes("calculate") || c.includes("formula"))) return false;
+
+  // EXCLUDE: short factual answers (less than 200 chars — one-liner facts)
+  if (content.trim().length < 200) return false;
+
+  // EXCLUDE: quiz / test responses
+  if (c.includes("your answer") || c.includes("correct!") || c.includes("wrong") ||
+      c.includes("nice! 🔥") || c.includes("almost!")) return false;
+
+  // INCLUDE: concept/theory signals
+  const conceptSignals = [
+    "is a ", "is an ", "refers to", "means ", "defined as",
+    "works by", "process of", "concept of", "theory",
+    "explain", "understand", "basically", "essentially",
+    "in simple terms", "think of it", "imagine",
+    "for example", "such as", "including",
+  ];
+  return conceptSignals.some(s => c.includes(s));
+}
+
 // ─── AI Bubble ────────────────────────────────────────────────
 function AIBubble({
   msg,
@@ -3612,6 +3647,11 @@ function AIBubble({
             {isLast && <ActionButtons onAction={onQuickAction} />}
           </div>
         </div>
+      )}
+
+      {/* StyleChoiceCard — only for concept/theory questions, not coding/math/factual */}
+      {isLast && !isStreaming && !msg.isError && msg.content && isConceptQuestion(msg.content) && (
+        <StyleChoiceCard onChoice={onStyleChoice} />
       )}
     </div>
   );
