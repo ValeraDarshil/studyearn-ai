@@ -1819,7 +1819,7 @@ router.post('/verify-otp', async (req, res) => {
     const resetToken = jwt.sign(
       { userId: user._id.toString(), purpose: 'reset_password' },
       process.env.JWT_SECRET!,
-      { expiresIn: '5m' }
+      { expiresIn: '5m' , algorithm: 'HS512' as const }
     );
 
     res.json({ success: true, resetToken, message: 'OTP verified. You can now set a new password.' });
