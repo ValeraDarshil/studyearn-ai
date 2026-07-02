@@ -1547,6 +1547,8 @@ router.post('/signup', authLimiter, validateSignup, async (req, res) => {
         totalXP:       (user as any).totalXP || user.points,
         questionsLeft: user.questionsLeft,
         streak:        user.streak,
+        onboardingCompleted:  false,  // ← ADD (naya user, always false)
+        brainSetupCompleted:  false,  // ← ADD (naya user, always false)
       },
       referralBonus: !isDefaultReferral && !!referrerUser,
     });
@@ -1641,6 +1643,8 @@ router.post('/login', authLimiter, validateLogin, async (req, res) => {
         streak,
         isPremium:        (user as any).isPremium || false,
         premiumExpiresAt: (user as any).premiumExpiresAt || null,
+        onboardingCompleted:  (user as any).onboardingCompleted  || false,  // ← ADD
+        brainSetupCompleted:  (user as any).brainSetupCompleted  || false,  // ← ADD
       },
       streakInfo: {
         streakIncreased,
@@ -1982,6 +1986,8 @@ router.post('/google', authLimiter, async (req, res) => {
         premiumExpiresAt: user.premiumExpiresAt || null,
         avatar:           user.avatar || null,
         googleId:         user.googleId || null,
+        onboardingCompleted:  user.onboardingCompleted  || false,  // ← ADD
+        brainSetupCompleted:  user.brainSetupCompleted  || false,  // ← ADD
       },
     });
 

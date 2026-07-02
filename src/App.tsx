@@ -2375,6 +2375,7 @@ function AppContent() {
           <OnboardingTour
             onComplete={() => {
               setShowOnboarding(false);
+              setTimeout(() => setShowLearnerOnboarding(true), 500); // ← YEH ADD KARO
               setTimeout(
                 () =>
                   setShowStreakCelebration((prev) =>
