@@ -1963,7 +1963,8 @@ function AppContent() {
       !toastAchievement &&
       toastQueue.length > 0 &&
       !loading &&
-      !showOnboarding
+      !showOnboarding &&
+      !showLearnerOnboarding   // ← ADD: achievement block while brain setup open
     ) {
       const timer = setTimeout(() => {
         setToastAchievement(toastQueue[0]);
