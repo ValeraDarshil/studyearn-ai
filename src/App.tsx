@@ -1909,6 +1909,7 @@ function AppContent() {
 
   // ── AI Study OS — Learner Onboarding ─────────────────────
   const [showLearnerOnboarding, setShowLearnerOnboarding] = useState(false);
+  const [brainSetupPending, setBrainSetupPending] = useState(false);
 
   // ── Onboarding Tour ───────────────────────────────────────
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -1964,7 +1965,8 @@ function AppContent() {
       toastQueue.length > 0 &&
       !loading &&
       !showOnboarding &&
-      !showLearnerOnboarding   // ← ADD: achievement block while brain setup open
+      !brainSetupPending &&
+      !showLearnerOnboarding // ← ADD: achievement block while brain setup open
     ) {
       const timer = setTimeout(() => {
         setToastAchievement(toastQueue[0]);
@@ -2376,7 +2378,11 @@ function AppContent() {
           <OnboardingTour
             onComplete={() => {
               setShowOnboarding(false);
-              setTimeout(() => setShowLearnerOnboarding(true), 500); // ← YEH ADD KARO
+              setBrainSetupPending(true); // ← ADD: achievement block karo turant
+              setTimeout(() => {
+                setShowLearnerOnboarding(true);
+                setBrainSetupPending(false); // ← ADD: brain setup appear hone ke baad flag clear
+              }, 500);
               setTimeout(
                 () =>
                   setShowStreakCelebration((prev) =>
