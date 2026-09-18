@@ -1748,47 +1748,52 @@ const NVIDIA_BASE     = 'https://integrate.api.nvidia.com/v1';
 // ─────────────────────────────────────────────────────────────
 
 // NVIDIA text models — subject-aware routing
+// NOTE (Sep 2026): deepseek-ai/deepseek-r1 is officially DEPRECATED on
+// build.nvidia.com — removed from the `math` slot. Verify any NVIDIA
+// model id periodically at https://build.nvidia.com/models — this
+// catalog rotates models out with little notice.
 const NVIDIA_MODELS = {
-  ultra:   'meta/llama-3.1-405b-instruct',      // best quality
-  math:    'deepseek-ai/deepseek-r1',            // math/reasoning
-  coding:  'nvidia/llama-3.3-nemotron-super-49b-v1', // coding
-  fast:    'meta/llama-3.3-70b-instruct',        // fast fallback
-  stem:    'microsoft/phi-4',                    // science/STEM
+  ultra:   'meta/llama-3.1-405b-instruct',           // best quality (verify still active)
+  math:    'nvidia/llama-3.1-nemotron-70b-instruct',  // math/reasoning (deepseek-r1 replacement)
+  coding:  'nvidia/llama-3.3-nemotron-super-49b-v1',  // coding
+  fast:    'meta/llama-3.3-70b-instruct',             // fast fallback
+  stem:    'microsoft/phi-4',                          // science/STEM
 };
 
 // NVIDIA vision models (for images + scanned PDFs) — free tier
 const NVIDIA_VISION_MODELS = [
-  'meta/llama-3.2-11b-vision-instruct',          // best free vision
-  'microsoft/phi-3.5-vision-instruct',           // backup vision
+  'nvidia/nemotron-nano-12b-v2-vl',              // multimodal reasoning + image understanding
+  'meta/llama-3.2-11b-vision-instruct',          // backup vision
 ];
 
 // Groq text models
+// NOTE (Sep 2026): llama-3.3-70b-versatile and llama-3.1-70b-versatile
+// are Groq PRODUCTION/Enterprise-tier only now (ContactSales pricing) —
+// not usable on free/dev keys. mixtral-8x7b-32768 and gemma2-9b-it are
+// deprecated. openai/gpt-oss-* are Groq's current free/dev-tier models.
 const GROQ_MODELS = [
-  'llama-3.3-70b-versatile',
-  'llama-3.1-70b-versatile',
-  'mixtral-8x7b-32768',
-  'gemma2-9b-it',
+  'openai/gpt-oss-120b',
+  'openai/gpt-oss-20b',
 ];
 
 // Groq vision model
-const GROQ_VISION_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct';
+// NOTE (Sep 2026): meta-llama/llama-4-scout-17b-16e-instruct was
+// deprecated by Groq — no direct vision replacement in their current
+// production lineup, so Groq is skipped for vision and OpenRouter/
+// NVIDIA vision models below carry that load instead.
+const GROQ_VISION_MODEL = '';
 
-// OpenRouter text models (free)
+// OpenRouter text models (free) — verified against openrouter.ai/collections/free-models, Sep 2026
 const OR_MODELS = [
-  'meta-llama/llama-3.3-70b-instruct:free',
-  'deepseek/deepseek-r1-0528:free',
-  'qwen/qwen3-235b-a22b:free',
-  'google/gemma-3-27b-it:free',
-  'mistralai/mistral-small-3.1-24b-instruct:free',
+  'deepseek/deepseek-v4-flash-0731:free',   // DeepSeek — best free general/coding/reasoning pick
+  'nvidia/nemotron-3-super-120b-a12b:free', // strong reasoning, 1M context
+  'nex-agi/nex-n2.5-mini:free',             // lighter fallback
 ];
 
-// OpenRouter vision models (free)
+// OpenRouter vision models (free) — old Qwen2.5-VL free tiers were pulled; replaced Sep 2026
 const OR_VISION_MODELS = [
-  'qwen/qwen2.5-vl-72b-instruct:free',
-  'qwen/qwen2.5-vl-7b-instruct:free',
-  'meta-llama/llama-3.2-11b-vision-instruct:free',
-  'microsoft/phi-4-multimodal-instruct:free',
-  'google/gemini-2.0-flash-exp:free',
+  'inclusionai/ling-3.0-flash-vl:free',   // native vision + agentic, 262K context
+  'thinkingmachines/inkling-small:free',  // multimodal (image+audio) backup
 ];
 
 // ─────────────────────────────────────────────────────────────
@@ -2018,12 +2023,19 @@ async function groqStream(msgs: ChatMessage[], sys: string, res: ExpressResponse
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${GROQ_KEY}` },
         body: JSON.stringify({ model, temperature: 0.4, max_tokens: 4096, stream: true, messages: [{ role: 'system', content: sys }, ...msgs] }),
       });
-      if (!response.ok) continue;
+      if (!response.ok) {
+        // FIX: was silently `continue`-ing — status/body were never logged,
+        // making 401/429/404 indistinguishable in production logs.
+        const body = await response.text().catch(() => '');
+        logger.warn(`[Groq stream] ${model} HTTP ${response.status}: ${body.slice(0, 300)}`);
+        continue;
+      }
       logger.info(`[Groq stream] ✅ ${model}`);
       await pipeStream(response, res);
       return;
     } catch (e: any) {
-      logger.debug(`[Groq stream] ${model}: ${e.message}`);
+      // FIX: was logger.debug — invisible in prod (level=info). Bumped to warn.
+      logger.warn(`[Groq stream] ${model} threw: ${e.message}`);
     }
   }
   throw new Error('Groq stream: all failed');
@@ -2043,12 +2055,19 @@ async function openRouterStream(msgs: ChatMessage[], sys: string, res: ExpressRe
         },
         body: JSON.stringify({ model, temperature: 0.4, max_tokens: 4096, stream: true, messages: [{ role: 'system', content: sys }, ...msgs] }),
       });
-      if (!response.ok) continue;
+      if (!response.ok) {
+        // FIX: was silently `continue`-ing — status/body were never logged,
+        // making 401/429/404 indistinguishable in production logs.
+        const body = await response.text().catch(() => '');
+        logger.warn(`[OR stream] ${model} HTTP ${response.status}: ${body.slice(0, 300)}`);
+        continue;
+      }
       logger.info(`[OR stream] ✅ ${model}`);
       await pipeStream(response, res);
       return;
     } catch (e: any) {
-      logger.debug(`[OR stream] ${model}: ${e.message}`);
+      // FIX: was logger.debug — invisible in prod (level=info). Bumped to warn.
+      logger.warn(`[OR stream] ${model} threw: ${e.message}`);
     }
   }
   throw new Error('OpenRouter stream: all failed');
@@ -2103,6 +2122,10 @@ async function nvidiaVision(imageUrl: string, userPrompt: string): Promise<strin
 // ─────────────────────────────────────────────────────────────
 async function groqVision(imageUrl: string, userPrompt: string): Promise<string> {
   if (!GROQ_KEY) throw new Error('No Groq key');
+  // Groq currently has no free/dev-tier vision model (llama-4-scout was
+  // deprecated, see GROQ_VISION_MODEL comment above) — skip immediately
+  // instead of firing a request with an empty model id.
+  if (!GROQ_VISION_MODEL) throw new Error('No Groq vision model configured');
 
   const prompt = userPrompt?.trim()
     ? `Student's question: "${userPrompt}". Analyze the image and answer completely step-by-step.`
