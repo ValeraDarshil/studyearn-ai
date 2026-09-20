@@ -94,8 +94,21 @@ function detectPreferredHour(activities: any[]): ActiveHourPattern {
   return { preferredHour, preferredPeriod, confidence };
 }
 
-function calcAccuracy(quizHistory: any[], from: number, to: number): number {
-  const slice = quizHistory.slice(from, to);
+// BUG FIX: quizHistory is appended chronologically (oldest → newest, via
+// $push in brainController.ts's submitQuizResult), so the most recent
+// quizzes are at the END of the array, not the front. This used to slice
+// from the front — `slice(0, 5)` grabbed the OLDEST 5 entries and called
+// them "recent", inverting accuracyTrend/performanceDrop/highImprovement
+// for any student with more than 10 quiz attempts. Now slices from the
+// end: the last N entries are "recent", the N before those are "previous".
+function calcAccuracy(quizHistory: any[], recentCount: number, previousCount: number): number {
+  // recentCount/previousCount are treated as a window size, not raw
+  // indices — e.g. calcAccuracy(history, 0, 5) means "the most recent 5",
+  // calcAccuracy(history, 5, 10) means "the 5 before those".
+  const total = quizHistory.length;
+  const sliceStart = Math.max(0, total - previousCount);
+  const sliceEnd   = Math.max(0, total - recentCount);
+  const slice = quizHistory.slice(sliceStart, sliceEnd);
   if (!slice.length) return 0;
   return slice.reduce((sum: number, q: any) => sum + (q.score / 100), 0) / slice.length;
 }

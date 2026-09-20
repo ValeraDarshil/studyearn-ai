@@ -332,6 +332,27 @@ export async function submitQuizResult(req: Request, res: Response): Promise<voi
       source: 'quiz',
     });
 
+    // BUG FIX: this endpoint updated topicMastery (weak/strong topics,
+    // AI Brain's topic analysis) but never wrote to quizHistory — a
+    // completely separate array that behaviorAnalyzer.ts reads to compute
+    // recentAccuracy/previousAccuracy for the AI Mentor. Without this,
+    // quizHistory stayed empty forever, so two entire mentor triggers
+    // (LOW_PERFORMANCE, HIGH_PROGRESS) could never fire, and every
+    // "quiz accuracy" stat elsewhere in AI Brain silently read as 0.
+    // $slice caps it at the most recent 50 so the array doesn't grow
+    // unbounded — behaviorAnalyzer only ever needs the last 10.
+    await StudentProfile.updateOne(
+      { userId },
+      {
+        $push: {
+          quizHistory: {
+            $each:  [{ subject, topic, score, totalQuestions, correctAnswers, attemptedAt: new Date() }],
+            $slice: -50,
+          },
+        },
+      },
+    );
+
     await syncActivityToProfile(userId, 'quiz_completed', 20);
 
     const alert = await generateQuizAlert(userId, topic, subject, score);
