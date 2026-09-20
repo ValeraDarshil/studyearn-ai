@@ -259,6 +259,30 @@ async function checkAndDeductQuota(
 }
 
 /**
+ * refundQuotaOnFailure — undoes the deduction made by checkAndDeductQuota()
+ * when the AI ultimately fails to produce an answer (thrown error, or a
+ * stream that completes with zero content). Without this, a student loses
+ * one of their limited daily questions for an attempt that produced nothing.
+ */
+async function refundQuotaOnFailure(userId: string): Promise<{ questionsLeft: number } | null> {
+  try {
+    const updated = await User.findByIdAndUpdate(
+      userId,
+      {
+        $inc:  { questionsLeft: 1 },
+        $pop:  { questionUsedAt: 1 }, // removes the timestamp just pushed by checkAndDeductQuota
+      },
+      { new: true },
+    ).lean();
+    if (!updated) return null;
+    return { questionsLeft: (updated as any).questionsLeft ?? 0 };
+  } catch (err: any) {
+    logger.error('refundQuotaOnFailure error: ' + err.message);
+    return null;
+  }
+}
+
+/**
  * handleQuestionUsed — called AFTER AI response to log points + activity.
  * Quota is already deducted by checkAndDeductQuota() before the AI call.
  */
@@ -585,6 +609,29 @@ export async function askAI(req: Request, res: Response) {
     }
 
     const responseMs = Date.now() - startMs;
+
+    // BUG FIX: same issue as the streaming endpoint — checkAndDeductQuota()
+    // already deducted a question upfront. solveWithVision()'s last-resort
+    // fallback never throws, it returns a canned "❌ Unable to process..."
+    // string, so without this check a totally failed image read still
+    // consumed a quota question AND awarded points. Refund + return
+    // success:false instead of falling through to handleQuestionUsed().
+    const trimmedAnswer = (answer || '').trim();
+    const answerFailed =
+      !trimmedAnswer || trimmedAnswer.startsWith('❌ Unable to process this image');
+    if (answerFailed) {
+      let refreshedLeft: number | undefined;
+      if (userId) {
+        const refund = await refundQuotaOnFailure(userId);
+        refreshedLeft = refund?.questionsLeft;
+      }
+      return res.json({
+        success:       false,
+        answer:        trimmedAnswer || 'No answer was generated. Your question has been refunded — please try again.',
+        questionsLeft: refreshedLeft,
+      });
+    }
+
     const userAction = await handleQuestionUsed(req, String(prompt || '').substring(0, 100));
     const pts        = userAction?.pointsAwarded ?? (quotaResult.isPremium ? 20 : 10);
 
@@ -620,7 +667,20 @@ export async function askAI(req: Request, res: Response) {
 
   } catch (err: any) {
     logger.error('/api/ai/ask error: ' + err.message);
-    return res.status(500).json({ success: false, answer: 'Failed to process your question. Please try again.' });
+    // BUG FIX: refund the quota question deducted upfront, same reasoning
+    // as the answerFailed check above — a thrown error here also means no
+    // answer was ever produced for this attempt.
+    let refreshedLeft: number | undefined;
+    const userId = getUserIdFromToken(req);
+    if (userId) {
+      const refund = await refundQuotaOnFailure(userId);
+      refreshedLeft = refund?.questionsLeft;
+    }
+    return res.status(500).json({
+      success:       false,
+      answer:        'Failed to process your question. Your question has been refunded — please try again.',
+      questionsLeft: refreshedLeft,
+    });
   }
 }
 
@@ -820,6 +880,27 @@ export async function askAIStream(req: Request, res: Response): Promise<void> {
 
     const responseMs = Date.now() - startMs;
 
+    // BUG FIX: a stream can finish without throwing yet still produce zero
+    // tokens (e.g. every provider returned an empty/malformed body). This
+    // previously fell through to handleQuestionUsed() below regardless,
+    // so the student's quota stayed deducted and the frontend's optimistic
+    // points badge showed anyway, even for "No answer received." Treat it
+    // as a failed attempt: refund the question, tell the frontend, stop.
+    if (!fullResponse) {
+      let refreshedLeft: number | undefined;
+      if (userId) {
+        const refund = await refundQuotaOnFailure(userId);
+        refreshedLeft = refund?.questionsLeft;
+      }
+      if (!res.writableEnded) {
+        res.write('data: ' + JSON.stringify({
+          error: 'No answer was generated. Your question has been refunded — please try again.',
+          ...(refreshedLeft !== undefined ? { questionsLeft: refreshedLeft } : {}),
+        }) + '\n\n');
+      }
+      return;
+    }
+
     if (fullResponse && userId) {
       const validation = validateAndLog(fullResponse, pkg.plan.intent, prompt, userId);
       if (validation.pedagogyScore !== undefined) {
@@ -849,8 +930,23 @@ export async function askAIStream(req: Request, res: Response): Promise<void> {
       ).catch(() => {});
     }
 
-    if (userId) {
-      handleQuestionUsed(req, String(prompt).substring(0, 100)).catch(() => {});
+    if (userId && fullResponse) {
+      // BUG FIX: this used to be a fire-and-forget `.catch(() => {})` call —
+      // its return value (the REAL pointsAwarded/questionsLeft) was thrown
+      // away, and the frontend showed an optimistic guess instead. Now we
+      // await it and push the real numbers back over SSE before the stream
+      // closes, so the points badge reflects what was actually saved.
+      try {
+        const userAction = await handleQuestionUsed(req, String(prompt).substring(0, 100));
+        if (userAction && !res.writableEnded) {
+          res.write('data: ' + JSON.stringify({
+            pointsAwarded: userAction.pointsAwarded,
+            questionsLeft: userAction.questionsLeft,
+          }) + '\n\n');
+        }
+      } catch (e: any) {
+        logger.warn('handleQuestionUsed (stream) failed: ' + e.message);
+      }
     }
 
     // Store this turn for next turn's feedback scoring
@@ -917,9 +1013,20 @@ export async function askAIStream(req: Request, res: Response): Promise<void> {
     }
 
   } catch (err: any) {
+    logger.error('AskAI v18 stream error: ' + err.message);
+    // BUG FIX: same reasoning as the empty-fullResponse check above — a
+    // thrown error here means no answer was ever produced, so the quota
+    // question deducted upfront by checkAndDeductQuota() must be refunded.
+    let refreshedLeft: number | undefined;
+    if (userId) {
+      const refund = await refundQuotaOnFailure(userId);
+      refreshedLeft = refund?.questionsLeft;
+    }
     if (!res.writableEnded) {
-      logger.error('AskAI v18 stream error: ' + err.message);
-      res.write('data: ' + JSON.stringify({ error: 'Stream failed. Please try again.' }) + '\n\n');
+      res.write('data: ' + JSON.stringify({
+        error: 'Stream failed. Your question has been refunded — please try again.',
+        ...(refreshedLeft !== undefined ? { questionsLeft: refreshedLeft } : {}),
+      }) + '\n\n');
     }
   } finally {
     if (!res.writableEnded) res.end();
@@ -1214,7 +1321,20 @@ export async function solvePDF(req: Request, res: Response) {
 
   } catch (err: any) {
     logger.error('/api/ai/solve-pdf error: ' + err.message);
-    return res.status(500).json({ success: false, answer: 'Failed to process PDF. Please try again.' });
+    // BUG FIX: same reasoning as askAI/askAIStream — checkAndDeductQuota()
+    // already deducted a question upfront; a thrown error here means the
+    // PDF was never actually solved, so refund it.
+    let refreshedLeft: number | undefined;
+    const userId = getUserIdFromToken(req);
+    if (userId) {
+      const refund = await refundQuotaOnFailure(userId);
+      refreshedLeft = refund?.questionsLeft;
+    }
+    return res.status(500).json({
+      success:       false,
+      answer:        'Failed to process PDF. Your question has been refunded — please try again.',
+      questionsLeft: refreshedLeft,
+    });
   }
 }
 
