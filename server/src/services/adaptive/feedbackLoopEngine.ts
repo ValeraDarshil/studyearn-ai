@@ -104,17 +104,32 @@ export const feedbackLoopEngine = {
     const outcomeType    = detectOutcome(inferredState, retryCount);
     const strategySuccess = isStrategySuccess(outcomeType);
 
+    // BUG FIX: 'engaged' is detectOutcome()'s fallback for turns with no
+    // clear signal of mastery, confusion, or frustration — the student
+    // just continued naturally. isStrategySuccess() still classifies it
+    // as "success-ish" for logging, but it must NOT be written into the
+    // strategy-score or topic-mastery counters as a real success: doing
+    // so previously inflated every strategy's success rate with neutral
+    // noise, diluting the exact signal strategyScoringEngine depends on
+    // to pick the best strategy per student. Neutral turns now skip both
+    // writes below instead of moving either metric.
+    const isNeutralOutcome = outcomeType === 'engaged';
+
     logger.info(
-      { userId, strategy, outcomeType, strategySuccess },
+      { userId, strategy, outcomeType, strategySuccess, isNeutralOutcome },
       '[FeedbackLoop] Outcome detected'
     );
 
-    // Step 2: Update strategy score
-    try {
-      await strategyScoringEngine.recordOutcome(userId, strategy, strategySuccess);
-      actions.push(`strategy_score_updated(${strategy}:${strategySuccess ? 'success' : 'fail'})`);
-    } catch (err: any) {
-      logger.warn({ err: err.message }, '[FeedbackLoop] Strategy score update failed');
+    // Step 2: Update strategy score (skip neutral outcomes — see note above)
+    if (!isNeutralOutcome) {
+      try {
+        await strategyScoringEngine.recordOutcome(userId, strategy, strategySuccess);
+        actions.push(`strategy_score_updated(${strategy}:${strategySuccess ? 'success' : 'fail'})`);
+      } catch (err: any) {
+        logger.warn({ err: err.message }, '[FeedbackLoop] Strategy score update failed');
+      }
+    } else {
+      actions.push(`strategy_score_skipped(${strategy}:neutral)`);
     }
 
     // Step 3: Record mistake if wrong/confused on a topic
@@ -132,6 +147,10 @@ export const feedbackLoopEngine = {
     try {
       await learningOutcomeTracker.record({
         userId, sessionId, topic, subject, strategy, outcomeType, strategySuccess,
+        // BUG FIX: same neutral-outcome reasoning as Step 2 — a merely
+        // "engaged" turn is not evidence the student's topic mastery
+        // actually improved, so don't let it nudge masteryLevel up.
+        skipMasteryUpdate: isNeutralOutcome,
       });
       actions.push('outcome_tracked');
     } catch (err: any) {
@@ -139,7 +158,10 @@ export const feedbackLoopEngine = {
     }
 
     // Step 5: Milestone detection — every 5 correct turns
-    if (strategySuccess && turnCount > 0 && turnCount % 5 === 0) {
+    // BUG FIX: gated on !isNeutralOutcome too — a run of "engaged" turns
+    // with no real correctness signal shouldn't trigger a "answered N
+    // questions correctly" milestone.
+    if (strategySuccess && !isNeutralOutcome && turnCount > 0 && turnCount % 5 === 0) {
       try {
         await longTermMemoryEngine.recordMilestone(
           userId, 'streak',
@@ -167,6 +189,10 @@ export interface OutcomeRecord {
   strategy:        TeachingStrategy;
   outcomeType:     OutcomeType;
   strategySuccess: boolean;
+  // BUG FIX: when true (neutral 'engaged' outcomes), skip the
+  // updateTopicMastery() call below entirely — see feedbackLoopEngine
+  // Step 4 for the full reasoning.
+  skipMasteryUpdate?: boolean;
 }
 
 export const learningOutcomeTracker = {
@@ -184,7 +210,7 @@ export const learningOutcomeTracker = {
       }
 
       // Update StudentProfile topic mastery (writes isWeak/isStrong + overallMastery)
-      if (rec.topic) {
+      if (rec.topic && !rec.skipMasteryUpdate) {
         await updateTopicMastery(userId, rec.topic, rec.subject, rec.strategySuccess);
       }
     } catch (err: any) {
@@ -234,6 +260,11 @@ function detectOutcome(state: InferredUserState, retryCount: number): OutcomeTyp
   return 'engaged';
 }
 
+// NOTE: this still classifies 'engaged' as truthy (used for logging and
+// as FeedbackResult.strategySuccess) but processOutcome() above no longer
+// writes 'engaged' outcomes into strategy-score or topic-mastery counters
+// — see the isNeutralOutcome gating there. Don't rely on this function's
+// return value alone to decide whether an outcome should move a metric.
 function isStrategySuccess(outcome: OutcomeType): boolean {
   return outcome === 'correct' || outcome === 'clarity' || outcome === 'engaged';
 }
@@ -335,6 +366,22 @@ async function updateTopicMastery(
       const isWeak          = startingMastery < WEAK_THRESHOLD;
       const isStrong        = startingMastery >= STRONG_THRESHOLD;
 
+      // BUG FIX: topicMasterySchema requires `category` (LearnerCategory:
+      // 'school' | 'coding' | 'college' | 'self') — the $push below used to
+      // omit it entirely. Mongoose subdoc pushes don't run full-document
+      // validators by default, so this silently inserted an invalid entry
+      // (no category) instead of throwing, corrupting downstream queries
+      // that filter/group topicMastery by category. Also missing from the
+      // $setOnInsert branch, where StudentProfile.learnerCategory is
+      // itself `required: true` with no schema default — if this upsert
+      // were ever the very first write for a user (profile doesn't exist
+      // yet), it would have failed validation outright.
+      const profileCat = await StudentProfile.findOne(
+        { userId },
+        { learnerCategory: 1 },
+      ).lean();
+      const learnerCategory = (profileCat as any)?.learnerCategory ?? 'self';
+
       const result = await StudentProfile.findOneAndUpdate(
         {
           userId,
@@ -345,17 +392,19 @@ async function updateTopicMastery(
             topicMastery: {
               topic,
               subject,
+              category:        learnerCategory,
               masteryLevel:    startingMastery,
               isWeak,
               isStrong,
               totalAttempts:   1,
               correctAttempts: success ? 1 : 0,
               lastAttemptedAt: now,
-              createdAt:       now,
+              trend:           'stable',
             },
           },
           $setOnInsert: {
             userId,
+            learnerCategory,
             aiStrategyStats:     {},
             overallMasteryScore: 50,
             createdAt:           now,
