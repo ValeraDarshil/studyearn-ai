@@ -133,8 +133,22 @@ export async function analyzeBehavior(userId: string): Promise<BehaviorSnapshot>
   try {
     const [profile, recentActivities] = await Promise.all([
       StudentProfile.findOne({ userId }).lean(),
+      // BUG FIX: Activity.model.ts's schema field is `timestamp`, not
+      // `createdAt` — there's no `{ timestamps: true }` option either, so
+      // `createdAt` doesn't exist on any Activity document. Sorting by a
+      // non-existent field is effectively a no-op in MongoDB: documents
+      // came back in arbitrary order, not newest-first. That made
+      // recentActivities[0] a random pick from up to 50 stored
+      // activities, so hoursSinceLastLogin (and therefore
+      // daysSinceLastLogin / comebackCandidate) was essentially random
+      // each time the mentor ran — explaining wildly inconsistent
+      // "N days missed" values even for actively-studying users. Because
+      // comebackCandidate short-circuits every other trigger in
+      // mentorTriggerEngine.ts (COMEBACK is checked first and returns
+      // immediately), this one bug was silently locking the whole mentor
+      // onto COMEBACK messages and starving every other trigger type.
       Activity.find({ userId })
-        .sort({ createdAt: -1 })
+        .sort({ timestamp: -1 })
         .limit(50)
         .lean(),
     ]);
