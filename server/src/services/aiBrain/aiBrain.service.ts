@@ -120,7 +120,14 @@ export async function getAITutorContext(userId: string): Promise<{
       weakTopics:       compact.weakTopics,
       learnerType:      compact.learningType,
       tutorPersonality: compact.tutorPersonality,
-      preferredLang:    compact.learningType,
+      // BUG FIX: this was `compact.learningType` (a copy-paste error) —
+      // it silently fed 'school'/'coding'/'college'/'self' into a field
+      // downstream code checks with `=== 'hinglish'` to decide the
+      // student's response language (tutorContextManager.ts). Since that
+      // comparison could never be true, every student's Hinglish
+      // preference was being ignored and they always got English —
+      // this is the actual value now.
+      preferredLang:    compact.preferredLanguage,
       learningSpeed:    compact.learningSpeed,
       nextAction,
     };

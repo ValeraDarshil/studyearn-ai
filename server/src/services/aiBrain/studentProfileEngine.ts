@@ -154,6 +154,7 @@ export async function getCompactProfile(userId: string): Promise<{
   currentStreak: number;
   overallMastery: number;
   activityScore: number;
+  preferredLanguage: 'english' | 'hinglish';
 } | null> {
   const p = await buildStudentProfile(userId);
   if (!p) return null;
@@ -167,6 +168,7 @@ export async function getCompactProfile(userId: string): Promise<{
     currentStreak:    p.currentStreak,
     overallMastery:   p.overallMastery,
     activityScore:    p.activityScore,
+    preferredLanguage: p.preferredLanguage,
   };
 }
 

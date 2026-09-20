@@ -195,10 +195,24 @@ async function awardBonusXP(
 
   // Log the bonus XP in today's daily log
   const todayKey = new Date().toISOString().split('T')[0];
-  await StudentProfile.updateOne(
+  const result = await StudentProfile.updateOne(
     { userId, 'dailyLogs.date': todayKey },
     { $inc: { 'dailyLogs.$.xpEarned': bonusXP } },
   );
+
+  // BUG FIX: the positional $ update above only works if today's dailyLogs
+  // entry already exists. COMEBACK is fired precisely for users who
+  // haven't studied today (that's the whole trigger condition) — so for
+  // the trigger that most needs this bonus, matchedCount was almost
+  // always 0 and the XP silently vanished while this function still
+  // returned bonusXP as if it had been credited. Fall back to creating
+  // today's log entry when no match was found.
+  if (result.matchedCount === 0) {
+    await StudentProfile.updateOne(
+      { userId },
+      { $push: { dailyLogs: { date: todayKey, xpEarned: bonusXP } } },
+    );
+  }
 
   return bonusXP;
 }

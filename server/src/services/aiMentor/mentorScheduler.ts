@@ -160,14 +160,23 @@ export function start(): void {
     const hourUTC = nowUTC.getUTCHours();
     const minUTC  = nowUTC.getUTCMinutes();
 
+    // BUG FIX: `minUTC < 60` is always true (minutes only range 0–59), so
+    // this ran EVERY MINUTE for the entire target hour (60x) instead of
+    // once. The per-user anti-spam cooldown in aiMentorEngine (8h since
+    // last fire) stopped users from actually getting duplicate messages,
+    // but the scheduler still re-queried up to 1000 profiles and ran
+    // runAIMentor() for each, 60 times over, every single day — pure
+    // wasted load. Narrowed to a 5-minute window matching the stated
+    // target time (2:30 / 15:30 UTC, per the comments below), the same
+    // pattern already used correctly for the daily reset job.
     // 2:30 UTC = 8:00 AM IST → daily reminder
-    if (hourUTC === 2 && minUTC < 60) {
+    if (hourUTC === 2 && minUTC >= 30 && minUTC < 35) {
       try { await runDailyReminder(); }
       catch (err) { logger.error({ err }, '[MentorScheduler] Daily reminder error'); }
     }
 
     // 15:30 UTC = 9:00 PM IST → streak-at-risk
-    if (hourUTC === 15 && minUTC < 60) {
+    if (hourUTC === 15 && minUTC >= 30 && minUTC < 35) {
       try { await runStreakAtRiskCheck(); }
       catch (err) { logger.error({ err }, '[MentorScheduler] Streak check error'); }
     }

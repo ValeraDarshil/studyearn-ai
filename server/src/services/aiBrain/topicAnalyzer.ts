@@ -80,8 +80,17 @@ export async function analyzeTopics(userId: string): Promise<TopicAnalysis | nul
     // Track trend extremes
     let mostImproved: string | null  = null;
     let mostDeclined: string | null  = null;
-    let bestTrendDelta  = -Infinity;
-    let worstTrendDelta = Infinity;
+    // BUG FIX: the old heuristic collapsed every topic's trend into just
+    // 3 possible delta values (+1 / -1 / 0), so "most improved" was
+    // effectively just "the FIRST topic in array order with trend ===
+    // 'improving'" — not the topic that actually improved the most, since
+    // no later 'improving' topic could ever beat an already-set +1.
+    // topicMastery has no stored historical delta to compare against, so
+    // the best available real signal is current masteryLevel: among
+    // genuinely 'improving' topics, the one furthest along; among
+    // genuinely 'declining' topics, the one furthest behind.
+    let mostImprovedMastery = -Infinity;
+    let mostDeclinedMastery = Infinity;
 
     for (const t of mastery) {
       const analyzed = buildAnalyzedTopic(t, profile.learnerCategory);
@@ -102,10 +111,16 @@ export async function analyzeTopics(userId: string): Promise<TopicAnalysis | nul
       subjectMap[t.subject].total += t.masteryLevel;
       subjectMap[t.subject].count += 1;
 
-      // Track trends (heuristic: improving = +delta, declining = -delta)
-      const delta = t.trend === 'improving' ? 1 : t.trend === 'declining' ? -1 : 0;
-      if (delta > bestTrendDelta)  { bestTrendDelta = delta;  mostImproved = t.topic; }
-      if (delta < worstTrendDelta) { worstTrendDelta = delta; mostDeclined = t.topic; }
+      // Track trends (real signal: current masteryLevel among topics that
+      // genuinely have that trend — see note above)
+      if (t.trend === 'improving' && t.masteryLevel > mostImprovedMastery) {
+        mostImprovedMastery = t.masteryLevel;
+        mostImproved = t.topic;
+      }
+      if (t.trend === 'declining' && t.masteryLevel < mostDeclinedMastery) {
+        mostDeclinedMastery = t.masteryLevel;
+        mostDeclined = t.topic;
+      }
     }
 
     // Sort by priority (critical first, then by mastery ascending)
@@ -119,10 +134,6 @@ export async function analyzeTopics(userId: string): Promise<TopicAnalysis | nul
       .map(([s, v]) => ({ subject: s, avg: Math.round(v.total / v.count) }))
       .sort((a, b) => a.avg - b.avg);
     const weakestSubject = subjectAvgs[0]?.subject || null;
-
-    // Only mark mostDeclined if it actually declined
-    if (worstTrendDelta >= 0) mostDeclined = null;
-    if (bestTrendDelta  <= 0) mostImproved = null;
 
     return {
       critical,
