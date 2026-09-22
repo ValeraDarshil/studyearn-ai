@@ -42,6 +42,11 @@ export interface AppContextType {
   // 🏆 Pending unclaimed achievements — drives notification bell badge
   pendingAchievements: any[];
   setPendingAchievements: (achievements: any[]) => void;
+  // 🤖 AI Mentor → AskAI handoff — set when a mentor micro-task's "Start"
+  // button should open AskAI pre-filled with a real prompt for that task,
+  // instead of just showing a bare timer with nothing to actually do.
+  pendingAskPrompt: string | null;
+  setPendingAskPrompt: (prompt: string | null) => void;
 }
 
 export const AppContext = createContext<AppContextType>({
@@ -70,6 +75,8 @@ export const AppContext = createContext<AppContextType>({
   refreshQuota: async () => {},
   pendingAchievements: [],
   setPendingAchievements: () => {},
+  pendingAskPrompt: null,
+  setPendingAskPrompt: () => {},
 });
 
 export const useApp = () => useContext(AppContext);

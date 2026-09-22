@@ -16,6 +16,8 @@
  *   teachingLoopEngine.ts       → GAP 6: iterative teach→check→retry loop
  *   aiBrainCore.ts              → GAP 7: central orchestrator brain
  *   metricsEngine.ts            → GAP 8: learning metrics + optimization
+ *   llmStateInferenceEngine.ts  → BRAIN UPGRADE 1a: LLM-based emotion read (augments GAP 3)
+ *   banditStrategyEngine.ts     → BRAIN UPGRADE 1b: Thompson Sampling selection (wraps GAP 1)
  */
 
 export { strategyScoringEngine }                          from './strategyScoringEngine.js';
@@ -29,6 +31,12 @@ export type { RetrievalResult, RetrievedMemoryItem }      from './memoryRetrieva
 
 export { userStateInferenceEngine }                       from './userStateInferenceEngine.js';
 export type { InferredUserState, InferredEmotion, CognitiveLoad } from './userStateInferenceEngine.js';
+
+export { llmStateInferenceEngine }                        from './llmStateInferenceEngine.js';
+export type { LLMInferredState, LLMEmotion }               from './llmStateInferenceEngine.js';
+
+export { banditStrategyEngine }                           from './banditStrategyEngine.js';
+export type { BanditPick }                                 from './banditStrategyEngine.js';
 
 export { feedbackLoopEngine, learningOutcomeTracker }     from './feedbackLoopEngine.js';
 export type { FeedbackInput, FeedbackResult, OutcomeType } from './feedbackLoopEngine.js';

@@ -25,6 +25,7 @@
  */
 
 import { logger } from '../../utils/logger.js';
+import type { LLMInferredState } from './llmStateInferenceEngine.js';
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -224,6 +225,64 @@ export const userStateInferenceEngine = {
       inferred.cognitiveLoad = frontendCognitiveLoad as CognitiveLoad;
     }
     return inferred;
+  },
+
+  /**
+   * mergeWithLLMSignal — BRAIN UPGRADE (Phase 1a).
+   * Blends a real language-model read of the student's state on top of
+   * the regex-based inference. `llmState` is `null` whenever the LLM
+   * call failed, timed out, or returned malformed data — in that case
+   * this function is a no-op and the regex-only state passes through
+   * completely unchanged. The pipeline is never dependent on the LLM
+   * succeeding.
+   *
+   * Blending rule: confusion/frustration take the MAX of regex vs LLM —
+   * either signal firing is enough to act on (regex won't have false
+   * negatives suppressed by a weaker LLM read, and vice versa). Mastery
+   * and emotion trust the LLM when it's confident, since those need
+   * real language understanding that regex fundamentally can't do.
+   */
+  mergeWithLLMSignal(
+    inferred:  InferredUserState,
+    llmState:  LLMInferredState | null,
+  ): InferredUserState {
+    if (!llmState) return inferred; // no signal available — regex-only, unchanged
+
+    const merged: InferredUserState = {
+      ...inferred,
+      confusionScore:   Math.max(inferred.confusionScore, llmState.confusionScore),
+      frustrationScore: Math.max(inferred.frustrationScore, llmState.frustrationScore),
+      inferredFrom: [
+        ...inferred.inferredFrom,
+        `llm(emotion=${llmState.emotion},confidence=${llmState.confidence.toFixed(2)})`,
+      ],
+    };
+
+    // Trust the LLM's mastery read when it's reasonably confident —
+    // regex mastery patterns are a small fixed phrase list and miss a lot.
+    if (llmState.masterySignal && llmState.confidence >= 0.5) {
+      merged.masterySignal = true;
+      merged.confusionScore = Math.max(0, merged.confusionScore - 0.3);
+    }
+
+    // If the LLM is confident and disagrees with regex's neutral read,
+    // let it override the emotion label — regex only knows 'neutral'
+    // by ABSENCE of pattern matches, which is a weak signal by construction.
+    if (llmState.confidence >= 0.6 && (inferred.emotion === 'neutral' || llmState.confidence > 0.75)) {
+      merged.emotion = llmState.emotion;
+    }
+
+    merged.confusionScore   = Math.min(1, merged.confusionScore);
+    merged.frustrationScore = Math.min(1, merged.frustrationScore);
+    merged.needsReexplain    = merged.confusionScore > 0.5 || inferred.needsReexplain;
+    merged.needsEncouragement = merged.frustrationScore > 0.4 || inferred.needsEncouragement;
+
+    logger.debug(
+      { emotion: merged.emotion, confusion: merged.confusionScore.toFixed(2) },
+      '[UserStateInference] Merged with LLM signal',
+    );
+
+    return merged;
   },
 };
 

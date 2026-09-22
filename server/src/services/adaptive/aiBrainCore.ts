@@ -46,8 +46,10 @@
 import { longTermMemoryEngine }                               from './longTermMemoryEngine.js';
 import { memoryRetrievalEngine }                              from './memoryRetrievalEngine.js';
 import { userStateInferenceEngine, InferredUserState }        from './userStateInferenceEngine.js';
+import { llmStateInferenceEngine }                            from './llmStateInferenceEngine.js';
 import { teachingLoopEngine, TeachingPhase }                  from './teachingLoopEngine.js';
 import { strategyScoringEngine, TeachingStrategy }            from './strategyScoringEngine.js';
+import { banditStrategyEngine }                               from './banditStrategyEngine.js';
 import { modelPerformanceTracker, RoutingDecision }           from './modelPerformanceTracker.js';
 import { feedbackLoopEngine }                                 from './feedbackLoopEngine.js';
 import { logger }                                             from '../../utils/logger.js';
@@ -165,8 +167,13 @@ export const aiBrainCore = {
     const startMs = Date.now();
     logger.info({ userId, topic, turnCount, currentState }, '[BrainCore v2] Processing AskAI turn');
 
-    // ── STEP 2.1: Retrieve Memory (parallel — fast path) ──────
-    const [memoryResult, retrievalResult] = await Promise.allSettled([
+    // ── STEP 2.1: Retrieve Memory + LLM state read (parallel — fast path) ──
+    // BRAIN UPGRADE: llmStateInferenceEngine runs in the SAME batch as the
+    // memory calls, so a slow/failed LLM call adds zero serial latency —
+    // worst case it just times out at 3.5s while memory calls (usually
+    // faster) have already resolved, and mergeWithLLMSignal() treats a
+    // null result as "no signal", falling back to regex-only cleanly.
+    const [memoryResult, retrievalResult, llmStateResult] = await Promise.allSettled([
       longTermMemoryEngine.getMemory(userId),
       memoryRetrievalEngine.retrieve({
         userId,
@@ -174,10 +181,12 @@ export const aiBrainCore = {
         currentState,
         topK:         5,            // only relevant context — no dumping
       }),
+      llmStateInferenceEngine.infer(userMessage, prevAiResponse ?? undefined),
     ]);
 
     const memory    = memoryResult.status    === 'fulfilled' ? memoryResult.value    : null;
     const retrieval = retrievalResult.status === 'fulfilled' ? retrievalResult.value : null;
+    const llmState  = llmStateResult.status  === 'fulfilled' ? llmStateResult.value  : null;
 
     // ── STEP 2.2: Analyze User State ──────────────────────────
     let inferredState = userStateInferenceEngine.infer({
@@ -195,6 +204,10 @@ export const aiBrainCore = {
       frontendComprehension,
       frontendCognitiveLoad,
     );
+
+    // BRAIN UPGRADE: layer the LLM's language-understanding read on top.
+    // No-op if llmState is null (LLM call failed/timed out/no key set).
+    inferredState = userStateInferenceEngine.mergeWithLLMSignal(inferredState, llmState);
 
     // ── STEP 2.3: Get Teaching Phase ──────────────────────────
     // FIX 4B: Always use getStateAsync — it hits RAM cache first, DB only on
@@ -223,10 +236,19 @@ export const aiBrainCore = {
       });
     }
 
-    // ── STEP 2.5: Strategy Scoring — CRITICAL (data-driven) ───
-    // No hardcoded: if confused → simplify
-    // Instead: score all strategies, pick highest-scoring
-    const topStrategy = await strategyScoringEngine.getBestStrategy({
+    // ── STEP 2.5: Strategy Selection — BRAIN UPGRADE (Thompson Sampling) ──
+    // Previously this made TWO separate strategy-scoring calls
+    // (getBestStrategy + getTopStrategies), each independently hitting
+    // MongoDB for the same per-user stats — a duplicate DB read on every
+    // single turn. banditStrategyEngine.pick() does ONE contextual scoring
+    // pass and reuses it for both the pick and the transparency list.
+    //
+    // The pick itself is no longer a deterministic argmax: it's a
+    // Thompson Sample from each candidate strategy's Beta distribution
+    // (contextual score = informative prior, real per-user outcomes =
+    // evidence layered on top). See banditStrategyEngine.ts for the full
+    // rationale. Falls back to a safe default ('TEACH') if anything fails.
+    const banditPick = await banditStrategyEngine.pick({
       userId,
       currentState,
       masteryLevel,
@@ -235,6 +257,8 @@ export const aiBrainCore = {
       sessionStreak:     Math.max(0, turnCount - retryCount),
       lastStrategy:      prevStrategy ?? null,
     });
+
+    const topStrategy = banditPick.strategy;
 
     // Apply optimizationEngine boosts from cache (no DB hit if cache warm)
     let finalStrategy: TeachingStrategy = topStrategy;
@@ -249,22 +273,12 @@ export const aiBrainCore = {
       }
     } catch { /* non-fatal — keep topStrategy */ }
 
-    // Get top-5 strategy scores for logging + transparency
-    let strategyScores: Array<{ strategy: TeachingStrategy; score: number }> = [];
-    try {
-      const topStrategies = await strategyScoringEngine.getTopStrategies({
-        userId,
-        currentState,
-        masteryLevel,
-        confusionSignal:   inferredState.emotion === 'confused',
-        frustrationSignal: inferredState.emotion === 'frustrated',
-        sessionStreak:     Math.max(0, turnCount - retryCount),
-        lastStrategy:      prevStrategy ?? null,
-      }, 5);
-      strategyScores = topStrategies.map(s => ({ strategy: s.strategy, score: s.score }));
-    } catch {
-      strategyScores = [{ strategy: topStrategy, score: 1.0 }];
-    }
+    // Top-5 strategy scores for logging + transparency (reused from the
+    // single bandit scoring pass above — no extra DB call).
+    const strategyScores: Array<{ strategy: TeachingStrategy; score: number }> =
+      banditPick.allScores.length > 0
+        ? banditPick.allScores.slice(0, 5).map(s => ({ strategy: s.strategy, score: s.score }))
+        : [{ strategy: topStrategy, score: 1.0 }];
 
     // ── STEP 2.6: Build FinalDecision (all decisions here) ────
 
@@ -325,7 +339,9 @@ export const aiBrainCore = {
       difficultyLevel,
     });
 
-    const strategyReason = strategyScores[0]
+    const strategyReason = banditPick.wasExploration
+      ? `${topStrategy} chosen via exploration (contextual score ${banditPick.contextualScore.toFixed(2)}, sampled ${banditPick.sampledValue.toFixed(2)})`
+      : strategyScores[0]
       ? `${topStrategy} scored ${strategyScores[0].score.toFixed(2)} (data-driven)`
       : `${topStrategy} (default)`;
 
@@ -333,6 +349,7 @@ export const aiBrainCore = {
       {
         userId,
         strategy:   finalStrategy,
+        exploration: banditPick.wasExploration,
         model:      modelDecision.modelId,
         phase:      loopState.phase,
         emotion:    inferredState.emotion,

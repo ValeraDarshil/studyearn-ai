@@ -15,6 +15,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Bot, RefreshCw, Clock, CheckCircle2, ChevronRight,
   Zap, Star, Trophy, Flame, AlertTriangle, TrendingUp,
@@ -97,7 +98,29 @@ function MentorLevelBadge({ level }: { level: number }) {
   );
 }
 
-function MicroTaskCard({ task, onComplete }: { task: MicroTask; onComplete: () => void }) {
+// BUG FIX (UX): MicroTaskCard used to be a pure decoration — a countdown
+// timer and a "Mark Complete" button with zero actual task content behind
+// them. Nothing stopped a student from hitting Mark Complete instantly
+// and collecting XP for doing nothing. This builds a real, topic-specific
+// prompt for the task and opens it in Ask AI, and Mark Complete is now
+// disabled until the timer has actually run out.
+function buildTaskPrompt(task: MicroTask): string {
+  const topic = task.topic || 'this topic';
+  switch (task.type) {
+    case 'quiz':
+      return `Quiz me on ${topic}. Give me one question at a time and check my answers.`;
+    case 'challenge':
+      return `Give me a ${task.difficulty}-difficulty challenge problem on ${topic} and walk me through it if I get stuck.`;
+    case 'revision':
+      return `I need a quick revision of ${topic} — the key points only, then test me with one question.`;
+    case 'warm_up':
+      return `Let's ease back in with ${topic} — give me a simple, friendly explanation to start with.`;
+    default:
+      return `Help me practice ${topic} — explain it simply, then give me a question to try.`;
+  }
+}
+
+function MicroTaskCard({ task, onComplete, onStartTask }: { task: MicroTask; onComplete: () => void; onStartTask: () => void }) {
   const timer = useTimer(task.durationMinutes);
   const diff  = DIFFICULTY_META[task.difficulty];
 
@@ -116,6 +139,15 @@ function MicroTaskCard({ task, onComplete }: { task: MicroTask; onComplete: () =
         <h3 className="text-base font-bold text-white mb-1">{task.title}</h3>
         <p className="text-sm text-slate-400 leading-relaxed">{task.description}</p>
       </div>
+
+      {/* Start Task — opens Ask AI pre-filled with a real prompt for this task */}
+      <button
+        onClick={onStartTask}
+        className="w-full py-3 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90 active:scale-[0.98] flex items-center justify-center gap-2"
+        style={{ background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)', boxShadow: '0 4px 14px rgba(99,102,241,0.3)' }}
+      >
+        <Bot className="w-4 h-4" /> Start Task in Ask AI <ChevronRight className="w-4 h-4" />
+      </button>
 
       {/* Timer */}
       <div className={`rounded-xl px-4 py-3 flex items-center justify-between border ${timer.done ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-slate-800/60 border-white/8'}`}>
@@ -147,11 +179,17 @@ function MicroTaskCard({ task, onComplete }: { task: MicroTask; onComplete: () =
         </div>
       </div>
 
+      {/* BUG FIX: this used to be clickable the instant the card rendered
+          — a student could award themselves XP without the timer ever
+          running. Now it stays disabled until the timer actually
+          finishes, so at minimum the counted-down time has to pass. */}
       <button
         onClick={onComplete}
-        className="w-full py-3 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90 active:scale-[0.98]"
+        disabled={!timer.done}
+        title={timer.done ? undefined : 'Finish the timer first'}
+        className="w-full py-3 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:opacity-40"
         style={{ background: 'linear-gradient(135deg, #10b981, #059669)', boxShadow: '0 4px 14px rgba(16,185,129,0.3)' }}>
-        ✅ Mark Complete
+        {timer.done ? '✅ Mark Complete' : `⏱ Finish timer to complete (${timer.display})`}
       </button>
     </div>
   );
@@ -326,7 +364,8 @@ function HistoryFeed({ messages }: { messages: MentorMessageData[] }) {
 
 // ── Main Page ──────────────────────────────────────────────────
 export default function AIMentor() {
-  const { userName } = useApp();
+  const { userName, setPendingAskPrompt } = useApp();
+  const navigate = useNavigate();
   const firstName = userName?.split(' ')[0] || 'there';
 
   const [state,       setState]     = useState<MentorState | null>(null);
@@ -389,6 +428,14 @@ export default function AIMentor() {
     setTaskDone(true);
     showToast('🎉 Task complete! XP awarded!');
     setTimeout(() => { setTaskDone(false); load(); }, 2000);
+  };
+
+  // BUG FIX: this is the piece that was entirely missing — "Start Task"
+  // now actually hands the task's topic off to Ask AI as a real prompt,
+  // instead of the task being a bare timer with nothing behind it.
+  const handleStartTask = (task: MicroTask) => {
+    setPendingAskPrompt(buildTaskPrompt(task));
+    navigate('/app/ask');
   };
 
   const handlePersonality = async (p: MentorPersonality) => {
@@ -542,7 +589,7 @@ export default function AIMentor() {
                   <h3 className="text-lg font-bold text-emerald-400">Task Complete! XP Awarded!</h3>
                 </div>
               ) : (
-                <MicroTaskCard task={microTask} onComplete={handleCompleteTask} />
+                <MicroTaskCard task={microTask} onComplete={handleCompleteTask} onStartTask={() => handleStartTask(microTask)} />
               )}
             </div>
           )}
