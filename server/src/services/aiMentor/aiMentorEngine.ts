@@ -31,6 +31,8 @@ import { AIMentorSession }         from '../../models/AIMentorSession.model.js';
 import { behaviorAnalyzer, BehaviorSnapshot } from './behaviorAnalyzer.js';
 import { mentorTriggerEngine, MentorTrigger } from './mentorTriggerEngine.js';
 import { mentorMessageGenerator, MentorMessage, MentorPersonality } from './mentorMessageGenerator.js';
+import { llmMentorMessageGenerator } from './llmMentorMessageGenerator.js';
+import { churnPredictionEngine, ChurnRiskAssessment } from './churnPredictionEngine.js';
 import { mentorActionEngine, MentorActionResult } from './mentorActionEngine.js';
 import { logger }                  from '../../utils/logger.js';
 
@@ -89,11 +91,25 @@ export async function runAIMentor(
       session = await AIMentorSession.create({ userId });
     }
 
-    // ── 2. Analyze behavior ──────────────────────────────────
-    const snapshot = await behaviorAnalyzer.analyzeBehavior(userId);
+    // ── 2. Analyze behavior + predictive risk (parallel) ─────
+    // MENTOR UPGRADE: churnPredictionEngine runs alongside the existing
+    // snapshot analysis — it's a trend-based read over dailyLogs/
+    // quizHistory, independent data from what behaviorAnalyzer reads,
+    // so there's no reason to serialize them. churnPredictionEngine
+    // never throws (see its own internal try/catch), but Promise
+    // .allSettled keeps this call-site defensive regardless.
+    const [snapshotResult, riskResult] = await Promise.allSettled([
+      behaviorAnalyzer.analyzeBehavior(userId),
+      churnPredictionEngine.assessForUser(userId),
+    ]);
+
+    if (snapshotResult.status === 'rejected') throw snapshotResult.reason;
+    const snapshot = snapshotResult.value;
+    const risk: ChurnRiskAssessment | null =
+      riskResult.status === 'fulfilled' ? riskResult.value : null;
 
     // ── 3. Detect triggers ───────────────────────────────────
-    const triggers = mentorTriggerEngine.detectTriggers(snapshot);
+    const triggers = mentorTriggerEngine.detectTriggers(snapshot, risk);
 
     if (!triggers.length) {
       return {
@@ -135,12 +151,14 @@ export async function runAIMentor(
       }
     }
 
-    // ── 5. Generate message ──────────────────────────────────
+    // ── 5. Generate message — MENTOR UPGRADE: LLM-personalized, ──
+    // with the proven template system as an automatic, silent fallback.
     const personality = options.personalityOverride ?? session.mentorPersonality;
-    const message = await mentorMessageGenerator.generateMentorMessage(
+    const message = await llmMentorMessageGenerator.generateSmartMentorMessage(
       snapshot,
       primaryTrigger,
       personality,
+      risk,
     );
 
     // ── 6. Execute actions ───────────────────────────────────

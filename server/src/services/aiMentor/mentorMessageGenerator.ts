@@ -512,6 +512,59 @@ const TEMPLATES: Record<
     },
   },
 
+  // MENTOR UPGRADE: proactive trigger — fires on a declining trend,
+  // before the streak has actually broken or a full 24h+ has passed.
+  AT_RISK_PREDICTED: {
+    friendly: {
+      english: (c) => ({
+        emoji: '📉',
+        title: `Noticed you slowing down a bit`,
+        body:  `Your study pattern's been a little quieter lately. No pressure — even a quick ${c.weakTopic ? `look at ${c.weakTopic}` : 'session'} today keeps things moving.`,
+        cta:   'Quick Check-in',
+        taskHint: '5-min light session',
+      }),
+      hinglish: (c) => ({
+        emoji: '📉',
+        title: 'Thoda slow ho gaye ho recently',
+        body:  `Pichle kuch din activity thodi kam lag rahi hai. Koi tension nahi — aaj bas 5 min ${c.weakTopic ? c.weakTopic : ''} dekh lo, momentum wapas aa jaayega.`,
+        cta:   'Jaldi Check-in',
+        taskHint: '5 min ka halka session',
+      }),
+    },
+    strict: {
+      english: (c) => ({
+        emoji: '📊',
+        title: `Your activity is trending down.`,
+        body:  `Consistency is slipping. Get back to it today before this becomes a real gap — ${c.weakTopic ?? '10 minutes'} is a good place to start.`,
+        cta:   'Get Back On Track',
+        taskHint: `10-min session${c.weakTopic ? `: ${c.weakTopic}` : ''}`,
+      }),
+      hinglish: (c) => ({
+        emoji: '📊',
+        title: 'Activity down trend pe hai.',
+        body:  `Consistency slip ho rahi hai. Aaj hi wapas track pe aa jao — ${c.weakTopic ?? '10 min'} se start karo.`,
+        cta:   'Track Pe Aao',
+        taskHint: `10 min session${c.weakTopic ? `: ${c.weakTopic}` : ''}`,
+      }),
+    },
+    motivational: {
+      english: (c) => ({
+        emoji: '💪',
+        title: `Catch this dip before it grows.`,
+        body:  `Every learner has quieter weeks — what matters is catching it early. One focused session today turns the trend right back around.`,
+        cta:   'Turn It Around',
+        taskHint: 'Power 10-min session',
+      }),
+      hinglish: (c) => ({
+        emoji: '💪',
+        title: 'Is dip ko abhi pakdo, badhne se pehle.',
+        body:  `Har learner ke quiet weeks aate hain — asli baat hai time pe pakadna. Aaj ek focused session trend wapas ghuma dega.`,
+        cta:   'Trend Ghumao',
+        taskHint: '10 min ka power session',
+      }),
+    },
+  },
+
   MILESTONE_REACHED: {
     friendly: {
       english: (c) => ({

@@ -22,6 +22,7 @@
 
 import { BehaviorSnapshot } from './behaviorAnalyzer.js';
 import { StudentProfile }   from '../../models/StudentProfile.model.js';
+import type { ChurnRiskAssessment } from './churnPredictionEngine.js';
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -35,7 +36,8 @@ export type MentorTriggerType =
   | 'GOAL_PENDING'
   | 'COMEBACK'
   | 'WEAK_TOPIC_FOCUS'
-  | 'MILESTONE_REACHED';
+  | 'MILESTONE_REACHED'
+  | 'AT_RISK_PREDICTED';   // MENTOR UPGRADE: proactive — fires BEFORE inactivity/streak-break happens
 
 export interface MentorTrigger {
   type:      MentorTriggerType;
@@ -49,6 +51,7 @@ const PRIORITY_MAP: Record<MentorTriggerType, 1 | 2 | 3> = {
   COMEBACK:          1,
   STREAK_BREAK:      1,
   LOW_PERFORMANCE:   1,
+  AT_RISK_PREDICTED: 1,   // proactive catch — same urgency tier as the reactive "already broken" triggers
   INACTIVE_USER:     2,
   STREAK_AT_RISK:    2,
   WEAK_TOPIC_FOCUS:  2,
@@ -60,7 +63,7 @@ const PRIORITY_MAP: Record<MentorTriggerType, 1 | 2 | 3> = {
 
 // ── Trigger Detection ──────────────────────────────────────────
 
-export function detectTriggers(snap: BehaviorSnapshot): MentorTrigger[] {
+export function detectTriggers(snap: BehaviorSnapshot, risk?: ChurnRiskAssessment | null): MentorTrigger[] {
   const triggers: MentorTrigger[] = [];
 
   // COMEBACK (highest priority — 3+ days gone)
@@ -93,6 +96,32 @@ export function detectTriggers(snap: BehaviorSnapshot): MentorTrigger[] {
       context: {
         recentAccuracy:   snap.recentAccuracy,
         previousAccuracy: snap.previousAccuracy,
+        weakTopics:       snap.weakTopics.slice(0, 3),
+      },
+    });
+  }
+
+  // AT_RISK_PREDICTED (MENTOR UPGRADE — proactive, fires BEFORE the
+  // student has actually gone inactive or broken a streak). Only fires
+  // when trend-based risk is genuinely high AND nothing has already
+  // manifestly broken (streakBroken/performanceDrop already cover the
+  // "it already happened" case with their own triggers above — this
+  // is specifically for catching the decline before those trip).
+  if (
+    risk &&
+    risk.dataQuality !== 'insufficient' &&
+    (risk.riskLevel === 'high' || risk.riskLevel === 'critical') &&
+    !snap.streakBroken &&
+    !snap.performanceDrop
+  ) {
+    triggers.push({
+      type:    'AT_RISK_PREDICTED',
+      priority: 1,
+      reason:  risk.signals.length ? risk.signals.join('; ') : `Engagement trend risk score ${risk.riskScore}/100`,
+      context: {
+        riskScore:        risk.riskScore,
+        riskLevel:        risk.riskLevel,
+        activityTrendPct: risk.activityTrendPct,
         weakTopics:       snap.weakTopics.slice(0, 3),
       },
     });
