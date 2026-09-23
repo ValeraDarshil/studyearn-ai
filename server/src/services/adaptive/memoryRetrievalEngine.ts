@@ -6,13 +6,19 @@
  * based on the current query.
  *
  * Retrieval strategy:
- *   1. Keyword overlap between query and memory items
+ *   1. TF-IDF + synonym-aware semantic scoring between query and memory
+ *      items (BRAIN UPGRADE — see semanticScoringEngine.ts; previously
+ *      exact-keyword-only overlap, which missed synonyms/morphological
+ *      variants/paraphrasing entirely)
  *   2. Recency weighting (recent mistakes score higher)
  *   3. Frequency weighting (repeated mistakes score highest)
  *   4. State-based filtering (STUCK → weak only, ADVANCED → strong)
  *
- * No vector DB required — keyword scoring is sufficient for an
- * edu-app context. Vector DB can be swapped in later as an upgrade.
+ * No external vector DB or embedding API required — TF-IDF is computed
+ * fresh per-request from the student's own (small) memory corpus, so
+ * this is always up to date with zero indexing infrastructure. A real
+ * dense-embedding model remains a valid future upgrade — see
+ * semanticScoringEngine.ts's own header for that tradeoff.
  *
  * Integration:
  *   • contextFusionEngine.ts  — replaces full memory dump
@@ -20,6 +26,7 @@
  */
 
 import { longTermMemoryEngine, LongTermMemory, ConceptStrength, MistakeRecord } from './longTermMemoryEngine.js';
+import { semanticScoringEngine, SemanticScorer } from './semanticScoringEngine.js';
 import { logger } from '../../utils/logger.js';
 
 // ── Types ──────────────────────────────────────────────────────
@@ -60,12 +67,23 @@ export const memoryRetrievalEngine = {
     logger.info({ userId, queryText: queryText.slice(0, 60), currentState }, '[MemoryRetrieval] Retrieving memory');
 
     const memory = await longTermMemoryEngine.getMemory(userId);
-    const queryTokens = tokenize(queryText);
+
+    // BRAIN UPGRADE: build ONE semantic scorer from this student's own
+    // memory corpus (all their concept/mistake topic strings), instead
+    // of the old exact-keyword-only tokenize() overlap. IDF is computed
+    // once here and reused across every candidate — cheap even though
+    // it now does real TF-IDF + synonym-aware scoring per item.
+    const candidateTexts = [
+      ...memory.weakConcepts.map(c => c.concept),
+      ...memory.strongConcepts.map(c => c.concept),
+      ...memory.pastMistakes.map(m => m.topic),
+    ];
+    const scorer = semanticScoringEngine.createScorer(queryText, candidateTexts);
 
     const candidates: RetrievedMemoryItem[] = [
-      ...scoreWeakConcepts(memory.weakConcepts, queryTokens, currentState),
-      ...scoreStrongConcepts(memory.strongConcepts, queryTokens, currentState),
-      ...scoreMistakes(memory.pastMistakes, queryTokens),
+      ...scoreWeakConcepts(memory.weakConcepts, scorer, currentState),
+      ...scoreStrongConcepts(memory.strongConcepts, scorer, currentState),
+      ...scoreMistakes(memory.pastMistakes, scorer),
     ];
 
     // Sort by score descending, take topK
@@ -107,13 +125,13 @@ export const memoryRetrievalEngine = {
 // ─────────────────────────────────────────────────────────────
 
 function scoreWeakConcepts(
-  concepts:    ConceptStrength[],
-  queryTokens: Set<string>,
-  state:       string
+  concepts: ConceptStrength[],
+  scorer:   SemanticScorer,
+  state:    string
 ): RetrievedMemoryItem[] {
   return concepts.map(c => {
     const baseScore = state === 'STUCK' ? 0.60 : 0.30;
-    const keywordBoost = topicOverlap(c.concept, queryTokens) * 0.40;
+    const keywordBoost = scorer.score(c.concept) * 0.40;
     const masteryPenalty = c.masteryScore / 200;  // weaker topics score higher
     const score = Math.min(1, baseScore + keywordBoost - masteryPenalty);
 
@@ -128,13 +146,13 @@ function scoreWeakConcepts(
 }
 
 function scoreStrongConcepts(
-  concepts:    ConceptStrength[],
-  queryTokens: Set<string>,
-  state:       string
+  concepts: ConceptStrength[],
+  scorer:   SemanticScorer,
+  state:    string
 ): RetrievedMemoryItem[] {
   return concepts.map(c => {
     const baseScore = state === 'ADVANCED' ? 0.50 : 0.20;
-    const keywordBoost = topicOverlap(c.concept, queryTokens) * 0.40;
+    const keywordBoost = scorer.score(c.concept) * 0.40;
     const score = Math.min(1, baseScore + keywordBoost);
 
     return {
@@ -148,14 +166,14 @@ function scoreStrongConcepts(
 }
 
 function scoreMistakes(
-  mistakes:    MistakeRecord[],
-  queryTokens: Set<string>
+  mistakes: MistakeRecord[],
+  scorer:   SemanticScorer
 ): RetrievedMemoryItem[] {
   const now = Date.now();
   return mistakes.map(m => {
-    const keywordBoost  = topicOverlap(m.topic, queryTokens) * 0.45;
+    const keywordBoost   = scorer.score(m.topic) * 0.45;
     const frequencyBoost = Math.min(0.30, m.count * 0.05);
-    const recencyScore  = recency(m.lastSeenAt, now);
+    const recencyScore   = recency(m.lastSeenAt, now);
     const score = Math.min(1, keywordBoost + frequencyBoost + recencyScore * 0.20);
 
     return {
@@ -193,24 +211,6 @@ function buildPromptBlock(items: RetrievedMemoryItem[], memory: LongTermMemory):
 // ─────────────────────────────────────────────────────────────
 // Utility
 // ─────────────────────────────────────────────────────────────
-function tokenize(text: string): Set<string> {
-  return new Set(
-    text.toLowerCase()
-      .replace(/[^a-z0-9\s]/g, ' ')
-      .split(/\s+/)
-      .filter(t => t.length > 2)
-  );
-}
-
-function topicOverlap(topic: string, queryTokens: Set<string>): number {
-  const topicTokens = tokenize(topic);
-  let overlap = 0;
-  for (const t of topicTokens) {
-    if (queryTokens.has(t)) overlap++;
-  }
-  return topicTokens.size > 0 ? overlap / topicTokens.size : 0;
-}
-
 function recency(dateStr: string, now: number): number {
   try {
     const age = now - new Date(dateStr).getTime();
