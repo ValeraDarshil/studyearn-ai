@@ -438,7 +438,17 @@ export function BrainDashboard() {
                 <Activity className="w-4 h-4 text-orange-400" /> Priority Focus Topics
               </h3>
               <div className="space-y-2">
-                {priorityTopics.map(t => (
+                {priorityTopics.map(t => {
+                  // BUGFIX: defensive clamp — a topic's stored masteryLevel
+                  // should always be a clean 0-100 integer (the backend
+                  // write path rounds/clamps it), but a topic entry written
+                  // by an older code path before that validation existed
+                  // can still carry a raw unrounded value forever if that
+                  // topic is never re-touched. Never trust a raw stored
+                  // number directly in a % width/label — always clamp at
+                  // the display boundary too, regardless of what's in the DB.
+                  const displayMastery = Math.round(Math.min(100, Math.max(0, t.mastery || 0)));
+                  return (
                   <div key={t.topic} className="flex items-center gap-3 p-3 rounded-xl bg-slate-800/50">
                     <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0 ${t.urgency === 'critical' ? 'bg-red-500/20 text-red-400' : t.urgency === 'high' ? 'bg-orange-500/20 text-orange-400' : 'bg-amber-500/20 text-amber-400'}`}>
                       #{t.rank}
@@ -450,16 +460,17 @@ export function BrainDashboard() {
                       </div>
                       <div className="flex items-center gap-2 mt-0.5">
                         <div className="h-1 flex-1 bg-slate-700 rounded-full overflow-hidden">
-                          <div className="h-full bg-violet-500 rounded-full" style={{ width: `${t.mastery}%` }} />
+                          <div className="h-full bg-violet-500 rounded-full" style={{ width: `${displayMastery}%` }} />
                         </div>
-                        <span className="text-xs text-slate-500 flex-shrink-0">{t.mastery}%</span>
+                        <span className="text-xs text-slate-500 flex-shrink-0">{displayMastery}%</span>
                       </div>
                     </div>
                     <span className={`text-xs px-2 py-0.5 rounded-full flex-shrink-0 font-medium ${t.urgency === 'critical' ? 'text-red-400 bg-red-500/10' : t.urgency === 'high' ? 'text-orange-400 bg-orange-500/10' : 'text-amber-400 bg-amber-500/10'}`}>
                       {t.urgency}
                     </span>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
