@@ -375,7 +375,7 @@ async function awardPoints(req: Request, action: string, detail: string): Promis
     if (!user) return 0;
     const premium = isPremiumValid(user);
     const pts = premium ? BASE_POINTS * PREMIUM_MULTI : BASE_POINTS;
-    user.points += pts;
+    user.points = (user.points || 0) + pts;
     (user as any).totalXP = ((user as any).totalXP || 0) + pts;
     await user.save();
     await Activity.create({ userId, action, details: detail, pointsEarned: pts });

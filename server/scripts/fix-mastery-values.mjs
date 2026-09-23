@@ -9,8 +9,13 @@
  * 0.0055017193632964180% on the dashboard.
  *
  * This script finds every topicMastery entry across every student whose
- * masteryLevel is not a clean 0-100 integer, and fixes it in place.
- * It does NOT touch anything else — no other field, no other collection.
+ * masteryLevel is not a clean 0-100 integer, and fixes it in place. It
+ * also backfills any entry missing the required `category` field (also
+ * legacy data, from before that field was required) — without this, a
+ * single bad entry anywhere in a student's array fails Mongoose's
+ * whole-document validation and silently discards every other fix for
+ * that same student. It does NOT touch anything else — no other field,
+ * no other collection.
  *
  * Plain JS on purpose — no tsx/ts-node in this project's deps, so this
  * runs directly against the already-compiled dist/ output. Zero new
@@ -42,6 +47,7 @@ async function main() {
 
   let studentsFixed = 0;
   let entriesFixed = 0;
+  let categoriesBackfilled = 0;
 
   for (const profile of profiles) {
     let changed = false;
@@ -58,15 +64,36 @@ async function main() {
         changed = true;
         entriesFixed++;
       }
+
+      // BUGFIX (discovered mid-cleanup): some very old entries were
+      // written before `category` was a required schema field, and
+      // have no value at all. Mongoose validates the WHOLE document on
+      // save() — one bad entry anywhere in the array fails the ENTIRE
+      // save, silently discarding every other fix for that student too.
+      // Backfill using the same fallback pattern updateTopicMastery()
+      // itself uses when creating a brand-new entry.
+      if (!entry.category) {
+        const fallbackCategory = profile.learnerCategory || 'self';
+        console.log(`  Backfilling category for ${profile.userId} / "${entry.topic}": (missing) -> ${fallbackCategory}`);
+        entry.category = fallbackCategory;
+        changed = true;
+        categoriesBackfilled++;
+      }
     }
 
     if (changed) {
-      await profile.save();
-      studentsFixed++;
+      try {
+        await profile.save();
+        studentsFixed++;
+      } catch (err) {
+        // Don't let one student's leftover data issue abort the whole
+        // run — log it clearly and keep going for everyone else.
+        console.error(`  ⚠ Could not save ${profile.userId}: ${err.message}`);
+      }
     }
   }
 
-  console.log(`\nDone. Fixed ${entriesFixed} entries across ${studentsFixed} student(s).`);
+  console.log(`\nDone. Fixed ${entriesFixed} mastery values, backfilled ${categoriesBackfilled} missing categories, across ${studentsFixed} student(s).`);
   await mongoose.disconnect();
   process.exit(0);
 }

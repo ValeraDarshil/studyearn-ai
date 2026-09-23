@@ -76,7 +76,7 @@ async function awardXPtoUser(
       new Date(user.premiumExpiresAt) > new Date();
 
     const finalXP = isPremium ? xp * 2 : xp;
-    user.points  += finalXP;
+    user.points   = (user.points || 0) + finalXP;
     user.totalXP  = (user.totalXP || 0) + finalXP;
     await user.save();
     await Activity.create({ userId, action, details: detail, pointsEarned: finalXP });

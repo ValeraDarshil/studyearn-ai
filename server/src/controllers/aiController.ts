@@ -300,7 +300,7 @@ async function handleQuestionUsed(
     const premium = isPremiumValid(user);
     const pts     = premium ? BASE_AI_POINTS * PREMIUM_MULTIPLIER : BASE_AI_POINTS;
 
-    user.points                      += pts;
+    user.points                      = (user.points || 0) + pts;
     (user as any).totalXP             = ((user as any).totalXP || 0) + pts;
     (user as any).totalQuestionsAsked = ((user as any).totalQuestionsAsked || 0) + 1;
     await user.save();

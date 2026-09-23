@@ -1409,7 +1409,7 @@ async function updateStreakOnLogin(user: any): Promise<{ streak: number; streakI
     user.streak = 1;
   }
 
-  user.points    += bonusPoints;
+  user.points    = (user.points || 0) + bonusPoints;
   user.lastActive = new Date();
   await user.save();
 
@@ -1734,7 +1734,7 @@ router.get('/me', async (req, res) => {
       } else if (lastDate !== today) {
         user.streak = 1;
       }
-      user.points               += bonusPoints;
+      user.points               = (user.points || 0) + bonusPoints;
       (user as any).totalXP      = ((user as any).totalXP || 0) + bonusPoints;
       user.lastActive            = new Date();
     }

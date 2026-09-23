@@ -183,7 +183,7 @@ async function handlePPTGenerated(req: Request): Promise<number> {
     const pts     = premium ? BASE_PPT_POINTS * PREMIUM_MULTIPLIER : BASE_PPT_POINTS;
     // free=20, premium=40
 
-    user.points                       += pts;
+    user.points                        = (user.points || 0) + pts;
     (user as any).totalXP              = ((user as any).totalXP || 0) + pts;
     (user as any).totalPPTsGenerated   = ((user as any).totalPPTsGenerated || 0) + 1;
     await user.save();

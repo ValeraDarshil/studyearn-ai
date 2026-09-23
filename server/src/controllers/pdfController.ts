@@ -308,7 +308,7 @@ async function handlePDFAction(req: Request, actionLabel: string): Promise<void>
     const pts     = premium ? BASE_PDF_POINTS * PREMIUM_MULTIPLIER : BASE_PDF_POINTS;
     // free=10, premium=20
 
-    user.points                     += pts;
+    user.points                      = (user.points || 0) + pts;
     (user as any).totalXP            = ((user as any).totalXP || 0) + pts;
     (user as any).totalPDFsConverted = ((user as any).totalPDFsConverted || 0) + 1;
     await user.save();
