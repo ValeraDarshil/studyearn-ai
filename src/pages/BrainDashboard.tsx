@@ -305,49 +305,65 @@ export function BrainDashboard() {
         <div className="space-y-6">
 
           {/* ── BRAIN UPGRADE: Live Strategy Confidence ─────── */}
-          {intelligence && intelligence.strategies.length > 0 && (
-            <div className="glass rounded-2xl p-5 border border-violet-500/20 bg-gradient-to-br from-violet-500/5 via-slate-900 to-slate-900">
-              <div className="flex items-center justify-between mb-5">
-                <h3 className="text-white font-semibold text-sm flex items-center gap-2">
-                  <Brain className="w-4 h-4 text-violet-400" />
-                  What the AI has learned about teaching you
-                </h3>
-                <span className="text-slate-500 text-xs">Live from every session</span>
-              </div>
+          {intelligence && (
+            intelligence.strategies.length > 0 ? (
+              <div className="glass rounded-2xl p-5 border border-violet-500/20 bg-gradient-to-br from-violet-500/5 via-slate-900 to-slate-900">
+                <div className="flex items-center justify-between mb-5">
+                  <h3 className="text-white font-semibold text-sm flex items-center gap-2">
+                    <Brain className="w-4 h-4 text-violet-400" />
+                    What the AI has learned about teaching you
+                  </h3>
+                  <span className="text-slate-500 text-xs">Live from every session</span>
+                </div>
 
-              <div className="flex flex-wrap gap-6 items-start">
-                {intelligence.strategies.slice(0, 4).map((s, idx) => (
-                  <ConfidenceRing key={s.strategy} data={s} isLeading={idx === 0} />
-                ))}
+                <div className="flex flex-wrap gap-6 items-start">
+                  {intelligence.strategies.slice(0, 4).map((s, idx) => (
+                    <ConfidenceRing key={s.strategy} data={s} isLeading={idx === 0} />
+                  ))}
 
-                {intelligence.strategies.length > 4 && (
-                  <div className="flex-1 min-w-[140px] space-y-2 pt-1">
-                    {intelligence.strategies.slice(4, 8).map(s => (
-                      <div key={s.strategy} className="flex items-center justify-between text-xs">
-                        <span className="text-slate-400">{s.label}</span>
-                        <span className="text-slate-500">{Math.round(s.confidence * 100)}%</span>
-                      </div>
+                  {intelligence.strategies.length > 4 && (
+                    <div className="flex-1 min-w-[140px] space-y-2 pt-1">
+                      {intelligence.strategies.slice(4, 8).map(s => (
+                        <div key={s.strategy} className="flex items-center justify-between text-xs">
+                          <span className="text-slate-400">{s.label}</span>
+                          <span className="text-slate-500">{Math.round(s.confidence * 100)}%</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {intelligence.memory && (
+                  <div className="flex flex-wrap gap-2 mt-5 pt-5 border-t border-slate-800">
+                    <span className="text-xs px-3 py-1.5 rounded-full bg-red-500/10 text-red-400 border border-red-500/20">
+                      {intelligence.memory.weakConceptsCount} weak concepts tracked
+                    </span>
+                    <span className="text-xs px-3 py-1.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                      {intelligence.memory.strongConceptsCount} mastered
+                    </span>
+                    {intelligence.memory.topMistakes.slice(0, 2).map(m => (
+                      <span key={m.topic} className="text-xs px-3 py-1.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700">
+                        {m.topic} · repeated ×{m.count}
+                      </span>
                     ))}
                   </div>
                 )}
               </div>
-
-              {intelligence.memory && (
-                <div className="flex flex-wrap gap-2 mt-5 pt-5 border-t border-slate-800">
-                  <span className="text-xs px-3 py-1.5 rounded-full bg-red-500/10 text-red-400 border border-red-500/20">
-                    {intelligence.memory.weakConceptsCount} weak concepts tracked
-                  </span>
-                  <span className="text-xs px-3 py-1.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                    {intelligence.memory.strongConceptsCount} mastered
-                  </span>
-                  {intelligence.memory.topMistakes.slice(0, 2).map(m => (
-                    <span key={m.topic} className="text-xs px-3 py-1.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700">
-                      {m.topic} · repeated ×{m.count}
-                    </span>
-                  ))}
+            ) : (
+              // BRAIN UPGRADE: empty state — previously this whole panel
+              // just rendered nothing when aiStrategyStats had no data yet
+              // (a new account, or before the AI has logged any outcomes),
+              // which made the entire feature invisible with zero signal
+              // that anything was there. An empty state that explains
+              // what's coming is a design decision — silence isn't.
+              <div className="glass rounded-2xl p-5 border border-slate-700/50 flex items-center gap-4">
+                <Brain className="w-8 h-8 text-slate-600 flex-shrink-0" />
+                <div>
+                  <p className="text-slate-300 text-sm font-medium">The AI hasn't learned enough about your teaching style yet</p>
+                  <p className="text-slate-500 text-xs mt-0.5">Ask the AI Tutor a few questions — this panel fills in as it learns what works for you.</p>
                 </div>
-              )}
-            </div>
+              </div>
+            )
           )}
 
           {/* ── Stage 4: Progress Score Card ───────────────── */}
