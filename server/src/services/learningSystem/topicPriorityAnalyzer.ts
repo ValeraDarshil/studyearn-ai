@@ -70,13 +70,22 @@ export async function analyzePriorities(userId: string): Promise<PriorityReport 
         ? Math.floor((today.getTime() - new Date(t.lastAttemptedAt).getTime()) / 86400000)
         : null;
 
+      // BUGFIX: clamp mastery ONCE at the top — a topic entry written by
+      // an older pre-validation code path can carry a raw unrounded value
+      // (e.g. a tiny float like 0.0055%) that sits untouched forever if
+      // that topic isn't re-practiced. Every downstream calculation here
+      // (score, action plan, reason text) and every API consumer should
+      // work off one clean 0-100 integer — never trust a stored field to
+      // already be valid at the point you read it.
+      const cleanMastery = Math.round(Math.min(100, Math.max(0, t.masteryLevel || 0)));
+
       // Priority score formula (0–100):
       //  mastery component:  lower mastery = higher score (max 40pts)
       //  trend component:    declining +25, stable +10, improving +0
       //  recency component:  not studied in 7+ days +15, 3–7 days +8
       //  attempts component: 0 attempts +10, 1–2 attempts +5
       //  quiz failure bonus: if >50% quiz fails on this topic +10
-      const masteryPts  = Math.round((1 - t.masteryLevel / 100) * 40);
+      const masteryPts  = Math.round((1 - cleanMastery / 100) * 40);
       const trendPts    = t.trend === 'declining' ? 25 : t.trend === 'stable' ? 10 : 0;
       const recencyPts  = daysSince === null ? 15
         : daysSince >= 7 ? 15 : daysSince >= 3 ? 8 : 0;
@@ -99,19 +108,26 @@ export async function analyzePriorities(userId: string): Promise<PriorityReport 
         : urgency === 'high' ? 25
         : urgency === 'medium' ? 20 : 15;
 
+      // BUGFIX: clamp mastery at the API boundary — a topic entry written
+      // by an older pre-validation code path can carry a raw unrounded
+      // value (e.g. a tiny float like 0.0055%) that sits untouched forever
+      // if that topic isn't re-practiced. Every CONSUMER of this API
+      // (dashboard, daily plan, any future client) should get a clean
+      // 0-100 integer regardless of what's actually stored — never trust
+      // a stored field to already be valid at the point you read it.
       return {
         rank:            i + 1, // will be re-ranked below
         topic:           t.topic,
         subject:         t.subject,
-        mastery:         t.masteryLevel,
+        mastery:         cleanMastery,
         urgencyScore,
         urgency,
         trend:           t.trend,
         daysSinceStudied: daysSince,
         totalAttempts:   t.totalAttempts,
-        actionPlan:      buildActionPlan(t.topic, t.subject, category, urgency, t.masteryLevel),
+        actionPlan:      buildActionPlan(t.topic, t.subject, category, urgency, cleanMastery),
         estimatedMins,
-        reason:          buildReason(t, daysSince, failRate),
+        reason:          buildReason({ ...t, masteryLevel: cleanMastery }, daysSince, failRate),
       };
     });
 
