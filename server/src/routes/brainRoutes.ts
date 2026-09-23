@@ -16,6 +16,7 @@ import {
   getAlerts,
   submitQuizResult,
   updateLearningStyle,
+  getBrainIntelligence,
 } from '../controllers/brainController.js';
 
 const router = Router();
@@ -32,6 +33,7 @@ router.use(authenticate);
 router.post('/setup',   setupProfile);
 router.get('/profile',  getProfile);
 router.get('/heatmap',  getHeatmap);
+router.get('/intelligence', getBrainIntelligence);
 
 // ── AI Learning Engine ────────────────────────────────────────
 router.get('/today-focus',      brainAILimiter, getTodayFocus);

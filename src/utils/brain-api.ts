@@ -177,6 +177,32 @@ export async function getAlerts(): Promise<{ success: boolean; alerts: Performan
   return brainFetch('/alerts');
 }
 
+export interface StrategyIntelligence {
+  strategy:     string;
+  label:        string;
+  successCount: number;
+  failureCount: number;
+  sampleSize:   number;
+  confidence:   number; // 0–1
+}
+
+export interface BrainIntelligenceMemory {
+  weakConceptsCount:   number;
+  strongConceptsCount: number;
+  mistakesTracked:     number;
+  topMistakes:         { topic: string; count: number; lastSeenAt: string }[];
+}
+
+export interface BrainIntelligence {
+  strategies: StrategyIntelligence[];
+  memory:     BrainIntelligenceMemory | null;
+  generatedAt?: string;
+}
+
+export async function getBrainIntelligence(): Promise<{ success: boolean; intelligence: BrainIntelligence }> {
+  return brainFetch('/intelligence');
+}
+
 export async function submitQuizResult(data: {
   subject: string;
   topic: string;

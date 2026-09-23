@@ -26,9 +26,10 @@ import {
 import {
   getStudentProfile, getTodayFocus, getLearningPath,
   getWeeklyReport, getAlerts, getHeatmapData,
-  completeLearningStep,
+  completeLearningStep, getBrainIntelligence,
   type StudentProfile, type TodayFocus, type LearningPath,
   type WeeklyReport, type PerformanceAlert, type HeatmapDay,
+  type BrainIntelligence, type StrategyIntelligence,
 } from '../utils/brain-api';
 import { useApp } from '../context/AppContext';
 // Stage 3 — Learning Engine
@@ -90,6 +91,50 @@ function buildHeatmapGrid(data: HeatmapDay[]): { date: string; count: number }[]
   return grid;
 }
 
+// ── BRAIN UPGRADE: Strategy confidence ring ─────────────────────
+// Distinct visual treatment from the linear progress bars used
+// everywhere else on this page — a radial dial reads as "confidence
+// the AI has learned", which is a genuinely different kind of number
+// from a mastery percentage or a completion bar.
+function ConfidenceRing({ data, isLeading }: { data: StrategyIntelligence; isLeading: boolean }) {
+  const radius = 34;
+  const circumference = 2 * Math.PI * radius;
+  const pct = Math.max(0, Math.min(1, data.confidence));
+  const offset = circumference * (1 - pct);
+
+  const ringColor =
+    pct >= 0.65 ? '#a78bfa' :   // violet-400 — strong learned confidence
+    pct >= 0.45 ? '#fbbf24' :   // amber-400 — moderate
+    '#475569';                  // slate-600 — still uncertain / low data
+
+  return (
+    <div className="flex flex-col items-center gap-2 w-[92px]">
+      <div className="relative w-20 h-20">
+        {isLeading && (
+          <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-violet-400 animate-pulse" />
+        )}
+        <svg viewBox="0 0 84 84" className="w-20 h-20 -rotate-90">
+          <circle cx="42" cy="42" r={radius} fill="none" stroke="#1e293b" strokeWidth="7" />
+          <circle
+            cx="42" cy="42" r={radius} fill="none"
+            stroke={ringColor} strokeWidth="7" strokeLinecap="round"
+            strokeDasharray={circumference}
+            strokeDashoffset={offset}
+            style={{ transition: 'stroke-dashoffset 0.8s ease-out' }}
+          />
+        </svg>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span className="text-white text-sm font-bold">{Math.round(pct * 100)}%</span>
+        </div>
+      </div>
+      <div className="text-center">
+        <div className="text-slate-300 text-xs font-medium leading-tight">{data.label}</div>
+        <div className="text-slate-600 text-[10px] mt-0.5">{data.sampleSize} uses</div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Component ─────────────────────────────────────────────
 export function BrainDashboard() {
   const navigate = useNavigate();
@@ -111,6 +156,8 @@ export function BrainDashboard() {
   // Stage 4 — Progress Intelligence state
   const [progressScore,  setProgressScore]  = useState<{ total: number; tierLabel: string; tierIcon: string; trend: string; message: string } | null>(null);
   const [insightCards,   setInsightCards]   = useState<InsightCard[]>([]);
+  // BRAIN UPGRADE — Dashboard visual overhaul: bandit-learned strategy confidence + memory summary
+  const [intelligence,   setIntelligence]   = useState<BrainIntelligence | null>(null);
 
   const loadAll = useCallback(async () => {
     setLoading(true);
@@ -136,11 +183,13 @@ export function BrainDashboard() {
         getPriorityTopics(3),
         getProgressScore(),
         getInsightCards(),
-      ]).then(([dpRes, ptRes, psRes, icRes]) => {
+        getBrainIntelligence(),
+      ]).then(([dpRes, ptRes, psRes, icRes, biRes]) => {
         if (dpRes.success && dpRes.plan) setDailyPlan(dpRes.plan);
         if (ptRes.success) setPriorityTopics(ptRes.topics || []);
         if (psRes.success && psRes.score) setProgressScore({ total: psRes.score, tierLabel: psRes.tier, tierIcon: psRes.icon, trend: psRes.trend, message: psRes.message });
         if (icRes.success) setInsightCards(icRes.cards || []);
+        if (biRes.success) setIntelligence(biRes.intelligence);
       }).catch(() => {});
     } catch (e) {
       console.error('[BrainDashboard] load error:', e);
@@ -254,6 +303,52 @@ export function BrainDashboard() {
       ════════════════════════════════════════════════════ */}
       {activeTab === 'overview' && (
         <div className="space-y-6">
+
+          {/* ── BRAIN UPGRADE: Live Strategy Confidence ─────── */}
+          {intelligence && intelligence.strategies.length > 0 && (
+            <div className="glass rounded-2xl p-5 border border-violet-500/20 bg-gradient-to-br from-violet-500/5 via-slate-900 to-slate-900">
+              <div className="flex items-center justify-between mb-5">
+                <h3 className="text-white font-semibold text-sm flex items-center gap-2">
+                  <Brain className="w-4 h-4 text-violet-400" />
+                  What the AI has learned about teaching you
+                </h3>
+                <span className="text-slate-500 text-xs">Live from every session</span>
+              </div>
+
+              <div className="flex flex-wrap gap-6 items-start">
+                {intelligence.strategies.slice(0, 4).map((s, idx) => (
+                  <ConfidenceRing key={s.strategy} data={s} isLeading={idx === 0} />
+                ))}
+
+                {intelligence.strategies.length > 4 && (
+                  <div className="flex-1 min-w-[140px] space-y-2 pt-1">
+                    {intelligence.strategies.slice(4, 8).map(s => (
+                      <div key={s.strategy} className="flex items-center justify-between text-xs">
+                        <span className="text-slate-400">{s.label}</span>
+                        <span className="text-slate-500">{Math.round(s.confidence * 100)}%</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {intelligence.memory && (
+                <div className="flex flex-wrap gap-2 mt-5 pt-5 border-t border-slate-800">
+                  <span className="text-xs px-3 py-1.5 rounded-full bg-red-500/10 text-red-400 border border-red-500/20">
+                    {intelligence.memory.weakConceptsCount} weak concepts tracked
+                  </span>
+                  <span className="text-xs px-3 py-1.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                    {intelligence.memory.strongConceptsCount} mastered
+                  </span>
+                  {intelligence.memory.topMistakes.slice(0, 2).map(m => (
+                    <span key={m.topic} className="text-xs px-3 py-1.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700">
+                      {m.topic} · repeated ×{m.count}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* ── Stage 4: Progress Score Card ───────────────── */}
           {progressScore && (

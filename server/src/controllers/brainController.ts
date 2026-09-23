@@ -399,3 +399,94 @@ export async function updateLearningStyle(req: Request, res: Response): Promise<
     res.status(500).json({ success: false, message: 'Failed to update learning style' });
   }
 }
+
+// ─────────────────────────────────────────────────────────────
+// GET /api/brain/intelligence
+// DASHBOARD UPGRADE: exposes the adaptive brain's LEARNED state —
+// per-strategy confidence (from aiStrategyStats, the same field the
+// bandit engine reads) + a long-term-memory summary. This is read-only
+// and purely additive: no existing endpoint or field is touched, it
+// just surfaces data that was already being written but never shown.
+// ─────────────────────────────────────────────────────────────
+const STRATEGY_LABELS: Record<string, string> = {
+  TEACH:          'Direct Teaching',
+  SIMPLIFY:       'Simplified Explanation',
+  HINT:           'Guided Hints',
+  CHALLENGE:      'Challenge Mode',
+  STEP_BY_STEP:   'Step-by-Step',
+  QUIZ:           'Quiz Check',
+  GUIDE:          'Guided Discovery',
+  FULL_SOLUTION:  'Full Solution',
+  ENCOURAGE:      'Encouragement',
+  SHORT:          'Short Answer',
+};
+
+export async function getBrainIntelligence(req: Request, res: Response): Promise<void> {
+  const userId = getUserIdFromToken(req);
+  if (!userId) {
+    res.status(401).json({ success: false, message: 'Unauthorized' });
+    return;
+  }
+
+  try {
+    const profile = await StudentProfile.findOne({ userId })
+      .select('aiStrategyStats aiLongTermMemory')
+      .lean();
+
+    if (!profile) {
+      res.json({ success: true, intelligence: { strategies: [], memory: null } });
+      return;
+    }
+
+    const rawStats = ((profile as any).aiStrategyStats ?? {}) as Record<string, { successCount?: number; failureCount?: number }>;
+
+    const strategies = Object.entries(rawStats)
+      .map(([strategy, s]) => {
+        const successCount = Number(s?.successCount) || 0;
+        const failureCount = Number(s?.failureCount) || 0;
+        const sampleSize    = successCount + failureCount;
+        // Laplace-smoothed success rate — same style of estimate the
+        // bandit engine's prior math is built on, shown here as a
+        // simple readable "how confident is the brain" summary rather
+        // than re-deriving the exact per-context posterior.
+        const confidence = (successCount + 1) / (sampleSize + 2);
+
+        return {
+          strategy,
+          label: STRATEGY_LABELS[strategy] ?? strategy,
+          successCount,
+          failureCount,
+          sampleSize,
+          confidence: Math.round(confidence * 100) / 100,
+        };
+      })
+      .sort((a, b) => b.sampleSize - a.sampleSize);
+
+    const ltm = (profile as any).aiLongTermMemory ?? {};
+    const weakConcepts = Array.isArray(ltm.weakConcepts) ? ltm.weakConcepts : [];
+    const strongConcepts = Array.isArray(ltm.strongConcepts) ? ltm.strongConcepts : [];
+    const mistakes = Array.isArray(ltm.pastMistakes) ? ltm.pastMistakes : [];
+
+    const topMistakes = [...mistakes]
+      .sort((a: any, b: any) => (b.count ?? 0) - (a.count ?? 0))
+      .slice(0, 5)
+      .map((m: any) => ({ topic: m.topic, count: m.count, lastSeenAt: m.lastSeenAt }));
+
+    res.json({
+      success: true,
+      intelligence: {
+        strategies,
+        memory: {
+          weakConceptsCount:   weakConcepts.length,
+          strongConceptsCount: strongConcepts.length,
+          mistakesTracked:     mistakes.length,
+          topMistakes,
+        },
+        generatedAt: new Date().toISOString(),
+      },
+    });
+  } catch (err: any) {
+    logger.error(`[BrainController] getBrainIntelligence: ${err.message}`);
+    res.status(500).json({ success: false, message: 'Failed to load brain intelligence' });
+  }
+}
