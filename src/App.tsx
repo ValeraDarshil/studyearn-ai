@@ -792,8 +792,8 @@ function AppContent() {
         setIsLoggedIn(true);
         setUserId(user._id);
         setUserName(user.name || "");
-        setPoints(user.points);
-        setTotalXP((user as any).totalXP || user.points);
+        setPoints(user.points || 0);
+        setTotalXP((user as any).totalXP || user.points || 0);
 
         const premExpiry = (user as any).premiumExpiresAt;
         const premActive =
@@ -845,8 +845,8 @@ function AppContent() {
         const streakInfoFromMe = (user as any)._streakInfo;
         if (!streakCelebration && streakInfoFromMe?.streakIncreased) {
           setCelebrationStreak(streakInfoFromMe.currentStreak);
-          setPoints(user.points);
-          setTotalXP((user as any).totalXP || user.points);
+          setPoints(user.points || 0);
+          setTotalXP((user as any).totalXP || user.points || 0);
           if (!shouldShowTour)
             setTimeout(() => setShowStreakCelebration(true), streakDelay);
         }
@@ -877,7 +877,7 @@ function AppContent() {
             setTimeout(() => {
               checkAndUnlockAchievements({
                 ...stats,
-                points: user.points,
+                points: user.points || 0,
                 streak: user.streak || 0,
               });
             }, 1800);
@@ -940,8 +940,12 @@ function AppContent() {
             setUnlockedAchievements(result.unlockedAchievements);
             newlyUnlocked.push(ach);
             if (result.rewardPoints > 0) {
-              setPoints((prev) => prev + result.rewardPoints);
-              setTotalXP((prev) => prev + result.rewardPoints);
+              // BUGFIX: no fallback meant a NaN-tainted points state (from
+              // an earlier corrupted backend fetch) would stay NaN forever
+              // through every subsequent local update — see addPoints()
+              // below for the full explanation, same pattern here.
+              setPoints((prev) => (prev || 0) + result.rewardPoints);
+              setTotalXP((prev) => (prev || 0) + result.rewardPoints);
             }
           }
         } catch (e) {
@@ -985,9 +989,21 @@ function AppContent() {
   };
 
   const addPoints = async (amount: number) => {
-    const newPoints = pointsRef.current + amount;
+    // BUGFIX: this is the exact spot that produced the "NaN after
+    // AskAI reward, fixed by refresh" bug. pointsRef.current had no
+    // fallback — if it was ever set to NaN (from an unguarded
+    // setPoints(user.points) on an earlier profile fetch, back when the
+    // BACKEND could still return a corrupted NaN), every subsequent
+    // addPoints() call kept producing NaN forever (NaN + amount = NaN),
+    // since this is pure client-side arithmetic — it never re-reads the
+    // true value from the server until a full page reload re-fetches
+    // the profile. The backend no longer ever returns NaN (fixed
+    // separately), but this local computation needed its own guard too
+    // — never trust a ref/state value to already be valid without
+    // checking, regardless of what "should" have set it correctly.
+    const newPoints = (pointsRef.current || 0) + amount;
     setPoints(newPoints);
-    setTotalXP((prev) => prev + amount);
+    setTotalXP((prev) => (prev || 0) + amount);
     checkAndUnlockAchievements({ points: newPoints });
   };
 
