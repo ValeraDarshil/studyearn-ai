@@ -2839,7 +2839,23 @@ export function AskAI() {
       });
 
       if (accumulated) {
-        addPoints(finalPoints);
+        // BUGFIX (real fix this time): finalPoints is often undefined in
+        // this streaming path — the backend doesn't always send a
+        // pointsAwarded SSE event, even though it DOES correctly award
+        // points server-side whenever a real answer comes back (that's
+        // exactly what this `if (accumulated)` guard confirms). The
+        // previous fix made addPoints() silently treat a missing amount
+        // as 0 to stop the NaN crash — which stopped the crash, but also
+        // silently stopped the visible counter from moving on every
+        // response where finalPoints never arrived, which turned out to
+        // be most of them. The counter went quiet instead of broken.
+        // The correct fix is here, at the call site: when the backend
+        // didn't confirm an exact amount, use the same premium-aware
+        // estimate the non-streaming path already uses (line ~2549) —
+        // it matches what the backend actually awards in the normal
+        // case, so the optimistic local increment stays accurate instead
+        // of just being suppressed to 0.
+        addPoints(finalPoints ?? (isPremium ? 20 : 10));
         useQuestion();
         const newTotal = (userStats.totalQuestionsAsked || 0) + 1;
         setUserStats({ ...userStats, totalQuestionsAsked: newTotal });
