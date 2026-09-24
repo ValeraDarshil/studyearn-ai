@@ -990,20 +990,24 @@ function AppContent() {
 
   const addPoints = async (amount: number) => {
     // BUGFIX: this is the exact spot that produced the "NaN after
-    // AskAI reward, fixed by refresh" bug. pointsRef.current had no
-    // fallback — if it was ever set to NaN (from an unguarded
-    // setPoints(user.points) on an earlier profile fetch, back when the
-    // BACKEND could still return a corrupted NaN), every subsequent
-    // addPoints() call kept producing NaN forever (NaN + amount = NaN),
-    // since this is pure client-side arithmetic — it never re-reads the
-    // true value from the server until a full page reload re-fetches
-    // the profile. The backend no longer ever returns NaN (fixed
-    // separately), but this local computation needed its own guard too
-    // — never trust a ref/state value to already be valid without
-    // checking, regardless of what "should" have set it correctly.
-    const newPoints = (pointsRef.current || 0) + amount;
+    // AskAI reward, fixed by refresh" bug. Two separate gaps existed:
+    //   1. pointsRef.current had no fallback — if it was ever NaN from
+    //      an earlier unguarded profile fetch, every subsequent call
+    //      stayed NaN forever (fixed below with `|| 0`).
+    //   2. `amount` ITSELF was never validated — if a caller ever
+    //      passes NaN/undefined (e.g. from `result.pointsAwarded ??
+    //      fallback`, where `??` only catches null/undefined, NOT an
+    //      actual NaN value coming back from an API response), the
+    //      addition still produces NaN regardless of how clean
+    //      pointsRef.current is. This was the gap the first fix missed.
+    // addPoints() is the single shared choke point every feature calls
+    // through, so sanitizing BOTH operands here — not just the ref —
+    // makes it impossible for any caller, current or future, to poison
+    // the points state.
+    const safeAmount = Number.isFinite(amount) ? amount : 0;
+    const newPoints = (pointsRef.current || 0) + safeAmount;
     setPoints(newPoints);
-    setTotalXP((prev) => (prev || 0) + amount);
+    setTotalXP((prev) => (prev || 0) + safeAmount);
     checkAndUnlockAchievements({ points: newPoints });
   };
 
